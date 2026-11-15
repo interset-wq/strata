@@ -1,6 +1,6 @@
-"""校验归档完整性并解压出源库。可重复执行，已解压则跳过。
+"""校验归档完整性并解压出 jsonl。可重复执行，已解压则跳过。
 
-仅在需要重新解压时运行（源库已存在则直接返回）：
+仅在需要重新解压时运行（jsonl 已存在则直接返回）：
     uv run --extra archive python analysis/prepare.py
 """
 
@@ -24,8 +24,8 @@ def sha256(path: Path) -> str:
 
 
 def main() -> int:
-    if C.SOURCE_DB.exists():
-        print(f"源库已存在，跳过解压：{C.SOURCE_DB}")
+    if C.JSONL_DIR.exists() and any(C.JSONL_DIR.glob(C.SOURCE["glob"])):
+        print(f"jsonl 已存在，跳过解压：{C.JSONL_DIR}")
         return 0
 
     if not C.ARCHIVE.exists():
@@ -41,13 +41,18 @@ def main() -> int:
         return 1
     print(f"归档校验通过 {actual[:12]}…")
 
-    import py7zr
+    try:
+        import py7zr
+    except ImportError:
+        print("缺少 py7zr，请用：uv run --extra archive python analysis/prepare.py")
+        return 1
 
-    C.EXTRACT_DIR.mkdir(parents=True, exist_ok=True)    with py7zr.SevenZipFile(C.ARCHIVE, mode="r") as zf:
+    C.EXTRACT_DIR.mkdir(parents=True, exist_ok=True)
+    with py7zr.SevenZipFile(C.ARCHIVE, mode="r") as zf:
         zf.extractall(path=C.EXTRACT_DIR)
 
-    if not C.SOURCE_DB.exists():
-        print(f"解压后未找到 {C.SOURCE_DB}")
+    if not any(C.JSONL_DIR.glob(C.SOURCE["glob"])):
+        print(f"解压后未在 {C.JSONL_DIR} 找到 {C.SOURCE['glob']}")
         return 1
 
     print(f"已解压到 {C.EXTRACT_DIR}")

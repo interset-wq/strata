@@ -348,17 +348,18 @@ select
 
 ### 7.1 与规范化产物线的关系
 
-`analysis/` 另建一条规范化产出线，以 novel_hub 的 `database.db` 为源，表为
-`author` / `tag` / `contest` / `genre` / `ptype` / `status` / `novel` / `novel_tag`，
-约束写在 `analysis/out/schema.sql`，DuckDB 导入时即生效。
+`analysis/` 另建一条产出线，直接读 novel_hub 爬虫的原始 jsonl，产出一张
+`analysis/out/novels.csv`：按 `nid` 去重、列重命名、枚举落中文真值、标签以 `|`
+连在同一行内不展开。约束写在 `analysis/out/schema.sql`，DuckDB 导入时生效。
 
 | 产物 | 服务对象 | 组织方式 | 约束 |
 |---|---|---|---|
 | `datasets/v1/` | Flutter 应用 | 反规范化，含 `flg_` 标记与定年结果 | 无 DDL，靠构建断言 |
-| `analysis/out/` | 分析脚本 | 3NF，枚举外置为码表 | `schema.sql` 的 PK / FK / UNIQUE / CHECK |
+| `analysis/out/` | 分析脚本 | 单表宽表，枚举即真值，列表不展开 | `schema.sql` 的 PK / CHECK |
 
-两者不是版本关系，是同一上游的两种组织方式：前者用冗余换查询延迟，后者用 join
-换一致性。`novels_era` 与 `era_stats` 只存在于本表，规范化线不含定年结果。
+两者不是版本关系，是同一上游的两种组织方式：前者用冗余换查询延迟，后者用一张
+平表换分析时的直接可读。`novels_era` 与 `era_stats` 只存在于本表，`analysis/out`
+不含定年结果。
 
 ## 8. 三条使用规则
 
