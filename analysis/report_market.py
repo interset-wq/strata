@@ -289,6 +289,42 @@ def section_supply(df: pd.DataFrame) -> tuple[str, dict]:
     return text, stats
 
 
+# 北大《中国网络文学编年简史》明确写出起始年份的代表作（词条与 2017-01-10 纪事）。
+# 以「书名关键词 + 作者」双条件定位，取同作者下最小 nid，排除续作与同名书。
+# 史料见 analysis/references/sfacg-pku-chronicle.md。
+EXTERNAL_WORKS = [
+    ("英雄？我早就不当了", "无聊看看天", 2016),
+    ("我是我妻", "乱世银娘", 2015),
+    ("我是高富帅", "小花同学", 2012),
+    ("请别告诉我这是三国正史", "黑礁商会房东", 2012),
+    ("史上最强BOSS就是本大爷", "芥末馒头", 2012),
+    ("因为我是开武器店的大叔", "怀世", 2015),
+    ("变身之后，我与她的狂想曲", "血烟天照", 2015),
+]
+
+
+def external_works_check(df: pd.DataFrame) -> tuple[str, int, int]:
+    """用外部史料的作品起始年校验定年曲线的绝对位置。"""
+    rows = []
+    for keyword, author, hist_year in EXTERNAL_WORKS:
+        hit = df[
+            df["title"].str.contains(keyword, regex=False, na=False)
+            & (df["author"] == author)
+        ]
+        if hit.empty:
+            continue
+        r = hit.nsmallest(1, "id").iloc[0]
+        dev = int(r["est_year"]) - hist_year
+        rows.append([
+            f"《{keyword}》", str(hist_year),
+            f"{int(r['est_year'])}（{str(r['est_date'])[:10]}）",
+            f"{dev:+d}" if dev else "0", r["confidence"],
+        ])
+    n_same = sum(r[3] == "0" for r in rows)
+    table = md_table(rows, ["作品", "史料年份", "nid 定年", "偏差（年）", "置信"])
+    return table, n_same, len(rows)
+
+
 def section_dating(df: pd.DataFrame) -> str:
     loo = eras.leave_one_out()
     interp = loo[loo["kind"] == "interp"]
@@ -308,6 +344,7 @@ def section_dating(df: pd.DataFrame) -> str:
     q_all = d["delta"]
     viol = d[d["delta"] < -31]
     viol_by_conf = viol.groupby("confidence").size() / d.groupby("confidence").size() * 100
+    ext_table, ext_same, ext_n = external_works_check(df)
 
     return f"""## 1. 定年方法与误差
 
@@ -334,9 +371,9 @@ mid {conf.get('mid', 0)}%、low {conf.get('low', 0)}%。低置信集中在 {low_
 
 ### 封面时间戳交叉验证
 
-`cover_url` 保留着封面文件的上传时间（路径 `YYYY/MM`），与 nid 定年构成
-**两条独立证据链**。封面更换会换新文件，时间戳记录最后一次上传，一般不早于
-创建时间。爬虫缺陷产生的共用封面（组内 id 最大者为属主，其余为错值）已在
+`cover_url` 保留着封面文件的上传时间（路径 `YYYY/MM`），构成与 API 锚点
+相互独立的**第二条证据链**。封面更换会换新文件，时间戳记录最后一次上传，
+一般不早于创建时间。爬虫缺陷产生的共用封面（组内 id 最大者为属主，其余为错值）已在
 构建时清洗，此处使用的 {len(d):,} 本封面均为属主封面：
 
 | 指标 | 值 |
@@ -349,9 +386,35 @@ mid {conf.get('mid', 0)}%、low {conf.get('low', 0)}%。低置信集中在 {low_
 ![封面时间戳偏差分布](figures/01_dating.png)
 
 偏差中位为负（封面上传略早于 nid 定年），与「草稿阶段先传封面、后正式上架」
-的流程一致。两条证据链在 ±47 天内吻合的占 {100 - len(viol) / len(d) * 100:.1f}%，
-定年估计由此获得独立佐证。mid 区间违例率高于 high（集中在 2017 年锚点稀疏段），
-对应月级误差；low 区间（{low_span}）封面多被更换，验证在该区间失效而非通过。"""
+的流程一致。两条证据链在 ±47 天内吻合的占 {100 - len(viol) / len(d) * 100:.1f}%。
+mid 区间违例率高于 high（集中在 2017 年锚点稀疏段），对应月级误差；
+low 区间（{low_span}）封面多被更换，验证在该区间失效而非通过。
+
+### 外部史料交叉验证
+
+API 锚点是定年曲线的输入，留一法误差只度量插值内洽性；封面时间戳虽独立观测，
+仍来自站点自身数据。二者都无法排除曲线整体年代偏移。第三条证据链完全独立于
+本数据集：北京大学网络文学研究团队《中国网络文学编年简史》（邵燕君、李强主编，
+北京大学出版社，2023）的 SF轻小说词条与简史，给出 2004–2018 逐条纪事及代表作
+年份（`analysis/references/sfacg-pku-chronicle.md`）。下列 {ext_n} 部作品以
+「书名 + 作者」双条件定位，取同作者下最小 nid 的条目：
+
+{ext_table}
+
+{ext_same}/{ext_n} 部定年与史料年份一致；唯一偏差为《我是高富帅》
+（史料 2012、定年 2013-01），与本节声明的 low 段误差量级相符。该检验不依赖
+任何站点统计字段，是对定年曲线**绝对年代位置**的独立校准。需注意这 {ext_n} 部
+作品全部集中在 2012–2016，即 low 置信段：它校准的正是锚点稀疏的早期区间，
+而 high/mid 段的绝对位置仍由密集 API 锚点保证，两者互补而非重复。
+
+站点级事件亦吻合：文学频道 2006-08-23 上线，最早 API 锚点为 2006-08-26，
+相差 3 天；2010-04-05 改版将既有作品分为 15 类（含「冒险类」「爱情类」），
+解释了数据集中 2 行无法归入现行 9 类的记录属旧分类未迁移、而非站点错误，
+并说明「同人类」自 2010 年即存在；2012-08-28 应版权方要求下架《刀剑神域》《加速世界》
+等日轻，与早期搬运书下架、正版授权版复用旧 id 的现象同源。
+商业化节点的精确日期（2014-12-04 iOS 客户端、2015-01-27 奥飞天使轮、
+2015-05-07 VIP 付费、2015-09-01 安卓客户端、2016-01-13 自动签约通道）
+为 §2 的分期提供依据。"""
 
 
 def section_genre(df: pd.DataFrame) -> str:
@@ -547,7 +610,8 @@ def build() -> None:
 > 1. 数据源 `analysis/out/novels.csv`，{len(df):,} 行，当前在册作品。已剔除下架、
 >    空状态、无文字书名且无内容、正版日轻等六类行（判据见 `analysis/config.py`），
 >    年度量因此是存活口径，历史真实供给高于此值。
-> 2. 年份由 nid 定年（`analysis/eras.py`），不是 `updated_at`；方法与误差见 §1。
+> 2. 年份由 nid 定年（`analysis/eras.py`），不是 `updated_at`；方法、误差与
+>    API 锚点 / 封面时间戳 / 外部史料三条证据链见 §1。
 > 3. 快照采集于 {SNAPSHOT}，且 2026-05 之后新书在快照中的可见性骤降
 >    （nid 流速不变、成书率降至约 1/14），**年度序列止于 2025**。
 > 4. 完结率含右删失：世代越新，完结概率越被低估，跨世代比较只对
