@@ -84,17 +84,23 @@ def _check_values(df: pd.DataFrame) -> list[str]:
         if len(bad):
             errs.append(f"{name}: 取值越界 {sorted(set(bad))[:5]}")
 
-    for name in ("words", "clicks", "praises"):
+    for name in ("words", "clicks", "praises", "likes"):
         s = df[name]
         neg = s[(s != "") & (s.astype("int64") < 0)]
         if len(neg):
             errs.append(f"{name}: 出现 {len(neg)} 个负值")
 
-    likes = df["likes"]
-    present = likes[likes != ""]
-    neg = present[present.astype("int64") < 0]
-    if len(neg):
-        errs.append(f"likes: 出现 {len(neg)} 个负值，应已置空")
+    # 以下两条对应 build_csv.drop_mask，用同一判据复核，防止剔除逻辑失效
+    empty = (df["words"].astype("int64") <= C.EMPTY_WORDS) & (
+        df["clicks"].astype("int64") <= C.EMPTY_CLICKS
+    )
+    textless = df.loc[~df["title"].map(C.has_text_char) & empty, "title"]
+    if len(textless):
+        errs.append(f"title: {len(textless)} 行无文字标题且无内容，例 {textless.iloc[0]!r}")
+
+    shell = (df["words"] == "0") & (df["clicks"] == "0")
+    if shell.any():
+        errs.append(f"{int(shell.sum())} 行字数与人气同时为 0")
 
     tags = df["tags"]
     bad = tags[

@@ -1,13 +1,14 @@
 """novel_hub 的原始 jsonl → 单张宽表 CSV。
 
 上游的 jsonl 是爬虫直接产物，同一 nid 会因分片重叠出现多次，且字段名是
-抓取脚本的内部命名。本脚本做五件事，然后产出唯一一份 CSV：
+抓取脚本的内部命名。本脚本做六件事，然后产出唯一一份 CSV：
 
 1. 按 nid 去重，保留最后一条（后抓的覆盖先抓的，实测 click 只增不减）
 2. 列重命名，去掉 ``_num`` / ``novel_`` 这类来源痕迹
 3. 枚举转真值，并把「断更」并入「连载中」
 4. 文本归一：非法字符换空格、非 ASCII 空白归一、压缩连续空格、去首尾空白
-5. 清洗：负收藏置空、占位封面置空、分类后缀归一、标签去重
+5. 清洗：占位封面置空、分类后缀归一、标签去重
+6. 剔除整行：负收藏、全零、无文字标题且无内容（见 ``config.DROP_RULES``）
 
 列表字段不展开，标签以 ``|`` 连接在同一行内。
 
@@ -18,8 +19,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
-import shutil
 import sys
 import unicodedata
 from datetime import datetime, timezone
@@ -140,14 +141,7 @@ def clean_tags(value: list, tally: dict) -> str:
 
 
 def clean_row(row: dict, tally: dict, genre_fixes: list) -> dict:
-    likes = int(row["like_num"])
-    if likes < 0:
-        tally["likes_negative_nulled"] += 1
-        likes = None
-    else:
-        tally["likes_zero"] += likes == 0
-
-    for col in ("word_num", "click_num", "praise_num"):
+    for col in ("word_num", "click_num", "praise_num", "like_num"):
         tally[f"{col}_zero"] += int(row[col]) == 0
 
     cover = _norm(row["cover"], "cover_url", tally)
@@ -166,7 +160,7 @@ def clean_row(row: dict, tally: dict, genre_fixes: list) -> dict:
         "contest": _norm(row["contest"], "contest", tally),
         "words": int(row["word_num"]),
         "clicks": int(row["click_num"]),
-        "likes": likes,
+        "likes": int(row["like_num"]),
         "praises": int(row["praise_num"]),
         "featured": int(bool(row["banner"])),
         "cover_url": cover,
@@ -175,33 +169,49 @@ def clean_row(row: dict, tally: dict, genre_fixes: list) -> dict:
     }
 
 
-def build(records: dict[int, dict]) -> tuple[pd.DataFrame, dict, list]:
+def drop_mask(df: pd.DataFrame) -> dict[str, pd.Series]:
+    """三类不可用的行，判定在归一之后，互不重叠。"""
+    empty = (df["words"] <= C.EMPTY_WORDS) & (df["clicks"] <= C.EMPTY_CLICKS)
+    return {
+        "negative_likes": df["likes"] < 0,
+        "title_without_text": ~df["title"].fillna("").map(C.has_text_char) & empty,
+        "all_zero": (df["words"] == 0) & (df["clicks"] == 0),
+    }
+
+
+def build(records: dict[int, dict]) -> tuple[pd.DataFrame, dict, list, dict]:
     tally = {
         "text": {},
         "status_null_to_unknown": 0,
         "status_dead_to_ongoing": 0,
         "genre_relabelled": 0,
-        "likes_negative_nulled": 0,
         "cover_placeholder_nulled": 0,
         "tags_deduplicated": 0,
         "tags_dropped": 0,
         "word_num_zero": 0,
         "click_num_zero": 0,
         "praise_num_zero": 0,
-        "likes_zero": 0,
+        "like_num_zero": 0,
     }
     genre_fixes: list[str] = []
     rows = [clean_row(records[nid], tally, genre_fixes) for nid in sorted(records)]
     df = pd.DataFrame(rows, columns=C.COLUMN_NAMES)
 
     for name, dtype, _n, _src, _desc in C.COLUMNS:
-        if dtype == "Int64":
-            df[name] = pd.array(df[name], dtype="Int64")
-        elif dtype == "string":
-            df[name] = df[name].astype("string")
-        else:
-            df[name] = df[name].astype(dtype)
-    return df, tally, genre_fixes
+        df[name] = pd.array(df[name], dtype="Int64") if dtype == "Int64" else df[name].astype(dtype)
+
+    masks = drop_mask(df)
+    dropped = (
+        pd.concat(masks, axis=1).any(axis=1)
+        if masks
+        else pd.Series(False, index=df.index)
+    )
+    dropped_info = {
+        "rows": int(dropped.sum()),
+        "rules": {k: int(v.sum()) for k, v in masks.items()},
+        "ids": df.loc[dropped, "id"].tolist(),
+    }
+    return df.loc[~dropped].reset_index(drop=True), tally, genre_fixes, dropped_info
 
 
 # ---------------------------------------------------------------- DDL
@@ -225,7 +235,14 @@ def write_ddl(path: Path) -> None:
         "words >= 0",
         "clicks >= 0",
         "praises >= 0",
-        "likes IS NULL OR likes >= 0",
+        "likes >= 0",
+        # 至少一个可观测信号，与 drop_mask 的 all_zero 对应
+        "words > 0 OR clicks > 0",
+        # 与 drop_mask 对应：书名要么含文字，要么有内容——无文字标题的 100 行
+        # 里有 44 行是真实作品。用 \p{L} 而非 [:alpha:]，后者在 RE2 里只覆盖
+        # ASCII，会把全部中文书名判成空。
+        r"length(regexp_replace(title, '[^\p{L}]', '', 'g')) > 0"
+        f" OR words > {C.EMPTY_WORDS} OR clicks > {C.EMPTY_CLICKS}",
     ]
     lines.extend(f"  CHECK ({c})" for c in checks)
     body = ",\n".join(lines)
@@ -254,7 +271,7 @@ def main() -> int:
 
     records, load_stats = load_jsonl(C.JSONL_DIR)
     check_fields(records)
-    df, tally, genre_fixes = build(records)
+    df, tally, genre_fixes, dropped = build(records)
 
     C.OUT_DIR.mkdir(parents=True, exist_ok=True)
     tmp = C.OUT_DIR / "novels.tmp.csv"
@@ -265,12 +282,11 @@ def main() -> int:
         print(f"校验失败，{len(errors)} 项；未替换 {C.CSV_FILE.name}")
         for e in errors:
             print("  -", e)
-        tmp.unlink()
+        # 保留失败现场供排查，下次构建覆盖
+        os.replace(tmp, C.OUT_DIR / "novels.invalid.csv")
         return 1
 
-    if C.CSV_FILE.exists():
-        C.CSV_FILE.unlink()
-    shutil.move(str(tmp), str(C.CSV_FILE))
+    os.replace(tmp, C.CSV_FILE)
     write_ddl(C.SQL_FILE)
 
     manifest = {
@@ -279,6 +295,13 @@ def main() -> int:
         "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "table": "novels",
         "rows": int(len(df)),
+        "dropped": {
+            "rows": dropped["rows"],
+            "rules": {
+                k: {"rows": v, "why": C.DROP_RULES[k]} for k, v in dropped["rules"].items()
+            },
+            "ids": dropped["ids"],
+        },
         "file": {
             "name": C.CSV_FILE.name,
             "bytes": C.CSV_FILE.stat().st_size,
@@ -309,7 +332,7 @@ def main() -> int:
                 "relabelled": tally["genre_relabelled"],
                 "detail": genre_fixes,
             },
-            "likes": {"negative_nulled": tally["likes_negative_nulled"]},
+            "likes": {"negative_rows_dropped": dropped["rules"]["negative_likes"]},
             "cover": {
                 "rule": f"文件名以 {C.COVER_PLACEHOLDER} 开头视为无封面",
                 "placeholder_nulled": tally["cover_placeholder_nulled"],
@@ -322,7 +345,7 @@ def main() -> int:
         "zeros": {
             "words": tally["word_num_zero"],
             "clicks": tally["click_num_zero"],
-            "likes": tally["likes_zero"],
+            "likes": tally["like_num_zero"],
             "praises": tally["praise_num_zero"],
         },
         "distribution": {
@@ -350,6 +373,7 @@ def main() -> int:
     print(
         f"jsonl {load_stats['files']} 个文件 / {load_stats['lines']} 行"
         f" → 去重 {load_stats['duplicate_rows']} 行"
+        f" → 剔除 {dropped['rows']} 行 {dropped['rules']}"
     )
     print(f"novels.csv  {len(df)} 行  {C.CSV_FILE.stat().st_size / 1e6:.2f} MB")
     print(f"  状态   {manifest['distribution']['status']}")

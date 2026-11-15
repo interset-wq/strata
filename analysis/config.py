@@ -53,6 +53,35 @@ SPACE_CATEGORY = "Zs"
 # 保留 URL 会让人以为封面存在（36,212 行命中，含大小写与 [1] 变体）。
 COVER_PLACEHOLDER = "default"
 
+# ---------------------------------------------------------------- 行级剔除
+# 剔除的是「这一行不能作为有效记录」，不是「这本书不存在」。三类互不重叠，
+# 判定见 build_csv.drop_mask，理由见 DROP_RULES。
+#
+# 书名必须含文字：任一字母、汉字、假名或注音都算。纯数字（'3'、'2050'）、
+# 纯符号（'---'、'？？？？？？'）、数字与符号混合（'1,000'、'1/1'）、
+# 罗马数字（'ⅩⅩ'）都不算。
+#
+# 但无文字标题不等于脏数据：100 行里 44 行有实质内容，最典型的是「0.5」，
+# 45.9 万字、6.8 万点击、1,190 收藏，作者只是用符号作标题。删掉会损失真实
+# 市场信号。因此只在「也没有任何内容」时剔除，判据是下列两条阈值同时不满足。
+EMPTY_WORDS = 10_000
+EMPTY_CLICKS = 1_000
+
+
+# 判据是 str.isalpha 而非正则：它的边界恰好是 Unicode L 类，与 schema.sql 里
+# 的 \p{L} 同义。不用 \w——那会把罗马数字（Nl）与连接符（Pc）也算作有效文字。
+def has_text_char(value: str) -> bool:
+    return any(ch.isalpha() for ch in value)
+
+DROP_RULES = {
+    "negative_likes": "收藏为负。站点计数下溢，原值不可信且无法修正出真值。",
+    "title_without_text": (
+        f"书名不含文字字符，且字数 ≤ {EMPTY_WORDS}、点击 ≤ {EMPTY_CLICKS}，"
+        "既无法检索也无内容可依。"
+    ),
+    "all_zero": "字数、人气、收藏、赞同时为 0，没有任何可观测信号。",
+}
+
 # ---------------------------------------------------------------- 列定义
 # (列名, dtype, nullable, 来源列, 说明)
 COLUMNS: list[tuple[str, str, bool, str, str]] = [
@@ -65,7 +94,7 @@ COLUMNS: list[tuple[str, str, bool, str, str]] = [
     ("contest", "string", True, "contest", "参赛征文；空表示未参加"),
     ("words", "int64", False, "word_num", "字数"),
     ("clicks", "int64", False, "click_num", "人气，累计浏览"),
-    ("likes", "Int64", True, "like_num", "收藏；上游负值置空"),
+    ("likes", "int64", False, "like_num", "收藏；负值行已整行剔除"),
     ("praises", "int64", False, "praise_num", "赞"),
     ("featured", "int8", False, "banner", "站方运营位，0/1，非质量分"),
     ("cover_url", "string", True, "cover", "封面地址"),
