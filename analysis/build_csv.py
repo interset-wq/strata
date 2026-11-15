@@ -178,6 +178,28 @@ def clean_row(row: dict, tally: dict, genre_fixes: list) -> dict:
     }
 
 
+def dedup_covers(df: pd.DataFrame, tally: dict) -> pd.DataFrame:
+    """修复 novel_hub 爬虫的选择器缺陷：同一封面文件挂在多本书上。
+
+    缺陷机制：爬虫在详情页抓到了 id 更大的某本书的封面，因此一个共用组内
+    只有 id 最大者可能是属主——其余成员的封面时间戳全部晚于自身创建
+    （实测组内非属主的 |封面时间戳 − 定年| 中位 348 天，属主 −11 天，
+    与唯一封面分布逐分位一致，吻合率 89.8% vs 19.5%，见 analysis/eras.py）。
+
+    处置：组内保留 id 最大者，其余置空。属主判定不依赖时间戳（时间戳只
+    用于验证规则），规则本身是纯 id 判据，可随构建复算。
+    """
+    dup = df["cover_url"].notna() & df["cover_url"].duplicated(keep=False)
+    if not dup.any():
+        return df
+    sub = df[dup]
+    owners = sub.groupby("cover_url")["id"].idxmax()
+    losers = sub.index.difference(owners)
+    tally["cover_shared_bugged"] += len(losers)
+    df.loc[losers, "cover_url"] = pd.NA
+    return df
+
+
 def drop_mask(df: pd.DataFrame) -> dict[str, pd.Series]:
     """五类不可用的行，判定在归一之后，互不重叠。"""
     empty = (df["words"] <= C.EMPTY_WORDS) & (df["clicks"] <= C.EMPTY_CLICKS)
@@ -198,6 +220,7 @@ def build(records: dict[int, dict]) -> tuple[pd.DataFrame, dict, list, dict]:
         "genre_relabelled": 0,
         "genre_unresolved": 0,
         "cover_placeholder_nulled": 0,
+        "cover_shared_bugged": 0,
         "tags_deduplicated": 0,
         "tags_dropped": 0,
         "word_num_zero": 0,
@@ -223,7 +246,10 @@ def build(records: dict[int, dict]) -> tuple[pd.DataFrame, dict, list, dict]:
         "rules": {k: int(v.sum()) for k, v in masks.items()},
         "ids": df.loc[dropped, "id"].tolist(),
     }
-    return df.loc[~dropped].reset_index(drop=True), tally, genre_fixes, dropped_info
+    df = df.loc[~dropped].reset_index(drop=True)
+    # 行级剔除之后修复封面：被剔除的行不参与属主判定（其封面同为错值）
+    df = dedup_covers(df, tally)
+    return df, tally, genre_fixes, dropped_info
 
 
 # ---------------------------------------------------------------- DDL
@@ -350,9 +376,11 @@ def main() -> int:
             "cover": {
                 "rule": (
                     f"文件名以 {C.COVER_PLACEHOLDER} 开头视为无封面；"
-                    f"其余省略公共前缀 COVER_BASE"
+                    "其余省略公共前缀 COVER_BASE；爬虫缺陷导致的共用封面"
+                    "保留组内 id 最大者（属主），其余置空"
                 ),
                 "placeholder_nulled": tally["cover_placeholder_nulled"],
+                "shared_bugged_nulled": tally["cover_shared_bugged"],
             },
             "tags": {
                 "deduplicated": tally["tags_deduplicated"],

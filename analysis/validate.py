@@ -98,6 +98,12 @@ def _check_values(df: pd.DataFrame) -> list[str]:
             f"cover_url: {len(absolute)} 行含绝对地址，例 {absolute.iloc[0][:40]!r}"
         )
 
+    # 封面文件全库唯一：共用是爬虫缺陷，构建时已保留 id 最大者、其余置空
+    dup_cover = cover[cover != ""]
+    dup = dup_cover[dup_cover.duplicated(keep=False)]
+    if len(dup):
+        errs.append(f"cover_url: {len(dup)} 行共用封面文件，应仅保留属主")
+
     # 以下两条对应 build_csv.drop_mask，用同一判据复核，防止剔除逻辑失效
     empty = (df["words"].astype("int64") <= C.EMPTY_WORDS) & (
         df["clicks"].astype("int64") <= C.EMPTY_CLICKS
