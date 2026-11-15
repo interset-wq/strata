@@ -105,6 +105,13 @@ BASELINE = {
     "density_2026_04": 492,
     "density_2026_05": 36,
     "density_floor": 200,
+    # 可读性结构（reports/02_readability.md）。readable = 完结且 ≥30 万字。
+    "done_books": 43_577,
+    "dead_books": 199_616,
+    "readable_books": 3_766,
+    "under_10k_books": 120_204,
+    # ≥100 万字的书里仍有这么多是断更 —— 「长 = 安全」是错觉
+    "dead_pct_at_1m": 31.4,
 }
 
 
