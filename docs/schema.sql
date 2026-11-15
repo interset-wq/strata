@@ -152,8 +152,8 @@ CREATE TABLE catalog (
   --   （tags.id 跨片同 id 率实测 0%，见 schema 里 tags 表上方注释）
   id           INTEGER PRIMARY KEY,
   title        TEXT    NOT NULL,
-  author       TEXT    NOT NULL,   -- 实测 136,499 作者 / 240,725 书（1.76 本/人），
-                                   -- 不值得建 authors 表，字符串直接存
+  author       TEXT    NOT NULL,   -- 平台禁止改名与重名：同名即同人，可直接作身份键。
+                                   -- 多数作者只有一本书，不单独建 authors 表
   genre        INTEGER NOT NULL,   -- 1其他 2魔幻 3玄幻 4古风 5科幻 6校园 7都市 8游戏 9同人 10悬疑
 
   -- ★ 真实状态，三值。原库的 5/6 已被拆解，不再作为状态层存在。
