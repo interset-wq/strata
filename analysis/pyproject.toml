@@ -1,0 +1,15 @@
+[project]
+name = "strata-analysis"
+version = "0.1.0"
+description = "novel_hub v0.0.1 → 规范化 CSV + 约束 DDL"
+requires-python = ">=3.11"
+dependencies = [
+    "pandas>=2.2",
+]
+
+[project.optional-dependencies]
+# 仅在需要重新解压 dataset.7z 时需要
+archive = ["py7zr>=1.0"]
+
+[dependency-groups]
+dev = ["pytest>=8"]

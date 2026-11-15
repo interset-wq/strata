@@ -25,6 +25,10 @@ quarry/datasets/
 *.parquet
 *.feather
 
+# ── analysis：源库与产出都不入库，由 prepare / build 重建 ──────
+analysis/data/
+analysis/out/
+
 # 报告图入库（报告 markdown 直接引用），其余图表产物不入库
 quarry/reports/*.png
 quarry/reports/*.svg

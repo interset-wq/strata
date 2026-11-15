@@ -346,6 +346,20 @@ select
 | v4 | 删 `chunk` / `src_file`（上游打包切分，非数据属性） |
 | v5 | 删 `status`，拆为 `outcome` + `stats_precise`；A 标整体丢弃 |
 
+### 7.1 与规范化产物线的关系
+
+`analysis/` 另建一条规范化产出线，以 novel_hub 的 `database.db` 为源，表为
+`author` / `tag` / `contest` / `genre` / `ptype` / `status` / `novel` / `novel_tag`，
+约束写在 `analysis/out/schema.sql`，DuckDB 导入时即生效。
+
+| 产物 | 服务对象 | 组织方式 | 约束 |
+|---|---|---|---|
+| `datasets/v1/` | Flutter 应用 | 反规范化，含 `flg_` 标记与定年结果 | 无 DDL，靠构建断言 |
+| `analysis/out/` | 分析脚本 | 3NF，枚举外置为码表 | `schema.sql` 的 PK / FK / UNIQUE / CHECK |
+
+两者不是版本关系，是同一上游的两种组织方式：前者用冗余换查询延迟，后者用 join
+换一致性。`novels_era` 与 `era_stats` 只存在于本表，规范化线不含定年结果。
+
 ## 8. 三条使用规则
 
 1. **时间轴只用 `novels.id`**，`last_update` 与 `est_date` 都不是上架时间。

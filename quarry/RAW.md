@@ -57,13 +57,16 @@ DuckDB 写法：`attach 'cold_chunk.sqlite' as cold (type sqlite)`。
 
 ## 3. 表结构
 
-| 表 | 粒度 | 说明 |
+| 表 | 粒度 | 性质 |
 |---|---|---|
-| `novels` | 一书一行 | 书目与成绩字段，主键 `id` |
-| `authors` | 一片一行 | 作者名 → 代表书；名称索引，不是作者实体表，也不是全站字典 |
-| `tags` | 一片一行 | 本片引用到的标签，**不是全站字典** |
-| `novel_tags` | 一次挂载 | `(novel_id, tag_id)` |
-| `contests` | 一片一行 | 本片引用到的征文 |
+| `novels` | 一书一行 | 实体表，主键 `id` |
+| `authors` | 一片一行 | **查询优化表**：`name` 唯一 + 代表书三列（冗余自 `novels`） |
+| `tags` | 一片一行 | 维表，但仅为本片引用到的子集，不是全站字典 |
+| `novel_tags` | 一次挂载 | 关联表，主键 `(novel_id, tag_id)` |
+| `contests` | 一片一行 | 维表，本片引用到的子集 |
+
+`novel_tags` 声明了外键，但 SQLite 的 `PRAGMA foreign_keys` 默认为关，约束实际不执行。
+上游的完整性由构建脚本保证，不由数据库保证。
 
 ```sql
 create table novels (
@@ -85,6 +88,28 @@ create table novels (
   last_update DATETIME
 );
 ```
+
+### 3.1 反规范化是为读延迟做的取舍
+
+上游是一个本地优先（local-first）的阅读应用：SQLite 单文件随包分发，查询在设备上执行，
+没有服务端 join、缓存层或预处理管线。为把首屏与列表页的查询压到单次扫描，它把
+规范化会拆出去的东西留在原地，具体有三处：
+
+| 冗余 | 位置 | 省掉的成本 |
+|---|---|---|
+| 作者名以字符串存在书行上 | `novels.author` + `idx_novels_author` | 免 join 作者表即可按作者检索 |
+| 代表书标题与点击数复制到作者表 | `authors.top_novel_title` / `top_novel_clicks` | 免 join、免聚合即可渲染「作者 + 代表作 + 人气」 |
+| 三片各存一份 `tags` / `authors` / `contests` | 每片独立 | 免 attach 其余分片即可自包含查询 |
+
+代价是写放大与更新异常：同一事实存在多处，改动需同步。对上游这不构成问题——
+数据是一次性批量构建的只读快照，写入只发生在构建期，之后不再变更，冗余不会失配。
+换言之，**这里的反规范化不是建模疏忽，而是有明确前提的读优化**。
+
+本项目的前提不同：数据集要被多个分析脚本反复查询、跨版本对比、增量校验，
+必须能信任「一个事实只存在一处」。因此另建一条规范化产物线（`analysis/`，以
+novel_hub 的 `database.db` 为源，约束由 `schema.sql` 承载，见 `analysis/out/`），
+上游三片不再直接作为分析基底。`datasets/v1/` 保留为应用侧的反规范化快照，服务
+Flutter 的查询延迟，两条线用途不重叠。
 
 ## 4. 字段语义
 
@@ -121,8 +146,6 @@ create table novels (
 | 6 | 完结A | 在 2 的基础上满足 A 规则 |
 | 7 | 下架 | 上游标记，本快照已过滤 |
 
-A 规则的阈值写在 `site_config.toml [thresholds]`，规则原文见上游 `docs/website.md` 与
-`AGENTS.md`（`A status (pseudo)`）：
 
 ```
 A = banner OR click ≥ 1000 万 OR review ≥ 60 OR like ≥ 1 万 OR praise ≥ 1 万
@@ -146,7 +169,8 @@ A = banner OR click ≥ 1000 万 OR review ≥ 60 OR like ≥ 1 万 OR praise �
 - 同一 name 在不同片可能对应不同 id，同一 id 在不同片一定不对应同一对象。
 
 因此这三张表只能按 `name` 跨片对齐（`build_dataset.py` 已完成重映射），
-不得用其 id 做 join、排序或编号。
+不得用其 id 做 join、排序或编号。id 断号与片内重复存维表是同一取舍的两面：
+每片自包含，代价是 id 只在片内有效。
 
 ## 7. 数值字段的可用性
 
@@ -156,11 +180,7 @@ A = banner OR click ≥ 1000 万 OR review ≥ 60 OR like ≥ 1 万 OR praise �
 |---|---|---|
 | NULL | 未采集（`comment_num` / `review_num`） | 不可当 0 参与均值 |
 | 0 | 字段默认值，新建作品计数从 0 起算 | 不能作为删除、下架或清零的证据 |
-| 负值 | 计数抖动（仅 `like_num`） | 构建时置 NULL |
-
-取样约束：正文不可得（`word_num <= 0`）或计数非正的行不构成可读作品，
-在字数、人气、收藏等分布统计中应剔除；剔除数量随快照变化，不写死。
-**剔除是取样问题，不是下架统计**——0 值不能用于推断作品是否下架。
+| 负值 | 计数抖动（仅 `like_num`） | 脏数据 |
 
 ## 8. ID 空洞
 
