@@ -47,8 +47,52 @@ ANCHORS_PATH = Path(
 # 上游交付的三个文件。**只是打包方式，不是数据属性**：上游为了首屏加载把库拆成
 # 三个 sqlite 分批解压，切分依据是 status（cold = 2/4 完结·断更，warm = 5/6，
 # hot = 3 连载中），一一对应，没有任何信息量。本数据集只在构建期读这三个文件，
-# 产物里**不保留 chunk 列**——任何分析需要「完结/断更」这层区分时，直接用 status。
+# 产物里**不保留 chunk 列**——任何分析需要「完结/断更」这层区分时，直接用 outcome。
 CHUNKS = ("cold", "warm", "hot")
+
+# ── 上游 status 的两个派生层，都必须剥掉 ────────────────────────
+# 上游 `status` 有 5 个值，看着像「5 种状态」，其实是**两个正交维度压成了一列**：
+#
+#   维度一：结局（平台状态）  2 完结 / 4 断更 / 3 连载中
+#   维度二：A 标（派生状态）  5 = 断更A、6 = 完结A
+#
+# A 标不是平台状态，是 novel_hub 按规则给「成绩好的完结/断更书」打的标
+# （`novel_hub/docs/website.md` 的 Data Rules）。判定式见 A_RULE_SQL。
+#
+# 实测（2026-11-15）：判定式在非引进的 243,193 本完结/断更书上**零反例**——
+#   原 5/6 的 2,468 本全部 rule=True；原 2/4 的 240,725 本全部 rule=False。
+# 也就是说 `status` 里的 5/6 相对 2/4 **不携带任何额外信息**，完全可推导。
+# 更糟的是 A 标会污染结局分析：A 的实质是「收藏≥1万」（2,468 本里 2,353 本靠
+# 这一条进来），而 cold 段的 `like_num` 上限恰好是 9,999 —— A 的阈值比截断线
+# 高 1 档，于是「成绩达标」与「数值未被截断」在这个字段里纠缠不清。
+# 用 status=6 当「长篇小说」的代表会得到 108.7 万字的中位数，那是**选择偏差**，
+# 不是长篇的常态（完结长篇的 65% 落在未达标组）。
+#
+# 所以我们把它拆成两个语义干净的列：
+#   outcome       结局三值，我们的语义，唯一权威的「完结/断更/连载中」
+#   stats_precise 数值精度标记 = 原 status ∈ {3,5,6}（5,320 本）。
+#                 语义只有一句：**这本的 click/like/praise 来自详情页精确通道，
+#                 不是列表页显示值**。跟结局无关，跟质量无关。
+STATUS_TO_OUTCOME = {2: "done", 3: "ongoing", 4: "dead", 5: "dead", 6: "done"}
+OUTCOMES = ("ongoing", "done", "dead")
+# 精确通道对应的原始状态。上游 A 标只打在 2/4 上，3（连载中）本来就走精确通道，
+# 所以精度判据是 3/5/6 而不是 5/6 —— 用 5/6 会漏掉 2,805 本连载中的精确值。
+PRECISE_STATUS = (3, 5, 6)
+
+# A 判定式，原样抄自 novel_hub/docs/website.md 的 Data Rules：
+#   断更/已完结 + (banner OR 人气≥1000万 OR 长评≥60 OR 收藏≥1万 OR 赞≥1万)
+# 只用于**审查**（tests 复现零反例），不进 schema —— 它是别人的主观划分，
+# 我们要保留的只有「数值精度」那一面，已经落在 stats_precise。
+# 上游列名语义：click_num=人气、like_num=收藏、praise_num=赞、review_num=长评。
+# 注意 review_num 有 98% 是 NULL（列表页不显示长评数），coalesce 成 0 后
+# 判定结果仍与上游一致，说明实际起作用的是其余四条。
+A_RULE_SQL = (
+    "(coalesce(has_banner, 0) = 1"
+    " or coalesce(click_num, 0) >= 10000000"
+    " or coalesce(review_num, 0) >= 60"
+    " or coalesce(like_num, 0) >= 10000"
+    " or coalesce(praise_num, 0) >= 10000)"
+)
 
 # ── 引进日轻的出版方账号 ──────────────────────────────────
 # 为什么按账号识别，而不是按标题或年份：
@@ -68,18 +112,24 @@ IMPORT_PUBLISHERS = ("天闻角川", "天闻角川2号机", "HJ文库", "丸山�
 # v2：新增 novels_era（nid 定年）与 era_stats（年表）两张表
 # v3：novels 增 flg_import；era_stats 排除引进日轻，并新增 import 两列
 # v4：novels 去掉 chunk 列（上游按 status 的打包切分，非数据属性）
-SCHEMA_VERSION = 4
+# v5：novels 的 status 拆成 outcome（三值）+ stats_precise（精度标记），删 status
+SCHEMA_VERSION = 5
 
 # 已知事实基线：断言用。数字变化即代表上游快照或口径变了，必须人工确认后再改。
 BASELINE = {
     "novels_total": 246_045,
     "banner_total": 667,
-    # banner 只出现在 status 3（连载中）/ 5 / 6，status 2/4（完结·断更）恒为 0。
-    # 原写作「banner 只在 warm 和 hot」，那是分片的同义反复，已换成 status 口径。
-    "banner_status_3": 29,
-    "banner_status_5_6": 638,
-    "banner_status_2_4": 0,
-    "status_counts": {2: 42_193, 3: 2_805, 4: 198_532, 5: 1_127, 6: 1_388},
+    # banner 只出现在 stats_precise 的书上（5,320 本里的 667 个），
+    # 但跨全部三种结局 —— 209 个在断更书上（那些书的成绩达标，被 A 标选中）。
+    "banner_outcome_done": 429,
+    "banner_outcome_ongoing": 29,
+    "banner_outcome_dead": 209,
+    # outcome 三值（非引进 245,998 + 引进 47）
+    "outcome_counts": {"done": 43_581, "dead": 199_659, "ongoing": 2_805},
+    "stats_precise_true": 5_320,
+    # A 判定式零反例的证据（tests 复现）：原 5/6 全 rule=True，原 2/4 全 rule=False
+    "a_rule_true": 2_468,
+    "a_rule_false": 240_725,
     "novel_tags_total": 742_546,
     "tag_total": 106,
     "authors_clean": 137_965,

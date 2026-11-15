@@ -45,29 +45,71 @@ def test_no_packaging_column(con):
     assert "src_file" not in cols
 
 
-def test_status_partition_is_complete(con):
-    """status 是「完结/断更/连载」的唯一权威轴，行数必须守恒。"""
-    rows = dict(con.execute("select status, count(*) from novels group by 1").fetchall())
-    assert rows == config.BASELINE["status_counts"]
+def test_status_column_is_gone(con):
+    """上游 status 必须被拆干净，不能以任何名字回来。
+
+    status 把「结局」和「A 标（成绩）」压成一列。我们只保留前者（outcome）和
+    后者唯一客观的那一面（stats_precise=数值精度）。任何「A 组」语义都不该落库：
+    它是别人的主观划分，而且判定式可从 banner/人气/长评/收藏/赞 五项实时算出。
+    """
+    cols = {r[0] for r in con.execute("describe novels").fetchall()}
+    assert "status" not in cols, "上游 status 又回到表里了，见 config 里的长注释"
+    assert "outcome" in cols and "stats_precise" in cols
+
+
+def test_outcome_partition_is_complete(con):
+    """outcome 三值互斥且穷尽，行数守恒。"""
+    rows = dict(con.execute("select outcome, count(*) from novels group by 1").fetchall())
+    assert rows == config.BASELINE["outcome_counts"]
     assert sum(rows.values()) == config.BASELINE["novels_total"]
+    assert set(rows) == set(config.OUTCOMES)
 
 
-def test_banner_only_on_ongoing_status(con):
+def test_a_rule_reproduces_upstream_status(con):
+    """A 判定式必须零反例复现上游的 5/6 —— 这是「拆掉 status 不影响信息量」的证据。
+
+    判定式来自 novel_hub/docs/website.md：
+        断更/已完结 + (banner OR 人气≥1000万 OR 长评≥60 OR 收藏≥1万 OR 赞≥1万)
+    在 243,193 本完结/断更书上应该全对：A 组 2,468 本全 True，其余全 False。
+    如果哪天出现反例，说明上游改了规则，config.A_RULE_SQL 的注释要重写。
+    """
+    got = con.execute(
+        f"""
+        select {config.A_RULE_SQL} as rule_a, count(*) as n
+        from novels
+        where not flg_import and outcome in ('done', 'dead')
+        group by 1 order by 1
+        """
+    ).fetchall()
+    assert dict(got) == {
+        True: config.BASELINE["a_rule_true"],
+        False: config.BASELINE["a_rule_false"],
+    }, f"A 判定式不再零反例，上游规则变了：{got}"
+    # 反过来：A 组就是精确通道里的完结/断更书，不多不少。
+    only_a = con.execute(
+        f"""select count(*) from novels
+            where not flg_import and outcome in ('done','dead') and {config.A_RULE_SQL}"""
+    ).fetchone()[0]
+    precise = con.execute(
+        """select count(*) from novels
+           where not flg_import and outcome in ('done','dead') and stats_precise"""
+    ).fetchone()[0]
+    assert only_a == precise == config.BASELINE["a_rule_true"]
+
+
+def test_banner_only_on_precise_numerals(con):
+    """banner 只挂在精确通道的书上，但跨全部三种结局。"""
     assert scalar(con, "select count(*) from novels where has_banner") == config.BASELINE["banner_total"]
-    # banner 只挂在 3（连载中）/ 5 / 6；2（完结）/ 4（断更）恒为 0。
-    # 这条以前写成「cold 分片没有 banner」，那是同义反复。
     assert (
-        scalar(con, "select count(*) from novels where has_banner and status in (2, 4)")
-        == config.BASELINE["banner_status_2_4"]
-    )
-    assert (
-        scalar(con, "select count(*) from novels where has_banner and status in (5, 6)")
-        == config.BASELINE["banner_status_5_6"]
-    )
-    assert (
-        scalar(con, "select count(*) from novels where has_banner and status = 3")
-        == config.BASELINE["banner_status_3"]
-    )
+        scalar(con, "select count(*) from novels where has_banner and not stats_precise") == 0
+    ), "banner 出现在截断数值的书上了——上游的精确重采范围变了"
+    for outcome, key in (("done", "banner_outcome_done"),
+                         ("ongoing", "banner_outcome_ongoing"),
+                         ("dead", "banner_outcome_dead")):
+        assert (
+            scalar(con, f"select count(*) from novels where has_banner and outcome = '{outcome}'")
+            == config.BASELINE[key]
+        )
 
 
 # ───────── 归一化 ─────────
@@ -161,12 +203,18 @@ def test_known_anomalies_are_flagged_not_deleted(con):
 
 
 def test_enum_values_legal(con):
-    for col, ok in [("genre", range(1, 11)), ("status", range(1, 8)), ("ptype", range(1, 5))]:
+    for col, ok in [("genre", range(1, 11)), ("ptype", range(1, 5))]:
         ok_list = ",".join(map(str, ok))
         bad = scalar(
             con, f"select count(*) from novels where {col} is null or {col} not in ({ok_list})"
         )
         assert bad == 0, f"{col} 存在非法值"
+    bad = scalar(
+        con,
+        "select count(*) from novels where outcome is null"
+        f" or outcome not in ({','.join(repr(o) for o in config.OUTCOMES)})",
+    )
+    assert bad == 0, "outcome 存在非法值"
 
 
 # ───────── 定年（era） ─────────

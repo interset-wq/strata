@@ -1,7 +1,8 @@
 """可读性结构的断言：报告里每个结论都要有一条守着。
 
-这里守三件事：分母不能悄悄变大（否则「1.5%」是假的）、
-「越长越安全」不能退化成「长 = 安全」、2 与 6 两种完结不能混回一起。
+这里守四件事：分母不能悄悄变大（否则「1.5%」是假的）、
+「越长越安全」不能退化成「长 = 安全」、上游的 A 标不能被当成结局、
+「精确通道的书更长」不能被读成「长篇都成绩好」。
 """
 from __future__ import annotations
 
@@ -27,7 +28,7 @@ def test_outcomes_conserve(con):
     assert s["books"] == config.BASELINE["novels_total"] - config.BASELINE["import_books"]
 
 
-def test_status_groups_match_baseline(con):
+def test_outcome_groups_match_baseline(con):
     s = R.summary(con)
     assert s["done"] == config.BASELINE["done_books"]
     assert s["dead"] == config.BASELINE["dead_books"]
@@ -82,14 +83,37 @@ def test_dropoff_shares_sum_to_100(con):
     assert first["label"] == "<1 万" and 45 < first["death_share"] < 55
 
 
-def test_finished_two_kinds_are_different(con):
-    """status 2 与 6 是两个物种，混在一起的「完结书中位数」没有意义。"""
+def test_finished_tiers_are_score_strata_not_species(con):
+    """「完结书」只有一种常态，其余两档是**成绩分层**，不是两种书。
+
+    这是本模块最容易写错的地方（旧版就写错了）：上游 status 6 = 完结 + A 标，
+    而 A 的实质是「收藏≥1万」。所以 6 更长是因为成绩好的书通常更长，
+    是选择偏差；不能说成「6 是长篇、2 是短篇」。
+    硬反证：完结且 ≥30 万字的书里，6 成以上落在**未达标**那一档。
+    """
     f = R.finished_profile(con).set_index("kind")
-    short = f.loc["完结 2（短篇/常规）"]
-    long_ = f.loc["完结 6（长篇）"]
-    assert short["w50"] < 20_000
-    assert long_["w50"] > 1_000_000
-    assert long_["w50"] / short["w50"] > 50
+    all_ = f.loc["完结·全部"]
+    precise = f.loc["完结·精确通道"]
+    rest = f.loc["完结·未达标/截断"]
+
+    # 完结书的常态是短：中位 1 万字上下，不是 108 万字
+    assert 8_000 < all_["w50"] < 12_000
+    assert precise["n"] + rest["n"] == all_["n"]
+    assert precise["w50"] > 1_000_000 and rest["w50"] < 20_000
     # 跨度必须是 0 截断后的值，不能出现负数
     for k in ("s25", "s50", "s75", "s90"):
-        assert short[k] >= 0 and long_[k] >= 0
+        for row in (all_, precise, rest):
+            assert row[k] >= 0
+
+    tier = dict(
+        con.execute(
+            """select stats_precise, count(*) from novels
+               where not flg_import and outcome = 'done' and word_num >= 300000
+               group by 1"""
+        ).fetchall()
+    )
+    share = tier[True] / sum(tier.values())
+    assert share < 0.4, (
+        f"完结长篇里精确通道占 {share:.0%}，超过 4 成了——"
+        "那说明「6 更长」不只是选择偏差，得回头重看 A 的判定式"
+    )

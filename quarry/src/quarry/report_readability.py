@@ -80,7 +80,7 @@ def plot(lad: pd.DataFrame, bands: pd.DataFrame, path) -> None:
     fig.text(0.008, 0.985, "可读性：这不是 24.6 万本书，是 3,766 本可读完的书",
              fontsize=13, color=INK, ha="left", va="top")
     fig.text(0.008, 0.945,
-             "已剔除引进日轻；完结 = status 2/6，断更 = 4/5，连载 = 3；"
+             "已剔除引进日轻；结局取 outcome 三值（done/dead/ongoing）；"
              "「可读完」= 完结且 ≥30 万字",
              fontsize=8.2, color=MUTED, ha="left", va="top")
 

@@ -162,16 +162,28 @@ def clean_novels(novels: pd.DataFrame) -> pd.DataFrame:
     # 见 config.IMPORT_PUBLISHERS 里的口径说明。
     df["flg_import"] = df["author"].isin(config.IMPORT_PUBLISHERS)
 
+    # ── 上游 status 拆成两个语义干净的列（见 config 里的长注释）──
+    # outcome：结局三值。这是**我们自己的**语义，全项目唯一权威的结局字段。
+    # stats_precise：数值精度标记（原 status ∈ {3,5,6}）。只说「这些数字来自
+    #   详情页精确通道」，不说质量也不说结局。原 5/6 的 A 标是上游按规则
+    #   派生的，判定式零反例，已整体丢弃（config.A_RULE_SQL 只留给 tests 审查）。
+    df["outcome"] = df["status"].map(config.STATUS_TO_OUTCOME)
+    df["stats_precise"] = df["status"].isin(config.PRECISE_STATUS)
+    unknown = df["outcome"].isna().sum()
+    if unknown:
+        raise ValueError(f"status 出现未映射的值：{sorted(df.loc[df.outcome.isna(), 'status'].unique())}")
+
     order = [
-        "id", "title", "author", "genre", "status", "ptype", "has_banner",
+        "id", "title", "author", "genre", "outcome", "ptype", "has_banner",
         "word_num", "click_num", "praise_num", "like_num",
         "comment_num", "review_num", "contest_id", "cover", "last_update",
+        "stats_precise",
         "flg_placeholder_title", "flg_word_zero", "flg_default_cover",
         "flg_like_fixed", "flg_praise_gt_click", "flg_comment_missing", "flg_import",
     ]
     # 注意：构建期给每行打的 ``chunk`` / ``src_file`` **不进产物**。
     # 那是上游为了首屏加载做的打包切分（见 config.CHUNKS），与 status 一一对应，
-    # 留在表里只会诱使后续分析把它当成一个维度。要「完结/断更」的区分就用 status。
+    # 留在表里只会诱使后续分析把它当成一个维度。要「完结/断更」的区分就用 outcome。
     return df[order]
 
 
@@ -244,7 +256,11 @@ def build() -> dict:
         "source_note": (
             "上游把库拆成 cold/warm/hot 三个文件只为分批解压、加快首屏，"
             "切分依据是 status（cold=2/4, warm=5/6, hot=3），不携带任何数据信息。"
-            "本数据集不保留该列；需要这层区分请用 status。"
+            "上游 status 本身也压了两个正交维度：结局(2完结/4断更/3连载) 与 A 标"
+            "(5=断更A, 6=完结A，上游按 banner/人气/长评/收藏/赞五条件之一派生的成绩标记)。"
+            "本数据集把 status 拆成 outcome（三值结局）+ stats_precise（数值精度），"
+            "A 标整体丢弃 —— 判定式在原 2/4/5/6 的 243,193 行上零反例，"
+            "即 5/6 相对 2/4 无额外信息，且 A 阈值（收藏≥1万）高于 cold 段截断线上限（9,999）。"
         ),
         "source_partition": {"cold": [2, 4], "warm": [5, 6], "hot": [3]},
         "source": sources,

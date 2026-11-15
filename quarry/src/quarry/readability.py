@@ -3,14 +3,23 @@
 ``annual.py`` 数每年多了几本书，``supply.py`` 问少的是谁，这里问的是**这些书有多少
 是能读的**。三个口径必须先钉死，否则整份报告会得出反的结论：
 
-1. **``status`` 是唯一权威的结局字段**，五个值不能随便二分成「完结 / 未完结」：
-   2（完结）与 4（断更）的分布几乎重合（字数中位 9.5k / 10.2k，跨度中位都是 12 天），
-   而 5（断更A）/ 6（完结A）字数中位 59 万 / 109 万，差两个数量级。所以
-   ``DONE`` / ``DEAD`` 各自包含两个值，且**必须分带看**——把 2 和 6 混在一起算
-   「完结书字数中位数」，会得到 9,502 这个毫无意义的数。
-2. **「坑率」不能用全库当分母**。2025-2026 的书还没到能判定的年纪（2026 年只有
+1. **``outcome`` 是唯一权威的结局字段**，只有三值 ``ongoing`` / ``done`` / ``dead``。
+   上游那个看起来像「5 种状态」的 ``status`` 其实是两个正交维度压成一列：
+   结局（2 完结 / 4 断更 / 3 连载中）＋ A 标（5 = 断更A、6 = 完结A）。
+   A 标是 novel_hub 按「banner OR 人气≥1000万 OR 长评≥60 OR 收藏≥1万 OR 赞≥1万」
+   派生的**成绩**标记，判定式在原 2/4/5/6 的 243,193 行上零反例，
+   所以 5/6 相对 2/4 不携带任何结局信息。它在构建期已被拆掉（见 config）。
+   **旧版这里写的是「2 与 6 是两个物种，必须分带看」——那是错的框架**：
+   6 相对 2 多出来的只是「收藏≥1万」，而收藏达标的长篇自然更长，
+   于是分带看会得出「6 是长篇、2 是短篇」的假象。真实情况是
+   2,440 本完结长篇（含 640 本 ≥100 万字）落在未达标组里。
+2. **``stats_precise`` 只关于数值精度，不关于结局**。它覆盖 5,320 本（原 status
+   3/5/6），这些书的 click/like/praise 来自详情页精确通道；其余 240,725 本的
+   数值是列表页显示值，``like`` 上限 9,999、``click`` 上限 382 万。
+   做任何「成绩」类统计前必须用这一列过滤，否则是在拿截断值排序。
+3. **「坑率」不能用全库当分母**。2025-2026 的书还没到能判定的年纪（2026 年只有
    42% 有结局），所以结局类指标一律截到 ``SETTLED_END = 2025``，增速类截到更早。
-3. **字数在快照日是现值，不是终值**。连载中的书还在长，所以「≥30 万字」的
+4. **字数在快照日是现值，不是终值**。连载中的书还在长，所以「≥30 万字」的
    分母里天然少了一批未来的长书；这条只影响连载中的 2,805 本（1.1%），可忽略，
    但对 2024-2025 的「完结长书」计数是下界。
 """
@@ -18,10 +27,10 @@ from __future__ import annotations
 
 import pandas as pd
 
-# 结局分组。为什么 2/4 与 5/6 必须分开统计，见模块 docstring 第 1 条。
-DONE = (2, 6)  # 完结
-DEAD = (4, 5)  # 断更
-ONGOING = (3,)  # 连载中
+# 结局分组。三值互斥且穷尽，没有「A 组」这第二个维度。
+DONE = "outcome = 'done'"
+DEAD = "outcome = 'dead'"
+ONGOING = "outcome = 'ongoing'"
 
 # 结局判定的截止年：2026 只有 42% 的书有结局（其余还在更或刚发），不能当分母。
 SETTLED_END = 2025
@@ -68,7 +77,7 @@ def ladder(con) -> pd.DataFrame:
         ("≥30 万字", f"select count(*) {_BASE} and word_num >= 300000"),
         (
             f"≥{READ_MIN_WORDS // 10000} 万字且完结",
-            f"select count(*) {_BASE} and word_num >= {READ_MIN_WORDS} and status in {DONE}",
+            f"select count(*) {_BASE} and word_num >= {READ_MIN_WORDS} and {DONE}",
         ),
     ]
     out = pd.DataFrame(
@@ -90,9 +99,9 @@ def word_bands(con) -> pd.DataFrame:
         f"""
         select {_band_sql()} as band,
                count(*) as books,
-               count(*) filter (where status in {DONE}) as done,
-               count(*) filter (where status in {DEAD}) as dead,
-               count(*) filter (where status in {ONGOING}) as ongoing,
+               count(*) filter (where {DONE}) as done,
+               count(*) filter (where {DEAD}) as dead,
+               count(*) filter (where {ONGOING}) as ongoing,
                round(median(click_num))::BIGINT as click_p50
         {_BASE}
         group by 1 order by 1
@@ -117,10 +126,10 @@ def outcome_by_year(con, since: int = 2010) -> pd.DataFrame:
     df = con.execute(
         f"""
         select e.est_year as year, count(*) as books,
-               count(*) filter (where n.status in {DONE}) as done,
-               count(*) filter (where n.status in {DEAD}) as dead,
-               count(*) filter (where n.status in {ONGOING}) as ongoing,
-               count(*) filter (where n.status in {DONE}
+               count(*) filter (where n.outcome = 'done') as done,
+               count(*) filter (where n.outcome = 'dead') as dead,
+               count(*) filter (where n.outcome = 'ongoing') as ongoing,
+               count(*) filter (where n.outcome = 'done'
                                   and n.word_num >= {READ_MIN_WORDS}) as done_long
         from novels n join novels_era e using (id)
         where not n.flg_import and e.est_year >= {since}
@@ -140,7 +149,7 @@ def dropoff(con) -> pd.DataFrame:
     真正投入的量。``death_share`` 是**死在这一段**的断更书占全部断更的比例，
     ``reach_pct`` 是有多少断更书活着越过了这一段的起点。
     """
-    n = con.execute(f"select count(*) {_BASE} and status in {DEAD}").fetchone()[0]
+    n = con.execute(f"select count(*) {_BASE} and {DEAD}").fetchone()[0]
     # 只取关心的一侧边界，最后一段用「≥100 万」收尾
     edges = [(0, 10_000), (10_000, 50_000), (50_000, 100_000),
              (100_000, 300_000), (300_000, 500_000), (500_000, 10**12)]
@@ -150,7 +159,7 @@ def dropoff(con) -> pd.DataFrame:
         r = con.execute(
             f"""select count(*),
                        count(*) filter (where word_num >= {hi})
-                {_BASE} and status in {DEAD}
+                {_BASE} and {DEAD}
                   and word_num >= {lo} and word_num < {hi}"""
         ).fetchone()
         rows.append({"label": lab, "lo": lo, "books": r[0]})
@@ -164,11 +173,18 @@ def dropoff(con) -> pd.DataFrame:
 
 
 def finished_profile(con) -> pd.DataFrame:
-    """完结书的形状：多长、写了多久、多快。**必须分 2 与 6 两档看。**
+    """完结书的形状：多长、写了多久、多快。
 
-    把 status 2 和 6 混在一起算，字数中位会是 9,502、阅读时长 0.3 小时——
-    因为 96.8% 的「完结」是 status 2。分开看才是两个不同的东西：
-    一个是「短篇收尾」，一个是「写完一部长篇」。
+    分三行看，但**这三行不是「三种书」，是同一批完结书的成绩分层**：
+
+    - 全部完结（43,581）：字数中位 1.0 万、跨度 13 天 —— 这才是「完结书」的常态。
+    - 其中精确通道（原 status 6，1,388 本）：中位 108.7 万字、561 天。
+    - 其中未达标/被截断（原 status 2，42,193 本）：中位 9,502 字、12 天。
+
+    **不要说「6 是长篇、2 是短篇」**。6 之所以长，是因为它按「收藏≥1万」筛出来的，
+    成绩好的书自然更长；这是选择偏差，不是定义。反证：完结且 ≥30 万字的 3,766 本里，
+    只有 1,326 本（35%）在精确通道，另外 2,440 本（含 640 本 ≥100 万字）都在未达标组。
+    想描述「长篇的典型形态」，用全部完结那一行，不要用 6 那一行。
 
     ``wpm`` 只在跨度 ≥30 天的书上算：天数太小时 word_num/span 会炸出几万字/天
     的假值（整本搬运的书就是这种）。跨度用 0 截断，全库 12.5% 的 est_date
@@ -176,7 +192,12 @@ def finished_profile(con) -> pd.DataFrame:
     """
     q = "[0.25, 0.5, 0.75, 0.9]"
     rows = []
-    for kind, cond in (("完结 2（短篇/常规）", "status = 2"), ("完结 6（长篇）", "status = 6")):
+    tiers = (
+        ("完结·全部", DONE),
+        ("完结·精确通道", f"{DONE} and stats_precise"),
+        ("完结·未达标/截断", f"{DONE} and not stats_precise"),
+    )
+    for kind, cond in tiers:
         w = con.execute(f"select quantile_cont(word_num, {q}) {_BASE} and {cond}").fetchone()[0]
         s = con.execute(
             f"""select quantile_cont(greatest(date_diff('day', est_date, last_update), 0), {q})
@@ -212,8 +233,8 @@ def dead_in_long(con) -> pd.DataFrame:
     for m in (100_000, 300_000, 500_000, 1_000_000):
         r = con.execute(
             f"""select count(*),
-                       count(*) filter (where status in {DEAD}),
-                       count(*) filter (where status in {DONE})
+                       count(*) filter (where {DEAD}),
+                       count(*) filter (where {DONE})
                 {_BASE} and word_num >= {m}"""
         ).fetchone()
         rows.append(
@@ -232,8 +253,8 @@ def dead_in_long(con) -> pd.DataFrame:
 def click_share(con) -> pd.DataFrame:
     """注意力份额：各字数带拿走多少点击。
 
-    警告：``status IN (2,4)`` 的 ``click_num`` 被列表页截断在 382 万，所以
-    ≥100 万那一带的份额是**下界**。这一列只能看「长书拿走的份额远高于其数量占比」
+    警告：``not stats_precise`` 的 240,725 本，``click_num`` 被列表页截断在 382 万，
+    所以 ≥100 万那一带的份额是**下界**。这一列只能看「长书拿走的份额远高于其数量占比」
     这个方向，不能引用具体数值。
     """
     df = word_bands(con).copy()
@@ -248,11 +269,11 @@ def click_share(con) -> pd.DataFrame:
 def summary(con) -> dict:
     """几个要写进结论、也要被 tests 钉住的数。"""
     n = con.execute(f"select count(*) {_BASE}").fetchone()[0]
-    done = con.execute(f"select count(*) {_BASE} and status in {DONE}").fetchone()[0]
+    done = con.execute(f"select count(*) {_BASE} and {DONE}").fetchone()[0]
     read = con.execute(
-        f"select count(*) {_BASE} and status in {DONE} and word_num >= {READ_MIN_WORDS}"
+        f"select count(*) {_BASE} and {DONE} and word_num >= {READ_MIN_WORDS}"
     ).fetchone()[0]
-    dead = con.execute(f"select count(*) {_BASE} and status in {DEAD}").fetchone()[0]
+    dead = con.execute(f"select count(*) {_BASE} and {DEAD}").fetchone()[0]
     half = con.execute(
         f"select count(*) {_BASE} and word_num < 10000"
     ).fetchone()[0]
