@@ -54,8 +54,8 @@ uv run pytest -q          # 46 项断言：规模 / 归一化 / 清洗 / 定年 
 ```
 
 数据集（约 46 MB）随 [GitHub Release](https://github.com/interset-wq/strata/releases) 发布，不进 git。
-解压到 `quarry/datasets/v1/` 后即可直接分析。**字段语义、NULL 含义、哪 5,320 本能排序、
-哪些数被截断过——先看 [`quarry/DATASET.md`](./quarry/DATASET.md)**：
+解压到 `quarry/datasets/v1/` 后即可直接分析。**字段语义、NULL 与 0 的区别、
+成绩指标的粒度与可比性——先看 [`quarry/DATASET.md`](./quarry/DATASET.md)**：
 
 ```python
 import duckdb

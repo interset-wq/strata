@@ -1,67 +1,70 @@
-# RAW.md
-> 三片快照：`cold` / `warm` / `hot` SQLite，共 246,045 本书，是 `build_dataset.py` 的输入原料，**不等于 `datasets/v1` 数据集**。本文面向数据集构建者，用于识别原始数据缺陷；分析代码只读 `datasets/v1`。
+# 上游原料说明 · Novly Release 三片 SQLite
 
-快照信息：
-- 快照日期：2026-06-13
-- 解压总大小：137.7 MB；gzip 压缩包 62.1 MB
-- 表结构：三片完全一致，5 张表、11 个索引
-- 数据边界：`cold` 240,725｜`warm` 2,515｜`hot` 2,805；跨片 `novels.id` 无重复
-- gz sha256：cold `920f88bb…` / warm `74b909af…` / hot `1a8514f7…`
+> 本文件描述 `build_dataset.py` 的输入：`data/raw/chunks/{cold,warm,hot}_chunk.sqlite`，
+> 来自上游 Novly Release 的 `assets/chunks/*.sqlite.gz`。原料仅用于重建数据集，
+> 分析代码只读 `datasets/v1`；产物字段语义见 [`DATASET.md`](./DATASET.md)。
+>
+> 本文只记录**结构、语义与约束**，不记录统计量。所有行数与分布随快照变化，
+> 需要时以 `datasets/v1/manifest.json` 与 `config.BASELINE` 为准。
 
-| 文件 | 用途 | 阅读时机 |
+## 1. 来源与文件
+
+| 项 | 内容 |
+|---|---|
+| 快照日 | 2026-06-13（三片同一时点导出） |
+| 格式 | SQLite 3，三片表结构完全一致（5 张表、11 个索引），可 `attach` 后跨片查询 |
+| 体积 | 解压约 138 MB，gz 约 62 MB；`cold` 占绝大部分 |
+| 完整性 | 解压后 sha256 与 `datasets/v1/manifest.json` 的 `source` 段逐条一致 |
+| 版本管理 | 位于 `.gitignore`，不进 Git、不随 Release 分发 |
+
+| 文件 | 上游用途 | 内容 |
 |---|---|---|
-| RAW.md（本文） | 原料来源、分片逻辑、ID 隔离、数据缺陷 | 构建数据集、核对 raw/数据集行数、数值异常排查 |
-| DATASET.md | `datasets/v1` 表结构、字段语义、体检SQL | 编写查询、引用指标前 |
+| `cold_chunk.sqlite` | 静态存量，按需解压 | 主体，不含 banner 记录 |
+| `warm_chunk.sqlite` | 优质存量合并包 | 与 `cold` 不重叠 |
+| `hot_chunk.sqlite` | 首屏加载，按月更新 | 仅连载中作品 |
 
-## 30 秒上手
-文件路径：`quarry/data/raw/chunks/`，纳入 `.gitignore`，不进入 Git、不随 Release 分发。
-- 无该原料：无法重建数据集
-- 已有 `datasets/v1`：无需该原料
+原料不可替代：缺失则无法重建数据集。已有 `datasets/v1` 时无需读取原料。
 
 ```python
 import sqlite3
 con = sqlite3.connect("file:data/raw/chunks/cold_chunk.sqlite?mode=ro", uri=True)
-con.execute("select count(*) from novels").fetchone()
 ```
 
 ```sql
 attach 'cold_chunk.sqlite' as cold;
 attach 'warm_chunk.sqlite' as warm;
 attach 'hot_chunk.sqlite'  as hot;
-select 'cold' src, count(*) from cold.novels
-union all select 'warm', count(*) from warm.novels
-union all select 'hot',  count(*) from hot.novels;
 ```
-DuckDB 兼容写法：`attach 'cold_chunk.sqlite' as cold (type sqlite)`。
 
-## 文件清单
-| chunk | 文件 | novels | 解压字节 | gz字节 | 压缩率 | 上游App定位 |
-|---|---|---|---|---|---|---|
-| cold | cold_chunk.sqlite | 240725 | 134156288 | 60506244 | 45.1% | 静态存量，按需解压 |
-| warm | warm_chunk.sqlite | 2515 | 1593344 | 734620 | 46.1% | 优质存量合并包 |
-| hot | hot_chunk.sqlite | 2805 | 1925120 | 889167 | 46.2% | 首屏加载、按月更新 |
-| 合计 | 三片 | 246045 | 137674752 | 62130031 | 45.1% | — |
+DuckDB 写法：`attach 'cold_chunk.sqlite' as cold (type sqlite)`。
 
-| chunk | 解压sha256 |
-|---|---|
-| cold | `0e2b90f09489e26137332831fa96cf2a6450efee016e933d41d7d2a9753372e0` |
-| warm | `7399d1045bac670cb303936e51c09b7ada9928e5ce42e46023e4f739aef155cd` |
-| hot | `89fa62daa0e1c14c727919d91dbf905db2b606b23a9369599da38b473d115411` |
+## 2. 分片规则
 
-## 分片规则：按 status 划分
-| chunk | status取值 | 业务含义 |
+三片按 `novels.status` 分组，不是随机切分：
+
+| 片 | `status` | 含义 |
 |---|---|---|
-| cold | 2（已完结）、4（断更） | done + dead |
-| warm | 5（断更A）、6（完结A） | A标优质完结/断更 |
-| hot | 3（连载中） | ongoing |
+| `cold` | 2 已完结 / 4 断更 | 非 A 组的完结层 |
+| `warm` | 5 断更A / 6 完结A | A 组 |
+| `hot` | 3 连载中 | 连载层 |
 
-三片不是随机切分，成绩层差异极大：`warm` 的 VIP（`ptype=4`）占 **93.0%**（2,337/2,515），`hot` 17.4%、`cold` 仅 1.7%。同理 `has_banner=1` 的 667 本里 638 本在 `warm`、29 本在 `hot`、**cold 为 0**。
+由此产生三个必须遵守的前提：
 
-### 分层样本特征
-> 预留章节，用于补充三类分片样本分布、指标分布、长尾特征说明。
+1. **每片都是条件样本**。`warm` 的 VIP 与 banner 占比显著高于其余两片，`cold` 无 banner；
+   在单片上算任何「全站比例」都会偏。
+2. **并集才是完整快照**。跨片 `novels.id` 无重复，可直接 `union all`。
+3. **分片不携带数据属性**。它是上游为分批解压做的打包切分，构建时丢弃（见 `DATASET.md` §4.2）。
 
-## 表与字段
-### novels（16列，一书一行）
+## 3. 表结构
+
+| 表 | 粒度 | 说明 |
+|---|---|---|
+| `novels` | 一书一行 | 书目与成绩字段，主键 `id` |
+| `authors` | 一片一行 | 作者名 → 代表书，**不是人**，也**不是全站字典** |
+| `tags` | 一片一行 | 本片引用到的标签，**不是全站字典** |
+| `novel_tags` | 一次挂载 | `(novel_id, tag_id)` |
+| `contests` | 一片一行 | 本片引用到的征文 |
+
 ```sql
 create table novels (
   id INTEGER PRIMARY KEY,
@@ -83,95 +86,119 @@ create table novels (
 );
 ```
 
-- `id`：全局唯一，跨片不重复。跨度 2,242–777,879，号段里只有 **31.7%** 有书（775,638 个号对应 246,045 本，**68.3% 空洞**）。**空洞是「号建过、现在读不到」**：SFACG 用自增主键、号只增不重用，抓取又覆盖了列表页全量分页（不是按 ID 抽样），被删或被屏蔽的书不再出现在列表里、号就永久空着。但**别把它当「下架率」算**——空号来源是混杂的，且大部分不是「曾经的好书后来被下架」（见下节）。能用的事实只有一条：**246,045 是今天在架的，775,638 是历史上用掉的号数**，两者之差不可归因。
-- `author`：字符串类型，非稳定业务主键；平台规定作者名唯一，不支持作者改名。可能混入非法字符，建议后续同理非法字符统一替换为空格。三片 140,638 行，按 name 去重后 **137,965**（重复 2,673 行）。
-- `genre` / `ptype`：字段默认值都是 1，快照内**没有取值 1 的记录**——`genre ∈ 2..10`（9 类），`ptype ∈ {2,3,4}`（免费/签约/VIP）。
-- `last_update`：UTC 时间串（`+00:00`），**不是上架时间**。三片抓取时点不同：cold 最晚 2026-06-09、warm 2026-06-08、hot 2026-06-13。
-- `cover`：默认封面标识存在大小写两种写法（`defaultNew.jpg` / `defaultnew.jpg`）；DuckDB `LIKE` 大小写敏感，直接查询会造成漏检。
-- `comment_num` / `review_num`：**98.1% 为 NULL**（241,355/246,045），两列 NULL 完全同步。语义为未采集，不等于数值 0。分片看：cold 98.5% / warm 73.7% / hot 86.6% NULL——所以「A 标 = 走过详情接口」也不成立（warm 里近四分之三同样没有评论数）。
-- 数值字段的 **0 是默认值，不是下架信号**：新建书四项计数都从 0 起算，「刚开书」与「被清零」在数据上长得一样，无法区分。实测也支持这一点——「任一项 ≤0」的 **45,165 本里 44,668 本（98.9%）有正文**，37,224 本字数不足 1 万，横跨 2007–2026（2024 年前就有 36,006 本）。它们绝大多数就是没人收藏、没人点赞的普通书：
-  - `like_num=0`：30,117 本（12.2%）；`praise_num=0`：33,196 本（13.5%）；`click_num=0`：4,476 本（1.8%）
-  - `word_num=0`：497 本（0.2%）。其中 6 本却有 1 万以上人气（最高 169,726 / 1,385 收藏，2018–2025 都有），原因不明，可能正文被清也可能只是抓取缺列——**样本只有 6 本，不构成规则，更不要据此推断整批**
-  - 四项全为 0 的只有 **1 本**
-  - `like_num` 是唯一出现负值的列：58 本（全在 cold），-1 到 -11，属计数抖动；`build_dataset` 把它们置为 NULL——`datasets/v1` 里 `like_num` 的 58 个 NULL 就是这 58 行
-  - 想找「没抓到」请认 **NULL**（`comment_num` / `review_num` 98.1% 为 NULL）；**0 是真实观测值**，不是缺失、也不是删除
-- `like_num` 语义为收藏量；`praise_num` 语义为点赞量（与 `click_num` 三者不同源，不要混用）。
+## 4. 字段语义
 
-### ID 空洞：能数，但不能归因
-平台对下架书的页面不返回 404（`book.sfacg.com/Novel/{nid}/` 照样给 200），`status` 里也没有任何代码写入 7——**raw 里不存在「已删除」标记**。唯一痕迹是 `novels` 里没有那一行：自增主键、号不重用，被抓到时才发现号是空的。
-
-| 形态 | 表里长什么样 | 数量 | 能拿到什么 |
-|---|---|---|---|
-| 号失效 | `novels` 里没有这一行 | 529,593 个号（68.3%） | 只有一个空洞，无标题无作者无时间 |
-
-**不能当下架率**，因为空号的来源至少四类，比例完全不可知：
-
-- **早期盗版日轻**：平台起家靠搬运日本轻小说，版权清理时整批下架，号就空着
-- **测试数据**：管理员、测试员开新功能时批量建的测试书，从来不是作品
-- **违规强制下架**：内容不合规被平台强制删除
-- **作者主动下架**：作者联系编辑要求撤下
-
-前两类与「作品生命周期」无关，后两类才是真正的减员——但它们混在一起，且**没有任何字段能区分**（死号没有元数据）。所以：不做下架率、不做「历史建书总量 = 775,638」、也不要把 nid 空洞内插成年份做供给曲线，那只是把测试书和盗版书算进「当年新书」。
-
-**数值 0 不是第二条痕迹**（见上）：0 是新书的默认值，零值集合里 98.9% 有正文。按「任一项为 0 就剔除」会砍掉 45,165 本（18.4%）真实样本，这是错的。
-
-结论：**246,045 是「今天在架」的样本，不是历史全集的抽样**。任何「某年新增 N 本」「完结率」都只能当方向，不能当总量。
-
-### 三套互不相通的 ID 空间
-`novels.id` 是唯一可跨片 join 的键；`authors` / `tags` / `contests` 各自独立自增，而且 **`INSERT OR IGNORE` 跳过时也会消耗序号**，导致 id 全是断号：
-
-| 片 | authors | tags | contests / novel_tags |
-|---|---|---|---|
-| cold | 136,499 行，id 240,726–377,224 | **99 行**，id 1–710,395 | contests 97 行到 91,516；novel_tags 721,748 |
-| warm | 1,652 行，id 2,516–4,167 | 79 行，id 1–8,466 | contests 55 行；novel_tags 8,656 |
-| hot | 2,487 行，id 2,806–5,292 | 86 行，id 1–5,577 | contests 57 行；novel_tags 12,142 |
-
-`cold.authors` 从 **240,726** 起，正好是「240,725 本书各插一次 + 136,499 行」的烧号结果（`sqlite_sequence` = 377,224）；`cold.tags` 只有 99 行却撑到 710,395 号，因为每挂一个标签就烧一个号（seq 721,748 = novel_tags 行数）。**结论：这三张表的 id 是片内编号，跨片只能按 name join**，`build_dataset.py` 已把它们重映射成全局 id。
-
-顺便：`tags` 也不是全站字典，而是「本片用到的子集」——cold 99 / warm 79 / hot 86，并集 106，cold 恰好缺 7 个。在单片上算「全站标签热度」会漏。
-
-## status 派生逻辑
-平台原生仅两类状态：`连载中`、`已完结`；其余状态为上游派生伪状态。派生判定代码不在公开仓库，判定逻辑不可复现。
-
-| status值 | 标识 | 来源 |
+| 字段 | 语义 | 约束 |
 |---|---|---|
-| 1 | 其他 | 兜底状态，本快照无数据 |
+| `id` | 站点 nid，自增、严格单调、跨片唯一 | 号段不连续，见 §8 |
+| `title` | 书名 | 含纯数字占位记录 |
+| `author` | 作者名字符串 | 非身份标识，改名即新人、同名可能两人 |
+| `genre` | 分类 | 取值 2–10，无 1；数据集不附名称 |
+| `status` | 上游状态 | 见 §5，不可直接用于「当前是否连载」 |
+| `ptype` | 编辑漏斗层级 | 2 免费 / 3 签约 / 4 VIP，不是价格 |
+| `has_banner` | 站方运营位 | 非质量分，见 `DATASET.md` §5.4 |
+| `word_num` | 字数，快照日现值 | 连载中仍在增长；0 表示正文不可得，见 §7 |
+| `click_num` | 人气（累计浏览） | 跨年不可比；高位为千位粒度，见 `DATASET.md` §3 |
+| `like_num` | 收藏（API `markCount`） | 与 `praise_num` 语义错位，见 `DATASET.md` §3 |
+| `praise_num` | 赞（API `fav`） | 同上 |
+| `comment_num` | 短评数 | 大量 NULL，语义为未采集，不等于 0 |
+| `review_num` | 长评数 | 与 `comment_num` 同步缺失 |
+| `contest_id` | 征文 id | 未参加为 NULL |
+| `cover` | 封面 URL | 默认封面存在大小写两种写法 |
+| `last_update` | 最后更新时间，UTC（`+00:00`） | **不是上架时间**，见 `DATASET.md` §5.1 |
+
+## 5. `status` 的派生链
+
+平台原生只提供两个状态，其余为上游派生：
+
+| 值 | 标识 | 来源 |
+|---|---|---|
+| 1 | 其他 | 解析兜底，快照内无记录 |
 | 2 | 已完结 | 平台原生 |
 | 3 | 连载中 | 平台原生 |
-| 4 | 断更 | 上游判定：连载状态 + 连续90天无更新 |
-| 5 | 断更A | A标：断更，满足 banner/click≥1000w/review≥60/like≥1w/praise≥1w 任一条件 |
-| 6 | 完结A | A标：已完结，满足A标阈值条件 |
-| 7 | 下架 | 上游标记，本快照已过滤该类数据 |
+| 4 | 断更 | 上游按「连载中 + 90 天无更新」判定 |
+| 5 | 断更A | 在 4 的基础上满足 A 规则 |
+| 6 | 完结A | 在 2 的基础上满足 A 规则 |
+| 7 | 下架 | 上游标记，本快照已过滤 |
 
-**判定时点不是快照日，`status=4` ≠「现在已断更」**：779 本 `status=4` 的书 `last_update` 在 2026-03-15 之后。cold 的断更书按月分布 2026-01 `1,043` / 02 `904` / 03 `1,239` / **04 `97` / 05 `2` / 06 `3`**——判定冻结在 2026 一季度。机制在爬虫的 cutoff：抓到 `last_update` 超出 7 天窗口的书就 `should_stop`，窗口外的书不再被访问，`status` 也不再更新。要按定义筛「已断」，得自己用 `last_update` 算，两个口径差 779 本。
+A 规则的阈值写在 `site_config.toml [thresholds]`，规则原文见上游 `docs/website.md` 与
+`AGENTS.md`（`A status (pseudo)`）：
 
-同理 `5`/`6` 是发版前按阈值打的标，上游自己在文档里称其为 **pseudo status**；`A` 只表示「banner 或四项阈值之一达标」，与结局、质量都无关。
+```
+A = banner OR click ≥ 1000 万 OR review ≥ 60 OR like ≥ 1 万 OR praise ≥ 1 万
+```
 
-## raw → datasets/v1 守恒映射
-| 指标 | raw合计 | datasets/v1 | 差异来源 |
-|---|---|---|---|
-| novels | 246045 | 246045 | 无 |
-| done | 43581 | 43581 | status 2+6合并 |
-| dead | 199659 | 199659 | status 4+5合并 |
-| ongoing | 2805 | 2805 | 无 |
-| stats_precise | 5320 | 5320 | status 3/5/6 = warm+hot 全量 |
-| has_banner | 667 | 667 | 无 |
-| novel_tags | 742546 | 742546 | tag_id全局重映射 |
-| authors | 140638行 | 137965 | 跨片同名去重 |
-| contests | 209行 | 99 | 跨片同名去重 |
-| tags | 264行 | 106 | 跨片同名去重 |
-| `like_num < 0` | 58 | 0（转 NULL） | 负值置空，见上 |
+三点使用约束：
 
-> `stats_precise` 命名误导：它等于 **warm 全量 + hot 全量**（详情通道两片），既不是「精度更高」，也不等于 A 标（A 标只有 5/6 那 2,515 本）。行数 5,320 不用动，解释要换。
+1. **派生代码不在公开仓库**。规则与阈值可读，执行过程不可复现，A 与结局、质量均无关。
+2. **判定时点早于快照日**。`status = 4` 不等于「当前已断更」：部分行在判定时点之后仍有更新。
+3. **判定不会自我更新**。抓取按 `last_update` 设 7 天 cutoff，窗口外的作品不再被访问，
+   `status` 停留在最后一次判定。
 
-## 原料体检SQL & 锚点
+需要结局时，用 `last_update` 按定义自行计算，不要直接引用 `status`。
+
+## 6. 三套互不相通的 ID 空间
+
+`novels.id` 是唯一可跨片 join 的键。`authors`、`tags`、`contests` 各自独立 `AUTOINCREMENT`，
+且 `INSERT OR IGNORE` 跳过时同样消耗序号，导致：
+
+- id 大量断号，起始值与本片作品数相关，而非从 1 开始；
+- 同一 name 在不同片可能对应不同 id，同一 id 在不同片一定不对应同一对象。
+
+因此这三张表只能按 `name` 跨片对齐（`build_dataset.py` 已完成重映射），
+不得用其 id 做 join、排序或编号。
+
+## 7. 数值字段的可用性
+
+三类取值必须分开处理：
+
+| 取值 | 含义 | 处理 |
+|---|---|---|
+| NULL | 未采集（`comment_num` / `review_num`） | 不可当 0 参与均值 |
+| 0 | 字段默认值，新建作品计数从 0 起算 | 不能作为删除、下架或清零的证据 |
+| 负值 | 计数抖动（仅 `like_num`） | 构建时置 NULL |
+
+取样约束：正文不可得（`word_num <= 0`）或计数非正的行不构成可读作品，
+在字数、人气、收藏等分布统计中应剔除；剔除数量随快照变化，不写死。
+**剔除是取样问题，不是下架统计**——0 值不能用于推断作品是否下架。
+
+## 8. ID 空洞
+
+`id` 为自增主键、号不重用，抓取覆盖列表页全量分页而非按 id 抽样。
+因此号段中的空洞说明该行已被删除：平台对已删作品不返回 404，raw 中也没有任何删除标记
+（`status` 无 7 值），删除时间与原因均不可得。
+
+空号来源至少四类：早期盗版日轻的版权清理、管理员与测试员创建的功能测试数据、
+违规内容强制下架、作者联系编辑主动撤下。死号没有元数据，四类无法区分。
+
+据此确定三条禁令：
+
+- 不以号段宽度计算下架率或存活率；
+- 不把号段宽度当作历史建书总量；
+- 不对空洞做年度内插以估算供给。
+
+可用的陈述只有一条：当前快照是「仍在架」的样本，不是历史全集的抽样。
+
+## 9. 到 `datasets/v1` 的映射
+
+| 原料 | 产物 | 变换 |
+|---|---|---|
+| `novels` | `novels` | 丢弃 `status`、`chunk`；负值置 NULL；派生 `flg_` 标记 |
+| `novels.id` | `novels_era` | 按 nid 密度定年，输出估计上架日与置信度 |
+| `status` | `outcome` + `stats_precise` | 2/6→`done`，4/5→`dead`，3→`ongoing` |
+| `authors` / `contests` / `tags` | 同名表 | 按 `name` 跨片去重并重编号 |
+| `novel_tags` | `novel_tags` | `tag_id` 重映射为全局 id |
+| `last_update` | 原样保留 | 不作为上架时间使用 |
+
+## 10. 构建前校验
+
 ```sql
--- 分片计数、ID边界
-select 'cold' c, count(*) n, min(id) lo, max(id) hi from cold.novels
+-- 分片行数与 id 边界
+select 'cold' src, count(*) n, min(id) lo, max(id) hi from cold.novels
 union all select 'warm', count(*), min(id), max(id) from warm.novels
 union all select 'hot',  count(*), min(id), max(id) from hot.novels;
 
--- 跨片ID重复校验
+-- 跨片 id 重复数，预期为 0
 select
   (select count(*) from cold.novels)
 + (select count(*) from warm.novels)
@@ -179,35 +206,17 @@ select
 - (select count(*) from (
     select id from cold.novels union
     select id from warm.novels union
-    select id from hot.novels)) as dup; -- 预期结果 0
+    select id from hot.novels)) as dup;
+
+-- status 取值必须落在本片允许集合内
+select 'cold', status, count(*) from cold.novels group by 2
+union all select 'warm', status, count(*) from warm.novels group by 2
+union all select 'hot',  status, count(*) from hot.novels  group by 2;
 ```
 
-校验锚点（任意一项不匹配，停止数据集构建流程）：
-1. 分片行数：240725 / 2515 / 2805；并集总数 246045，无重复ID
-2. status取值约束：cold ∈ {2,4}；warm ∈ {5,6}；hot ∈ {3}
-3. cold 分片 `has_banner=1` 样本数量为 0（另两片 638 / 29）
-4. cold `like_num` 最大值 9999；warm `like_num` 最大值 354531
-5. `click_num >= 1000000` 的样本共 3,745 本，其中末三位非零数量 = 0
-6. cold.authors 最小 id = 240726；cold.tags 行数 = 99 而最大 id = 710395
-7. authors 去重后 137965；tags 去重后 106（分片 99/79/86）；contests 去重后 99（分片 97/55/57）
-8. novel_tags 关联记录总数 742546（721748 + 8656 + 12142）
-9. `last_update` 最大值：hot 2026-06-13（cold 2026-06-09 / warm 2026-06-08）；hot 最小值 2026-04-03
-10. `like_num < 0` 共 58 本，全部在 cold；warm/hot 均为 0
-11. ID 空洞 529,593 个（775,638 − 246,045）= 删号数（**不可读作下架量**）；零值书 45,165 本（98.9% 有正文，不是下架）
-12. 文件sha256与manifest清单一致
+校验项与期望值由 `config.BASELINE` 与 `manifest.json` 提供，不在本文写死。
+任一不符即停止构建，确认原料版本或口径是否变更。
 
-全部锚点校验通过后，执行构建命令：
 ```bash
 uv run python -m quarry.build_dataset
 ```
-产出固定哈希的数据集，pytest 断言全部通过。
-
-## 六种会算错的写法
-| 写法 | 后果 |
-|---|---|
-| 拿 ID 空洞算下架率 / 历史建书总量 | 空号混着早期盗版日轻、测试书、违规下架、作者下架，比例不可知，分母没有意义 |
-| 把 0 值当下架/清零痕迹 | 45,165 本（18.4%）里 98.9% 有正文，是新书与低互动书；按它剔除等于删掉真实样本 |
-| `authors.id` / `tags.id` 跨片 join | 三套独立自增空间且烧号，必错；只能按 name |
-| 用单片 `tags` 算标签热度 | 本片是子集（99/79/86），cold 缺 7 个标签 |
-| `status=4` 当「现在已断更」 | 779 本与 `last_update` 矛盾；判定冻结在 2026Q1 |
-| 直接在 raw 上跑分析 | 分析只读 `datasets/v1`，raw 是构建输入，随时可能被替换 |

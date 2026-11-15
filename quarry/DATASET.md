@@ -1,26 +1,18 @@
 # 数据集字典 · strata v1
 
-> 246,045 本书、2006-08 至 2026-06 的书目快照。上游 `Novly` 的三片 sqlite
-> 只是原料，本文件描述的是**我们自己构建的** `datasets/v1/`。原料本身的字段、
-> id 空间与脏数据见 [`RAW.md`](./RAW.md)。
+> `schema_version 5` · `content_hash cd773d14…` · 快照日 2026-06-13
 >
-> 本文件的每个数字都可以用文中给的 SQL 现算出来。**凡是写死的数字，都是断言锚点**
-> （`config.BASELINE`），改了就要人工确认。
+> 本文件描述我们构建的 `datasets/v1/`。上游三片 sqlite 的字段、id 空间与脏数据见
+> [`RAW.md`](./RAW.md)。本文只记录结构、语义与使用约束，不记录统计量：所有计数以
+> `manifest.json` 与 `config.BASELINE` 为准，需要时现算。
 
-```
-schema_version 5 · content_hash cd773d14… · 快照日 2026-06-13
-novels 246,045 · novel_tags 742,546 · authors 137,965 · contests 99 · tags 106
-```
-
----
-
-## 30 秒上手
+## 0. 读取
 
 ```python
 import duckdb
 con = duckdb.connect("datasets/v1/strata-v1.duckdb", read_only=True)
 
-# 唯一权威的结局字段是 outcome，不是 status（status 已删除，见 §4）
+# 结局用 outcome，不存在 status 列
 con.sql("select outcome, count(*) from novels group by 1 order by 2 desc")
 
 # 上架时间在 novels_era，不在 novels.last_update
@@ -32,167 +24,166 @@ con.sql("""
 """)
 ```
 
-不想装 DuckDB 就读 parquet（`datasets/v1/parquet/*.parquet`，zstd）。
-**校验只能对 parquet 做**：`strata-v1.duckdb` 每次构建字节都不同（DuckDB 内部元数据非确定），
-`manifest.json` 里已标 `deterministic: false`。
+也可直接读 `datasets/v1/parquet/*.parquet`（zstd）。**校验只能对 parquet 做**：
+`strata-v1.duckdb` 每次构建字节不同（DuckDB 内部元数据非确定），`manifest.json` 已标
+`deterministic: false`。
 
----
+## 1. 表与粒度
 
-## 1. 表：一行是什么
+| 表 | 粒度 | 一行是什么 |
+|---|---|---|
+| `novels` | 一书一行 | 书目、成绩指标与 7 个 `flg_` 标记 |
+| `novels_era` | 一书一行 | `nid → 日期` 定年结果，1:1 于 `novels` |
+| `era_stats` | 一年一行 | 年表，已排除引进日轻，被排除量另列 |
+| `tags` | 一标签一行 | `tag_id` 连续，`name` 唯一 |
+| `novel_tags` | 一次挂载 | `(novel_id, tag_gid)` |
+| `authors` | 一作者名一行 | 按 name 去重的代表书，**不是一个人** |
+| `contests` | 一征文一行 | 按 name 去重 |
 
-| 表             | 行数    | 粒度                 | 一行是什么                                                |
-| -------------- | ------- | -------------------- | --------------------------------------------------------- |
-| `novels`     | 246,045 | 一本书               | 书目 + 全部成绩指标 + 7 个 `flg_` 标记                  |
-| `novels_era` | 246,045 | 一本书               | `nid → 日期` 定年结果（1:1 于 novels，`id` 可 join） |
-| `era_stats`  | 21      | 一年                 | 年表，**已排除引进日轻**，被排除量另列两列          |
-| `tags`       | 106     | 一个标签             | `tag_id` 1–106 连续，`name` 唯一                     |
-| `novel_tags` | 742,546 | 一次挂载             | `(novel_id, tag_gid)`，覆盖 233,858 本（95.1%）         |
-| `authors`    | 137,965 | 一个**作者名** | 按 name 去重后的代表书（不是「一个人」）                  |
-| `contests`   | 99      | 一个征文             | 按 name 去重（原 209 行 → 99 名）                        |
-
-**没有 `status` 列，也没有 `chunk` 列。** 两个都是上游的加工产物，已被剥掉：
-`status` 拆成 `outcome` + `stats_precise`，`chunk`（cold/warm/hot）只是打包切分。
-见 §4.1、§4.2。
-
----
+无 `status` 列，无 `chunk` 列。两者都是上游加工产物，已剥离（§4）。
 
 ## 2. 字段字典
 
 ### 2.1 `novels`
 
-| 字段              | 类型        | NULL    | 实测范围                      | 含义与注意                                                                                           |
-| ----------------- | ----------- | ------- | ----------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `id`            | BIGINT      | 0       | 2,242 ~ 777,879               | **就是站点 nid**，全局自增、严格单调。它是全库唯一的时间轴依据                                 |
-| `title`         | TEXT        | 0       | —                            | 65 本是纯数字占位（`flg_placeholder_title`）                                                       |
-| `author`        | TEXT        | 0       | 137,965 个不同串              | **是字符串，不是身份**。改名=新人，同名=可能两人（§5.6）                                      |
-| `genre`         | BIGINT      | 0       | 2–10（无 1）                 | 2魔幻 3玄幻 4古风 5科幻 6校园 7都市 8游戏 9同人 10悬疑。**数据集不带名称，要自己映射**         |
-| `outcome`       | TEXT        | 0       | `done`/`dead`/`ongoing` | **唯一权威的结局**。43,581 / 199,659 / 2,805                                                   |
-| `ptype`         | BIGINT      | 0       | 2/3/4                         | 2 免费(91.9%)、3 签约(5.3%)、4 VIP(2.8%)。**是编辑漏斗层级，不是价格**                         |
-| `has_banner`    | BIGINT      | 0       | 0/1                           | 667 本（0.27%）。站方运营位，不是质量分（§5.4）                                                     |
-| `word_num`      | BIGINT      | 0       | 0 ~ 21,762,745                | 字数，**快照日的现值**，连载中还在长。497 本为 0（不是 NULL）——新建未发布或抓取缺列，**0 不是下架标记** |
-| `click_num`     | BIGINT      | 0       | 0 ~ 118,613,000               | **人气**（累计浏览）。不是「点击次数」也不是「收藏」                                           |
-| `praise_num`    | BIGINT      | 0       | 0 ~ 138,110                   | **赞**（API `fav`）。名字和语义反了，见 §3                                                  |
-| `like_num`      | DOUBLE      | 58      | 0 ~ 354,531                   | **收藏**（API `markCount`）。58 个 NULL 来自负值修正                                         |
-| `comment_num`   | DOUBLE      | 241,355 | 0 ~ 162,798                   | 短评数。**98.1% 是 NULL = 未采集，不是 0**                                                     |
-| `review_num`    | DOUBLE      | 241,355 | 0 ~ 612                       | 长评数，同样 98.1% NULL。同上                                                                        |
-| `contest_id`    | DOUBLE      | 150,488 | 1–99                         | 61.2% 的书不参加征文                                                                                 |
-| `cover`         | TEXT        | 0       | —                            | 34,641 本是默认封面（`flg_default_cover`）                                                         |
-| `last_update`   | TIMESTAMPTZ | 0       | —                            | **最后更新，不是上架时间**。UTC 带时区（§5.1）                                                |
-| `stats_precise` | BOOLEAN     | 0       | 5,320 True                    | **这行的 click/like/praise 是否来自详情页精确通道**。决定能不能排序（§3）                     |
+| 字段 | 类型 | NULL | 含义与约束 |
+|---|---|---|---|
+| `id` | BIGINT | 否 | 站点 nid，全局自增、严格单调；全库唯一的时间轴依据 |
+| `title` | TEXT | 否 | 书名；含纯数字占位记录（`flg_placeholder_title`） |
+| `author` | TEXT | 否 | 名字字符串，非身份；改名即新人，同名可能两人（§5.6） |
+| `genre` | BIGINT | 否 | 2 魔幻 / 3 玄幻 / 4 古风 / 5 科幻 / 6 校园 / 7 都市 / 8 游戏 / 9 同人 / 10 悬疑；无 1 |
+| `outcome` | TEXT | 否 | `done` / `dead` / `ongoing`，唯一权威的结局字段 |
+| `ptype` | BIGINT | 否 | 2 免费 / 3 签约 / 4 VIP；编辑漏斗层级，不是价格 |
+| `has_banner` | BIGINT | 否 | 0/1；站方运营位，非质量分（§5.4） |
+| `word_num` | BIGINT | 否 | 字数，快照日现值；连载中仍在增长 |
+| `click_num` | BIGINT | 否 | 人气（累计浏览）；不是点击数，也不是收藏 |
+| `praise_num` | BIGINT | 否 | 赞（API `fav`）；命名与语义错位（§3 第 4 条） |
+| `like_num` | DOUBLE | 是 | 收藏（API `markCount`）；NULL 来自上游负值修正 |
+| `comment_num` | DOUBLE | 是 | 短评数；NULL 表示未采集，不是 0（§5.7） |
+| `review_num` | DOUBLE | 是 | 长评数；与 `comment_num` 同步缺失 |
+| `contest_id` | DOUBLE | 是 | 征文 id；NULL 表示未参加 |
+| `cover` | TEXT | 否 | 封面 URL；默认封面存在大小写两种写法（§5.9） |
+| `last_update` | TIMESTAMPTZ | 否 | 最后更新，UTC 带时区；不是上架时间（§5.1） |
+| `stats_precise` | BOOLEAN | 否 | 上游 `status ∈ {3,5,6}` 的标记，即 `warm` + `hot` 两片全量；**既不表示精度，也不等于 A 标**（§3） |
 
-7 个 `flg_`：`placeholder_title`(65) / `word_zero`(497) / `default_cover`(34,641) /
-`like_fixed`(58) / `praise_gt_click`(2,094) / `comment_missing`(241,355) / `import`(47)。
+7 个 `flg_`：`placeholder_title`、`word_zero`、`default_cover`、`like_fixed`、
+`praise_gt_click`、`comment_missing`、`import`。均为派生布尔标记，不参与指标计算。
 
 ### 2.2 `novels_era`
 
-| 字段                  | 类型        | 说明                                                                                           |
-| --------------------- | ----------- | ---------------------------------------------------------------------------------------------- |
-| `id`                | BIGINT      | join `novels.id`                                                                             |
-| `est_date`          | TIMESTAMP_S | **估计的上架日**，无时区（naive）。全库 2006-08-26 ~ 2026-06-13                          |
-| `est_year`          | SMALLINT    | 由 `est_date` 取年，年表都用它                                                               |
-| `nid_gap`           | BIGINT      | 两侧锚点的 nid 间距。**不要用它判断精度**（能从 1 跳到 53,021）                          |
-| `gap_days`          | INT         | 两侧锚点的**日期**间距，P25/50/75/90/99 = 61/84/121/211/870                              |
-| `mode`              | TEXT        | `interp` / `extrap_low` / `extrap_high`。v1 全库 100% `interp`（首尾锚点恰好是首尾书） |
-| `confidence`        | TEXT        | `gap_days ≤ 90` → high(141,495)；`≤365` → mid(81,438)；else low(23,112)                |
-| `err_lower_bound`   | INT         | 误差**下界**：`est_date - last_update` 的正值。40,338 本 > 0，中位 3 天                |
-| `after_last_update` | BOOLEAN     | `err_lower_bound > 1`，30,662 本（12.5%）                                                    |
+| 字段 | 类型 | 含义 |
+|---|---|---|
+| `id` | BIGINT | join `novels.id` |
+| `est_date` | TIMESTAMP_S | 估计上架日，无时区；按 nid 单调性在两侧锚点间插值 |
+| `est_year` | SMALLINT | 由 `est_date` 取年，年表使用该列 |
+| `nid_gap` | BIGINT | 两侧锚点的 nid 间距；不能用于判断精度 |
+| `gap_days` | INT | 两侧锚点的日期间距，是 `confidence` 的依据 |
+| `mode` | TEXT | `interp` / `extrap_low` / `extrap_high` |
+| `confidence` | TEXT | `gap_days ≤ 90` → `high`；`≤ 365` → `mid`；否则 `low` |
+| `err_lower_bound` | INT | `est_date - last_update` 的正值，误差下界 |
+| `after_last_update` | BOOLEAN | `err_lower_bound > 1`，估计日晚于最后更新 |
 
-`confidence` 的分水岭在 **2017**：2016 及以前几乎全 `low`（锚点按 2.5% 分位采样，
-早期书少→锚点稀，两侧隔 1–2 年）；2017 起 0% `low`。
+定年精度随时间变化：锚点按 nid 分位采样，早期作品稀疏，`confidence` 以 2017 年为分界，
+之前多为 `low`。使用分年序列时应同时读取该列。
 
 ### 2.3 `era_stats`
 
-| 字段                                  | 说明                            | 陷阱                                                 |
-| ------------------------------------- | ------------------------------- | ---------------------------------------------------- |
-| `books_new`                         | 当年新增                        | **不含引进日轻**，加 `import_books` 才是全量 |
-| `authors_new`                       | 当年首次出现的作者名            | 名字口径，不是人                                     |
-| `banners`                           | 当年 banner 授予量              | 最近 3 年右删失，见 `censored`                     |
-| `grant_per_1k`                      | `banners / books_new × 1000` | 2006 年分母 0 → NULL，不是 0                        |
-| `p50/p90/p99_view`                  | 当年新书人气分位                | 同一年内可比，**跨年不可比**                   |
-| `median_word`                       | 当年新书字数中位                | 删失：老书有十年时间长，新书没有                     |
-| `vip_pct`                           | `ptype=4` 占比（%）           | —                                                   |
-| `import_books` / `import_banners` | 被排除的引进日轻                | 守恒式：`books_new + import_books == 当年全量`     |
-| `censored`                          | 仍在删失窗口内                  | 2024–2026 为 True                                   |
+| 字段 | 含义 | 约束 |
+|---|---|---|
+| `books_new` | 当年新增 | 不含引进日轻，加 `import_books` 才是全量 |
+| `authors_new` | 当年首次出现的作者名 | 名字口径，不是人数 |
+| `banners` | 当年 banner 授予量 | 最近年份存在右删失，见 `censored` |
+| `grant_per_1k` | `banners / books_new × 1000` | 分母为 0 时为 NULL，不是 0 |
+| `p50/p90/p99_view` | 当年新书人气分位 | 同年内可比，跨年不可比 |
+| `median_word` | 当年新书字数中位 | 受删失影响，老书积累时间长 |
+| `vip_pct` | `ptype = 4` 占比 | — |
+| `import_books` / `import_banners` | 被排除的引进日轻 | 守恒式：`books_new + import_books` = 当年全量 |
+| `censored` | 仍在删失窗口内 | 2024–2026 为 True |
 
 ### 2.4 `tags` / `novel_tags`
 
-`tags` 是**重编号后**的：上游三片各自 `AUTOINCREMENT`，同 id 率 0%，cold 片 99 行却
-撑到 710,395 号（纯废号）。这里按 `name` 字典序重编成 1–106，保证重建结果完全一致。
+`tags` 由上游片内 id 按 `name` 字典序重编为连续编号，保证重建结果一致；
+上游 id 是片内编号且大量断号，不可跨片使用。
 
-`novel_tags` 挂载数：1 个 24,630 本 / 2 个 35,032 / 3 个 66,411 / 4 个 90,313 /
-5 个 17,467 / 6 个 3 / 7 个 2。**上限 7 是截断，不是事实**（§5.3）。
+`novel_tags` 单本最多 7 个标签，**上限来自上游截断，不是作品实际标签数**。
+标签集合本身也是采样子集，不是全站字典（§5.3）。
 
 ### 2.5 `authors` / `contests`
 
-`authors` 不是人：按名字去重，取 `top_novel_clicks` 最大的那本当代表。24.6 万本书
-对应 137,965 个名字，**68% 的名字只有一本书**——这不是「68% 的作者只写一本」，
-是「改名 + 一次性投递 + 同人搬运」混在一起的结果。
+`authors` 不是人：按 name 去重，取 `top_novel_clicks` 最大的作品作为代表。
+多数名字只对应一本书，这是改名、一次性投稿与同人搬运混合的结果，
+不能读作「多数作者只写一本」。
 
-`contests` 99 个：`2022春季征文` ~ `龙之谷征文`，跨片重复 110 行已合并，
-`novels.contest_id` 已重映射。
+`contests` 按 name 去重，`novels.contest_id` 已重映射到去重后的编号。
 
----
+## 3. 成绩指标的可比性
 
-## 3. 最危险的一件事：三个指标有两套精度
+三件事决定这些数字能不能比。
 
-`stats_precise` 不是「质量标记」，只回答一句：**这行的数字是详情页给的，还是列表页显示值？**
+**1）`click_num` 是累计值。** 等于当年用户规模 × 曝光时长，2015 年的作品积累十余年，
+2025 年的只有一年多。跨年比较只能用当年内部分位或比例类指标。
 
-|                                  | `stats_precise = false`（240,725 本）       | `stats_precise = true`（5,320 本） |
-| -------------------------------- | --------------------------------------------- | ------------------------------------ |
-| `click_num` 上限               | **3,824,000**                           | 118,613,000                          |
-| `like_num` 上限                | **9,999**（恰好等于 9,999 的只有 1 本） | 354,531                              |
-| `praise_num` 上限              | **9,928**                               | 138,110                              |
-| `comment_num` / `review_num` | 98.1% NULL                                    | 全部有值                             |
+**2）`click_num` 高位为千位粒度。** 上游对百万以上的显示值按「万」为单位保留一位小数，
+还原后 `click_num ≥ 100 万` 时末三位恒为 0，并列极多。排序得到的「第 N 名」在并列区不唯一。
+该粒度全库一致，不区分分片或分组。
 
-成因不是采集器有两套逻辑，而是**同一份数据被冻结在不同年代**：历史归档段早年用列表页
-采集，显示值「10903.2万」被还原成整数后只精确到千位，此后再没重采过，截断值就永久留在库里。
+**3）`like_num` / `praise_num` 是精确整数，但完结层受 A 规则截断。** A 规则只作用于
+已完结与断更的作品，因此 `cold` 片（非 A 的完结层）这两项必然低于阈值 1 万；
+连载层（`hot`）不受该规则约束，可以有高分作品。这是「达标即被标为 A」的筛选结果，
+不是测量误差，不能读作上游截断：
 
-**规则**：
+- 跨全库比较收藏或赞是有效的，但结果按分片分层；
+- 在完结层上筛「收藏 ≥ 1 万」，等价于筛 A 规则命中，不能推出「没有更多高收藏作品」。
+
+**4）`stats_precise` 既不表示精度，也不等于 A 标。** 它等于上游 `status ∈ {3,5,6}`，
+即 `warm` 与 `hot` 两片全量，包含全部连载中作品；A 标只对应 `status ∈ {5,6}`。
+命名的由来是上游假设这两片走过详情页采集，实测不成立：`warm` 中多数作品的评论数同样缺失，
+`click_num` 的千位粒度在两组中都存在。该列仅用于复现上游分层与兼容旧查询，
+不应作为「可信 / 不可信」开关，也不宜作为分析维度。
+
+**由此得到的写法：**
 
 ```sql
--- ❌ 错：跨精度排序，前 5,320 名之外全是截断值
-select id, title from novels order by like_num desc limit 20;
+-- 按人气排序：说明粒度，接受 100 万以上的千位并列
+select id, title, click_num from novels order by click_num desc limit 20;
 
--- ✅ 对：要排序/比大小，就锁在精确通道
-select id, title, like_num from novels
-where stats_precise order by like_num desc limit 20;
+-- 按收藏排序：有效，但结果天然按 A 组分层
+select id, title, like_num from novels order by like_num desc limit 20;
 
--- ✅ 对：要全库覆盖，就只用分位/比例，且承认 300 万以上是地板
-select id from novels where click_num >= 100000;   -- 低端不受 cap 影响，可信
+-- 门槛筛选：低门槛无副作用；高门槛（≥ 1000 万 / ≥ 1 万）的结果等价于 A 规则命中
+select id from novels where click_num >= 100000;
 ```
 
-被截断的只有**顶端**：`click < 300 万` 的占非精确组的 99.99%，这些数是真的。
-所以「人气 ≥ 10 万」这类**低门槛**筛选全库可用；「人气 ≥ 1000 万」「收藏 ≥ 1 万」
-这类**高门槛**只能用在精确通道上。
+**4）三个指标的名字是错的。** 上游把「收藏」译作 `like_num`，把「赞」写作 `praise_num`，
+两者语义与字面相反。数据集保留上游名以便对账，`docs/schema.sql` 使用 API 原名：
 
----
+| `quarry`（上游名） | 真实语义 | 站方 API key | `docs/schema.sql` |
+|---|---|---|---|
+| `click_num` | 人气（累计浏览） | `viewTimes` | `view_num` |
+| `like_num` | 收藏 | `markCount` | `mark_num` |
+| `praise_num` | 赞 | `fav` | `fav_num` |
 
-## 4. 上游的四个加工层，全部剥掉了
+`order by like_num` 排的是收藏榜。
 
-上游 `Novel Hub` 不是原始数据，它自己做了四层加工。我们只取事实字段，判断一律重做。
+## 4. 已剥离的上游加工
 
-### 4.1 `status` 5 值 → `outcome` 3 值 + `stats_precise`
+上游 `Novel Hub` 不是原始数据，自带四层加工。本项目只取事实字段，判断一律重做。
 
-上游 `status`：2 完结 / 3 连载中 / 4 断更 / 5 断更A / 6 完结A。
-`A` 不是平台状态，是上游按规则派生的成绩标记：
+### 4.1 `status` → `outcome` + `stats_precise`
 
-> `断更`/`已完结` + (banner OR 人气≥1000万 OR 长评≥60 OR 收藏≥1万 OR 赞≥1万) → `断更A`/`完结A`
+上游 `status` 为 2 完结 / 3 连载中 / 4 断更 / 5 断更A / 6 完结A，其中 4、5、6 为派生值
+（派生链见 `RAW.md` §5）。A 标是「成绩达标」标记，不携带结局信息：
 
-判定式在原 2/4/5/6 的 243,193 行上**零反例**（5/6 全部 True，2/4 全部 False），
-即 `5/6` 相对 `2/4` **不携带任何额外信息**。而且它的实质是「收藏 ≥ 1 万」——
-2,468 本里 2,353 本靠这一条进来，而上方截断线正好是 9,999，两件事纠缠不清。
+- 2 与 6 都是已完结，4 与 5 都是断更，差别只在成绩；
+- A 标与「长篇」「优质」无对应关系，用 `status = 6` 取长篇会产生选择偏差。
 
-后果最严重的一条：拿 `status=6` 当「长篇小说」会得到 108.7 万字的中位数，那是
-**选择偏差**。完结且 ≥30 万字的 3,766 本里，只有 1,326 本（35%）在 A 组。
+因此 `outcome` 由本项目定义；`stats_precise` 保留上游 `status ∈ {3,5,6}` 的分层信息，
+仅用于兼容与复现，不承担语义。A 判定式作为常量 `config.A_RULE_SQL` 留作测试基线。
 
-所以：`outcome` 由我们定（`done`/`dead`/`ongoing`），`stats_precise` 只表达精度，
-判定式作为常量 `config.A_RULE_SQL` 留给测试复现零反例。
+### 4.2 `chunk` → 不留列
 
-### 4.2 `cold/warm/hot` 三片 → 不留列
-
-三片与 `status` 严格一一对应（cold=2/4、warm=5/6、hot=3），并集恰好 246,045。
-它只是上游**为了首屏加载分批解压**做的打包切分，零信息量。留在表里只会诱使分析
-把它当维度——这类错误在本项目里真实发生过一次。
+`cold/warm/hot` 与 `status` 一一对应，是上游为分批解压做的打包切分，不含数据属性。
+留列会诱使分析把它当维度，故删除。
 
 ### 4.3 `tags.id` → 按 name 重编号
 
@@ -202,123 +193,102 @@ select id from novels where click_num >= 100000;   -- 低端不受 cap 影响，
 
 见 §2.5。
 
----
-
-## 5. 陷阱清单（每条都踩过）
+## 5. 使用约束
 
 ### 5.1 `last_update` 不是上架时间
 
-老书 `last_update` 是十年后的一次编辑。2015 年创建的书和 2025 年创建的书可能
-`last_update` 都在 2026。**所有「某年新增多少本」必须用 `novels_era.est_date`。**
+老书的 `last_update` 常是多年后的一次编辑。所有「某年新增」必须用 `novels_era.est_date`。
 
 ```sql
--- ❌ 这算的是「最后更新时间分布」，不是创作年代
+-- 错：这是最后更新时间分布
 select strftime(last_update, '%Y') y, count(*) from novels group by 1;
 
--- ✅
+-- 对
 select est_year y, count(*) from novels_era group by 1 order by 1;
 ```
 
-### 5.2 `id` 有 68.3% 的空洞——能数，但**不能当「下架率」**
+### 5.2 `id` 空洞不可归因
 
-nid 是自增主键、号不重用，抓取又覆盖列表页全量分页（`List/default.aspx`），所以空洞只说明
-「这一行被删了」。但**空号的来源是混杂的**，至少四类：
+`id` 为自增主键、号不重用，空洞说明该行已被删除；平台不返回 404，raw 无删除标记。
+空号混有版权清理、测试数据、违规下架、作者主动撤下四类来源，死号无元数据，无法区分。
+不计算下架率与存活率，不把号段宽度当历史总量，不对空洞做年度内插（`RAW.md` §8）。
 
-- 早期盗版日轻：平台起家靠搬运日本轻小说，版权清理时整批下架
-- 测试数据：管理员/测试员开发新功能时批量建的测试书，从来不是作品
-- 违规强制下架
-- 作者联系编辑主动撤下
+### 5.3 `tags` 是截断采样
 
-前两类与作品生命周期无关，后两类才是真减员，但**没有字段能区分**（死号没有元数据）。
-所以：
+上游按作品保留前几个标签，单本上限 7，标签集合为采样子集。按年统计的「标签密度」
+只有方向意义，绝对值不能当全量引用；也不能用「某标签作品少」证明该标签冷门。
 
-- **不计算下架率**，也不把 **775,638** 当「历史建书总量」
-- **不要把 nid 空洞内插成年份做供给曲线**，那等于把测试书和盗版书算进「当年新书」
-- 能用的只有一条：**246,045 是今天在架的样本**；「某年新增 N 本」只是方向，不是总量
+### 5.4 `has_banner` 是运营位
 
-平台对下架页不返回 404（`Novel/{nid}/` 照样 200），连删除时间都拿不到。
+banner 授予与成绩、完结状态都可能不一致，存在「成绩达标但未完结」的样本。
+可作为「官方精选」的收录条件，不能进入质量分加权。
 
-### 5.3 `tags` 是 top-N 截断采样，不是全量
+引进日轻全部带 banner，认可类统计必须 `where not flg_import`，否则早期年份的
+banner 会全部由引进作品构成。
 
-cold 段 72 万条关联只挂在 99 个标签上，**每个标签约 7,290 本**——均匀得可疑，
-是采样不是自然分布。单本标签上限 7（只有 2 本达到），说明每本只保留了前几个标签。
+### 5.5 2026-05 之后是采集断层
 
-后果：按年算「标签密度」得到的是 **top-99 口径**下的数字，2010 年 0.53 个/本、
-2026 年 4.24 个/本。方向可信（老书确实标签少），**绝对值不能当全量引用**，
-也**不能**用「某标签只有 N 本」证明它冷门。
+`est_date` 的最大值接近快照日，但 5 月起单位 nid 的成书数显著下降，而 nid 流速未变。
+判据是 nid 密度，不是行数。
 
-### 5.4 `has_banner` 是运营位，不是质量分
+- 年度序列截止 2025；
+- 2026 只能使用 1–4 月同窗口对比；
+- `supply.nid_density()` 已封装，低于 `density_floor` 的月份不进入序列。
 
-667 本（0.27%），663/667 是 VIP，**209 本其实已经断更**（成绩达标但没写完）。
-它可以用作「官方精选」入口的收录条件，**不能进质量分加权**。
+### 5.6 `author` 是字符串
 
-另外：47 本引进日轻 **100% 带 banner**，且 2006–2009 年的 banner 全是它们。
-所有认可类统计必须 `where not flg_import`，否则「早期原创 banner」会凭空多出 12 个。
+改名即新人（高估新人流入、低估留存），同名可能两人（低估新人）。
+cohort 与留存分析必须声明为名字口径。
 
-### 5.5 2026-05 之后的书是「看不见」，不是「没有」
+### 5.7 NULL 与 0 是两件事
 
-`est_date` 最大值 2026-06-13，但 5 月起每千个 nid 的成书数从 ~490 掉到 36，而 nid 流速
-仍是 ~72/天、一个月没变。**判据是 nid 密度，不是行数**。
+| 字段 | NULL 含义 | 处理 |
+|---|---|---|
+| `comment_num` / `review_num` | 未采集 | 不可 `coalesce` 成 0，否则会把缺失读成「没有评论」 |
+| `like_num` | 上游负值，物理不可能 | 已置 NULL 并标记 `flg_like_fixed` |
+| `contest_id` | 未参加征文 | 可当 0 处理 |
+| `era_stats.grant_per_1k` | 分母为 0 | 保持 NULL |
 
-- 年度序列**截止 2025**
-- 2026 只能用 **1–4 月同窗口**（2022 12,262 → 2026 3,997，同比 −19.8%）
-- `supply.nid_density()` 已封装，低于 `density_floor=200` 的月份一律不进序列
+0 是有效观测值，表示计数未积累；不作为删除、下架或清零的证据（`RAW.md` §7）。
 
-### 5.6 `author` 是字符串，不是人
+### 5.8 含 NULL 的列被推断为 `DOUBLE`
 
-改名 = 新人（高估新人流入、低估留存）；同名可能是两个人（低估新人）。
-cohort / 留存分析必须写明这是**名字口径**。
+`like_num`、`comment_num`、`review_num`、`contest_id` 在 DuckDB 中为 DOUBLE，
+`sum()` 返回浮点，`group by` 可能出现 `10000.0`。需要整数时显式 `cast(... as bigint)`。
 
-### 5.7 NULL 与 0 是两件事，别用 `coalesce` 抹平
+### 5.9 `LIKE` 大小写
 
-| 字段                                      | NULL 含义                                                   |
-| ----------------------------------------- | ----------------------------------------------------------- |
-| `comment_num` / `review_num`（98.1%） | **未采集**。抹成 0 会得出「99% 的书没长评」这个假结论 |
-| `like_num`（58）                        | 上游值是负数，物理不可能，已置 NULL 并打 `flg_like_fixed` |
-| `contest_id`（61.2%）                   | 真的不参加征文                                              |
-| `era_stats.grant_per_1k`（2006）        | 分母 0。是 NULL，不是 0                                     |
+默认封面存在大小写两种写法，DuckDB 的 `LIKE` 区分大小写，会漏检。统一用 `ILIKE`。
 
-### 5.8 NULL 列在 DuckDB 里是 `DOUBLE`
+### 5.10 排名在并列区不唯一
 
-`like_num` / `comment_num` / `review_num` / `contest_id` 因为含 NULL，被推断成 DOUBLE。
-直接 `sum()` 得浮点，`group by` 也可能出现 `10000.0`。需要整数就 `cast(... as bigint)`。
+`click_num` 取值高度集中，低区间大量并列（成因见 §3 第 2 条）。任何「第 N 名」「前 N%」
+都需要声明并列处理规则，否则结果不可复现。
 
-### 5.9 `LIKE` 大小写：SQLite 不敏感，DuckDB 敏感
+### 5.11 结局的「完结」不等于「写完」
 
-默认封面 34,641 本含 2 条 `defaultnew.jpg` 小写变体，用 `LIKE '%defaultnew%'` 会漏成 34,639。
-**统一用 `ILIKE`。**
+`outcome = 'done'` 包含大量极短作品与提前归档的作品。可推荐样本必须同时满足字数条件：
 
-### 5.10 人气不能跨年比较，并列还极多
+```sql
+where outcome = 'done' and word_num >= 300000
+```
 
-`click_num` 是累计值 = 当年用户规模 × 曝光时长。2015 年的书攒了 11 年，2025 年的只有 1.5 年。
-唯一可跨年比较的是**当年内部分位**。
+单独使用 `outcome = 'done'` 会被空壳作品污染。
 
-而且全库只有 **42,840 个不同取值**（24.6 万本），中位点击 412——**大量并列，名次不唯一**。
-`order by click_num` 得到的「第 N 名」在并列区没有意义。
+### 5.12 非正值行在分析前剔除
 
-### 5.11 三个指标的名字是错的
+正文不可得（`word_num <= 0`）或计数非正的行不代表可读作品，字数、人气、收藏的分布
+统计应排除。v1 保留这些行以便追溯，未在构建阶段删除。
 
-上游把「收藏」翻成 `like_num`（Facebook 语境），把「赞」写成 `praise_num`。
-**语义正好反了。** 而本项目的 App 设计文档（`docs/schema.sql`）用的是 API 原名：
+剔除是取样处理，不是下架统计：0 值来自默认值与未积累，不能用于推断作品是否下架。
 
-| `quarry` 数据集（上游名） | 真实语义         | 站方 API key  | `docs/schema.sql` 里的名字 |
-| --------------------------- | ---------------- | ------------- | ---------------------------- |
-| `click_num`               | 人气（累计浏览） | `viewTimes` | `view_num`                 |
-| `like_num`                | **收藏**   | `markCount` | `mark_num`                 |
-| `praise_num`              | **赞**     | `fav`       | `fav_num`                  |
+```sql
+where word_num > 0 and click_num > 0
+```
 
-两套命名并存是刻意的（数据集保留上游名便于对账），但**写 SQL 时必须看这张表**。
-`order by like_num` 排的是收藏榜，不是点赞榜。
+### 5.13 `genre` / `ptype` 不带名称
 
-### 5.12 结局的「完结」不等于「写完」
-
-43,581 本 `done` 里 92% 在 30 万字以下，中位 9,502 字、跨度 12 天。
-真正「能推荐给别人读完」的（完结且 ≥30 万字）只有 **3,766 本（1.53%）**。
-筛选必须 `outcome = 'done' and word_num >= 300000`，两个条件都要。
-
-### 5.13 `genre` / `ptype` 是数字，数据集不带名称
-
-不想每次重抄映射，就直接把映射写进查询（一条语句，复制即可跑）：
+映射直接写进查询：
 
 ```sql
 with genre_map(id, name) as (values
@@ -329,93 +299,46 @@ from novels n join genre_map g on g.id = n.genre
 group by 1 order by n desc;
 ```
 
-实测**无 `genre=1`**（表里定义过「1 其他」，但一本都没有）。
 `ptype`：2 免费 / 3 签约 / 4 VIP。
 
-### 5.14 数值 0 是默认值，**不是**下架标记
-
-新建书四项计数都从 0 起算，所以「刚开书」和「被清零」在数据上完全同形。按「任一项 ≤0」筛，
-全库有 **45,165 本（18.4%）**，但其中 **44,668 本（98.9%）有正文**，37,224 本字数不足 1 万，
-横跨 2007–2026——这批就是普通的新书与低互动书：
-
-| 条件 | 本数 | 占比 | 说明 |
-|---|---|---|---|
-| `like_num = 0` | 30,117 | 12.2% | 没人收藏，绝大多数是冷门书 |
-| `praise_num = 0` | 33,196 | 13.5% | 没人点赞 |
-| `click_num = 0` | 4,476 | 1.8% | 有正文但零曝光，多为刚发布 |
-| `word_num = 0` | 497 | 0.2% | 未发布/空壳；其中 6 本有 1 万以上人气，原因不明，样本太小不构成规则 |
-| 四项全为 0 | 1 | — | 唯一的全空行 |
-
-**不要**用 `where click_num > 0 and like_num > 0 and praise_num > 0 and word_num > 0` 清洗样本
-——那会删掉 18.4% 的真实数据，并把「新人第一本书」整批排除，直接污染供给与留存类结论。
-
-真正表达「没采集到」的是 **NULL**：`comment_num` / `review_num` 98.1% 为 NULL。0 是真实观测值。
-
-### 5.15 三个峰值错开 6 年，别混成一个「黄金期」
-
-| 量                              | 峰值年         | 值        |
-| ------------------------------- | -------------- | --------- |
-| 认可密度（每千本新书获 banner） | **2015** | 22.36‰   |
-| banner 绝对量                   | **2016** | 95 个     |
-| 单本爆发力 P99 人气             | **2019** | 272 万    |
-| 供给                            | **2022** | 37,095 本 |
-| 成品（完结且≥30万）            | **2021** | 522 本    |
-
-「2015 认可先起 → 2019 爆款见顶 → 2022 规模见顶」是三个不同的机制，
-合并成一句「黄金五年」会丢掉全部信息。
-
----
-
-## 6. 校验：重建后先跑这段
+## 6. 校验与重建
 
 ```bash
-uv run pytest -q                       # 46 项断言，全绿才可信
+uv run pytest -q          # 断言全绿才可信
+uv run python -m quarry.build_dataset
 ```
 
-手工快速体检：
+手工体检（期望值与 `manifest.json`、`config.BASELINE` 对照，不在此写死）：
 
 ```sql
 select
-  (select count(*) from novels)                          as novels,      -- 246045
-  (select count(*) from novels where outcome='done')      as done,        -- 43581
-  (select count(*) from novels where stats_precise)       as precise,     -- 5320
-  (select count(*) from novels where has_banner)          as banners,     -- 667
-  (select count(*) from novels where flg_import)          as imports,     -- 47
-  (select count(*) from novel_tags)                       as tag_links,   -- 742546
-  (select count(*) from authors)                          as authors,     -- 137965
-  (select max(est_date)::date from novels_era)            as last_day;    -- 2026-06-13
+  (select count(*) from novels)                     as novels,
+  (select count(*) from novels where outcome='done') as done,
+  (select count(*) from novels where stats_precise)  as a_group,
+  (select count(*) from novels where has_banner)     as banners,
+  (select count(*) from novels where flg_import)     as imports,
+  (select count(*) from novel_tags)                  as tag_links,
+  (select count(*) from authors)                     as authors,
+  (select max(est_date)::date from novels_era)       as last_day;
 ```
 
-任何一项不等，说明原料换了或口径改了——先停下确认，**不要**直接改基线。
+任一项不符，先确认原料版本或口径是否变更，不要直接改基线。
 
-重建：
-
-```bash
-uv run python -m quarry.build_dataset   # raw → datasets/v1，约 20 秒
-```
-
-同一份原料必定构建出相同的 parquet（5 个文件 sha256 逐字节一致），
-`manifest.json` 的 `content_hash` 只由 parquet 决定。
-
----
+同一份原料构建出的 parquet 逐字节一致，`content_hash` 只由 parquet 决定。
 
 ## 7. schema 演进
 
-改列结构必须 +1，并在 `config.SCHEMA_VERSION` 留一行说明。
+改列结构必须递增版本，并在 `config.SCHEMA_VERSION` 留说明。
 
-| 版本 | 变化                                                               |
-| ---- | ------------------------------------------------------------------ |
-| v2   | 新增 `novels_era`（定年）与 `era_stats`（年表）                |
-| v3   | `novels` 增 `flg_import`；`era_stats` 排除引进日轻并新增两列 |
-| v4   | 删 `chunk` / `src_file`（上游打包切分，非数据属性）            |
-| v5   | 删 `status`，拆成 `outcome` + `stats_precise`；A 标整体丢弃  |
+| 版本 | 变化 |
+|---|---|
+| v2 | 新增 `novels_era`（定年）与 `era_stats`（年表） |
+| v3 | `novels` 增 `flg_import`；`era_stats` 排除引进日轻并新增两列 |
+| v4 | 删 `chunk` / `src_file`（上游打包切分，非数据属性） |
+| v5 | 删 `status`，拆为 `outcome` + `stats_precise`；A 标整体丢弃 |
 
----
+## 8. 三条使用规则
 
-## 8. 三句话总结
-
-1. **只有 `novels.id`（nid）能当时间轴**，`last_update` 和 `est_date` 都是别的东西。
-2. **只有 `stats_precise` 的 5,320 本能排序**，其余 24 万本的顶端被截断过，只能比门槛不能比大小。
-3. **只有 `outcome='done' AND word_num>=300000` 的 3,766 本算「可读」**，`outcome='done'` 单独用会被空壳书骗。
-
-前两条决定**怎么算**，第三条决定**算什么**。
+1. **时间轴只用 `novels.id`**，`last_update` 与 `est_date` 都不是上架时间。
+2. **结局只用 `outcome`**，`stats_precise` 是上游分片遗留标记，不是精度、也不是 A 标。
+3. **可读样本要两个字条件**：`outcome = 'done'` 加字数门槛；单独使用会被空壳作品污染。

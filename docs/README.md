@@ -10,8 +10,8 @@
 
 | # | 文档 | 作用 | 什么时候读 |
 | --- | --- | --- | --- |
-| 0 | [`../quarry/DATASET.md`](../quarry/DATASET.md) | **数据集字典**：7 张表的字段语义、NULL 含义、两套精度、15 条踩过的坑、体检 SQL | **要写查询、或要引用任何数字之前** |
-| 0.5 | [`../quarry/RAW.md`](../quarry/RAW.md) | **上游原料字典**：三片 sqlite 的血缘、按 status 切分的规则、三套互不相通的 id 空间、cold 片的截断线 | 要跑 `build_dataset`、要核对 raw 与数据集的行数、数字对不上时 |
+| 0 | [`../quarry/DATASET.md`](../quarry/DATASET.md) | **数据集字典**：表与粒度、字段语义、NULL 与 0 的区别、成绩指标的可比性、使用约束、体检 SQL | **要写查询、或要引用任何数字之前** |
+| 0.5 | [`../quarry/RAW.md`](../quarry/RAW.md) | **上游原料字典**：三片的来源与切分规则、`status` 派生链、三套 id 空间、数值可用性与 ID 空洞 | 要跑 `build_dataset`、要核对 raw 与数据集、数字对不上时 |
 | 1 | [`data-findings.md`](./data-findings.md) | SFACG 24.6 万本全量实测报告。**所有设计决策的数据依据** | 想知道「为什么是这个设计」 |
 | 2 | [`architecture.md`](./architecture.md) | 架构、技术栈、数据分层、榜单设计、刷新策略、迁移清单 | 要动手写代码之前 |
 | 3 | [`search.md`](./search.md) | 搜索的三层架构与三个官方接口实测 | 做搜索模块时 |
