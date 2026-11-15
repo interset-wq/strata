@@ -155,6 +155,8 @@ def clean_row(row: dict, tally: dict, genre_fixes: list) -> dict:
     if cover and cover.rsplit("/", 1)[-1].lower().startswith(C.COVER_PLACEHOLDER):
         tally["cover_placeholder_nulled"] += 1
         cover = None
+    elif cover and cover.startswith(C.COVER_BASE):
+        cover = cover[len(C.COVER_BASE):]
 
     status = _norm(row["status"], "status", tally)
     return {
@@ -167,7 +169,7 @@ def clean_row(row: dict, tally: dict, genre_fixes: list) -> dict:
         "contest": _norm(row["contest"], "contest", tally),
         "words": int(row["word_num"]),
         "clicks": int(row["click_num"]),
-        "likes": int(row["like_num"]),
+        "favs": int(row["like_num"]),
         "praises": int(row["praise_num"]),
         "featured": int(bool(row["banner"])),
         "cover_url": cover,
@@ -180,7 +182,7 @@ def drop_mask(df: pd.DataFrame) -> dict[str, pd.Series]:
     """五类不可用的行，判定在归一之后，互不重叠。"""
     empty = (df["words"] <= C.EMPTY_WORDS) & (df["clicks"] <= C.EMPTY_CLICKS)
     return {
-        "negative_likes": df["likes"] < 0,
+        "negative_favs": df["favs"] < 0,
         "title_without_text": ~df["title"].fillna("").map(C.has_text_char) & empty,
         "all_zero": (df["words"] == 0) & (df["clicks"] == 0),
         "status_missing": df["status"].isna(),
@@ -244,8 +246,8 @@ def write_ddl(path: Path) -> None:
         "featured IN (0, 1)",
         "words >= 0",
         "clicks >= 0",
+        "favs >= 0",
         "praises >= 0",
-        "likes >= 0",
         # 至少一个可观测信号，与 drop_mask 的 all_zero 对应
         "words > 0 OR clicks > 0",
         # 与 drop_mask 对应：书名要么含文字，要么有内容——无文字标题的 100 行
@@ -344,9 +346,12 @@ def main() -> int:
                 "unresolved_dropped": tally["genre_unresolved"],
                 "detail": genre_fixes,
             },
-            "likes": {"negative_rows_dropped": dropped["rules"]["negative_likes"]},
+            "favs": {"negative_rows_dropped": dropped["rules"]["negative_favs"]},
             "cover": {
-                "rule": f"文件名以 {C.COVER_PLACEHOLDER} 开头视为无封面",
+                "rule": (
+                    f"文件名以 {C.COVER_PLACEHOLDER} 开头视为无封面；"
+                    f"其余省略公共前缀 COVER_BASE"
+                ),
                 "placeholder_nulled": tally["cover_placeholder_nulled"],
             },
             "tags": {
@@ -357,7 +362,7 @@ def main() -> int:
         "zeros": {
             "words": tally["word_num_zero"],
             "clicks": tally["click_num_zero"],
-            "likes": tally["like_num_zero"],
+            "favs": tally["like_num_zero"],
             "praises": tally["praise_num_zero"],
         },
         "distribution": {

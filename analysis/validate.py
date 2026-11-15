@@ -84,11 +84,19 @@ def _check_values(df: pd.DataFrame) -> list[str]:
         if len(bad):
             errs.append(f"{name}: 取值越界 {sorted(set(bad))[:5]}")
 
-    for name in ("words", "clicks", "praises", "likes"):
+    for name in ("words", "clicks", "favs", "praises"):
         s = df[name]
         neg = s[(s != "") & (s.astype("int64") < 0)]
         if len(neg):
             errs.append(f"{name}: 出现 {len(neg)} 个负值")
+
+    # cover_url 已省略公共前缀，有值时必须是相对路径，出现 http 即回归
+    cover = df["cover_url"]
+    absolute = cover[cover.str.startswith("http", na=False)]
+    if len(absolute):
+        errs.append(
+            f"cover_url: {len(absolute)} 行含绝对地址，例 {absolute.iloc[0][:40]!r}"
+        )
 
     # 以下两条对应 build_csv.drop_mask，用同一判据复核，防止剔除逻辑失效
     empty = (df["words"].astype("int64") <= C.EMPTY_WORDS) & (

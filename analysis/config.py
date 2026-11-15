@@ -53,6 +53,10 @@ SPACE_CATEGORY = "Zs"
 # 保留 URL 会让人以为封面存在（36,212 行命中，含大小写与 [1] 变体）。
 COVER_PLACEHOLDER = "default"
 
+# 全部非空封面共用此前缀（实测 210,963 行无一例外，其后是 YYYY/MM/ 或直接
+# 文件名）。存相对路径：前缀对每行相同，没有信息量，还原时拼回即可。
+COVER_BASE = "http://rs.sfacg.com/web/novel/images/NovelCover/Big/"
+
 # ---------------------------------------------------------------- 行级剔除
 # 剔除的是「这一行不能作为有效记录」，不是「这本书不存在」。三类互不重叠，
 # 判定见 build_csv.drop_mask，理由见 DROP_RULES。
@@ -74,7 +78,7 @@ def has_text_char(value: str) -> bool:
     return any(ch.isalpha() for ch in value)
 
 DROP_RULES = {
-    "negative_likes": "收藏为负。站点计数下溢，原值不可信且无法修正出真值。",
+    "negative_favs": "收藏为负。站点计数下溢，原值不可信且无法修正出真值。",
     "title_without_text": (
         f"书名不含文字字符，且字数 ≤ {EMPTY_WORDS}、点击 ≤ {EMPTY_CLICKS}，"
         "既无法检索也无内容可依。"
@@ -102,10 +106,10 @@ COLUMNS: list[tuple[str, str, bool, str, str]] = [
     ("contest", "string", True, "contest", "参赛征文；空表示未参加"),
     ("words", "int64", False, "word_num", "字数"),
     ("clicks", "int64", False, "click_num", "人气，累计浏览"),
-    ("likes", "int64", False, "like_num", "收藏；负值行已整行剔除"),
+    ("favs", "int64", False, "like_num", "收藏数；负值行已整行剔除"),
     ("praises", "int64", False, "praise_num", "赞"),
     ("featured", "int8", False, "banner", "站方运营位，0/1，非质量分"),
-    ("cover_url", "string", True, "cover", "封面地址"),
+    ("cover_url", "string", True, "cover", "封面路径，省略公共前缀 COVER_BASE；空表示无封面"),
     ("updated_at", "string", False, "last_update", "最后更新时间，ISO 8601 无时区"),
     ("tags", "string", True, "tags", "标签，| 分隔，最多 5 个"),
 ]
