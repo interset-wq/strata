@@ -77,7 +77,7 @@ def plot(d: pd.DataFrame, r: pd.DataFrame, path) -> None:
     fig.text(0.008, 0.985, "供给为什么塌：人少了，不是人写少了",
              fontsize=13, color=INK, ha="left", va="top")
     fig.text(0.008, 0.945,
-             "已剔除引进日轻；2026 年因采集通道 5 月断供不进曲线（见报告 §1）",
+             "已剔除引进日轻；2026-05 起新书只剩约 7% 可见，不进曲线（见报告 §1）",
              fontsize=8.2, color=MUTED, ha="left", va="top")
     ax.legend(frameon=False, fontsize=8, loc="upper left")
 

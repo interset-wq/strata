@@ -44,6 +44,10 @@ ANCHORS_PATH = Path(
     os.environ.get("QUARRY_ANCHORS", ROOT / "data" / "anchors" / "nid_anchors.jsonl")
 )
 
+# 上游交付的三个文件。**只是打包方式，不是数据属性**：上游为了首屏加载把库拆成
+# 三个 sqlite 分批解压，切分依据是 status（cold = 2/4 完结·断更，warm = 5/6，
+# hot = 3 连载中），一一对应，没有任何信息量。本数据集只在构建期读这三个文件，
+# 产物里**不保留 chunk 列**——任何分析需要「完结/断更」这层区分时，直接用 status。
 CHUNKS = ("cold", "warm", "hot")
 
 # ── 引进日轻的出版方账号 ──────────────────────────────────
@@ -63,15 +67,19 @@ IMPORT_PUBLISHERS = ("天闻角川", "天闻角川2号机", "HJ文库", "丸山�
 # 数据集 schema 版本：列结构变化时 +1，读取方据此判断能否兼容
 # v2：新增 novels_era（nid 定年）与 era_stats（年表）两张表
 # v3：novels 增 flg_import；era_stats 排除引进日轻，并新增 import 两列
-SCHEMA_VERSION = 3
+# v4：novels 去掉 chunk 列（上游按 status 的打包切分，非数据属性）
+SCHEMA_VERSION = 4
 
 # 已知事实基线：断言用。数字变化即代表上游快照或口径变了，必须人工确认后再改。
 BASELINE = {
     "novels_total": 246_045,
     "banner_total": 667,
-    "banner_warm": 638,
-    "banner_hot": 29,
-    "cold_has_banner": 0,
+    # banner 只出现在 status 3（连载中）/ 5 / 6，status 2/4（完结·断更）恒为 0。
+    # 原写作「banner 只在 warm 和 hot」，那是分片的同义反复，已换成 status 口径。
+    "banner_status_3": 29,
+    "banner_status_5_6": 638,
+    "banner_status_2_4": 0,
+    "status_counts": {2: 42_193, 3: 2_805, 4: 198_532, 5: 1_127, 6: 1_388},
     "novel_tags_total": 742_546,
     "tag_total": 106,
     "authors_clean": 137_965,
@@ -86,10 +94,17 @@ BASELINE = {
     # 排除引进日轻后的 banner 总数（原 667）
     "banner_original_only": 620,
     # 供给归因的锚点（reports/01_supply.md §2）。2022 是供给峰值，
-    # 2025 是最后一个完整采集年 —— 2026 年 5 月起两通道断供，不进年度序列。
+    # 2025 是最后一个完整采集年。
     "supply_2022": 37_095,
     "supply_2025": 14_574,
     "supply_drop": 22_521,
+    # 采集可用上限：2026-04。5 月起「每千个 nid 的成书数」从 ~490 掉到 36，
+    # 而 nid 序列仍以 ~72/天 推进 —— 新书是「看不见」，不是「没有」。
+    # 见 supply.nid_density()；低于 density_floor 的月份一律不进任何序列。
+    "supply_usable_until": "2026-04",
+    "density_2026_04": 492,
+    "density_2026_05": 36,
+    "density_floor": 200,
 }
 
 

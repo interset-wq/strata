@@ -27,21 +27,20 @@ def test_year_series_stops_at_2025(con):
     assert d["year"].min() == 2007
 
 
-def test_channel_cutoff_is_real(con):
-    """2026-05 的断崖必须是采集边界，不是站点行为。
+def test_nid_density_defines_the_cutoff(con):
+    """2026-05 的断崖必须是「看不见」而不是「没有」。
 
-    证据是两片互补：cold 在 4 月塌、hot 同时抬；5 月两片一起断。
-    若哪天 cold 又有了 5 月的新书，说明上游改了通道，§1 的结论要重写。
+    两条必须同时成立：成书率断崖（~490 → 36‰nid），而 nid 流速不塌（~72/天）。
+    若哪天 nid/天 也同步掉到个位数，说明真的是断供，§1 的结论要重写。
     """
-    m = supply.channel_check(con, since=2026).set_index("month")
-    assert m.loc[4, "total"] > 900, "2026-04 应仍接近月均 1,000"
-    assert m.loc[4, "cold"] < 150, "cold 在 4 月应已塌"
-    assert m.loc[4, "hot"] > 800, "hot 应在 4 月接过来了"
-    assert m.loc[5, "total"] < 150, "2026-05 两片应同时断供"
-    mx = con.execute(
-        "select max(e.est_date) from novels n join novels_era e using (id) where n.chunk = 'cold'"
-    ).fetchone()[0]
-    assert str(mx)[:10] <= "2026-05-01", f"cold 分片已越过 2026-05-01：{mx}"
+    d = supply.nid_density(con, since="2025-09-01").set_index("period")
+    assert d.loc["2026-03", "per_1k"] > 400, "密度断点不能提前到 3 月"
+    assert d.loc["2026-04", "per_1k"] > config.BASELINE["density_floor"]
+    assert d.loc["2026-05", "per_1k"] < 100, "5 月密度应已崩"
+    assert d.loc["2026-05", "nid_per_day"] > 40, "5 月 nid 必须照常推进——否则是真断供"
+    # 2026 全年 nid 流速应与 2025 同一量级，不是断崖
+    y = supply.nid_density(con, freq="year").set_index("period")
+    assert y.loc["2026", "nid_per_day"] > y.loc["2025", "nid_per_day"] * 0.6
 
 
 def test_decomposition_conserves(con):

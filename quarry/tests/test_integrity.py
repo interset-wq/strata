@@ -33,18 +33,41 @@ def test_novels_total(con):
     assert scalar(con, "select count(*) from novels") == config.BASELINE["novels_total"]
 
 
-def test_three_chunks_complete(con):
-    rows = dict(con.execute("select chunk, count(*) from novels group by 1").fetchall())
+def test_no_packaging_column(con):
+    """产物里不能有 chunk。
+
+    cold / warm / hot 是上游为了分批解压、加快首屏做的**打包切分**，切分依据就是
+    status（cold=2/4、warm=5/6、hot=3），一一对应，不携带任何信息。它一旦留在表里，
+    后面每个分析都会忍不住把它当成一个维度——这类错误在报告里已经出过一次。
+    """
+    cols = [r[0] for r in con.execute("describe novels").fetchall()]
+    assert "chunk" not in cols, "chunk 又回到表里了，见 config.CHUNKS 的说明"
+    assert "src_file" not in cols
+
+
+def test_status_partition_is_complete(con):
+    """status 是「完结/断更/连载」的唯一权威轴，行数必须守恒。"""
+    rows = dict(con.execute("select status, count(*) from novels group by 1").fetchall())
+    assert rows == config.BASELINE["status_counts"]
     assert sum(rows.values()) == config.BASELINE["novels_total"]
-    assert set(rows) == set(config.CHUNKS)
 
 
-def test_banner_only_in_warm_and_hot(con):
+def test_banner_only_on_ongoing_status(con):
     assert scalar(con, "select count(*) from novels where has_banner") == config.BASELINE["banner_total"]
-    assert scalar(con, "select count(*) from novels where has_banner and chunk='cold'") == 0
-    w = scalar(con, "select count(*) from novels where has_banner and chunk='warm'")
-    h = scalar(con, "select count(*) from novels where has_banner and chunk='hot'")
-    assert (w, h) == (config.BASELINE["banner_warm"], config.BASELINE["banner_hot"])
+    # banner 只挂在 3（连载中）/ 5 / 6；2（完结）/ 4（断更）恒为 0。
+    # 这条以前写成「cold 分片没有 banner」，那是同义反复。
+    assert (
+        scalar(con, "select count(*) from novels where has_banner and status in (2, 4)")
+        == config.BASELINE["banner_status_2_4"]
+    )
+    assert (
+        scalar(con, "select count(*) from novels where has_banner and status in (5, 6)")
+        == config.BASELINE["banner_status_5_6"]
+    )
+    assert (
+        scalar(con, "select count(*) from novels where has_banner and status = 3")
+        == config.BASELINE["banner_status_3"]
+    )
 
 
 # ───────── 归一化 ─────────

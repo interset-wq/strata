@@ -5,10 +5,12 @@
 
 三个必须先钉死的前提，否则结论会全错：
 
-1. **2026 年不能进供给曲线**。``cold`` 分片的 ``est_date`` 上限是 2026-05-01，
-   且 4 月起月量从 707 掉到 93、5 月只剩 1 本；``hot`` 同期也只剩 79 / 46。
-   两个采集通道在 2026-05 同时断供——曲线尽头那个断崖是采集边界，不是站点崩塌。
-   所以年度口径一律截止 ``SUPPLY_END = 2025``，2026 只用 1–4 月做**同窗口**对比。
+1. **2026-05 之后不能进供给曲线**。判据不是分片，是 **nid 密度**：nid 是站点的自增
+   序列，与日历无关地单调推进，而「每千个 nid 里落成几本书」长期稳定在 410–490
+   （2025-09 至 2026-04 连续 8 个月实测）。2026-05 起这个比值掉到 36、6 月 54，
+   可同期 nid 仍以 ~72/天 推进（``nid_density``）。**nid 没停、书却不见了，
+   只能是新书在快照里不可见**，不是站点断供。所以年度口径一律截止
+   ``SUPPLY_END = 2025``，2026 只用 1–4 月做**同窗口**对比。
 2. **作者名不是稳定身份**。改名等于新人，同名可能是两个人。这会同时高估新人流入、
    低估留存，方向已知、幅度不可测，写在报告里而不修正。
 3. **作者首次出现年份受定年精度限制**。2016 及以前 100% 是 ``low``（见
@@ -19,9 +21,9 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-# 年度口径截止年。2026 只有大半年、且 5 月起通道断供，不能进年度序列。
+# 年度口径截止年：2026 只有大半年，且 5 月起新书不可见，不能进年度序列。
 SUPPLY_END = 2025
-# 同窗口：每年 1–4 月的累计量。4 月是两通道都还完整的最后一个月。
+# 同窗口：每年 1–4 月的累计量。4 月是 nid 密度还正常的最后一个月。
 PARTIAL_MONTHS = 4
 # 留存观测的 cohort 起点：2015 是 banner 元年，也是定年可信度的分界下方一年。
 COHORT_START = 2015
@@ -40,26 +42,40 @@ def _sql_novels() -> str:
     """
 
 
-def channel_check(con, since: int = 2025) -> pd.DataFrame:
-    """按月、按分片看供给量——用来证明 2026-05 的断崖是采集边界。
+def nid_density(con, freq: str = "month", since: str | None = None) -> pd.DataFrame:
+    """每千个 nid 里落成几本书 —— 判断「采集是否还完整」的唯一硬指标。
 
-    三个分片是**状态划分**（cold = 已完结/断更，hot = 连载中，warm = 完结·断更A），
-    所以任一月份的「全量」必须是三片之和。若某一片在末尾月份塌掉，
-    而另一片同时抬头，说明是通道切换而非真实变化。
+    ``nid`` 是站点自增序列，与日历无关地单调推进；只要采集完整，单位 nid 的成书数
+    就稳定（2025-09 至 2026-04 实测 411–492）。它断崖式下跌只有两种解释：
+
+    * 站点真的没人写书了 —— 但那样 ``nid_per_day`` 必须同步塌；
+    * 新书在快照里不可见 —— nid 照常推进，只有成书数掉。
+
+    两者用同一张表就能分开，**不需要借助上游的分片**。上游把库拆成三个文件只是
+    为了分批解压加快首屏，与数据内容无关，本数据集已不保留该列。
     """
-    return con.execute(
+    key = (
+        "strftime(e.est_date, '%Y-%m')"
+        if freq == "month"
+        else "e.est_year::varchar"
+    )
+    where = f"and e.est_date >= DATE '{since}'" if since else ""
+    df = con.execute(
         f"""
-        select e.est_year as year,
-               extract(month from e.est_date)::int as month,
-               count(*) filter (where n.chunk = 'cold') as cold,
-               count(*) filter (where n.chunk = 'warm') as warm,
-               count(*) filter (where n.chunk = 'hot')  as hot,
-               count(*) as total
+        select {key} as period,
+               count(*) as books,
+               min(n.id) as nid_lo,
+               max(n.id) as nid_hi,
+               max(n.id) - min(n.id) as nid_span,
+               date_diff('day', min(e.est_date), max(e.est_date)) + 1 as days
         from novels n join novels_era e using (id)
-        where not n.flg_import and e.est_year >= {since}
-        group by 1, 2 order by 1, 2
+        where not n.flg_import {where}
+        group by 1 order by 1
         """
     ).df()
+    df["per_1k"] = (df["books"] * 1000.0 / df["nid_span"]).round(0)
+    df["nid_per_day"] = (df["nid_span"] / df["days"]).round(1)
+    return df
 
 
 def panel(con) -> pd.DataFrame:

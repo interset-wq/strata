@@ -71,6 +71,8 @@ def load_raw() -> tuple[dict[str, pd.DataFrame], list[dict]]:
         t0 = time.time()
         for name in parts:
             df = read_table(path, name)
+            # 构建期标记来源片，只用于 tags / novel_tags / contests 的跨片对齐
+            # （三片的 tag id 各自编号）。不进产物。
             df["chunk"] = chunk
             parts[name].append(df)
         parts["novels"][-1]["src_file"] = path.name
@@ -163,10 +165,13 @@ def clean_novels(novels: pd.DataFrame) -> pd.DataFrame:
     order = [
         "id", "title", "author", "genre", "status", "ptype", "has_banner",
         "word_num", "click_num", "praise_num", "like_num",
-        "comment_num", "review_num", "contest_id", "cover", "last_update", "chunk",
+        "comment_num", "review_num", "contest_id", "cover", "last_update",
         "flg_placeholder_title", "flg_word_zero", "flg_default_cover",
         "flg_like_fixed", "flg_praise_gt_click", "flg_comment_missing", "flg_import",
     ]
+    # 注意：构建期给每行打的 ``chunk`` / ``src_file`` **不进产物**。
+    # 那是上游为了首屏加载做的打包切分（见 config.CHUNKS），与 status 一一对应，
+    # 留在表里只会诱使后续分析把它当成一个维度。要「完结/断更」的区分就用 status。
     return df[order]
 
 
@@ -236,6 +241,12 @@ def build() -> dict:
         "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "built_by": "quarry.build_dataset",
         "note": "由上游 Novel Hub 快照构建。上游原始文件不随本数据集分发，仅记录校验和以便溯源。",
+        "source_note": (
+            "上游把库拆成 cold/warm/hot 三个文件只为分批解压、加快首屏，"
+            "切分依据是 status（cold=2/4, warm=5/6, hot=3），不携带任何数据信息。"
+            "本数据集不保留该列；需要这层区分请用 status。"
+        ),
+        "source_partition": {"cold": [2, 4], "warm": [5, 6], "hot": [3]},
         "source": sources,
         "anchors": {
             "file": str(config.ANCHORS_PATH.relative_to(config.ROOT)),
