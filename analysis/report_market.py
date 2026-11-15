@@ -11,72 +11,30 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-import matplotlib
 import numpy as np
 import pandas as pd
 
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
-from matplotlib import font_manager  # noqa: E402
-
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt  # noqa: E402
+
+import charts
 import eras
 
 OUT = Path(__file__).resolve().parent / "reports" / "01_market_structure.md"
-FIG_DIR = OUT.parent / "figures"
 
-# 分期底色与系列配色（色盲安全，非涨跌语义）
-PERIODS = [
-    (2007, 2014, "兴趣站期", "#F2F2F2"),
-    (2015, 2016, "商业化初期", "#E8EEF7"),
-    (2017, 2022, "扩张期", "#DCE8F5"),
-    (2023, 2025, "收缩期", "#F5E8E8"),
-]
-C = {"blue": "#4477AA", "red": "#CC3311", "green": "#009988", "gray": "#777777"}
-
-
-def setup_style() -> None:
-    for name in ("Microsoft YaHei", "SimHei", "Noto Sans CJK SC"):
-        if any(f.name == name for f in font_manager.fontManager.ttflist):
-            plt.rcParams["font.sans-serif"] = [name, "DejaVu Sans"]
-            break
-    plt.rcParams["font.family"] = "sans-serif"
-    plt.rcParams.update(
-        {
-            "axes.unicode_minus": False,
-            "savefig.dpi": 150,
-            "figure.dpi": 150,
-            "font.size": 9,
-            "axes.spines.top": False,
-            "axes.spines.right": False,
-            "axes.axisbelow": True,
-            "axes.grid": True,
-            "grid.color": "#DDDDDD",
-            "grid.linewidth": 0.6,
-        }
-    )
-
-
-def shade_periods(ax, years: pd.Series, label_y_frac: float = 0.97) -> None:
-    """按分期加底色带并在顶部标注分期名。"""
-    for lo, hi, name, color in PERIODS:
-        if years.max() < lo or years.min() > hi:
-            continue
-        ax.axvspan(lo - 0.5, hi + 0.5, color=color, zorder=0)
-        mid = (max(lo, years.min()) + min(hi, years.max())) / 2
-        ax.text(
-            mid, label_y_frac, name, transform=ax.get_xaxis_transform(),
-            ha="center", va="top", fontsize=7.5, color="#666666",
-        )
-
-
-def yearly_counts(df: pd.DataFrame) -> pd.Series:
-    return df[df["est_year"].between(2007, 2025)].groupby("est_year").size()
+GENRE_ORDER = ["魔幻", "玄幻", "古风", "科幻", "校园", "都市", "游戏", "同人", "悬疑"]
 SNAPSHOT = "2026-06-13"
 SNAP_YEAR_FRAC = 2026 + 162 / 365  # 快照时刻的十进年份
 
 GENRE_ORDER = ["魔幻", "玄幻", "古风", "科幻", "校园", "都市", "游戏", "同人", "悬疑"]
+
+
+def yearly_counts(df: pd.DataFrame) -> pd.Series:
+    return df[df["est_year"].between(2007, 2025)].groupby("est_year").size()
 
 
 def load() -> pd.DataFrame:
@@ -112,13 +70,6 @@ def md_table(rows: list[list], header: list[str]) -> str:
     return "\n".join(lines)
 
 
-def save(fig: plt.Figure, name: str) -> str:
-    FIG_DIR.mkdir(parents=True, exist_ok=True)
-    fig.savefig(FIG_DIR / name, bbox_inches="tight", facecolor="white")
-    plt.close(fig)
-    return f"figures/{name}"
-
-
 def fig_dating(df: pd.DataFrame) -> str:
     """封面时间戳 − 定年估计 的偏差分布。"""
     ts = eras.cover_timestamp(df["cover_url"])
@@ -129,17 +80,17 @@ def fig_dating(df: pd.DataFrame) -> str:
     fig, ax = plt.subplots(figsize=(7.2, 3.0))
     lo, hi = -60, 730
     clip = delta.between(lo, hi)
-    ax.hist(delta[clip], bins=58, color=C["blue"], edgecolor="white", linewidth=0.3)
-    ax.axvline(0, color=C["gray"], lw=0.8)
-    ax.axvspan(-47, 47, color=C["green"], alpha=0.12, zorder=0)
+    ax.hist(delta[clip], bins=58, color=charts.C["blue"], edgecolor="white", linewidth=0.3)
+    ax.axvline(0, color=charts.C["gray"], lw=0.8)
+    ax.axvspan(-47, 47, color=charts.C["green"], alpha=0.12, zorder=0)
     ax.text(0, 1.02, "±47 天吻合窗", transform=ax.get_xaxis_transform(),
-            ha="center", fontsize=7.5, color=C["green"])
+            ha="center", fontsize=7.5, color=charts.C["green"])
     med = delta.median()
-    ax.axvline(med, color=C["red"], lw=0.9, ls="--")
+    ax.axvline(med, color=charts.C["red"], lw=0.9, ls="--")
     ax.annotate(
         f"中位 {med:.0f} 天", xy=(med, 3000), xytext=(120, 11000),
-        fontsize=7.5, color=C["red"],
-        arrowprops=dict(arrowstyle="-", color=C["red"], lw=0.7),
+        fontsize=7.5, color=charts.C["red"],
+        arrowprops=dict(arrowstyle="-", color=charts.C["red"], lw=0.7),
     )
     n_out = (~clip).sum()
     ax.text(
@@ -150,27 +101,27 @@ def fig_dating(df: pd.DataFrame) -> str:
     ax.set_xlim(lo, hi)
     ax.set_xlabel("偏差（天）：封面时间戳 − 定年估计")
     ax.set_ylabel("书数")
-    return save(fig, "01_dating.png")
+    return charts.save(fig, "01_dating.png")
 
 
 def fig_supply(df: pd.DataFrame) -> str:
     """年度新书量柱状 + 分期底色。"""
     y = yearly_counts(df)
     fig, ax = plt.subplots(figsize=(7.2, 3.2))
-    ax.bar(y.index, y.values, width=0.8, color=C["blue"], zorder=2)
-    shade_periods(ax, y.index)
+    ax.bar(y.index, y.values, width=0.8, color=charts.C["blue"], zorder=2)
+    charts.shade_periods(ax, y.index)
     peak_year = int(y.idxmax())
     ax.annotate(
         f"{peak_year} 年峰值 {int(y.max()):,} 本",
         xy=(peak_year, y.max()), xytext=(peak_year - 4.8, y.max() * 0.9),
-        fontsize=8, arrowprops=dict(arrowstyle="-", color=C["gray"], lw=0.7),
+        fontsize=8, arrowprops=dict(arrowstyle="-", color=charts.C["gray"], lw=0.7),
     )
     ax.set_xlim(2006.5, 2025.5)
     ax.set_xticks(range(2007, 2026, 2))
     ax.set_ylim(top=y.max() * 1.12)
     ax.set_xlabel("年（nid 定年）")
     ax.set_ylabel("新书量（在册）")
-    return save(fig, "01_supply.png")
+    return charts.save(fig, "01_supply.png")
 
 
 def fig_genre(df: pd.DataFrame) -> str:
@@ -179,14 +130,14 @@ def fig_genre(df: pd.DataFrame) -> str:
     share = pd.crosstab(d["est_year"], d["genre"], normalize="index").mul(100)
     fig, ax = plt.subplots(figsize=(7.2, 3.2))
     for genre, color, style in (
-        ("魔幻", C["blue"], "-"),
-        ("玄幻", C["green"], "-"),
-        ("同人", C["red"], "-"),
+        ("魔幻", charts.C["blue"], "-"),
+        ("玄幻", charts.C["green"], "-"),
+        ("同人", charts.C["red"], "-"),
     ):
         ax.plot(share.index, share[genre], style, color=color, lw=1.6)
     # 线端直接标注，不用图例框
     last = share.index.max()
-    for genre, color in (("魔幻", C["blue"]), ("玄幻", C["green"]), ("同人", C["red"])):
+    for genre, color in (("魔幻", charts.C["blue"]), ("玄幻", charts.C["green"]), ("同人", charts.C["red"])):
         ax.text(
             last + 0.5, share.loc[last, genre], genre,
             color=color, fontsize=8.5, va="center",
@@ -196,16 +147,16 @@ def fig_genre(df: pd.DataFrame) -> str:
         f"{peak_year} 峰值 {share['同人'].max():.1f}%",
         xy=(peak_year, share["同人"].max()),
         xytext=(peak_year - 4.5, share["同人"].max() * 0.82),
-        fontsize=8, color=C["red"],
-        arrowprops=dict(arrowstyle="-", color=C["red"], lw=0.7),
+        fontsize=8, color=charts.C["red"],
+        arrowprops=dict(arrowstyle="-", color=charts.C["red"], lw=0.7),
     )
-    shade_periods(ax, share.index)
+    charts.shade_periods(ax, share.index)
     ax.set_xlim(2006.5, 2027.0)
     ax.set_xticks(range(2007, 2026, 2))
     ax.set_ylim(0, 55)
     ax.set_xlabel("年（nid 定年）")
     ax.set_ylabel("占当年新书 %")
-    return save(fig, "01_genre.png")
+    return charts.save(fig, "01_genre.png")
 
 
 def fig_price(df: pd.DataFrame) -> str:
@@ -216,22 +167,22 @@ def fig_price(df: pd.DataFrame) -> str:
         vip=("price_type", lambda s: (s == "VIP").mean() * 100),
     )
     fig, ax = plt.subplots(figsize=(7.2, 3.0))
-    ax.plot(rate.index, rate["signed"], "-", color=C["blue"], lw=1.6)
-    ax.plot(rate.index, rate["vip"], "-", color=C["gray"], lw=1.4)
-    shade_periods(ax, rate.index)
+    ax.plot(rate.index, rate["signed"], "-", color=charts.C["blue"], lw=1.6)
+    ax.plot(rate.index, rate["vip"], "-", color=charts.C["gray"], lw=1.4)
+    charts.shade_periods(ax, rate.index)
     last = rate.index.max()
     ax.annotate(f"签约率 {rate['signed'].iloc[-1]:.1f}%",
                 xy=(last, rate['signed'].iloc[-1]),
-                xytext=(4, 0), textcoords="offset points", fontsize=8, color=C["blue"], va="center")
+                xytext=(4, 0), textcoords="offset points", fontsize=8, color=charts.C["blue"], va="center")
     ax.annotate(f"VIP {rate['vip'].iloc[-1]:.1f}%",
                 xy=(last, rate['vip'].iloc[-1]),
-                xytext=(4, 0), textcoords="offset points", fontsize=8, color=C["gray"], va="center")
+                xytext=(4, 0), textcoords="offset points", fontsize=8, color=charts.C["gray"], va="center")
     ax.set_xlim(2006.5, 2026.2)
     ax.set_xticks(range(2007, 2026, 2))
     ax.set_ylim(0, 15)
     ax.set_xlabel("年（nid 定年）")
     ax.set_ylabel("占当年新书 %")
-    return save(fig, "01_price.png")
+    return charts.save(fig, "01_price.png")
 
 
 def fig_completion(df: pd.DataFrame) -> str:
@@ -247,7 +198,7 @@ def fig_completion(df: pd.DataFrame) -> str:
     b = d.groupby("wband", observed=True)["status"].agg(
         lambda s: (s == "已完结").mean() * 100
     )
-    ax1.bar(range(len(b)), b.values, width=0.7, color=C["blue"])
+    ax1.bar(range(len(b)), b.values, width=0.7, color=charts.C["blue"])
     ax1.set_xticks(range(len(b)), b.index, fontsize=7.5)
     for i, v in enumerate(b.values):
         ax1.text(i, v + 1, f"{v:.0f}", ha="center", fontsize=7.5, color="#444444")
@@ -255,7 +206,7 @@ def fig_completion(df: pd.DataFrame) -> str:
     ax1.set_xlabel("当前字数档")
     ax1.set_ylabel("完结率 %")
 
-    for status, color in (("已完结", C["red"]), ("连载中", C["gray"])):
+    for status, color in (("已完结", charts.C["red"]), ("连载中", charts.C["gray"])):
         w = np.sort(df.loc[df["status"] == status, "words"].to_numpy())
         ccdf = 1 - np.arange(1, len(w) + 1) / len(w)
         ax2.plot(w, ccdf, color=color, lw=1.4, label=f"{status}（n={len(w):,}）")
@@ -263,13 +214,13 @@ def fig_completion(df: pd.DataFrame) -> str:
     ax2.set_yscale("log")
     ax2.set_ylim(1e-5, 2)
     ax2.set_xlim(1e3, 1e7)
-    ax2.axvline(2e5, color=C["gray"], lw=0.7, ls=":")
+    ax2.axvline(2e5, color=charts.C["gray"], lw=0.7, ls=":")
     ax2.text(2e5, 1.4, "20 万字", fontsize=7.5, color="#666666", ha="center")
     ax2.set_xlabel("字数（对数）")
     ax2.set_ylabel("P(字数 > x)")
     ax2.legend(frameon=False, fontsize=7.5, loc="lower left")
 
-    return save(fig, "01_completion.png")
+    return charts.save(fig, "01_completion.png")
 
 
 def section_supply(df: pd.DataFrame) -> tuple[str, dict]:
@@ -551,7 +502,7 @@ def section_completion(df: pd.DataFrame) -> str:
 
 
 def build() -> None:
-    setup_style()
+    charts.setup_style()
     df = load()
     for fig in (fig_dating, fig_supply, fig_genre, fig_price, fig_completion):
         path = fig(df)
