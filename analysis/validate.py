@@ -76,7 +76,7 @@ def _check_values(df: pd.DataFrame) -> list[str]:
 
     for name, allowed in (
         ("status", C.STATUSES),
-        ("genre", C.GENRES + [C.UNCLASSIFIED]),
+        ("genre", C.GENRES),
         ("price_type", C.PRICE_TYPES),
         ("featured", ["0", "1"]),
     ):

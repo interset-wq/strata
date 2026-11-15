@@ -107,24 +107,31 @@ def _norm(value: str | None, field: str, tally: dict) -> str:
 
 
 # ---------------------------------------------------------------- 清洗
-def clean_status(value: str | None, tally: dict) -> str:
+def clean_status(value: str | None, tally: dict) -> str | None:
+    """归一到连载中/已完结。空状态是已下架作品，返回 None 由调用方剔除。"""
+    if value is None:
+        tally["status_missing"] += 1
+        return None
     if value not in C.STATUS_MAP:
         raise SystemExit(f"出现未登记的状态值 {value!r}")
-    if value is None:
-        tally["status_null_to_unknown"] += 1
-    elif value == "断更":
+    if value == "断更":
         tally["status_dead_to_ongoing"] += 1
     return C.STATUS_MAP[value]
 
 
-def clean_genre(value: str, tally: dict, fixes: list) -> str:
+def clean_genre(value: str, tally: dict, fixes: list) -> str | None:
+    """先去掉「类」后缀，再取前两字试一次；都不中即无处可归，返回 None。"""
     if value in C.GENRES:
         return value
     bare = value.removesuffix(C.GENRE_SUFFIX)
-    target = bare if bare in C.GENRES else C.UNCLASSIFIED
-    tally["genre_relabelled"] += 1
-    fixes.append(f"{value} → {target}")
-    return target
+    for cand in (bare, bare[:2]):
+        if cand in C.GENRES:
+            tally["genre_relabelled"] += 1
+            fixes.append(f"{value} → {cand}")
+            return cand
+    tally["genre_unresolved"] += 1
+    fixes.append(f"{value} → 剔除")
+    return None
 
 
 def clean_tags(value: list, tally: dict) -> str:
@@ -170,21 +177,24 @@ def clean_row(row: dict, tally: dict, genre_fixes: list) -> dict:
 
 
 def drop_mask(df: pd.DataFrame) -> dict[str, pd.Series]:
-    """三类不可用的行，判定在归一之后，互不重叠。"""
+    """五类不可用的行，判定在归一之后，互不重叠。"""
     empty = (df["words"] <= C.EMPTY_WORDS) & (df["clicks"] <= C.EMPTY_CLICKS)
     return {
         "negative_likes": df["likes"] < 0,
         "title_without_text": ~df["title"].fillna("").map(C.has_text_char) & empty,
         "all_zero": (df["words"] == 0) & (df["clicks"] == 0),
+        "status_missing": df["status"].isna(),
+        "genre_unresolved": df["genre"].isna(),
     }
 
 
 def build(records: dict[int, dict]) -> tuple[pd.DataFrame, dict, list, dict]:
     tally = {
         "text": {},
-        "status_null_to_unknown": 0,
+        "status_missing": 0,
         "status_dead_to_ongoing": 0,
         "genre_relabelled": 0,
+        "genre_unresolved": 0,
         "cover_placeholder_nulled": 0,
         "tags_deduplicated": 0,
         "tags_dropped": 0,
@@ -229,7 +239,7 @@ def write_ddl(path: Path) -> None:
         lines.append(" ".join(parts))
     checks = [
         f"status IN ({', '.join(repr(s) for s in C.STATUSES)})",
-        f"genre IN ({', '.join(repr(g) for g in C.GENRES + [C.UNCLASSIFIED])})",
+        f"genre IN ({', '.join(repr(g) for g in C.GENRES)})",
         f"price_type IN ({', '.join(repr(p) for p in C.PRICE_TYPES)})",
         "featured IN (0, 1)",
         "words >= 0",
@@ -324,12 +334,14 @@ def main() -> int:
                 "fields": tally["text"],
             },
             "status": {
-                "rule": "断更并入连载中；null 记为未知",
+                "rule": "断更并入连载中；空状态视为已下架，整行剔除",
                 "dead_to_ongoing": tally["status_dead_to_ongoing"],
-                "null_to_unknown": tally["status_null_to_unknown"],
+                "missing_dropped": tally["status_missing"],
             },
             "genre": {
+                "rule": "去「类」后缀，再取前两字；都不中即剔除",
                 "relabelled": tally["genre_relabelled"],
+                "unresolved_dropped": tally["genre_unresolved"],
                 "detail": genre_fixes,
             },
             "likes": {"negative_rows_dropped": dropped["rules"]["negative_likes"]},
