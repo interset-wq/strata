@@ -27,20 +27,24 @@
 顺序是 **2015 认可先起 → 2019 爆款见顶 → 2022 规模才见顶**。供给涨到 11.7 倍的同时，
 每千本获 banner 的能力从 22.4‰ 跌到 1.08‰（−95%）——名额没变，分母变了。
 
-2022 之后供给三年跌 61%（37,095 → 27,215 → 18,877 → 14,574），这条曲线没有删失，最硬。
+2022 之后供给三年跌 61%（37,095 → 27,215 → 18,877 → 14,574）。**这 22,521 本的缺口里
+73% 是「新人没来」，不是老作者停笔**——人均产量几乎没动（1.42 → 1.27），塌的是活跃人数
+（24,181 → 10,720）。同期新人首年留存从 17.7% 跌到 10.7%，新生代最终拿到 banner 的比例
+从 3.31% 跌到 0.11%。详见 [`quarry/reports/01_supply.md`](./quarry/reports/01_supply.md)。
 
 > 口径：已剔除版权方账号（天闻角川 / 天闻角川2号机 / HJ文库 / 丸山黄金）的 **47 本引进日轻**（`novels.flg_import`）。这批书由版权方
 > 账号整批上架、banner 由版权方提供，不代表 SFACG 对原创作品的认可。剔除后 2006–2009 年
 > 原创 banner **归零**——那四年的 banner 全给了引进书。
 
-详见 [`quarry/reports/00_timeline.md`](./quarry/reports/00_timeline.md)。
+详见 [`quarry/reports/00_timeline.md`](./quarry/reports/00_timeline.md)（时间轴）
+与 [`01_supply.md`](./quarry/reports/01_supply.md)（供给归因）。
 
 ## 快速开始
 
 ```bash
 cd quarry
 uv sync
-uv run pytest -q          # 26 项断言：规模 / 归一化 / 清洗 / 定年 / 可复现
+uv run pytest -q          # 35 项断言：规模 / 归一化 / 清洗 / 定年 / 可复现 / 供给归因
 ```
 
 数据集（约 46 MB）随 [GitHub Release](https://github.com/interset-wq/strata/releases) 发布，不进 git。
@@ -56,7 +60,8 @@ con.sql("select year, books_new, banners, grant_per_1k from era_stats order by y
 
 ```bash
 uv run python -m quarry.build_dataset     # raw → datasets/v1，约 4 秒
-uv run python -m quarry.report_timeline   # 出图
+uv run python -m quarry.report_timeline   # 出时间轴的图
+uv run python -m quarry.report_supply     # 出供给归因的图
 ```
 
 ## 方法上守的四条线

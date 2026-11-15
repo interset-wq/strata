@@ -85,6 +85,11 @@ BASELINE = {
     "import_banners": 47,
     # 排除引进日轻后的 banner 总数（原 667）
     "banner_original_only": 620,
+    # 供给归因的锚点（reports/01_supply.md §2）。2022 是供给峰值，
+    # 2025 是最后一个完整采集年 —— 2026 年 5 月起两通道断供，不进年度序列。
+    "supply_2022": 37_095,
+    "supply_2025": 14_574,
+    "supply_drop": 22_521,
 }
 
 
