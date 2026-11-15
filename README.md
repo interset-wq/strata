@@ -54,7 +54,8 @@ uv run pytest -q          # 46 项断言：规模 / 归一化 / 清洗 / 定年 
 ```
 
 数据集（约 46 MB）随 [GitHub Release](https://github.com/interset-wq/strata/releases) 发布，不进 git。
-解压到 `quarry/datasets/v1/` 后即可直接分析：
+解压到 `quarry/datasets/v1/` 后即可直接分析。**字段语义、NULL 含义、哪 5,320 本能排序、
+哪些数被截断过——先看 [`quarry/DATASET.md`](./quarry/DATASET.md)**：
 
 ```python
 import duckdb
@@ -65,9 +66,9 @@ con.sql("select year, books_new, banners, grant_per_1k from era_stats order by y
 从上游原始快照重建（需要自己准备三片 sqlite 到 `quarry/data/raw/chunks/`）：
 
 ```bash
-uv run python -m quarry.build_dataset     # raw → datasets/v1，约 4 秒
-uv run python -m quarry.report_timeline   # 出时间轴的图
-uv run python -m quarry.report_supply     # 出供给归因的图
+uv run python -m quarry.build_dataset       # raw → datasets/v1
+uv run python -m quarry.report_timeline     # 出时间轴的图
+uv run python -m quarry.report_supply       # 出供给归因的图
 uv run python -m quarry.report_readability  # 出可读性结构的图
 ```
 

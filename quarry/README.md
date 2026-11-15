@@ -3,6 +3,10 @@
 SFACG 二十年书目数据的**勘测**项目。名字取「采石场」——从沉积层里开采样本，出数据与基线，
 不做产品判断。App 本体叫「书层 Strata」，在 `../app/`，与本项目分开命名。
 
+> **要写查询？先读 [`DATASET.md`](./DATASET.md)。** 那里是数据集字典：每张表、每个字段的
+> 真实语义、NULL 含义、两套精度、15 条踩过的坑，以及可直接复制的体检 SQL。
+> 本文件讲的是「为什么这么建」，DATASET.md 讲的是「怎么读才不会算错」。
+
 ## 数据主权：我们只发布自己的数据集
 
 上游 `Novel Hub` 的三片 sqlite 只是**构建原料**，不随本项目发布，也不进 git。
@@ -13,8 +17,8 @@ data/raw/chunks/*.sqlite       上游三片原始快照   191 MB   不进 git / 
         │
         ▼  uv run python -m quarry.build_dataset
 datasets/v1/                   我们的数据集        46 MB   不进 git / 随 Release 发布
-  ├── strata-v1.duckdb         单文件，开箱即用     24.3 MB
-  ├── parquet/*.parquet        工具无关，长期归档   21.5 MB
+  ├── strata-v1.duckdb         单文件，开箱即用     24.0 MB
+  ├── parquet/*.parquet        工具无关，长期归档   21.6 MB
   └── manifest.json            版本 + 行数 + sha256 + 来源 + 锚点指纹
 ```
 
@@ -32,15 +36,18 @@ datasets/v1/                   我们的数据集        46 MB   不进 git / �
 
 ### 唯一的口径排除：引进日轻
 
-`novels.flg_import` 标出 **46 本引进日轻**（`天闻角川` 37 + `天闻角川2号机` 1 + `HJ文库` 9），
-这 46 本 **100% 带 banner**。它们由版权方账号整批上架，banner 由版权方提供，
-不代表 SFACG 对原创作品的当期认可，所以所有认可类统计都排除它们。
+`novels.flg_import` 标出 **47 本引进日轻**（`天闻角川` 36 + `天闻角川2号机` 1 +
+`HJ文库` 9 + `丸山黄金` 1），这 47 本 **100% 带 banner**。它们由版权方账号整批上架，
+banner 由版权方提供，不代表 SFACG 对原创作品的当期认可，所以所有认可类统计都排除它们。
 
-判定只能用出版方账号，理由写在 `config.IMPORT_PUBLISHERS` 的注释里，简言之：
+判定只能用版权方账号，理由写在 `config.IMPORT_PUBLISHERS` 的注释里，简言之：
 
 - 标题匹配不行：含「刀剑神域」的 87 本里 **86 本是中国人写的同人**，是同人就得算原创
 - 年份不行：2008–2013 的作者全是中文网名，盗版期整本搬运没留痕迹
 - `typeId` 不行：奇诺之旅和 2020 年的原创都是 21
+
+边界规则是「**这个账号属于版权方一侧，还是站内作者**」，不是「名字像不像出版社」——
+`丸山黄金` 是《Overlord》作者的署名账号，属于前者。
 
 排除的影响很大：**2006–2009 年原创 banner 从 12 个降到 0**，那四年的 banner 全给了引进书。
 这就是「引进期」的硬定义。被排除的量记在 `era_stats.import_books` / `import_banners`，
@@ -75,7 +82,7 @@ uv run python -m quarry.tools.refill_anchors --lo 777879 --hi 800000 --n 12
 cd quarry
 uv sync
 # 从 GitHub Release 下载 strata-v1 并解压到 datasets/v1/
-uv run pytest -q          # 26 项断言，含 manifest、定年精度与引进日轻口径
+uv run pytest -q          # 46 项断言，含 manifest、定年精度、引进日轻口径、状态语义
 ```
 
 **B. 从上游原始快照重建**（需要自己拿到那三片 sqlite）
@@ -113,12 +120,13 @@ uv run pytest -q
 
 ## 已知数据缺陷（分析时必须记住）
 
-- **tags 是 top-N 截断采样**：cold 片 72 万条关联只挂在 99 个标签上（每标签约 7,290 本），
+- **`tags` 是 top-N 截断采样**：cold 片 72 万条关联只挂在 99 个标签上（每标签约 7,290 本），
   `tags.id` 稀疏到 710,395，单本标签数上限 7。所谓「按年标签密度」是 top-99 口径下的数字，
   老书偏用长尾标签会被低估；趋势方向可信，绝对值不可当全量。
-- **banner 与 status 强绑定**：banner 只出现在 `status ∈ {3 连载中, 5 断更A, 6 完结A}`，
-  cold 片 24 万本（`2 已完结 / 4 断更`）一条 banner 都没有。A 后缀疑似**等级标记**而非更新状态，
-  待验证。
+- **banner 是站方运营位，不是质量分**：667 本里 663 本是 VIP，**209 本其实已经断更**
+  （成绩达标但没写完）。它只能当「官方精选」的收录条件，不能进质量分加权。
+  上游 `status` 里的 5/6（断更A/完结A）就是「banner 或成绩达标」派生出来的，
+  已在 v5 拆成 `outcome` + `stats_precise`，判定式见 `config.A_RULE_SQL`。
 - **`LIKE` 大小写**：SQLite 对 ASCII 不敏感、DuckDB 敏感。默认封面 34,641 含 2 条
   `defaultnew.jpg` 小写变体，用 `LIKE` 会漏成 34,639。统一用 `ILIKE`。
 - **`comment_num` / `review_num` 仅 4,690 本有值**（1.9%），NULL = 未采集。
@@ -148,13 +156,17 @@ quarry/
 │   ├── build_dataset.py    raw → datasets/v1（归一化 + 清洗 + 去重 + 定年）
 │   ├── era.py              nid → 日期：插值、留一法验证、置信度
 │   ├── annual.py           年度年表 era_stats + 删失标记
+│   ├── supply.py           供给归因：新人/老人分解、cohort 留存、nid 密度
+│   ├── readability.py      可读性：漏斗、字数分带×结局、成品率、注意力份额
 │   ├── report_timeline.py  出时间轴报告图
+│   ├── report_supply.py    出供给归因图
+│   ├── report_readability.py  出可读性图
 │   └── tools/refill_anchors.py   补锚点（快照更新后用）
 ├── data/anchors/           91 个 nid 锚点（**入库**，随数据集发布）
 ├── datasets/v1/            自有数据集（gitignored，随 Release 发布）
 ├── data/raw/chunks/        上游原料（gitignored，不发布）
 ├── sql/                    分析查询
-├── tests/                  26 项断言
+├── tests/                  46 项断言
 ├── reports/                产出报告与图表
 └── notebooks/              探索（结论必须落回 src/ 或 tests/）
 ```
@@ -164,3 +176,5 @@ quarry/
 | 报告 | 内容 |
 |---|---|
 | [`reports/00_timeline.md`](reports/00_timeline.md) | 时间轴：定年模型、年表、三阶段、删失警告、"黄金五年 15–20"检验 |
+| [`reports/01_supply.md`](reports/01_supply.md) | 供给归因：2022→2025 三年 −61%，73% 是新人没来；留存与转化 |
+| [`reports/02_readability.md`](reports/02_readability.md) | 可读性结构：24.6 万是作品数，3,766 是可读数；成品率与坑率 |
