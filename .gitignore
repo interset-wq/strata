@@ -1,0 +1,65 @@
+# 参考项目与原始抓取脚本，不入库
+temp/
+
+# ── 数据层：体积大的一律不入库 ──────────────────────────────
+# 上游原始快照（191 MB）：不随 Release 分发，仅本地构建时用
+#   cd quarry && uv run python -m quarry.build_dataset
+# 注意用 quarry/data/* 而不是 quarry/data/：后者会让下面的 ! 例外失效
+quarry/data/*
+quarry/data/raw/
+# ↑ 例外：nid→日期锚点只有几十 KB，是定年模型的全部依据，必须入库
+!quarry/data/anchors/
+!quarry/data/anchors/**
+# ↑ 注意：必须写成 /data/ 而不是 data/。后者会匹配任意层级的 data 目录，
+#   把 quarry/data/anchors/ 一起吃掉的，前面那些 ! 例外就全失效。
+/data/
+# 自有数据集（约 46 MB）：随 GitHub Release 发布，不进 git
+quarry/datasets/
+*.sqlite
+*.sqlite.gz
+*.sqlite-wal
+*.sqlite-shm
+*.db
+*.duckdb
+*.duckdb.wal
+*.parquet
+*.feather
+
+# 报告图入库（报告 markdown 直接引用），其余图表产物不入库
+quarry/reports/*.png
+quarry/reports/*.svg
+!quarry/reports/00_timeline.png
+
+# ── Python ────────────────────────────────────────────────
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+.ipynb_checkpoints/
+
+# ── Flutter / Dart（app/ 本体）─────────────────────────────
+.dart_tool/
+.packages
+build/
+dist/
+*.iml
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# ── IDE / 系统 ────────────────────────────────────────────
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# ── 凭据（API Basic 头等，一律不入库）──────────────────────
+.env
+.env.*
+!.env.example
+
+# ── 工作记忆与工具缓存 ─────────────────────────────────────
+.workbuddy/
+.atomcode/
+*.log

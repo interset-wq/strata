@@ -1,0 +1,13 @@
+# 统一用 LF：仓库同时被 Windows 与 Linux/macOS 读写，不能让行尾跟着平台漂
+* text=auto eol=lf
+
+# 二进制
+*.png binary
+*.jpg binary
+*.gif binary
+*.duckdb binary
+*.parquet binary
+*.sqlite binary
+
+# 锁文件与生成物不做 diff
+quarry/uv.lock linguist-generated=true
