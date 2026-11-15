@@ -228,10 +228,51 @@ def test_era_covers_every_novel(con):
 
 
 def test_era_stats_conserves_totals(con):
-    """年表必须与总表守恒：book 数、banner 数一个不差。"""
-    assert scalar(con, "select sum(books_new) from era_stats") == config.BASELINE["novels_total"]
-    assert scalar(con, "select sum(banners) from era_stats") == config.BASELINE["banner_total"]
+    """年表必须与总表守恒：book 数、banner 数一个不差。
+
+    排除引进日轻后，被排除的量落在 import_* 两列，所以守恒式是
+    ``books_new + import_books == 全库``，而不是只看 books_new。
+    """
+    assert scalar(
+        con, "select sum(books_new) + sum(import_books) from era_stats"
+    ) == config.BASELINE["novels_total"]
+    assert scalar(
+        con, "select sum(banners) + sum(import_banners) from era_stats"
+    ) == config.BASELINE["banner_total"]
     assert scalar(con, "select count(*) from era_stats") == 21  # 2006–2026
+
+
+# ───────── 引进日轻（口径） ─────────
+
+
+def test_import_publishers_are_exactly_the_licensed_corpus(con):
+    """引进日轻按出版方账号识别，且这批书的 banner 率必须是 100%。
+
+    100% 不是巧合：版权方整批上架、banner 由版权方提供，与原创作品的
+    「当期认可」是两件事。这条断言同时防止有人用标题匹配扩大口径——
+    标题含「刀剑神域」的 200+ 本绝大多数是中国人写的同人，属于原创。
+    """
+    n, banner = con.execute(
+        "select count(*), sum(has_banner) from novels where flg_import"
+    ).fetchone()
+    assert n == config.BASELINE["import_books"], f"引进书本数变了：{n}"
+    assert banner == config.BASELINE["import_banners"], f"引进书 banner 数变了：{banner}"
+
+    authors = {r[0] for r in con.execute("select distinct author from novels where flg_import").fetchall()}
+    assert authors == set(config.IMPORT_PUBLISHERS), f"出版方账号变了：{authors}"
+
+
+def test_early_years_have_no_original_banner(con):
+    """2006–2009 年原创作品零 banner——那些年的 banner 全部给了引进日轻。
+
+    这是「引进期」的硬定义：站点在这四年里没有对任何一部原创作品授予过 banner。
+    2010 年才出现第一个（2 个）。若哪天这条不成立，说明分类或定年坏了。
+    """
+    rows = dict(
+        con.execute("select year, banners from era_stats where year between 2006 and 2009").fetchall()
+    )
+    assert all(v == 0 for v in rows.values()), f"2006-2009 出现原创 banner：{rows}"
+    assert con.execute("select banners from era_stats where year = 2010").fetchone()[0] == 2
 
 
 def test_dating_precision_splits_at_2017(con):

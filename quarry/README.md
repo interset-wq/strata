@@ -22,13 +22,29 @@ datasets/v1/                   我们的数据集        46 MB   不进 git / �
 
 | 表 | 行数 | 说明 |
 |---|---|---|
-| `novels` | 246,045 | 书目主表，含 6 个 `flg_` 质量标记 |
+| `novels` | 246,045 | 书目主表，含 7 个 `flg_` 质量标记 |
 | `novels_era` | 246,045 | **nid 定年**：`est_date` / `est_year` / `confidence` |
-| `era_stats` | 21 | **年表**：每年新增书、作者、banner、人气分位、删失标记 |
+| `era_stats` | 21 | **年表**：每年新增书、作者、banner、人气分位、删失标记，**已排除引进日轻** |
 | `tags` | 106 | 标签，`name` 为唯一键 |
 | `novel_tags` | 742,546 | 书↔标签 |
 | `authors` | 137,965 | 按 name 去重（原 140,638，跨片重复 2,673） |
 | `contests` | 99 | 按 name 去重（原 209，跨片重复 110） |
+
+### 唯一的口径排除：引进日轻
+
+`novels.flg_import` 标出 **46 本引进日轻**（`天闻角川` 37 + `天闻角川2号机` 1 + `HJ文库` 9），
+这 46 本 **100% 带 banner**。它们由版权方账号整批上架，banner 由版权方提供，
+不代表 SFACG 对原创作品的当期认可，所以所有认可类统计都排除它们。
+
+判定只能用出版方账号，理由写在 `config.IMPORT_PUBLISHERS` 的注释里，简言之：
+
+- 标题匹配不行：含「刀剑神域」的 87 本里 **86 本是中国人写的同人**，是同人就得算原创
+- 年份不行：2008–2013 的作者全是中文网名，盗版期整本搬运没留痕迹
+- `typeId` 不行：奇诺之旅和 2020 年的原创都是 21
+
+排除的影响很大：**2006–2009 年原创 banner 从 12 个降到 0**，那四年的 banner 全给了引进书。
+这就是「引进期」的硬定义。被排除的量记在 `era_stats.import_books` / `import_banners`，
+守恒式是 `books_new + import_books == 全库`。
 
 ### 定年：为什么用 nid，为什么可信
 
@@ -59,7 +75,7 @@ uv run python -m quarry.tools.refill_anchors --lo 777879 --hi 800000 --n 12
 cd quarry
 uv sync
 # 从 GitHub Release 下载 strata-v1 并解压到 datasets/v1/
-uv run pytest -q          # 24 项断言，含 manifest 与定年精度校验
+uv run pytest -q          # 26 项断言，含 manifest、定年精度与引进日轻口径
 ```
 
 **B. 从上游原始快照重建**（需要自己拿到那三片 sqlite）
@@ -109,7 +125,7 @@ uv run pytest -q
 - **存活偏差**：上游已排除「下架」状态的书，库中只有今天仍在架的作品，
   所有「某年新增 N 本」都是下界。
 - **banner 授予有右删失**：banner 书创作跨度中位 2.5 年（P75 4.6、P90 7.1），
-  只有 15% 在 1 年内完成。所以最近 3 年的授予量还没发生完，`era_stats.censored`
+  只有 13% 在 1 年内完成。所以最近 3 年的授予量还没发生完，`era_stats.censored`
   标出这批年份——**2024 年 11 个、2025 年 7 个是下界，不是实况**。
 - **`view_num` / `click_num` 跨年不可比**：它是累计值，等于「当年用户规模 × 曝光时间」。
   2015 年创建的书已积累 11 年，2025 年的只有 1.5 年。做跨年比较只能用比例类指标
@@ -138,7 +154,7 @@ quarry/
 ├── datasets/v1/            自有数据集（gitignored，随 Release 发布）
 ├── data/raw/chunks/        上游原料（gitignored，不发布）
 ├── sql/                    分析查询
-├── tests/                  24 项断言
+├── tests/                  26 项断言
 ├── reports/                产出报告与图表
 └── notebooks/              探索（结论必须落回 src/ 或 tests/）
 ```

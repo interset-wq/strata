@@ -60,9 +60,11 @@ def plot(df: pd.DataFrame, path):
             ha="right", va="top", linespacing=1.4,
         )
 
-    # 右轴：认可密度
+    # 右轴：认可密度。0 值放到 NaN，否则对数轴会把整段压平。
+    dens = df["grant_per_1k"].astype("float64")
+    dens = dens.mask(dens <= 0)
     ax2 = ax.twinx()
-    ax2.plot(x, df["grant_per_1k"], color=ACCENT, lw=1.8, marker="o", ms=3.2,
+    ax2.plot(x, dens, color=ACCENT, lw=1.8, marker="o", ms=3.2,
              label="每千本获 banner（‰）", zorder=3)
     ax2.set_yscale("log")
     ax2.set_ylim(0.3, 3000)
@@ -70,28 +72,33 @@ def plot(df: pd.DataFrame, path):
     ax2.tick_params(axis="y", colors=ACCENT, labelsize=8)
     ax2.spines["top"].set_visible(False)
 
-    # 两个峰值
+    # 峰值由数据决定，不写死——写死过一次，把 2016 当成了密度峰值（其实 2015 更高）
+    peak_d = df.loc[df["grant_per_1k"].idxmax()]
+    peak_s = df.loc[df["books_new"].idxmax()]
     ax2.annotate(
-        "认可密度峰值 2016  19.4‰",
-        xy=(2016, 19.4), xytext=(2009.8, 150),
+        f"密度峰值 {int(peak_d['year'])}  {peak_d['grant_per_1k']:.1f}‰",
+        xy=(peak_d["year"], peak_d["grant_per_1k"]),
+        xytext=(peak_d["year"] - 6.2, 260),
         fontsize=8, color=ACCENT,
         arrowprops=dict(arrowstyle="-", color=ACCENT, lw=0.8),
     )
     ax.annotate(
-        "供给峰值 2022  37,095 本",
-        xy=(2022, 37095), xytext=(2021.6, 44800),
+        f"供给峰值 {int(peak_s['year'])}  {int(peak_s['books_new']):,} 本",
+        xy=(peak_s["year"], peak_s["books_new"]),
+        xytext=(peak_s["year"] - 0.4, peak_s["books_new"] * 1.21),
         ha="center", fontsize=8, color=INK,
         arrowprops=dict(arrowstyle="-", color=MUTED, lw=0.8),
     )
 
     fig.text(
-        0.008, 0.975, "菠萝包轻小说（SF 轻小说）二十年：供给与认可密度",
+        0.008, 0.975,
+        "菠萝包轻小说（SF 轻小说）二十年：供给与原创作品的认可密度",
         fontsize=13.5, color=INK, ha="left", va="top",
     )
     fig.text(
         0.008, 0.928,
-        "供给在 2022 见顶、认可密度在 2016 见顶——两者错开 6 年。"
-        "灰色区为右删失（新书还没到能拿 banner 的成熟度）",
+        "供给 2022 见顶；认可密度 2015 见顶后单调下滑。已剔除天闻角川/HJ文库的引进日轻，"
+        "灰区为右删失",
         fontsize=8.8, color=MUTED, ha="left", va="top",
     )
 

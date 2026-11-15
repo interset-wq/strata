@@ -155,12 +155,17 @@ def clean_novels(novels: pd.DataFrame) -> pd.DataFrame:
     df["flg_praise_gt_click"] = df["praise_num"] > df["click_num"]
     df["flg_comment_missing"] = df["comment_num"].isna()
 
+    # 引进日轻：版权方账号上传，banner 由版权方提供，不算 SFACG 的原创认可。
+    # 只标记不删除——它们仍是站点历史的一部分，但所有认可类统计必须排除。
+    # 见 config.IMPORT_PUBLISHERS 里的口径说明。
+    df["flg_import"] = df["author"].isin(config.IMPORT_PUBLISHERS)
+
     order = [
         "id", "title", "author", "genre", "status", "ptype", "has_banner",
         "word_num", "click_num", "praise_num", "like_num",
         "comment_num", "review_num", "contest_id", "cover", "last_update", "chunk",
         "flg_placeholder_title", "flg_word_zero", "flg_default_cover",
-        "flg_like_fixed", "flg_praise_gt_click", "flg_comment_missing",
+        "flg_like_fixed", "flg_praise_gt_click", "flg_comment_missing", "flg_import",
     ]
     return df[order]
 

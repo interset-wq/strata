@@ -46,9 +46,22 @@ ANCHORS_PATH = Path(
 
 CHUNKS = ("cold", "warm", "hot")
 
+# ── 引进日轻的出版方账号 ──────────────────────────────────
+# 为什么按账号识别，而不是按标题或年份：
+#   1. 引进日轻由版权方以「出版方账号」上传，banner 也由版权方提供，
+#      不代表 SFACG 对原创作品的当期认可。做认可机制分析时必须排除。
+#   2. 实测这三个账号名下 46 本书 banner 率 100%（37 + 1 + 9），
+#      而标题里出现「刀剑神域」「凉宫」的 200+ 本绝大多数是**中国人写的同人**，
+#      属于原创，不能排除——所以标题匹配不可用。
+#   3. 年份也不可用：2008-2013 的作者名全是中文网名（魂之重奏、逆鳞.散落），
+#      盗版期的整本搬运已不可识别，只有正版引进留下账号痕迹。
+# 新增账号必须同时更新 BASELINE["import_books"] 与 tests 里的断言。
+IMPORT_PUBLISHERS = ("天闻角川", "天闻角川2号机", "HJ文库")
+
 # 数据集 schema 版本：列结构变化时 +1，读取方据此判断能否兼容
 # v2：新增 novels_era（nid 定年）与 era_stats（年表）两张表
-SCHEMA_VERSION = 2
+# v3：novels 增 flg_import；era_stats 排除引进日轻，并新增 import 两列
+SCHEMA_VERSION = 3
 
 # 已知事实基线：断言用。数字变化即代表上游快照或口径变了，必须人工确认后再改。
 BASELINE = {
@@ -65,6 +78,11 @@ BASELINE = {
     "default_cover": 34_641,
     "zero_click": 4_476,
     "like_negative": 58,
+    # 引进日轻：46 本（角川 37 + HJ文库 9），banner 46/46
+    "import_books": 46,
+    "import_banners": 46,
+    # 排除引进日轻后的 banner 总数（原 667）
+    "banner_original_only": 621,
 }
 
 

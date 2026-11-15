@@ -45,15 +45,33 @@ def build_stats(
     novels: pd.DataFrame,
     censor_years: int = CENSOR_YEARS,
 ) -> pd.DataFrame:
-    """按年聚合。返回 ``era_stats`` 表。"""
-    cols = ["id", "author", "has_banner", "click_num", "word_num", "ptype"]
+    """按年聚合。返回 ``era_stats`` 表。
+
+    **排除引进日轻**（``flg_import``）。理由：版权方账号上传的书，banner 由版权方
+    提供，不代表 SFACG 对原创作品的当期认可。实测影响很大——2006-2009 年原创
+    banner 从 12 个降到 0，早期「引进期」才第一次有了硬定义。
+
+    排除的量不丢：落在 ``import_books`` / ``import_banners`` 两列里，
+    所以 ``books_new + import_books`` 才是当年全量。
+    """
+    cols = ["id", "author", "has_banner", "click_num", "word_num", "ptype", "flg_import"]
     df = novels_era[["id", "est_date", "est_year", "confidence", "mode"]].merge(
         novels[cols], on="id", how="left"
     )
 
+    import_df = df[df["flg_import"].fillna(False)]
+    # 年份骨架取自**全量**：2006 年 3 本书全是引进，排除后该年为 0，
+    # 但年份本身不能消失——否则 books_new + import_books 的合计对不上。
+    all_years = sorted(df["est_year"].unique())
+    df = df[~df["flg_import"].fillna(False)]
+
     # 作者首次出现年份：区分「新人涌入」与「老作者多产」
     debut = df.groupby("author", dropna=False)["est_year"].min()
     df["debut_year"] = df["author"].map(debut)
+
+    imp = import_df.groupby("est_year").agg(
+        import_books=("id", "size"), import_banners=("has_banner", "sum")
+    )
 
     rows = []
     for year, g in df.groupby("est_year", sort=True):
@@ -74,8 +92,36 @@ def build_stats(
             }
         )
     stats = pd.DataFrame(rows)
+    # 补回被整年排除掉的年份（如 2006 全为引进书）
+    missing = [y for y in all_years if y not in set(stats["year"])]
+    if missing:
+        pad = pd.DataFrame(
+            {
+                "year": missing,
+                "books_new": 0,
+                "authors_new": 0,
+                "banners": 0,
+                "p50_view": np.nan,
+                "p90_view": np.nan,
+                "p99_view": np.nan,
+                "median_word": np.nan,
+                "vip_pct": np.nan,
+                "banner_median_view": np.nan,
+                "banner_median_word": np.nan,
+            }
+        )
+        stats = pd.concat([stats, pad], ignore_index=True).sort_values("year")
+    stats = stats.reset_index(drop=True)
 
-    stats["grant_per_1k"] = (stats["banners"] * 1000.0 / stats["books_new"]).round(3)
+    stats["import_books"] = (
+        stats["year"].map(imp["import_books"]).fillna(0).astype("int32")
+    )
+    stats["import_banners"] = (
+        stats["year"].map(imp["import_banners"]).fillna(0).astype("int32")
+    )
+
+    denom = stats["books_new"].replace(0, np.nan)
+    stats["grant_per_1k"] = (stats["banners"] * 1000.0 / denom).round(3)
     for c in ("p50_view", "p90_view", "p99_view", "median_word",
               "banner_median_view", "banner_median_word"):
         stats[c] = stats[c].round(0)
@@ -87,21 +133,25 @@ def build_stats(
     order = [
         "year", "books_new", "authors_new", "banners", "grant_per_1k",
         "p50_view", "p90_view", "p99_view", "median_word", "vip_pct",
-        "banner_median_view", "banner_median_word", "censored",
+        "banner_median_view", "banner_median_word",
+        "import_books", "import_banners", "censored",
     ]
     stats = stats[order]
     stats["year"] = stats["year"].astype("int16")
-    stats["books_new"] = stats["books_new"].astype("int32")
-    stats["authors_new"] = stats["authors_new"].astype("int32")
-    stats["banners"] = stats["banners"].astype("int32")
+    for c in ("books_new", "authors_new", "banners"):
+        stats[c] = stats[c].astype("int32")
     return stats
 
 
 def maturity(con) -> pd.Series:
-    """banner 书的创作跨度（年）——删失窗口的依据。"""
+    """banner 书的创作跨度（年）——删失窗口的依据。
+
+    排除引进日轻：那些书是版权方整批上架的，创作跨度由原版出版时间决定，
+    与「原创作品多久能成熟到拿 banner」无关。
+    """
     df = con.execute(
         """select n.last_update, e.est_date from novels n join novels_era e using (id)
-           where n.has_banner = 1"""
+           where n.has_banner = 1 and not n.flg_import"""
     ).df()
     span = (
         df["last_update"].dt.tz_localize(None) - pd.to_datetime(df["est_date"])
