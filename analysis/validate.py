@@ -105,6 +105,13 @@ def _check_values(df: pd.DataFrame) -> list[str]:
         errs.append(f"cover_url: {len(dup)} 行共用封面文件，应仅保留属主")
 
     # 以下两条对应 build_csv.drop_mask，用同一判据复核，防止剔除逻辑失效
+    licensed = df.loc[df["author"].isin(C.LICENSED_LN_AUTHORS), "author"]
+    if len(licensed):
+        errs.append(
+            f"author: {len(licensed)} 行属正版日轻版权方账号（id 不遵守递增），"
+            f"例 {licensed.iloc[0]!r}"
+        )
+
     empty = (df["words"].astype("int64") <= C.EMPTY_WORDS) & (
         df["clicks"].astype("int64") <= C.EMPTY_CLICKS
     )

@@ -21,6 +21,13 @@ log 空间更接近匀速。两端用边界段斜率外推，标记 ``extrap``�
 迁移说明：引擎与锚点自 quarry/era.py 与 quarry/data/anchors 迁入（quarry
 将退役），锚点为 API 实测，不可由 dataset.7z 重建，故入库存放于
 ``analysis/anchors/``。
+
+与正版日轻的关系（边界澄清）：最低端的 3 个锚点（nid 2242 / 2243 / 2347，
+2006-08 至 2006-09）对应的书在数据集内已被整行剔除——站点早期上架的是
+盗版日轻，后来正版授权版复用了同标题的旧 id。锚点的 ``addTime`` 记录的是
+**该 nid 本身**的创建时刻（盗版条目时代），对 id 序列的日期映射依然成立；
+被污染的是数据集里那 47 行的「书与其 id 不同时出生」，而不是锚点。故锚点
+保留，剔除判据见 ``config.LICENSED_LN_AUTHORS``。
 """
 
 from __future__ import annotations

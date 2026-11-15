@@ -8,7 +8,8 @@
 3. 枚举转真值，并把「断更」并入「连载中」
 4. 文本归一：非法字符换空格、非 ASCII 空白归一、压缩连续空格、去首尾空白
 5. 清洗：占位封面置空、分类后缀归一、标签去重
-6. 剔除整行：负收藏、全零、无文字标题且无内容（见 ``config.DROP_RULES``）
+6. 剔除整行：负收藏、全零、无文字标题且无内容、正版日轻等
+   （见 ``config.DROP_RULES``，判据统一写在 ``config.py``）
 
 列表字段不展开，标签以 ``|`` 连接在同一行内。
 
@@ -201,7 +202,7 @@ def dedup_covers(df: pd.DataFrame, tally: dict) -> pd.DataFrame:
 
 
 def drop_mask(df: pd.DataFrame) -> dict[str, pd.Series]:
-    """五类不可用的行，判定在归一之后，互不重叠。"""
+    """六类不可用的行，判定在归一之后，互不重叠。"""
     empty = (df["words"] <= C.EMPTY_WORDS) & (df["clicks"] <= C.EMPTY_CLICKS)
     return {
         "negative_favs": df["favs"] < 0,
@@ -209,6 +210,7 @@ def drop_mask(df: pd.DataFrame) -> dict[str, pd.Series]:
         "all_zero": (df["words"] == 0) & (df["clicks"] == 0),
         "status_missing": df["status"].isna(),
         "genre_unresolved": df["genre"].isna(),
+        "licensed_light_novel": df["author"].isin(C.LICENSED_LN_AUTHORS),
     }
 
 
@@ -221,6 +223,8 @@ def build(records: dict[int, dict]) -> tuple[pd.DataFrame, dict, list, dict]:
         "genre_unresolved": 0,
         "cover_placeholder_nulled": 0,
         "cover_shared_bugged": 0,
+        "licensed_ln_total": 0,
+        "licensed_ln_with_banner": 0,
         "tags_deduplicated": 0,
         "tags_dropped": 0,
         "word_num_zero": 0,
@@ -234,6 +238,12 @@ def build(records: dict[int, dict]) -> tuple[pd.DataFrame, dict, list, dict]:
 
     for name, dtype, _n, _src, _desc in C.COLUMNS:
         df[name] = pd.array(df[name], dtype="Int64") if dtype == "Int64" else df[name].astype(dtype)
+
+    # 正版日轻的 banner 交叉验证：用户判据称「一定有 banner」，若未来出现
+    # 无 banner 的版权方账号行，manifest 会显示差异（不阻断发布）。
+    ln_mask = df["author"].isin(C.LICENSED_LN_AUTHORS)
+    tally["licensed_ln_total"] = int(ln_mask.sum())
+    tally["licensed_ln_with_banner"] = int((ln_mask & (df["featured"] == 1)).sum())
 
     masks = drop_mask(df)
     dropped = (
@@ -274,6 +284,9 @@ def write_ddl(path: Path) -> None:
         "clicks >= 0",
         "favs >= 0",
         "praises >= 0",
+        # 与 drop_mask 对应：版权方账号（正版日轻）的 nid 不遵守 id 递增，
+        # 整行剔除；约束层再兜一次，防未来数据源混入。
+        f"author NOT IN ({', '.join(repr(a) for a in sorted(C.LICENSED_LN_AUTHORS))})",
         # 至少一个可观测信号，与 drop_mask 的 all_zero 对应
         "words > 0 OR clicks > 0",
         # 与 drop_mask 对应：书名要么含文字，要么有内容——无文字标题的 100 行
@@ -297,6 +310,62 @@ def write_ddl(path: Path) -> None:
         + "COPY novels FROM 'novels.csv' (HEADER, NULL '');\n",
         encoding="utf-8",
     )
+
+
+# ---------------------------------------------------------------- 取值清单
+def write_vocabulary(df: pd.DataFrame, path: Path) -> None:
+    """从发布后的宽表生成 out/vocabulary.md（低基数列的全部取值）。
+
+    这是构建产物之一，必须与 novels.csv 同步；此前手工生成的版本会在行数
+    变更后失真，故纳入主流程。
+    """
+    n = len(df)
+    lines = [
+        "# 离散列取值清单",
+        "",
+        f"由 `analysis/out/novels.csv` 生成，共 {n:,} 行。只列低基数列的**全部**取值。",
+        "",
+        "## 唯一值个数",
+        "",
+        "| 列 | 唯一值 | 空串 |",
+        "|---|---:|---:|",
+    ]
+    for col in C.COLUMN_NAMES:
+        s = df[col].fillna("")
+        lines.append(f"| `{col}` | {s.nunique():,} | {int((s == '').sum()):,} |")
+
+    lines += ["", "## 枚举列", ""]
+    for col in ("status", "genre", "price_type", "featured"):
+        vc = df[col].value_counts()
+        lines += [f"### `{col}`（{len(vc)} 个）", "", "| 值 | 行数 | 占比 |", "|---|---:|---:|"]
+        for value in sorted(vc.index, key=str):
+            count = int(vc[value])
+            lines.append(f"| {value} | {count:,} | {count / n * 100:.2f}% |")
+        lines.append("")
+
+    contest = df.loc[df["contest"] != "", "contest"].value_counts()
+    lines += [
+        f"## `contest`（{len(contest)} 个值，非空 {int(contest.sum()):,} 行）",
+        "",
+        "| 值 | 行数 |",
+        "|---|---:|",
+    ]
+    lines += [f"| {v} | {int(c):,} |" for v, c in contest.items()]
+
+    tag_series = df.loc[df["tags"] != "", "tags"].str.split(C.TAG_SEP).explode()
+    tag_counts = tag_series.value_counts()
+    empty_tags = int((df["tags"] == "").sum())
+    lines += [
+        "",
+        f"## `tags`（{len(tag_counts)} 个标签，挂载 {int(tag_counts.sum()):,} 次）",
+        "",
+        f"单本最多 5 个，`{C.TAG_SEP}` 分隔。空 tags 的 {empty_tags:,} 行未计入。",
+        "",
+        "| 标签 | 次数 |",
+        "|---|---:|",
+    ]
+    lines += [f"| {v} | {int(c):,} |" for v, c in tag_counts.items()]
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
 
 
 # ---------------------------------------------------------------- 主流程
@@ -326,6 +395,7 @@ def main() -> int:
 
     os.replace(tmp, C.CSV_FILE)
     write_ddl(C.SQL_FILE)
+    write_vocabulary(df, C.OUT_DIR / "vocabulary.md")
 
     manifest = {
         "dataset": "novel_hub",
@@ -373,6 +443,17 @@ def main() -> int:
                 "detail": genre_fixes,
             },
             "favs": {"negative_rows_dropped": dropped["rules"]["negative_favs"]},
+            "licensed_light_novel": {
+                "rule": (
+                    "作者为版权方账号即整行剔除（正版日轻复用盗版条目旧 id，"
+                    "不遵守 id 递增；授权到期使在册状态失效）；"
+                    "banner 仅作交叉验证，不写入判据"
+                ),
+                "authors": sorted(C.LICENSED_LN_AUTHORS),
+                "rows_dropped": dropped["rules"]["licensed_light_novel"],
+                "with_banner": tally["licensed_ln_with_banner"],
+                "no_banner": tally["licensed_ln_total"] - tally["licensed_ln_with_banner"],
+            },
             "cover": {
                 "rule": (
                     f"文件名以 {C.COVER_PLACEHOLDER} 开头视为无封面；"

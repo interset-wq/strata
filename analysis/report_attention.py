@@ -114,8 +114,8 @@ def fig_cohort(df: pd.DataFrame) -> str:
     ax2.grid(False)
     ax2.plot(ginis.index, ginis.values, "-", color=charts.C["red"], lw=1.5,
              label="世代内 Gini（右轴）")
-    ax2.set_ylim(0.70, 1.02)
-    ax2.set_yticks([0.8, 0.9, 1.0])
+    ax2.set_ylim(0.65, 1.02)
+    ax2.set_yticks([0.7, 0.8, 0.9, 1.0])
     ax2.spines["right"].set_visible(True)
     ax2.spines["right"].set_color("#CCCCCC")
     ax2.tick_params(colors=charts.C["red"], labelsize=8)
@@ -290,13 +290,14 @@ def section_cohort(df: pd.DataFrame) -> str:
     ginis = d[d["est_year"] >= 2008].groupby("est_year")["favs"].apply(
         lambda s: gini(s.to_numpy()))
     ginis_main = ginis.drop(2008)
+    n2008 = int((d["est_year"] == 2008).sum())
 
     return f"""## 3. 世代维度：集中是结构常数
 
 ![世代收藏份额与世代内 Gini](figures/02_cohort.png)
 
 各世代内部的 Gini 稳定在 {ginis_main.min():.2f}–{ginis_main.max():.2f}
-（2008 年世代 {ginis[2008]:.2f} 为 n=405 的小样本例外，且经过 18 年存活筛选），
+（2008 年世代 {ginis[2008]:.2f} 为 n={n2008} 的小样本例外，且经过 18 年存活筛选），
 不随平台规模、题材结构、商业化程度变化。**头部集中是注意力的组织方式本身，
 而非某个年代的现象**；全库 Gini {gini(df['favs'].to_numpy()):.2f} 因此可以直接
 解读为结构参数。
@@ -351,7 +352,7 @@ def section_genre(df: pd.DataFrame) -> str:
 （欠额），但收藏中位 {g.loc['同人', 'med']:.0f} 为九类最高——中位数高而份额低
 同时成立，因为其 Gini 仅 {g.loc['同人', 'gini']:.2f}（其余品类 0.93–0.96）。
 同人受众按 IP 划分社群，注意力在社群内充分分布、不向头部聚拢：单本的中等
-热度有保证，出圈爆款几乎不存在（top 1000 占比 0.3‰）。"""
+热度有保证，出圈爆款几乎不存在（top 1000 占比 0.3%）。"""
 
 
 def section_filters(df: pd.DataFrame) -> str:
@@ -371,27 +372,35 @@ def section_filters(df: pd.DataFrame) -> str:
     feat = df[df["featured"] == 1]
     top1000 = df.nlargest(1000, "favs")
     feat_in_top = (top1000["featured"] == 1).mean() * 100
+    wband_all = pd.cut(
+        df["words"], [0, 1e4, 5e4, 1e5, 2e5, 5e5, np.inf],
+        labels=["<1万", "1-5万", "5-10万", "10-20万", "20-50万", "50万+"],
+    )
+    med_all = df.groupby(wband_all, observed=True)["favs"].median()
+    med_status = d.groupby("status")["favs"].median()
 
     return f"""## 5. 字数、完结与运营位
 
 ![字数档 × 完结状态的收藏中位](figures/02_words_status.png)
 
-字数是注意力的最强单变量分层：全库口径下收藏中位从 1 万字以下的 3 单调升至
-50 万字以上的 5,216。下表控制世代（2022 及以前，缓解删失）与字数档后，
-完结的溢价依然在每个档内成立：
+字数是注意力的最强单变量分层：全库口径下收藏中位从 1 万字以下的
+{med_all.loc['<1万']:.0f} 单调升至 50 万字以上的 {med_all.loc['50万+']:,.0f}。
+下表控制世代（2022 及以前，缓解删失）与字数档后，完结的溢价依然在每个档内成立：
 
 {table}
 
 完结溢价在两端最高（1–5 万档 {t.loc['1-5万', '已完结'] / t.loc['1-5万', '连载中']:.1f} 倍、
 20 万字以上约 2.1–2.3 倍）：完结既是内容确定性的信号，也筛选出投入度更高的作者，
-两个机制同向。原始口径下完结书收藏更高（全库中位 13 对 7），其中大部分水平差
+两个机制同向。原始口径下完结书收藏更高（≤2022 世代中位
+{med_status['已完结']:.0f} 对 {med_status['连载中']:.0f}），其中大部分水平差
 由字数梯度贡献——完结书更长；但控制字数档后溢价依然保留（1.3–2.3 倍），
 说明完结本身是独立于字数的注意力信号。
 
 featured（运营位）共 {len(feat)} 本（{len(feat) / len(df) * 100:.2f}%），收藏中位
 {feat['favs'].median():,.0f}，是全库中位（{df['favs'].median():.0f}）的
 {feat['favs'].median() / df['favs'].median():,.0f} 倍；top 1000 收藏书中有
-{feat_in_top:.0f}% 在运营位上。注意因果方向不可从快照判定：banner 是当前状态，
+{feat_in_top:.0f}% 在运营位上。已剔除的 47 本正版日轻全部为运营位书，
+因此此处统计不含授权内容。注意因果方向不可从快照判定：banner 是当前状态，
 展示的更可能是已被市场验证的书。可以确定的是**运营位与头部高度重合**——
 平台的推荐位在放大既有集中，而非制造长尾的可见性。"""
 
@@ -409,6 +418,8 @@ def build() -> None:
     ginis = df[df["est_year"] >= 2008].groupby("est_year")["favs"].apply(
         lambda s: gini(s.to_numpy()))
     ginis_main = ginis.drop(2008)
+    n2008 = int((df["est_year"] == 2008).sum())
+    feat_in_top = (df.nlargest(1000, "favs")["featured"] == 1).mean() * 100
     d22p = df[df["est_year"] <= 2022].copy()
     d22p["wband"] = pd.cut(
         d22p["words"], [2e5, 5e5, np.inf], labels=["20-50万", "50万+"],
@@ -434,6 +445,9 @@ def build() -> None:
 > 3. 数据源 `analysis/out/novels.csv`，{len(df):,} 行，快照 2026-06-13，
 >    在册存活口径；年份由 nid 定年（报告 01 §1）。
 > 4. featured 是快照时刻的运营位状态（当前态而非历史），因果方向见 §5。
+> 5. 正版日轻（版权方账号 47 行，全部 VIP 且在运营位）已整行剔除：其 nid
+>    复用同标题盗版条目的旧 id，不遵守 id 递增，见 `analysis/config.py`。
+>    剔除后运营位降至 620 本，本报告所有统计均不含该批。
 
 ---
 
@@ -443,7 +457,7 @@ def build() -> None:
    占 {top01:.1f}% 收藏，top 1% 占 {top1:.1f}%，top 10% 占 {top10:.1f}%；
    中位 {df['favs'].median():.0f} 对均值 {df['favs'].mean():,.0f}。
 2. **集中是结构常数**：各世代内 Gini 稳定在 {ginis_main.min():.2f}–{ginis_main.max():.2f}
-   （2008 年世代 {ginis[2008]:.2f} 为 n=405 的小样本例外），
+   （2008 年世代 {ginis[2008]:.2f} 为 n={n2008} 的小样本例外），
    20 年间不随平台规模、题材结构、商业化程度变化。
 3. **注意力随平台周期移动**：{share_2020_22:.0f}% 的收藏在 2020–2022 世代；
    若收藏仅随书龄累积应向早期世代倾斜，事实相反。
@@ -453,7 +467,7 @@ def build() -> None:
 5. **字数是最强分层变量，完结档内溢价成立**：收藏中位跨字数档差三个数量级；
    控制世代与字数档后完结书溢价仍达 {prem_ratio.min():.1f}–{prem_ratio.max():.1f} 倍
    （20 万字以上两档）。
-6. **运营位与头部重合**：top 1000 收藏书 44% 在 banner 位上，推荐位放大
+6. **运营位与头部重合**：top 1000 收藏书 {feat_in_top:.0f}% 在 banner 位上，推荐位放大
    而非缓和集中。
 
 ---
