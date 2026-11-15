@@ -6,6 +6,9 @@ SFACG 二十年书目数据的**勘测**项目。名字取「采石场」——�
 > **要写查询？先读 [`DATASET.md`](./DATASET.md)。** 那里是数据集字典：每张表、每个字段的
 > 真实语义、NULL 含义、两套精度、15 条踩过的坑，以及可直接复制的体检 SQL。
 > 本文件讲的是「为什么这么建」，DATASET.md 讲的是「怎么读才不会算错」。
+>
+> **要碰 raw？先读 [`RAW.md`](./RAW.md)。** 上游那三片 sqlite 的切分规则、三套互不相通的
+> id 空间、cold 片的截断线、以及为什么 `status` 5/6 等价于「精确通道」。
 
 ## 数据主权：我们只发布自己的数据集
 
@@ -13,7 +16,7 @@ SFACG 二十年书目数据的**勘测**项目。名字取「采石场」——�
 所有分析与后续开发只依赖 `datasets/`——我们自己产出的数据集。
 
 ```
-data/raw/chunks/*.sqlite       上游三片原始快照   191 MB   不进 git / 不随 Release
+data/raw/chunks/*.sqlite       上游三片原始快照   137.7 MB  不进 git / 不随 Release（gz 62.1 MB）
         │
         ▼  uv run python -m quarry.build_dataset
 datasets/v1/                   我们的数据集        46 MB   不进 git / 随 Release 发布
