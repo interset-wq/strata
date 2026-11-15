@@ -41,6 +41,14 @@ UNCLASSIFIED = "未分类"
 
 TAG_SEP = "|"
 
+# 非法字符按 Unicode 大类判定，替换为普通空格：
+#   Cc 控制符（含 \t \n \r）  Cf 格式符（零宽、BOM、软连字符、双向覆盖）
+#   Co 私用区                   Cs 代理对        Cn 未分配
+# 另把非 ASCII 的空白（NBSP、全角空格、em space 等 Zs）归一为普通空格：
+# 它们看起来是空格却不是，会让 split / 检索 / 去重全部失效。
+INVALID_CATEGORIES = frozenset({"Cc", "Cf", "Co", "Cs", "Cn"})
+SPACE_CATEGORY = "Zs"
+
 # 无封面时站点返回占位图而不是空值。文件名以 default 开头即视为无封面，
 # 保留 URL 会让人以为封面存在（36,212 行命中，含大小写与 [1] 变体）。
 COVER_PLACEHOLDER = "default"

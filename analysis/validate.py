@@ -19,6 +19,19 @@ import config as C
 INT_RE = re.compile(r"^(0|[1-9]\d*)$")
 TS_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$")
 
+# Cc 控制符、常见 Cf 格式符（零宽/软连字符/双向覆盖）、BMP 私用区。
+# Cn 未分配字符无法用正则枚举，实际数据中未出现。
+INVALID_RE = re.compile(
+    "[\x00-\x1f\x7f-\x9f"
+    "\u00ad\u061c\u06dd\u070f\u180e"
+    "\u200b-\u200f\u202a-\u202e\u2060-\u206f"
+    "\ufeff\ufff9-\ufffb"
+    "\ue000-\uf8ff]"
+)
+# 是空白但不是普通空格：NBSP、全角空格、em space 等
+ODD_SPACE_RE = re.compile(r"[^\S ]")
+MULTISPACE_RE = re.compile(r" {2,}")
+
 
 def _check_bytes(path: Path) -> list[str]:
     errs = []
@@ -92,12 +105,28 @@ def _check_values(df: pd.DataFrame) -> list[str]:
     if len(bad):
         errs.append(f"tags: {len(bad)} 行含多余分隔符，例 {bad.iloc[0]!r}")
 
-    for name in ("title", "author"):
+    errs.extend(_check_text(df))
+    return errs
+
+
+def _check_text(df: pd.DataFrame) -> list[str]:
+    """字符串列必须已归一：无非法字符、无非 ASCII 空白、无首尾与连续空格。"""
+    errs = []
+    for name, dtype, _null, _src, _desc in C.COLUMNS:
+        if dtype != "string":
+            continue
         s = df[name]
+        for pattern, label in (
+            (INVALID_RE, "非法字符"),
+            (ODD_SPACE_RE, "非 ASCII 空白"),
+            (MULTISPACE_RE, "连续空格"),
+        ):
+            hit = s[s.str.contains(pattern, regex=True, na=False)]
+            if len(hit):
+                errs.append(f"{name}: {len(hit)} 行含{label}，例 {hit.iloc[0][:30]!r}")
         ws = s[s != s.str.strip()]
         if len(ws):
             errs.append(f"{name}: {len(ws)} 行首尾有空白")
-
     return errs
 
 

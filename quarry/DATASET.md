@@ -350,7 +350,8 @@ select
 
 `analysis/` 另建一条产出线，直接读 novel_hub 爬虫的原始 jsonl，产出一张
 `analysis/out/novels.csv`：按 `nid` 去重、列重命名、枚举落中文真值、标签以 `|`
-连在同一行内不展开。约束写在 `analysis/out/schema.sql`，DuckDB 导入时生效。
+连在同一行内不展开；字符串已归一（非法字符换空格、非 ASCII 空白归一、压连续空格、
+去首尾空白）。约束写在 `analysis/out/schema.sql`，DuckDB 导入时生效。
 
 | 产物 | 服务对象 | 组织方式 | 约束 |
 |---|---|---|---|

@@ -1,12 +1,13 @@
 """novel_hub 的原始 jsonl → 单张宽表 CSV。
 
 上游的 jsonl 是爬虫直接产物，同一 nid 会因分片重叠出现多次，且字段名是
-抓取脚本的内部命名。本脚本做四件事，然后产出唯一一份 CSV：
+抓取脚本的内部命名。本脚本做五件事，然后产出唯一一份 CSV：
 
 1. 按 nid 去重，保留最后一条（后抓的覆盖先抓的，实测 click 只增不减）
 2. 列重命名，去掉 ``_num`` / ``novel_`` 这类来源痕迹
 3. 枚举转真值，并把「断更」并入「连载中」
-4. 清洗：负收藏置空、分类后缀归一、标签去重
+4. 文本归一：非法字符换空格、非 ASCII 空白归一、压缩连续空格、去首尾空白
+5. 清洗：负收藏置空、占位封面置空、分类后缀归一、标签去重
 
 列表字段不展开，标签以 ``|`` 连接在同一行内。
 
@@ -17,8 +18,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import shutil
 import sys
+import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -28,6 +31,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import config as C
 import validate
+
+MULTISPACE = re.compile(r" {2,}")
 
 
 def sha256(path: Path) -> str:
@@ -72,6 +77,34 @@ def check_fields(records: dict[int, dict]) -> None:
             raise SystemExit(f"nid {nid} 缺少字段 {missing}")
 
 
+# ---------------------------------------------------------------- 文本归一
+def normalise(value: str) -> tuple[str, int]:
+    """非法字符换空格，非 ASCII 空白归一并压缩，最后去首尾空白。"""
+    out: list[str] = []
+    replaced = 0
+    for ch in value:
+        cat = unicodedata.category(ch)
+        if cat in C.INVALID_CATEGORIES:
+            out.append(" ")
+            replaced += 1
+        elif cat == C.SPACE_CATEGORY and ch != " ":
+            out.append(" ")
+            replaced += 1
+        else:
+            out.append(ch)
+    return MULTISPACE.sub(" ", "".join(out)).strip(), replaced
+
+
+def _norm(value: str | None, field: str, tally: dict) -> str:
+    raw = value or ""
+    cleaned, replaced = normalise(raw)
+    if replaced or cleaned != raw:
+        entry = tally["text"].setdefault(field, {"rows": 0, "chars": 0})
+        entry["rows"] += 1
+        entry["chars"] += replaced
+    return cleaned
+
+
 # ---------------------------------------------------------------- 清洗
 def clean_status(value: str | None, tally: dict) -> str:
     if value not in C.STATUS_MAP:
@@ -96,11 +129,13 @@ def clean_genre(value: str, tally: dict, fixes: list) -> str:
 def clean_tags(value: list, tally: dict) -> str:
     seen: list[str] = []
     for tag in value:
-        tag = tag.strip()
-        if tag and tag not in seen:
-            seen.append(tag)
-    if len(seen) != len(value):
-        tally["tags_deduplicated"] += 1
+        cleaned = _norm(tag, "tags", tally)
+        if not cleaned:
+            tally["tags_dropped"] += 1
+        elif cleaned not in seen:
+            seen.append(cleaned)
+        else:
+            tally["tags_deduplicated"] += 1
     return C.TAG_SEP.join(seen)
 
 
@@ -115,49 +150,48 @@ def clean_row(row: dict, tally: dict, genre_fixes: list) -> dict:
     for col in ("word_num", "click_num", "praise_num"):
         tally[f"{col}_zero"] += int(row[col]) == 0
 
-    cover = row["cover"]
-    if isinstance(cover, str) and cover.strip():
-        basename = cover.rsplit("/", 1)[-1].lower()
-        if basename.startswith(C.COVER_PLACEHOLDER):
-            tally["cover_placeholder_nulled"] += 1
-            cover = None
+    cover = _norm(row["cover"], "cover_url", tally)
+    if cover and cover.rsplit("/", 1)[-1].lower().startswith(C.COVER_PLACEHOLDER):
+        tally["cover_placeholder_nulled"] += 1
+        cover = None
+
+    status = _norm(row["status"], "status", tally)
     return {
         "id": int(row["nid"]),
-        "title": row["novel_title"].strip(),
-        "author": row["author"].strip(),
-        "genre": clean_genre(row["genre"], tally, genre_fixes),
-        "price_type": row["price_type"],
-        "status": clean_status(row["status"], tally),
-        "contest": row["contest"].strip(),
+        "title": _norm(row["novel_title"], "title", tally),
+        "author": _norm(row["author"], "author", tally),
+        "genre": clean_genre(_norm(row["genre"], "genre", tally), tally, genre_fixes),
+        "price_type": _norm(row["price_type"], "price_type", tally),
+        "status": clean_status(status or None, tally),
+        "contest": _norm(row["contest"], "contest", tally),
         "words": int(row["word_num"]),
         "clicks": int(row["click_num"]),
         "likes": likes,
         "praises": int(row["praise_num"]),
         "featured": int(bool(row["banner"])),
-        "cover_url": cover.strip() if isinstance(cover, str) else None,
-        "updated_at": row["last_update"].replace(" ", "T"),
+        "cover_url": cover,
+        "updated_at": _norm(row["last_update"], "updated_at", tally).replace(" ", "T"),
         "tags": clean_tags(row["tags"], tally),
     }
 
 
 def build(records: dict[int, dict]) -> tuple[pd.DataFrame, dict, list]:
     tally = {
+        "text": {},
         "status_null_to_unknown": 0,
         "status_dead_to_ongoing": 0,
         "genre_relabelled": 0,
         "likes_negative_nulled": 0,
-        "tags_deduplicated": 0,
         "cover_placeholder_nulled": 0,
+        "tags_deduplicated": 0,
+        "tags_dropped": 0,
         "word_num_zero": 0,
         "click_num_zero": 0,
         "praise_num_zero": 0,
         "likes_zero": 0,
     }
     genre_fixes: list[str] = []
-    rows = [
-        clean_row(records[nid], tally, genre_fixes)
-        for nid in sorted(records)
-    ]
+    rows = [clean_row(records[nid], tally, genre_fixes) for nid in sorted(records)]
     df = pd.DataFrame(rows, columns=C.COLUMN_NAMES)
 
     for name, dtype, _n, _src, _desc in C.COLUMNS:
@@ -175,9 +209,8 @@ DUCK_TYPE = {"int64": "BIGINT", "int8": "TINYINT", "Int64": "BIGINT", "string": 
 
 
 def write_ddl(path: Path) -> None:
-    cols = C.COLUMNS
     lines = []
-    for name, dtype, nullable, _src, _desc in cols:
+    for name, dtype, nullable, _src, _desc in C.COLUMNS:
         parts = [f"  {name:<13} {DUCK_TYPE[dtype]}"]
         if not nullable:
             parts.append("NOT NULL")
@@ -215,7 +248,8 @@ def write_ddl(path: Path) -> None:
 def main() -> int:
     if not C.JSONL_DIR.exists():
         raise SystemExit(
-            f"缺少 jsonl 目录 {C.JSONL_DIR}\n先运行：uv run --extra archive python analysis/prepare.py"
+            f"缺少 jsonl 目录 {C.JSONL_DIR}\n"
+            "先运行：uv run --extra archive python analysis/prepare.py"
         )
 
     records, load_stats = load_jsonl(C.JSONL_DIR)
@@ -259,18 +293,31 @@ def main() -> int:
                 "rule": "同 nid 保留最后一条（文件顺序即抓取顺序）",
                 **load_stats,
             },
+            "text": {
+                "rule": (
+                    "Cc/Cf/Co/Cs/Cn 与非 ASCII 空白替换为空格，"
+                    "压缩连续空格后去首尾空白"
+                ),
+                "fields": tally["text"],
+            },
             "status": {
                 "rule": "断更并入连载中；null 记为未知",
                 "dead_to_ongoing": tally["status_dead_to_ongoing"],
                 "null_to_unknown": tally["status_null_to_unknown"],
             },
-            "genre": {"relabelled": tally["genre_relabelled"], "detail": genre_fixes},
+            "genre": {
+                "relabelled": tally["genre_relabelled"],
+                "detail": genre_fixes,
+            },
             "likes": {"negative_nulled": tally["likes_negative_nulled"]},
             "cover": {
-                "rule": f'文件名以 {C.COVER_PLACEHOLDER} 开头视为无封面',
+                "rule": f"文件名以 {C.COVER_PLACEHOLDER} 开头视为无封面",
                 "placeholder_nulled": tally["cover_placeholder_nulled"],
             },
-            "tags": {"deduplicated_rows": tally["tags_deduplicated"]},
+            "tags": {
+                "deduplicated": tally["tags_deduplicated"],
+                "dropped_empty": tally["tags_dropped"],
+            },
         },
         "zeros": {
             "words": tally["word_num_zero"],
@@ -293,17 +340,20 @@ def main() -> int:
             "null": "空串",
             "datetime": "ISO 8601，无时区",
             "list": f"tags 以 {C.TAG_SEP} 连接，不展开成行",
+            "text": "无控制符、无零宽字符、无非 ASCII 空白、无首尾空白、无连续空格",
         },
     }
     C.MANIFEST.write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
     )
 
-    print(f"jsonl {load_stats['files']} 个文件 / {load_stats['lines']} 行"
-          f" → 去重 {load_stats['duplicate_rows']} 行")
+    print(
+        f"jsonl {load_stats['files']} 个文件 / {load_stats['lines']} 行"
+        f" → 去重 {load_stats['duplicate_rows']} 行"
+    )
     print(f"novels.csv  {len(df)} 行  {C.CSV_FILE.stat().st_size / 1e6:.2f} MB")
     print(f"  状态   {manifest['distribution']['status']}")
-    print(f"  分类   {manifest['distribution']['genre']}")
+    print(f"  文本   {tally['text']}")
     print(f"已发布 {C.CSV_FILE}")
     return 0
 
