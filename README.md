@@ -16,7 +16,7 @@
 | 层 | 目录 | 状态 |
 | --- | --- | --- |
 | 研究 | [`analysis/`](./analysis/) | **已完成**：17 份报告、77 张图，数据管线可重建 |
-| 产品 | `app/` | **预留**：尚未开工，形态待重新设计 |
+| 产品 | [`app/`](./app/) | **设计中**：Flutter UI + 内嵌 Go 服务，见 [APP 设计文档 01](./app/docs/01-tech-stack.md) |
 | 设计档案 | [`docs/`](./docs/) | **历史稿**：含实测事实与早期方案，数字口径已过时，见 [文档索引](./docs/README.md) |
 
 **引用任何数字之前，先读 [`analysis/README.md`](./analysis/README.md) 的口径约束。**
@@ -125,7 +125,7 @@ for f in report_*.py; do uv run python "$f"; done   # 全部 17 份
 | [`docs/architecture.md`](./docs/architecture.md) | 早期架构、六个入口、种子策略 | 方案待重新设计 |
 | [`docs/cloud.md`](./docs/cloud.md) | 轻后端 P2 蓝图 | 未实现，待重新设计 |
 | [`docs/schema.sql`](./docs/schema.sql) / `schema-map.html` | 早期 17 表结构 | 待重新设计 |
-| [`app/README.md`](./app/README.md) | 产品预留位 | 尚未开工 |
+| [`app/README.md`](./app/README.md) | 产品预留位与设计文档索引 | 技术栈已定，见 [`app/docs/01-tech-stack.md`](./app/docs/01-tech-stack.md) |
 
 `temp/` 下是参考项目与原始抓取脚本，不进版本库。
 
@@ -150,4 +150,23 @@ for f in report_*.py; do uv run python "$f"; done   # 全部 17 份
 
 ## 许可
 
-代码 MIT（见 [`LICENSE`](./LICENSE)）。分析文字与图表版权归作者所有。
+本项目以 **GNU Affero 通用公共许可证第 3 版（AGPL-3.0）** 授权，
+Copyright (C) 2026 interset-wq，许可证全文见 [`LICENSE`](./LICENSE)。
+分析文字与图表版权归作者所有。
+
+**为什么用 AGPL 而不是宽松许可**：本项目包含面向第三方站点的抓取与解析代码。
+AGPL 第 13 条要求，若将（修改后的）程序作为网络服务提供给他人使用，
+必须向使用者提供完整的对应源码。这使「拿本项目搭一套抓取服务、闭源运营」
+的合法成本提高到需要公开自己的改动。
+
+**它的边界，需要说清楚**：
+
+- 许可证是**法律约束，不是技术措施**。它不阻止私人自用的抓取
+  （AGPL 不约束未分发、未对外提供网络服务的自用行为），
+  也不能替代礼貌访问。真正约束滥用强度的是引擎层的全局限速与单日上限。
+- 分发修改版、或将其作为网络服务对外提供，均须以 AGPL-3.0 开源完整对应源码；
+  **不提供商业授权例外**。
+- 已发布版本不可撤回授权：`v0.0.1` 及更早按 MIT 发布，该版本继续受 MIT 约束；
+  自本版起的新代码按 AGPL-3.0 授权。
+
+如果你的使用场景与上述义务不兼容（例如必须闭源分发），请勿使用本代码。
