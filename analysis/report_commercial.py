@@ -203,7 +203,7 @@ def fig_generation(t: pd.DataFrame, d: pd.DataFrame) -> str:
         if row["nid"] > max_nid:
             return "快照后（未入库）"
         if pd.isna(row["est_year"]):
-            return "已下架"
+            return "库内缺失"
         age = row["year"] - row["est_year"]
         if age <= 0:
             return "当年"
@@ -217,7 +217,7 @@ def fig_generation(t: pd.DataFrame, d: pd.DataFrame) -> str:
 
     t = t.copy()
     t["band"] = t.apply(band, axis=1)
-    order = ["当年", "上一年", "2-3 年", "4-6 年", "7 年以上", "已下架", "快照后（未入库）"]
+    order = ["当年", "上一年", "2-3 年", "4-6 年", "7 年以上", "库内缺失", "快照后（未入库）"]
     ct = pd.crosstab(t["year"], t["band"], normalize="index").mul(100)
     ct = ct.reindex(columns=[c for c in order if c in ct.columns], fill_value=0)
     colors = ["#4477AA", "#88AACC", "#CCDDF0", "#E8E8E8", "#BBBBBB", "#999999", "#DDAA77"]
@@ -336,8 +336,9 @@ def section_header(sb: dict, n_anchor: int, span: tuple[str, str],
 >    完结占比越高，这是机械偏置而非事实。
 > 6. **榜单覆盖到 {span[1]}，超出数据内容上界**：2026-06 之后新创建的书
 >    （nid > {int(sb['max_nid'])}）不在数据集内，属性不可得，一律单列
->    「库外」。同理，`nid` 在范围内但不在库内的条目为**已下架**书（历史上榜、
->    现已从站点移除），属性亦不可得。
+>    「库外」。同理，`nid` 在范围内但不在库内的条目属性亦不可得——报告 10 的
+>    存活审计表明其主体是**抓取源遗漏的在线书**（探测样本 90.7% 仍在线），而非
+>    已下架书；初稿「已下架」的解读已撤回。
 > 7. 无营收、付费人数、订阅量数据。月票票数是唯一带量级的公开付费信号，但含
 >    运营活动加成（如双倍月票），只能作相对刻度。
 > 8. 因果边界：上榜本身带来曝光，榜位与热度互为因果；本报告全部结论为结构
@@ -655,21 +656,25 @@ def section_scale(ranks: dict[int, pd.DataFrame], d: pd.DataFrame) -> str:
 「热销榜」的表格，可比的是**在榜事实与席位结构**，绝不可换算成金额或销量；
 这也是 §2 为何只能用「付费类型构成」而不是「消耗额」去验证计费机制。
 
-### 1.1 榜单是「当期在架」的快照，会留下下架痕迹
+### 1.1 榜单是「当期在架」的快照，库内缺失需要重新解释
 
 {thousands(t['nid'].isin(d['id']).sum())} 人次可在数据集内匹配，
 {thousands(beyond)} 人次为数据内容上界之后创建（占 {beyond / len(t) * 100:.1f}%），
 另有 {thousands(len(removed))} 人次（{removed['nid'].nunique()} 本独立书）的 nid
-在范围内却**不在库存**——即曾上榜、现已下架的书。其年份分布并不均匀：
+在范围内却**不在库存**。本报告初稿称之为「已下架」——**报告 10 的存活审计推翻了
+这一解释**：对全部 {removed['nid'].nunique()} 本逐一探测（m.sfacg.com/b/{{nid}}/），
+{pct((118 - 11) / 118 * 100)}% 仍然在线、书名与榜单记录一致，只有 11 本真正消失
+（9 本为 2015-2017 年热销榜书、2 本为 2024-2025 年）。这些书不是被站点删除，
+而是**书目抓取源遗漏**——且遗漏率随世代递减（2013-2014 年上榜书 {pct(rem_rate.get(2013, 0))}% /
+{pct(rem_rate.get(2014, 0))}% 缺失，2021 年后仅 1-3%），说明抓取源对老书的覆盖明显
+更差：
 
 {md_table([[str(int(y)), pct(v)] for y, v in rem_rate.items()],
-          ["上榜年", "当月条目中已下架占比 %"])}
+          ["上榜年", "当月条目中库内缺失占比 %"])}
 
-2013-2014 年高达 {pct(rem_rate.get(2013, 0))}% / {pct(rem_rate.get(2014, 0))}%，
-2016 年之后降至个位数。这与站点早期存在大量未授权日轻、后期集中清理的历史
-一致（参见报告 01 §1 的 `licensed_light_novel` 行级剔除口径及其成因）；也说明
-**用长期榜单序列做面板时必须把「书已消失」这一删失单独标出**，否则会把下架
-误读为「付费规模下降」。
+因此本报告的相应结论应读作：**月票榜头部书的存续极为稳定**（十六年 top20 席位
+里的书，绝大多数至今仍在架上连载或完结在架）——「头部书被批量下架」的推断不
+成立。遗留的不确定性（已删除与抓取遗漏的分解、未分配 nid 的存在）见报告 10 §5。
 """
 
 
@@ -931,7 +936,7 @@ def section_generation(t: pd.DataFrame, d: pd.DataFrame) -> str:
         if row["nid"] > max_nid:
             return "快照后（未入库）"
         if pd.isna(row["est_year"]):
-            return "已下架"
+            return "库内缺失"
         age = row["year"] - row["est_year"]
         if age <= 0:
             return "当年"
@@ -944,7 +949,7 @@ def section_generation(t: pd.DataFrame, d: pd.DataFrame) -> str:
         return "7 年以上"
 
     t2["band"] = t2.apply(band, axis=1)
-    order = ["当年", "上一年", "2-3 年", "4-6 年", "7 年以上", "已下架", "快照后（未入库）"]
+    order = ["当年", "上一年", "2-3 年", "4-6 年", "7 年以上", "库内缺失", "快照后（未入库）"]
     ct = pd.crosstab(t2["year"], t2["band"], normalize="index").mul(100)
     ct = ct.reindex(columns=[c for c in order if c in ct.columns], fill_value=0)
     rows = []
@@ -1106,8 +1111,10 @@ def section_bounds(sb: dict, t: pd.DataFrame) -> str:
    {sb['date']}。2026-06 之后的榜位大量为快照后新书（{t[t['year'] == 2026]['beyond'].mean() * 100:.1f}%
    的 2026 年月票条目），属性不可得；故 2026 年的世代构成、完结率等指标
    只在「可观测子样本」内计算，不可与往年直接比较。
-5. **已下架书的属性不可得**（月票榜 {t[t['removed']]['nid'].nunique()} 本），
-   它们集中于 2013-2014 年，与本项目已知的早期未授权日轻清理历史一致。
+5. **库内缺失书的属性不可得**（月票榜 {t[t['removed']]['nid'].nunique()} 本）。
+   报告 10 探测显示其 90.7% 仍在线——是抓取源遗漏而非下架；遗漏率随世代递减
+   （2013-2014 上榜书 22-25% 缺失、2021 年后 1-3%），未修正前，涉及「老书占比」
+   的对比都应视为受遗漏污染的近似。
 6. **无收入数据，且两个榜各缺一半**：热销榜没有金额（`ticketNum` 恒 0），
    月票榜有票数但票是**返还物**、归属可偏离消费对象。此外「年度总票」是每月
    前 20 名之和，若读者把票分散投给榜外书，该和会小于当月票总量——因此它只能
