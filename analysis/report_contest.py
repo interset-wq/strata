@@ -75,19 +75,29 @@ CAL_2024 = [
     ("2026 春季征文", "2026-02-27", "2026-05-03", charts.C["green"]),
 ]
 
-# IP 联动 / 主题类征文（游戏 IP 合作 + 平台主题活动）
+# IP 联动 / 站内主题征文（游戏 IP 合作等；对话小说产品线另列 DIAL_EXTRA）
 IP_EVENTS = [
     ("崩坏3征文", "崩坏3 × SF 同人征文（米哈游）"),
     ("少女前线征文", "少女前线 × SF 同人征文（散爆）"),
-    ("星穹小说家征文", "星穹小说家征文（米哈游·星穹铁道）"),
-    ("点鸭秋之偶像季征文活动", "点鸭秋之偶像季"),
-    ("点鸭秋色回忆征文活动", "点鸭秋色回忆"),
     ("龙之谷征文", "龙之谷 × SF 同人征文"),
-    ("怪谈异闻主题征文长篇", "怪谈异闻主题征文（长篇轨）"),
-    ("怪谈异闻主题征文短篇", "怪谈异闻主题征文（短篇轨）"),
-    ("超新星杯", "「超新星杯」短篇大赛"),
+    ("“超新星杯”短篇大赛", "「超新星杯」短篇大赛"),
     ("楚楚动仁同人征文", "楚楚动仁同人征文"),
 ]
+
+# 对话小说产品线的独立活动（用户 2026-11-16 核实：点鸭 = SFACG 旗下专注
+# 对话小说的平台，与「对话小说」为近义词；星穹小说家 / 怪谈异闻亦为对话
+# 形态的赛事，不是 IP 联动）
+DIAL_EXTRA = [
+    ("星穹小说家征文", "星穹小说家（对话小说）"),
+    ("点鸭秋之偶像季征文活动", "点鸭秋之偶像季"),
+    ("点鸭秋色回忆征文活动", "点鸭秋色回忆"),
+    ("怪谈异闻主题征文长篇", "怪谈异闻主题征文（长篇轨）"),
+    ("怪谈异闻主题征文短篇", "怪谈异闻主题征文（短篇轨）"),
+]
+
+
+def _is_dial(c: pd.Series) -> pd.Series:
+    return c.str.contains("对话|点鸭|星穹小说家|怪谈异闻", na=False, regex=True)
 
 
 def load() -> pd.DataFrame:
@@ -273,7 +283,9 @@ def section_header(sb: dict, n_anchor: int) -> str:
 >    在册存活口径；年份由 nid 定年（{n_anchor} 锚点插值，报告 01 §1），非
 >    `updated_at`。年度序列止于 2025。
 > 2. **`contest` 是报名时点标记，不是创建时间标记**：参赛方式为「创建新书时
->    选择参赛组别」，但平台允许旧书参赛（八/九/十征的 nid 下限远老于主体簇，
+>    选择参赛组别」（用户核实：近几年参赛条件之一即**从比赛页面创建新作品**，
+>    故大多数参赛作品创建于赛事时段内——这正是 cohort 窗口校验成立的机制
+>    基础）；但平台允许旧书参赛（八/九/十征的 nid 下限远老于主体簇，
 >    最早散点定年可早至 2016）。因此一切 cohort 统计使用 **nid 25-75 分位
 >    ±0.1×IQR 主体簇**剔除旧书长尾，nid 下限不具定年意义。
 > 3. **官方日期引用** `references/contest-editions.md`：四征 2016-07-08
@@ -299,7 +311,7 @@ def section_conclusion(d: pd.DataFrame, stal: pd.Series) -> str:
     x_bulk = [len(bulk(d[d["contest"].map(lambda c: bool(X_PAT[n].match(c)))])) for n, _ in X_EDITIONS]
     w_bulk = [len(bulk(d[d["contest"] == v])) for _, v in W_EDITIONS]
     dd = d[d["contest"] != ""]
-    dial = d[d["contest"].str.contains("对话", na=False)]
+    dial = d[_is_dial(d["contest"])]
     b3 = bulk(d[d["contest"] == "崩坏3征文"])
     b3_all = d[d["contest"] == "崩坏3征文"]
     b3_win = ((b3["est_date"] >= pd.Timestamp("2019-01-04")) & (b3["est_date"] <= pd.Timestamp("2019-02-11"))).mean()
@@ -345,11 +357,13 @@ def section_conclusion(d: pd.DataFrame, stal: pd.Series) -> str:
 4. **「报名容易完赛难」是征文漏斗的主结构**：X 征长篇轨报名主体簇的字数
    中位仅 {xl_med:,} 字，远低于 12 万字的官方参赛门槛（字数审核在征稿期
    结束当日进行）——大多数报名作品未达门槛即弃坑，与 §5 断更率互证。
-5. **IP 联动征文是独立产品线**：崩坏3（主体簇 {thousands(len(b3))} / 标注
-   {thousands(len(b3_all))} 本）等游戏 IP 合作与点鸭/星穹等主题类活动构成
-   第二梯队；对话小说征文是最大产品线（{thousands(len(dial))} 行，占参赛
-   {len(dial) / n_c * 100:.1f}%），与原创商业连载分轨。IP 类 VIP 率趋零，
-   二创供给不进付费体系（与报告 04 互证）。
+5. **对话小说是最大的独立产品线**（用户核实：点鸭 = SFACG 旗下专注对话
+   小说的平台，星穹小说家/怪谈异闻等亦为对话形态赛事，非 IP 联动）：
+   对话线合计 {thousands(len(dial))} 行（占参赛
+   {len(dial) / n_c * 100:.1f}%），含 X 征对话轨与点鸭/星穹/怪谈异闻等
+   独立活动，与原创商业连载分轨；**真正的 IP 联动仅游戏向**（崩坏3
+   主体簇 {thousands(len(b3))} / 标注 {thousands(len(b3_all))} 本、少女前线、
+   龙之谷），IP 类 VIP 率趋零，二创供给不进付费体系（与报告 04 互证）。
 6. **崩坏3 是唯一窗口校验反常**（主体簇 n={len(b3)}，窗内仅 {pct(b3_win * 100)}%，
    {pct(b3_early * 100)}% 定年早于官方启动日）：提示 nid ~178k 邻域 mid 段定年
    局部误差可达 ±10 天且方向不定，只记录、不改口径（报告 01 §1）。
@@ -398,10 +412,11 @@ def section_calendar(d: pd.DataFrame) -> str:
 
 ![官方日期甘特图]({fig_calendar()})
 
-库内 `contest` 标注覆盖 96 个活动名，可归为六条产品线：**SF 原创轻小说征文
+库内 `contest` 标注覆盖 96 个活动名，可归为五条产品线：**SF 原创轻小说征文
 大赛**（「X 征」，四至十三届）、**冬季征文**（九届）、**春季 / 秋季征文**、
-**对话小说征文**（X 征对话轨 + 独立活动）、**IP 联动与主题类**（崩坏3、
-少女前线、星穹小说家、点鸭、怪谈异闻等）。
+**对话小说征文**（X 征对话轨 + 点鸭/星穹小说家/怪谈异闻等独立活动——
+点鸭为 SFACG 旗下对话小说平台）、**IP 联动类**（崩坏3、少女前线、龙之谷
+等游戏 IP 合作）；另有「超新星杯」短篇大赛等少量站内赛事单列。
 
 X 征各届（主体簇口径，官方启动日有证据处标注）：
 
@@ -540,23 +555,29 @@ X 征长篇轨（官方门槛：12 万字以上连载，字数审核在征稿期
 
 
 def section_ip(d: pd.DataFrame, stal: pd.Series) -> str:
-    rows = []
-    for val, label in IP_EVENTS:
-        s = d[d["contest"] == val]
-        if len(s) == 0:
-            continue
-        b = bulk(s)
-        rows.append([label, thousands(len(s)), thousands(len(b)), window(b),
-                     f"{b['favs'].median():.0f}",
-                     pct((b["price_type"] == "VIP").mean() * 100)])
-    ip_table = md_table(rows, ["活动", "标注 n", "主体簇 n", "主体簇定年窗", "favs 中位", "VIP 率 %"])
+    def _ev_table(events):
+        rows = []
+        for val, label in events:
+            s = d[d["contest"] == val]
+            if len(s) == 0:
+                continue
+            b = bulk(s)
+            rows.append([label, thousands(len(s)), thousands(len(b)), window(b),
+                         f"{b['favs'].median():.0f}",
+                         pct((b["price_type"] == "VIP").mean() * 100)])
+        return md_table(rows, ["活动", "标注 n", "主体簇 n", "主体簇定年窗", "favs 中位", "VIP 率 %"])
 
-    dial = d[d["contest"].str.contains("对话", na=False)]
+    ip_table = _ev_table(IP_EVENTS)
+    dial_table = _ev_table(DIAL_EXTRA)
+
+    dial = d[_is_dial(d["contest"])]
     dial_n = len(dial)
     dial_acts = dial["contest"].nunique()
     dial_x = dial[dial["contest"].str.match(r"^(五|六|七|九|十)征对话")]
     dial_bulk = bulk(dial_x)
     dial_first = dial_bulk["est_date"].min().date()
+    dial_extra = d[d["contest"].isin([v for v, _ in DIAL_EXTRA])]
+    dial_extra_bulk = bulk(dial_extra)
 
     b3 = d[d["contest"] == "崩坏3征文"]
     b3b = bulk(b3)
@@ -564,22 +585,31 @@ def section_ip(d: pd.DataFrame, stal: pd.Series) -> str:
     b3_early = (b3b["est_date"] < pd.Timestamp("2019-01-04")).mean()
     b3_low = int(b3b["id"].min())
     b3_low_est = b3b.loc[b3b["id"].idxmin(), "est_date"].date()
-    return f"""## 4. IP 联动与产品线征文
+    return f"""## 4. 对话小说产品线与 IP 联动征文
 
-IP 联动 / 主题类活动（主体簇口径；崩坏3 官方日期 2019-01-04 → 02-11）：
+**对话小说是最大的独立产品线**：合计 {thousands(dial_n)} 行（占参赛
+{dial_n / max((d['contest'] != '').sum(), 1) * 100:.1f}%、{dial_acts} 个活动名）。
+口径说明（用户 2026-11-16 核实）：**点鸭是 SFACG 旗下专注对话小说的平台，
+与「对话小说」为近义词**；星穹小说家、怪谈异闻主题征文亦为对话形态的
+赛事——它们不是 IP 联动，只是挂了题材主题。X 征对话轨主体簇
+{thousands(len(dial_bulk))} 本（定年窗最早 {dial_first}），九征/十征对话轨
+单届即 1,900+/1,700+ 本；对话线自 2019 年前后上线（报告 04 §1 同人类
+同年上线），其征文轨与主系列并行而非混排。对话线的独立活动：
+
+{dial_table}
+
+独立对话活动合计主体簇 {thousands(len(dial_extra_bulk))} 本，与 X 征对话轨
+共同构成对话线的两个来源。其定年窗（2023 年多个活动集中在 3-12 月）
+显示对话赛事在 2023 年已形成全年多档节奏，与主系列的四季日历并行。
+
+IP 联动 / 同人及站内短篇赛事（崩坏3、少女前线、龙之谷为游戏 IP 合作；
+超新星杯为站内短篇赛。主体簇口径；崩坏3 官方日期 2019-01-04 → 02-11）：
 
 {ip_table}
 
 IP 联动征文的特点：**规模小（主体簇几十到三百余本）、热度低、VIP 率趋零**
 ——游戏 IP 同人写作的激励在 IP 侧（水晶、周边、代券）而非站内商业化，
 与报告 04 的「同人类 2019 上线、VIP≈0%」互相印证：二创供给不进付费体系。
-
-**对话小说征文是最大的产品线**：{thousands(dial_n)} 行（占参赛
-{dial_n / max((d['contest'] != '').sum(), 1) * 100:.1f}%、{dial_acts} 个活动名），
-X 征对话轨主体簇 {thousands(len(dial_bulk))} 本（定年窗最早
-{dial_first}），九征/十征对话轨单届即 1,900+/1,700+ 本——
-对话小说是 2019 年后平台重点扶持的独立形态（报告 04 §1 同人类同年上线），
-其征文轨与主系列并行而非混排。
 
 **崩坏3 案例的两点价值**。其一，量级吻合：官方参与奖限量 500 份，
 主体簇 {len(b3b)} 本 + 总标注 {len(b3)} 本，规模一致。其二，**它是全部
