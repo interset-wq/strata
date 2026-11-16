@@ -15,7 +15,7 @@
 
 | 层 | 目录 | 状态 |
 | --- | --- | --- |
-| 研究 | [`analysis/`](./analysis/) | **已完成**：17 份报告、77 张图，数据管线可重建 |
+| 研究 | [`analysis/`](./analysis/) | **已完成**：19 份报告、82 张图，数据管线可重建 |
 | 产品 | [`app/`](./app/) | **设计中**：Flutter UI + 内嵌 Go 服务，见 [APP 设计文档 01](./app/docs/01-tech-stack.md) |
 | 设计档案 | [`docs/`](./docs/) | **历史稿**：含实测事实与早期方案，数字口径已过时，见 [文档索引](./docs/README.md) |
 
@@ -34,7 +34,7 @@
 | 数据内容上界 | **2026-05-03**（原始 jsonl 的 `max(last_update)`，即扫描起点，非统一读取时刻） |
 | 上架年定年 | `analysis/eras.py`，104 锚点、log(nid) 分段线性，留一法 P99 = 50 天 |
 | 在架覆盖率 | 约 68.9%（95% CI 64.2–73.5%，报告 10） |
-| 产出 | 17 份报告、77 张图，均由生成器产出 |
+| 产出 | 19 份报告、82 张图，均由生成器产出 |
 
 抓取方式决定了数据的边界：原始 jsonl 是 Scrapy 按天切分、追加写入的产物，
 列表页按 `last_update` 降序、每天从上一天断点续爬。全量是一次约三周、
@@ -81,7 +81,7 @@ uv run python report_timeline.py           # 生成报告 16（单份）
 for f in report_*.py; do uv run python "$f"; done   # 全部 17 份
 ```
 
-完整管线、目录说明、17 份报告清单和 12 条口径约束见 [`analysis/README.md`](./analysis/README.md)。
+完整管线、目录说明、19 份报告清单和 12 条口径约束见 [`analysis/README.md`](./analysis/README.md)。
 `analysis/out/` 不入库，均可重建；榜单与存活探测需联网重新抓取。
 
 ---
@@ -118,7 +118,7 @@ for f in report_*.py; do uv run python "$f"; done   # 全部 17 份
 | 文档 | 用途 | 状态 |
 | --- | --- | --- |
 | [`analysis/README.md`](./analysis/README.md) | 数据管线、报告清单、口径约束 | **当前口径，先读** |
-| [`analysis/reports/`](./analysis/reports/) | 17 份报告正文与 77 张图 | **当前结论** |
+| [`analysis/reports/`](./analysis/reports/) | 19 份报告正文与 82 张图 | **当前结论** |
 | [`docs/README.md`](./docs/README.md) | 早期设计档案索引与失效清单 | 历史稿，待重新设计 |
 | [`docs/data-findings.md`](./docs/data-findings.md) | 早期全量实测（字段陷阱、榜单机制、banner、标签） | 实测事实可参考，数字过时 |
 | [`docs/search.md`](./docs/search.md) | 三个官方接口实测边界与搜索方案 | 接口事实可参考，方案待重设 |

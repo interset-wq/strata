@@ -1,7 +1,7 @@
 # analysis · SFACG 书层数据分析
 
 对菠萝包轻小说（SFACG）二十年书目数据的可复现研究。数据从原始爬虫产物出发，
-经规范化建成单张宽表，再按专题产出 18 份报告与 78 张图表。
+经规范化建成单张宽表，再按专题产出 19 份报告与 82 张图表。
 
 **定位**：官方榜单回答「现在什么火」，本分析回答「过去十年结构如何变化」。
 这是一个观察性书目研究，不含正文内容，也不含营收、付费人数或用户事件数据。
@@ -14,7 +14,7 @@
 | 年份覆盖 | 2007–2026（年度序列止于 2025：上界之后创建的新书不在库内） |
 | 定年 | `eras.py`，104 个锚点、log(nid) 分段线性插值，留一法 P99 = 50 天 |
 | 在架覆盖率 | 约 68.9%（95% CI 64.2–73.5%，见报告 10） |
-| 产出 | 18 份报告（`reports/*.md`）、78 张图（`reports/figures/*.png`） |
+| 产出 | 19 份报告（`reports/*.md`）、82 张图（`reports/figures/*.png`） |
 
 ---
 
@@ -36,7 +36,7 @@ uv run python build_csv.py
 生成报告（各生成器相互独立，可单跑；汇总篇 16 引用前序结论但数字自算）：
 
 ```bash
-for f in report_*.py; do uv run python "$f"; done   # 全部 18 份
+for f in report_*.py; do uv run python "$f"; done   # 全部 19 份
 uv run python report_market.py                       # 单跑 01（定年与供给）
 uv run python report_timeline.py                     # 单跑 16（收官汇总）
 ```
@@ -84,7 +84,7 @@ dataset.7z  ──prepare.py──▶  meta*.jsonl（22 文件，唯一原始数
 | `validate.py` | CSV 格式层与取值层校验；构建时自动调用 |
 | `prepare.py` | 校验归档 SHA-256 并解压出 jsonl |
 | `fetch_*.py` | 月度榜、存活状态与详情的可选联网抓取器 |
-| `report_*.py` | 18 份报告的生成器；**报告是生成物，勿手改** |
+| `report_*.py` | 19 份报告的生成器；**报告是生成物，勿手改** |
 | `anchors/` | 定年锚点：`nid_anchors.jsonl`（104 条插值输入）、`verified_dates.jsonl`（用户核实证据档案）、`approximate_dates.jsonl`（已清空，保留备用） |
 | `references/` | 外部查证档案：征文日期、萌神标签、榜单端点、定年取证、百科与史料等 |
 | `data/` | 归档与解压后的 jsonl（归档不入库） |
@@ -114,9 +114,10 @@ dataset.7z  ──prepare.py──▶  meta*.jsonl（22 文件，唯一原始数
 | 15 | 征文到商业化 | `report_contest_commerce.py` | 优势属于人，不属于比赛 |
 | 16 | 十年结构变迁 | `report_timeline.py` | 收官汇总：统一时间轴、六条主线、对照先于因果 |
 | 17 | banner 投入 | `report_banner.py` | 作者筛选、下注/奖励二元 |
-| 18 | 种子规模决策 | `report_seed_scale.py` | 捆绑 29,396 本（gz 4.2 MB）、膨胀源是索引不是表数 |
+| 18 | 种子规模决策 | `report_seed_scale.py` | 捆绑 29,396 本（gz 4.18 MB）、膨胀源是索引不是表数 |
+| 19 | 短篇生态 | `report_shortnovel.py` | 短篇=≤5万字且完结、收藏天花板、赞藏比在短篇里方向反 |
 
-编号经过顺延，最终为 15 征文商业化、16 汇总、17 banner（banner 应要求提前）、18 种子规模（面向 App 捆绑决策）。
+编号经过顺延，最终为 15 征文商业化、16 汇总、17 banner（banner 应要求提前）、18 种子规模、19 短篇（面向 App 品类设计）。
 
 ---
 

@@ -464,7 +464,7 @@ def section_moebattle(d: pd.DataFrame) -> str:
     m = m.merge(est[["id", "est_date"]], on="id")
     rows = []
     for r in m.itertuples():
-        mo = "|".join(t for t in r.tags.split("|") if t.endswith("萌神"))
+        mo = "、".join(t for t in r.tags.split("|") if t.endswith("萌神"))
         rows.append([
             str(int(r.id)), f"《{r.title}》", r.author, r.genre,
             mo, str(r.est_date.year), thousands(r.favs),
