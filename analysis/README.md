@@ -122,7 +122,7 @@ df = pd.read_csv(paths.CSV_FILE)
 | 07 | 商业化 | `generators/report_commercial.py` | 月票与热销两条刻度、付费 2020 见顶 |
 | 08 | 互动漏斗 | `generators/report_engagement.py` | 曝光分母效应、赞藏比断崖 |
 | 09 | 题材语义空间 | `generators/report_tagspace.py` | 99 词受控词表、同人 = IP 命名空间 |
-| 10 | 生存与遗漏 | `generators/report_survival.py` | 覆盖率 68.9%、游标扫描、下架推断被推翻 |
+| 10 | 生存与遗漏 | `generators/report_survival.py` | ⚠️ **覆盖率 68.9% 口径待重算**（只测「页面可访问」，未排除非小说页；本站状态码不可信）。游标扫描、下架推断被推翻两项仍成立。见 `references/sfacg-endpoints.md` §5.1、`../app/docs/04-search.md` §7.1 |
 | 11 | 速更短篇 | `generators/report_shortform.py` | 独立品类、新手高频试水、非弃坑 |
 | 12 | 标题形态与命名史 | `generators/report_titles.py` | 标题通胀、跟风证据分级 |
 | 13 | 跟风传播 | `generators/report_fad.py` | 头部少造词、爆款潮是赛道共振 |
