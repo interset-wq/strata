@@ -12,6 +12,7 @@
 | `m.sfacg.com/rank/{original,bm,new,jp,sale}.html` | 无 | **可用**（curl 直抓）。人气/收藏/新书/日轻/热销，各 top 20，无数值，nid 在相对链接 `/b/{nid}/` |
 | `m.sfacg.com/rank/ticket.html` | 无 | JS 渲染，curl 拿不到（用 web 版替代） |
 | `m.sfacg.com/API/HTML5.ashx?op=search&keyword={kw}` | 无 | **可用**。JSON，固定 ~12 条，含 `NovelID`/`Point` 评分/`TypeName`（参数名是 `keyword`，`q`/`key`/`s` 均报 501） |
+| `pages.sfacg.com/ajax/act/MonthlyBoy.ashx?op=getRanks&date={YYYY-MM}&rank={N}` | 无 | **可用，且可查任意月份（历史月票库）**。rank: 0=月票榜(top20, ticketNum=月票)、2=新书榜(top10)、3=热销榜(top20)、4=对话月票榜(top20)；rank=1 为 novly 未收录的未知榜。**2013-03 起连续有数据**（2013-02 及更早实测为空），每月一期、月度清零。语义证据：temp/novly/utils/{monthlyApi,urls,months}.ts + app/monthly/[ym].tsx。抓取器：`analysis/fetch_monthly_ranks.py` → `out/monthly_ranks.jsonl` |
 | `api.sfacg.com/novels/{nid}?expand=...,ticket,...` | Basic（`SFACG_AUTH`） | 本机无认证串，未测。单书月票（含周/月）只能走此端点 |
 
 补充：`docs/data-findings.md` §13.5 记录 App 有 11 榜（推荐/人气/畅销/新书/
