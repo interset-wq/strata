@@ -198,13 +198,13 @@ def doomsday_stats(d: pd.DataFrame) -> dict:
 # ---------- 章节 ----------
 
 
-def section_header() -> str:
-    return """# 04 · 题材与标签：分类结构、受控词表与征文
+def section_header(sb: dict) -> str:
+    return f"""# 04 · 题材与标签：分类结构、受控词表与征文
 
 > 口径声明：
-> 1. 数据源 `analysis/out/novels.csv`，245,779 行，快照 2026-06-13，在册存活口径；
->    年份由 nid 定年（103 个锚点，报告 01 §1），非 `updated_at`。
->    年度序列止于 2025（2026-05 后新书可见性骤降，定年落在 2026 的 4,021 行
+> 1. 数据源 `analysis/out/novels.csv`，245,779 行，数据内容上界 {sb['date']}，
+>    在册存活口径；年份由 nid 定年（103 个锚点，报告 01 §1），非 `updated_at`。
+>    年度序列止于 2025（内容上界之后新书不在库内，定年落在 2026 的 4,021 行
 >    不入年度统计）。
 > 2. **genre 与 tags 是两套口径**：genre 是站点货架的单选分类（现行 9 类，
 >    2010 年改版确立），决定作品出现在哪个入口；tags 是作者从站点受控词表
@@ -626,7 +626,8 @@ def section_contest(d: pd.DataFrame) -> str:
 def build() -> None:
     charts.setup_style()
     d = load()
-    body = f"""{section_header()}
+    sb = eras.snapshot_bounds(d)
+    body = f"""{section_header(sb)}
 
 ---
 

@@ -515,6 +515,7 @@ def retention_curve(df: pd.DataFrame, g: pd.DataFrame) -> pd.Series:
 def build() -> None:
     charts.setup_style()
     df = load()
+    sb = eras.snapshot_bounds(df)
     g = author_frame(df)
     retention = retention_curve(df, g)
     for fig in (
@@ -563,7 +564,7 @@ def build() -> None:
 
 > 口径声明：
 > 1. 数据源 `analysis/out/novels.csv`，{len(df):,} 行、{len(g):,} 个作者名，
->    快照 2026-06-13，在册存活口径；年份由 nid 定年（报告 01 §1），非 `updated_at`。
+>    数据内容上界 {sb['date']}，在册存活口径；年份由 nid 定年（报告 01 §1），非 `updated_at`。
 > 2. `author` 是字符串身份键：改名、马甲、共用笔名无法合并，同一自然人可能被
 >    拆成多个作者。因此作者数是上界，多产度、生涯长度与复投率是下界。
 >    版权方账号（正版日轻 47 行）已整行剔除。
@@ -573,7 +574,7 @@ def build() -> None:
 >    作者级与书级集中按同一总量对照（§2）。
 > 5. 「签约」指 `price_type=签约`；含 VIP 的付费合并口径单独标注（§5）。
 >    制度节点取自 `references/sfacg-pku-chronicle.md`（北大《中国网络文学编年简史》）。
-> 6. 完结率含右删失；年度序列止于 2025（2026-05 后新书可见性骤降）。
+> 6. 完结率含右删失；年度序列止于 2025（数据内容上界 {sb['date']} 之后新书不在库内）。
 
 ---
 

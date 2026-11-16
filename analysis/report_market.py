@@ -27,8 +27,6 @@ import eras
 OUT = Path(__file__).resolve().parent / "reports" / "01_market_structure.md"
 
 GENRE_ORDER = ["魔幻", "玄幻", "古风", "科幻", "校园", "都市", "游戏", "同人", "悬疑"]
-SNAPSHOT = "2026-06-13"
-SNAP_YEAR_FRAC = 2026 + 162 / 365  # 快照时刻的十进年份
 
 GENRE_ORDER = ["魔幻", "玄幻", "古风", "科幻", "校园", "都市", "游戏", "同人", "悬疑"]
 
@@ -235,7 +233,7 @@ def section_supply(df: pd.DataFrame) -> tuple[str, dict]:
         vip=("price_type", lambda s: (s == "VIP").mean() * 100),
         med_words=("words", "median"),
     )
-    y["exposure"] = SNAP_YEAR_FRAC - y.index
+    y["exposure"] = eras.snapshot_bounds(df)["year_frac"] - y.index
 
     rows = [
         [
@@ -686,6 +684,7 @@ def section_completion(df: pd.DataFrame) -> str:
 def build() -> None:
     charts.setup_style()
     df = load()
+    sb = eras.snapshot_bounds(df)
     for fig in (fig_dating, fig_supply, fig_genre, fig_price, fig_completion):
         path = fig(df)
         print(f"写出 {OUT.parent / path}")
@@ -726,8 +725,9 @@ def build() -> None:
 > 2. 年份由 nid 定年（`analysis/eras.py`），不是 `updated_at`；方法、误差与
 >    API 锚点 / 封面时间戳 / 外部史料 / 精确创建时间四条证据链见 §1。
 >    封面验证已剔除运营位书（平台同步换封面，非创建时间）。
-> 3. 快照采集于 {SNAPSHOT}，且 2026-05 之后新书在快照中的可见性骤降
->    （nid 流速不变、成书率降至约 1/14），**年度序列止于 2025**。
+> 3. 数据内容上界 {sb['date']}（原始 jsonl 的 `max(last_update)`，即抓取完成
+>    时刻；库内最新 nid 定年 {sb['newest_created']:%Y-%m-%d}），此后上架的新书
+>    不在库内，**年度序列止于 2025**。
 > 4. 完结率含右删失：世代越新，完结概率越被低估，跨世代比较只对
 >    存活 4 年以上的世代有效。
 > 5. **正版日轻（版权方账号 47 行）整行剔除**：站点早期存在大量盗版日轻，

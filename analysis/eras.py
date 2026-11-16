@@ -217,6 +217,40 @@ def cover_timestamp(cover_url) -> pd.Series:
     )
 
 
+def snapshot_bounds(df: pd.DataFrame) -> dict:
+    """数据内容上界——由数据集自身推导，不引用任何外部快照日期。
+
+    原始 jsonl 的 ``max(last_update)`` 即**抓取完成时刻**：此后上架的新书
+    不在库内，因此它同时是「新书可见性」的截止线与「末次更新距今」的
+    计时基准。数据集内最新 nid 的定年日给出可见作品的创建日上界。
+
+    返回:
+        content_end: 最新章节更新时间（内容上界）
+        newest_created: 库内最新作品的创建日（nid 定年）
+        date: 内容上界的日期字符串
+        year_frac: 内容上界的十进年份，供「暴露年数」口径使用
+        days_after: 内容上界之后仍出现在库中的作品数（应为 0）
+    """
+    upd = pd.to_datetime(df["updated_at"], errors="coerce")
+    content_end = upd.max()
+    est = df["est_date"] if "est_date" in df.columns else None
+    newest = est.max() if est is not None else pd.NaT
+    doy = int(content_end.dayofyear)
+    return {
+        "content_end": content_end,
+        "newest_created": newest,
+        "date": content_end.strftime("%Y-%m-%d"),
+        "year_frac": content_end.year + (doy - 1) / 365,
+        "days_after": int((est > content_end).sum()) if est is not None else 0,
+    }
+
+
+def staleness_days(df: pd.DataFrame, content_end: pd.Timestamp) -> pd.Series:
+    """末次更新距内容上界的天数（断更时长），负值不存在。"""
+    upd = pd.to_datetime(df["updated_at"], errors="coerce")
+    return (content_end - upd).dt.days
+
+
 def leave_one_out(anchors: pd.DataFrame | None = None) -> pd.DataFrame:
     """留一法误差。留出单元 = 同一秒时间戳的整组锚点。
 

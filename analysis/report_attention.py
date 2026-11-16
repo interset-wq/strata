@@ -408,6 +408,7 @@ featured（运营位）共 {len(feat)} 本（{len(feat) / len(df) * 100:.2f}%）
 def build() -> None:
     charts.setup_style()
     df = load()
+    sb = eras.snapshot_bounds(df)
     for fig in (fig_lorenz, fig_cohort, fig_genre_idx, fig_words_status):
         print(f"写出 {OUT.parent / fig(df)}")
 
@@ -442,7 +443,7 @@ def build() -> None:
 >    混杂，跨世代不可直接比；praises 仅作稳健性校验（§1）。
 > 2. 收藏同为存量：世代越新累积时间越短，跨世代绝对量比较只采用世代内 Gini
 >    与份额两种口径。
-> 3. 数据源 `analysis/out/novels.csv`，{len(df):,} 行，快照 2026-06-13，
+> 3. 数据源 `analysis/out/novels.csv`，{len(df):,} 行，数据内容上界 {sb['date']}，
 >    在册存活口径；年份由 nid 定年（报告 01 §1）。
 > 4. featured 是快照时刻的运营位状态（当前态而非历史），因果方向见 §5。
 > 5. 正版日轻（版权方账号 47 行，全部 VIP 且在运营位）已整行剔除：其 nid
