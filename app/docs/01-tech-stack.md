@@ -135,8 +135,8 @@ go-music-dl 的 `internal/appshell/server.go` 给出可直接照搬的协议：
 | `seed.db` | 数据目录 `seed/seed-<version>.db`（解压副本） | **只读打开** | 按版本比对替换 |
 | `user.db` | 应用数据目录（iOS `Application Support`、Android `filesDir`） | 读写 | **保留** |
 
-- `seed.db`：**扁平单表 `books`（20 列）+ 反范式 `book_tags`**（报告 18 实测定案）；
-  索引 4 个（`idx_favs` / `idx_year` / `idx_author` / `idx_bt`）；
+- `seed.db`：**扁平单表 `books`（23 列）+ 反范式 `book_tags`**（02 文档 §2 定案，实测建库）；
+  索引 9 个（含 1 个短篇部分索引与 2 个世代×分位复合索引）；
   **不建** `tags`/`authors`/`contests` 维度表（低基数枚举，拆表只增 JOIN 与体积）；
   `rank_snapshots` / `banner` 作为独立资产随包分发而非建表。构建期产出，运行时只 SELECT
 - `user.db`：`observations`（只追加）、书架、标注、搜索历史，**永不随安装替换**
@@ -201,8 +201,9 @@ go-music-dl 的 `internal/appshell/server.go` 给出可直接照搬的协议：
   以包内 `manifest.json` 的版本号与库内 `seed_meta.version` 比对决定是否替换，成功后删除旧文件。
   **替换是整文件换名，不做增量 UPDATE**——这是「种子只读」的落地形态；
   解压副本不会随覆盖安装自动刷新，版本比对是唯一保险。
-- schema 从 §2 的九条约束反推，至少包含 `books`（含 `est_year` 与分位）、
-  `tags`（含词表版本）、`banner`（含下注/奖励类型）、`rank_snapshots`、`seed_meta`（含上界与生成时间）。
+- schema 从 §2 的十条约束反推，**02 文档已定案**：`books`（23 列，含 `est_year`、
+  `est_conf` 与五列分位/比率）、`book_tags`（反范式）、`seed_meta`（含上界与生成时间）。
+  `banner` 与 `rank_snapshots` 作为独立资产随包分发，不建表。
 - **`observations` 表**（在 `user.db`）：`nid + observed_at` 为键，存详情页抓回的 clicks/favs/praises/words/status。
   写入只追加，种子升级不触碰；查询时与 `books` 按 `observed_at` 取新。
   索引按 `(nid, observed_at DESC)`，保证详情页读取是单次索引查找。
@@ -270,12 +271,12 @@ go-music-dl 的 `internal/appshell/server.go` 给出可直接照搬的协议：
 | 单本详情 TTL 14 天缓存 | **进入详情页即抓**，本地观测累积；仅保留秒级去重窗口 | 种子的定位是基线而非当前值；TTL 缓存会让数据停在过期态，违背「用得越多越准」 |
 | 单一库内分表（种子表 + 用户表） | **两份物理库**：`seed.db` 只读随包 / `user.db` 可写持久 | 覆盖安装整包替换种子，同库写入会随安装丢失 |
 | Gio 编译整个 App 为 Go 程序 | Go 以 C-archive/so 嵌入 Flutter 进程 | UI 已定 Flutter；iOS 禁止独立子进程 |
-| 内置 19,791 本 / gzip 2.4 MB | **内置 30,794 本 / gzip 约 4.4 MB**（通用底座 29,396 + 短篇补入 1,398） | 报告 18/19 现算，241,758 行全库实测建库；旧数字基于 246,045 本旧快照 |
+| 内置 19,791 本 / gzip 2.4 MB | **内置 30,831 本 / gzip 6.27 MB**（通用底座 29,396 + 短篇补入 1,398） | 报告 18/19 现算，241,758 行全库实测建库（02 文档 §附录）；旧数字基于 246,045 本旧快照 |
 | 成绩以绝对数排序 | 默认按同世代/同期分位排序 | 累计指标跨时点不可比（报告 02、08） |
 | 完结/断更直接取 `status` | 种子提供定年与状态语义，端上不重算 | 快照状态 ≠ 当期状态（报告 07） |
 | banner 全集 667 本、统一展示 | 620 本，区分下注/奖励，独立图资产表 | 新数据与用户核实（报告 17） |
 | `like_num`/`praise_num` 语义 | 统一为 `favs`（收藏）/`praises`（赞） | 上游字段名颠倒（早期实测 §13） |
-| 17 表 schema | **扁平单表 `books` + 反范式 `book_tags`，共 2 表 4 索引** | 报告 18 实测：膨胀源是索引不是表数；旧结构服务于旧数据分层 |
+| 17 表 schema | **扁平单表 `books` + 反范式 `book_tags`，共 2 表 9 索引** | 报告 18 + 02 文档实测：膨胀源是索引不是表数；旧结构服务于旧数据分层 |
 | 短篇与长篇共用一套刻度与分类 | 短篇独立榜：收藏限 ≤5 万字集合内、禁用赞藏比与转化率、题材体系另算 | 报告 19：短篇收藏天花板 7,881、赞藏比方向相反、同人占口碑层 60.5% |
 
 ---

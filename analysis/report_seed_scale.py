@@ -265,12 +265,14 @@ def main():
 
     # ---- 存储架构实测 ----
     # 全库分位（世代内，降序；1.0 = 该世代最强）——分位必须在全库算，不在种子池内算
+    # 键必须是 nid：groupby.rank 的索引是行位置，直接当键会取到别人的分位值
     pctl_maps = {}
     for _k, _c in [("fav", "favs"), ("click", "clicks"), ("praise", "praises")]:
         _g = d.groupby("est_year")[_c]
         _r = _g.rank(ascending=False, method="min")
         _n = _g.transform("size")
-        pctl_maps[_k] = {int(i): float(v) for i, v in (_r / _n).items()}
+        _s = pd.Series((_r / _n).values, index=d.id.values)
+        pctl_maps[_k] = {int(i): float(v) for i, v in _s.items()}
 
     p = tempfile.mktemp(suffix=".db")
     a = build_db(d, rec_seed, p, "flat", IDX_REC, True)
