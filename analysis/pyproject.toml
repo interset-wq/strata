@@ -6,6 +6,7 @@ requires-python = ">=3.11"
 dependencies = [
     "matplotlib>=3.11.2",
     "pandas>=2.2",
+    "requests>=2.34",
 ]
 
 [project.optional-dependencies]
