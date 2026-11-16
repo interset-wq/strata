@@ -42,6 +42,8 @@ ROOT = Path(__file__).resolve().parent
 ANCHORS_PATH = ROOT / "anchors" / "nid_anchors.jsonl"
 # 外部核实的精确创建时间：独立于插值输入的校验集，勿并入 ANCHORS_PATH
 VERIFIED_PATH = ROOT / "anchors" / "verified_dates.jsonl"
+# 粗略日期（「附近」）：只作月级一致性检查，不是等式约束
+APPROXIMATE_PATH = ROOT / "anchors" / "approximate_dates.jsonl"
 
 _EPOCH = np.datetime64("1970-01-01", "D")
 
@@ -83,6 +85,30 @@ def load_verified() -> pd.DataFrame:
     v["confidence"] = v["nid"].map(est["confidence"])
     v["gap_days"] = v["nid"].map(est["gap_days"])
     v["delta_days"] = (v["created_at"] - v["est_date"]).dt.days
+    return v.sort_values("nid").reset_index(drop=True)
+
+
+def load_approximate() -> pd.DataFrame:
+    """外部给出的**粗略**日期：误差 <7 天，约 80% 即为准确创建日。
+
+    用户说明「粗略时间的误差小于 7，甚至 80% 的概率就是准确时间」，
+    故它不是月级软约束，而是可回测定年误差的**强约束**（残差主要来自
+    曲线而非参考日）。因仍有约 20% 概率存在 ≤7 天偏差，不并入插值锚点。
+    返回列含 approx_date / est_date / delta_days / confidence / gap_days；
+    ``delta_days`` = 参考日 − nid 定年。
+    """
+    rows = [
+        json.loads(line)
+        for line in APPROXIMATE_PATH.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    v = pd.DataFrame(rows)
+    v["approx_date"] = pd.to_datetime(v["approx_date"])
+    est = estimate(v["nid"]).set_index("id")
+    v["est_date"] = pd.to_datetime(v["nid"].map(est["est_date"]))
+    v["confidence"] = v["nid"].map(est["confidence"])
+    v["gap_days"] = v["nid"].map(est["gap_days"])
+    v["delta_days"] = (v["approx_date"] - v["est_date"]).dt.days
     return v.sort_values("nid").reset_index(drop=True)
 
 
@@ -166,8 +192,16 @@ def cover_timestamp(cover_url) -> pd.Series:
       在详情页抓到了 id 更大的书的封面（选择器缺陷）。**组内 id 最大者
       是封面属主**，其余成员的时间戳晚于自身创建（中位 +348 天）。
       验证：属主的时间戳与定年吻合率 89.8%、分布与唯一封面逐分位一致；
-      其余成员 19.5%。build_csv 已按此规则清洗——共用组保留 id 最大者、
-      其余置空——清洗后数据集内封面文件全库唯一。
+    其余成员 19.5%。build_csv 已按此规则清洗——共用组保留 id 最大者、
+    其余置空——清洗后数据集内封面文件全库唯一。
+
+    **运营位书例外（用户口述机制，2026-11-16）**：``featured=1`` 的非日轻
+    由平台在 banner 更新后一段时间同步更换封面，操作方是平台而非作者，
+    故其时间戳记录的是运营操作、不是作品创建。实测 71 本有封面的运营位书
+    偏差中位 +338 天、±47 天窗口内 0 本（非运营位为 −11 天 / 88.9%），
+    因此定年交叉验证必须剔除 ``featured=1``。撤下 banner 后 ``featured=0``
+    但封面未回退的书仍可能保留运营期封面，是右侧长尾的来源之一；
+    封面时间戳一般只能给出创建的弱下界，不可逐本反推上架日。
 
     空值（无封面 / 占位封面 / 爬虫错值已清洗）返回 NaT。
     """

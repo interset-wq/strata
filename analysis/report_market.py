@@ -79,7 +79,8 @@ def fig_dating(df: pd.DataFrame) -> str:
     """封面时间戳 − 定年估计 的偏差分布。"""
     ts = eras.cover_timestamp(df["cover_url"])
     d = df.assign(cover_ts=ts)
-    d = d[d["cover_ts"].notna()].copy()
+    # 运营位书由平台随 banner 更新换封面，时间戳非创建时间，验证样本须剔除
+    d = d[d["cover_ts"].notna() & (d["featured"] == 0)].copy()
     delta = (d["cover_ts"] - d["est_date"]).dt.days
 
     fig, ax = plt.subplots(figsize=(7.2, 3.0))
@@ -92,17 +93,14 @@ def fig_dating(df: pd.DataFrame) -> str:
             ha="center", fontsize=7.5, color=charts.C["green"])
     med = delta.median()
     ax.axvline(med, color=charts.C["red"], lw=0.9, ls="--")
-    ax.annotate(
-        f"中位 {med:.0f} 天", xy=(med, 3000), xytext=(120, 11000),
-        fontsize=7.5, color=charts.C["red"],
-        arrowprops=dict(arrowstyle="-", color=charts.C["red"], lw=0.7),
-    )
     n_out = (~clip).sum()
-    ax.text(
-        0.99, 0.97,
-        f"n = {len(delta):,}（显示截断于 +{hi} 天，窗外 {n_out:,} 本未画出）",
-        transform=ax.transAxes, ha="right", va="top", fontsize=7.5, color="#666666",
-    )
+    hit = delta.between(-47, 47).mean() * 100
+    ax.text(0.99, 0.97, f"n = {len(delta):,}（非运营位封面；±47 天内 {hit:.1f}%）",
+            transform=ax.transAxes, ha="right", va="top", fontsize=7.5, color="#666666")
+    ax.text(0.99, 0.90, f"红虚线为中位 {med:.0f} 天",
+            transform=ax.transAxes, ha="right", va="top", fontsize=7.5, color=charts.C["red"])
+    ax.text(0.99, 0.83, f"右端截断于 +{hi} 天，窗外 {n_out:,} 本未画出",
+            transform=ax.transAxes, ha="right", va="top", fontsize=7.5, color="#666666")
     ax.set_xlim(lo, hi)
     ax.set_xlabel("偏差（天）：封面时间戳 − 定年估计")
     ax.set_ylabel("书数")
@@ -341,14 +339,18 @@ def section_dating(df: pd.DataFrame) -> str:
     )
     low_span = f"{int(low_years.index.min())}–{int(low_years.index.max())}"
 
-    # 封面时间戳交叉验证（共用封面已在构建时清洗，余下均为属主封面）
+    # 封面时间戳交叉验证：运营位书由平台换封面，时间戳非创建时间，须剔除
     ts = eras.cover_timestamp(df["cover_url"])
-    d = df.assign(cover_ts=ts)
-    d = d[d["cover_ts"].notna()].copy()
-    d["delta"] = (d["cover_ts"] - d["est_date"]).dt.days
+    all_cover = df.assign(cover_ts=ts)
+    all_cover = all_cover[all_cover["cover_ts"].notna()].copy()
+    all_cover["delta"] = (all_cover["cover_ts"] - all_cover["est_date"]).dt.days
+    banner = all_cover[all_cover["featured"] == 1]
+    d = all_cover[all_cover["featured"] == 0].copy()
     q_all = d["delta"]
     viol = d[d["delta"] < -31]
     viol_by_conf = viol.groupby("confidence").size() / d.groupby("confidence").size() * 100
+    hit_rate = q_all.between(-47, 47).mean() * 100
+    late_year = (q_all > 365).mean() * 100
     ext_table, ext_same, ext_n = external_works_check(df)
     ver = eras.load_verified()
     ver_rows = [
@@ -365,6 +367,26 @@ def section_dating(df: pd.DataFrame) -> str:
     )
     gaps = " / ".join(f"{int(x)} 天" for x in ver["gap_days"])
     deltas = " / ".join(fmt_delta(x) for x in ver["delta_days"])
+    hi_max = int(ver[ver["confidence"] == "high"]["delta_days"].abs().max())
+    mid_max = int(ver[ver["confidence"] == "mid"]["delta_days"].abs().max())
+    approx = eras.load_approximate()
+    approx_rows = [
+        [
+            str(int(r.nid)), f"《{r.title}》",
+            r.approx_date.strftime("%Y-%m-%d"),
+            r.est_date.strftime("%Y-%m-%d"),
+            fmt_delta(r.delta_days), r.confidence,
+        ]
+        for r in approx.itertuples()
+    ]
+    approx_table = md_table(
+        approx_rows, ["nid", "作品", "参考日期（±7 天）", "nid 定年", "偏差（天）", "置信"]
+    )
+    approx_deltas = " / ".join(fmt_delta(x) for x in approx["delta_days"])
+    approx_max = int(approx["delta_days"].abs().max())
+    gap_lo, gap_hi = int(approx["gap_days"].min()), int(approx["gap_days"].max())
+    gfs = approx[approx["nid"] == 27454].iloc[0]
+    gfs_days, gfs_gap = int(abs(gfs["delta_days"])), int(gfs["gap_days"])
 
     return f"""## 1. 定年方法与误差
 
@@ -393,21 +415,31 @@ mid {conf.get('mid', 0)}%、low {conf.get('low', 0)}%。低置信集中在 {low_
 
 `cover_url` 保留着封面文件的上传时间（路径 `YYYY/MM`），构成与 API 锚点
 相互独立的**第二条证据链**。封面更换会换新文件，时间戳记录最后一次上传，
-一般不早于创建时间。爬虫缺陷产生的共用封面（组内 id 最大者为属主，其余为错值）已在
-构建时清洗，此处使用的 {len(d):,} 本封面均为属主封面：
+一般不早于创建时间。爬虫缺陷产生的共用封面（组内 id 最大者为属主，其余为错值）
+已在构建时清洗，余下均为属主封面。
+
+**运营位书必须剔除**：`featured=1` 的非日轻由平台在 banner 更新后一段时间
+同步更换封面，操作方是平台而非作者，其时间戳记录的是运营操作、不是作品创建。
+实测 {len(banner):,} 本有封面的运营位书偏差中位 {banner['delta'].median():+.0f} 天、
+±47 天窗口内 0 本；剔除后验证样本为 {len(d):,} 本：
 
 | 指标 | 值 |
 |---|---|
 | 偏差（封面时间戳 − 定年估计）中位 | {q_all.median():.0f} 天 |
-| P5 / P95 | {q_all.quantile(.05):.0f} / {q_all.quantile(.95):.0f} 天 |
-| 封面时间戳早于估计 >31 天（违例） | {len(viol):,} 本（{len(viol) / len(d) * 100:.2f}%），最大提前 {abs(q_all.min()):.0f} 天 |
-| 违例率分层 | high {viol_by_conf.get('high', 0):.2f}% · mid {viol_by_conf.get('mid', 0):.2f}% |
+| P5 / P95 | {q_all.quantile(.05):.0f} / {q_all.quantile(.95):+.0f} 天 |
+| 落在 ±47 天内（双侧吻合） | {hit_rate:.1f}% |
+| 早于估计 31 天以上（草稿期提前量） | {len(viol):,} 本（{len(viol) / len(d) * 100:.2f}%），最大提前 {abs(q_all.min()):.0f} 天 |
+| 晚于估计 365 天以上（后续换封面） | {late_year:.2f}% |
+| 提前量分层 | high {viol_by_conf.get('high', 0):.2f}% · mid {viol_by_conf.get('mid', 0):.2f}% |
 
 ![封面时间戳偏差分布](figures/01_dating.png)
 
-偏差中位为负（封面上传略早于 nid 定年），与「草稿阶段先传封面、后正式上架」
-的流程一致。两条证据链在 ±47 天内吻合的占 {100 - len(viol) / len(d) * 100:.1f}%。
-mid 区间违例率高于 high（集中在 2017 年锚点稀疏段），对应月级误差；
+偏差中位为负、{hit_rate:.1f}% 落在 ±47 天内，与「草稿阶段先传封面、后正式上架」
+的流程一致。右侧 {100 - hit_rate:.1f}% 晚于 47 天、其中 {late_year:.2f}% 晚于一年，
+属后续换封面（含 banner 已撤下但封面未回退的书），不构成反证——时间戳记的是
+最后一次上传，只能给出创建的弱下界，不可逐本反推上架日。需注意
+「封面未早于估计 31 天以上」占 {100 - len(viol) / len(d) * 100:.1f}%，只约束提前方向，
+与双侧 ±47 天吻合率 {hit_rate:.1f}% 不是同一指标。
 low 区间（{low_span}）封面多被更换，验证在该区间失效而非通过。
 
 ### 外部史料交叉验证
@@ -422,10 +454,13 @@ API 锚点是定年曲线的输入，留一法误差只度量插值内洽性；�
 {ext_table}
 
 {ext_same}/{ext_n} 部定年与史料年份一致；唯一偏差为《我是高富帅》
-（史料 2012、定年 2013-01），与本节声明的 low 段误差量级相符。该检验不依赖
-任何站点统计字段，是对定年曲线**绝对年代位置**的独立校准。需注意这 {ext_n} 部
-作品全部集中在 2012–2016，即 low 置信段：它校准的正是锚点稀疏的早期区间。
-high/mid 段的绝对位置此前仅由密集 API 锚点保证，下节的精确创建时间校验补上这一空白。
+（史料 2012、定年 2013-01）。外部另给出该书创建日 2012-12-12（误差 <7 天），
+与定年仅差 {gfs_days} 天——**所谓「+1 年」是年粒度比较在跨年边界上放大的
+表观偏差，不是年量级误差**，真实误差属 low 段（插值间隔 {gfs_gap} 天）的月级量级。
+该检验不依赖任何站点统计字段，是对定年曲线**绝对年代位置**的独立校准。需注意这
+{ext_n} 部作品全部集中在 2012–2016，即 low 置信段：它校准的正是锚点稀疏的早期区间。
+high/mid 段的绝对位置此前仅由密集 API 锚点保证，下节的精确创建时间校验补上这一空白；
+再下一节的粗略日期则把 low 段误差从定性变为定量。
 
 站点级事件亦吻合：文学频道 2006-08-23 上线，最早 API 锚点为 2006-08-26，
 相差 3 天；2010-04-05 改版将既有作品分为 15 类（含「冒险类」「爱情类」），
@@ -444,14 +479,32 @@ high/mid 段的绝对位置此前仅由密集 API 锚点保证，下节的精确
 
 {ver_table}
 
-偏差 {deltas} 天，与置信分档声明的量级一致：high 段完全命中，两条 mid 段在月级以内
-（插值间隔依次 {gaps}）。三条偏差无一致方向，未显示 2023–2024 区间存在系统性年份偏移。
-前述史料代表作全部落在 low 段，本组首次把等式级独立校准覆盖到 high/mid 段。
+偏差 {deltas} 天（插值间隔依次 {gaps}），与置信分档一致：high 段最大偏差绝对值
+{hi_max} 天、mid 段 {mid_max} 天，均在同一月份内；偏差无一致方向，未显示
+2023–2024 区间存在系统性年份偏移。前述史料代表作全部落在 low 段，本组首次把
+等式级独立校准覆盖到 high/mid 段。
 
-三本同作者、同征文系列，n={len(ver)} 不构成统计样本，只用于绝对日期校验；配对依据、
-来源边界与量化影响见 `analysis/references/verified-dates.md`。校验集不并入插值锚点：
-并入会局部改变 2023–2024 段的插值斜率，连带改动该区间数千本作品的年度归属与全库
-年度统计，并改变留一法误差口径；而三条偏差无一致方向，不存在需修正的系统性偏移。"""
+其中 666497 独立给出，其余三条同作者、同征文系列且需配对判定；n={len(ver)}
+不构成统计样本，只用于绝对日期校验。配对依据、来源边界与量化影响见
+`analysis/references/verified-dates.md`。校验集不并入插值锚点：并入会局部改变
+2023–2024 段的插值斜率，连带改动该区间数千本作品的年度归属与全库年度统计，
+并改变留一法误差口径；而偏差无一致方向，不存在需修正的系统性偏移。
+
+### 粗略日期与 low 段误差实测
+
+另有 {len(approx)} 条外部参考日期（`analysis/anchors/approximate_dates.jsonl`），
+虽标注「粗略」，但**误差小于 7 天、约 80% 即为准确创建日**，可作等式级回测，
+不是月级软约束：
+
+{approx_table}
+
+三条全部落在 low 置信段（插值间隔 {gap_lo}–{gap_hi} 天），偏差
+{approx_deltas} 天，最大偏差绝对值 {approx_max} 天（约 {approx_max / 30.44:.1f} 个月），
+且方向不一致。这是 low 段定年误差的首个定量实测：参考日误差不超过 7 天，
+故上述偏差主要来自插值本身，证实锚点稀疏处会产生一至两个月的误差，
+与本节「年份误差可达数月」的声明一致，也解释了按年比较史料时跨年边界
+为何放大小误差（《我是高富帅》即为一例）。三点不足以修正曲线，
+但足以为该间隔区间的年份归属标注不确定性。"""
 
 
 def section_genre(df: pd.DataFrame) -> str:
@@ -648,7 +701,8 @@ def build() -> None:
 >    空状态、无文字书名且无内容、正版日轻等六类行（判据见 `analysis/config.py`），
 >    年度量因此是存活口径，历史真实供给高于此值。
 > 2. 年份由 nid 定年（`analysis/eras.py`），不是 `updated_at`；方法、误差与
->    API 锚点 / 封面时间戳 / 外部史料三条证据链见 §1。
+>    API 锚点 / 封面时间戳 / 外部史料 / 精确创建时间四条证据链见 §1。
+>    封面验证已剔除运营位书（平台同步换封面，非创建时间）。
 > 3. 快照采集于 {SNAPSHOT}，且 2026-05 之后新书在快照中的可见性骤降
 >    （nid 流速不变、成书率降至约 1/14），**年度序列止于 2025**。
 > 4. 完结率含右删失：世代越新，完结概率越被低估，跨世代比较只对
