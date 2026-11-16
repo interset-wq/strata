@@ -85,7 +85,7 @@ dataset.7z  ──pipeline/prepare.py──▶  meta*.jsonl（22 文件，唯一
 | `fetchers/` | 可选联网抓取器：月度榜、存活状态、存活书详情 |
 | `pipeline/` | 数据管线：`prepare`（校验归档并解压）、`build_csv`（jsonl → CSV 的唯一规范化入口）、`validate`（CSV 格式层与取值层校验，构建时自动调用） |
 | `anchors/` | 定年锚点：`nid_anchors.jsonl`（104 条插值输入）、`verified_dates.jsonl`（用户核实证据档案）、`approximate_dates.jsonl`（已清空，保留备用） |
-| `references/` | 外部查证档案：征文日期、萌神标签、榜单端点、定年取证、百科与史料等 |
+| `references/` | 外部查证档案：**端点总表 `sfacg-endpoints.md`**、征文日期、萌神标签、榜单端点、定年取证、百科与史料等 |
 | `data/` | 归档与解压后的 jsonl（归档不入库） |
 | `out/` | 派生数据资产，可重建，不入库 |
 | `reports/` | 报告正文与图表，均由生成器产出 |
@@ -179,6 +179,7 @@ df = pd.read_csv(paths.CSV_FILE)
 | `moebattle-tags.md` | 萌神标签来源、氪金机制与剔除依据 |
 | `my2020-top10.md` / `.json` | 2020 年度 TOP10 页面口径与 `fireMoney` 诊断 |
 | `sfacg-live-ranks.md` | 月度榜端点语义、计费机制与抓取证据 |
+| `sfacg-endpoints.md` | **已知端点总表**：三类搜索接口的字段覆盖与容量上限、`novelbytype` 枚举、详情页/目录/评论/榜单字段、静默限流与失败模式、复现命令 |
 | `sfacg-baike.md` / `bolobao-baike.md` / `pku-lightnovel-essay-2018.md` / `sfacg-pku-chronicle.md` | 平台沿革与文学史旁证 |
 
 ---
