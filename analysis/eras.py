@@ -2,7 +2,9 @@
 
 方法
 ----
-91 个锚点是 API 实测的作品创建时间（``addTime``），``nid`` 为站点全局自增
+103 个锚点是作品创建时间实测：91 个来自 API（``addTime``），12 条为用户
+核实创建时间（2026-11-16 并入，``source=user_verified``，见
+``references/verified-dates.md``）。``nid`` 为站点全局自增
 主键、严格单调，故可在锚点之间插值出任意 nid 的创建日期。
 
 插值在 log(nid) 空间进行：nid 增速 20 年间从约 2 涨到约 330 本/天（180 倍），
@@ -39,10 +41,13 @@ import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parent
+# 插值输入：91 个 API 实测锚点 + 12 条用户核实锚点（source=user_verified，
+# 2026-11-16 经用户批准从 verified_dates.jsonl 并入，low 段系统性偏差修正）
 ANCHORS_PATH = ROOT / "anchors" / "nid_anchors.jsonl"
-# 外部核实的精确创建时间：独立于插值输入的校验集，勿并入 ANCHORS_PATH
+# 用户核实创建时间的证据档案（12 条 exact）：已并入 ANCHORS_PATH 插值，
+# 本文件保留原始记录、配对依据与溯源（source 均为 user_verified）
 VERIFIED_PATH = ROOT / "anchors" / "verified_dates.jsonl"
-# 粗略日期（「附近」）：只作月级一致性检查，不是等式约束
+# 粗略日期（「附近」）：现已清空；文件保留，备后续粗略日期
 APPROXIMATE_PATH = ROOT / "anchors" / "approximate_dates.jsonl"
 
 _EPOCH = np.datetime64("1970-01-01", "D")
@@ -62,16 +67,16 @@ def load_anchors(path: Path | str | None = None) -> pd.DataFrame:
 
 
 def load_verified() -> pd.DataFrame:
-    """外部核实的精确创建时间，**不参与插值**，仅用于回测定年曲线。
+    """用户核实创建时间的证据档案（12 条 ``bound_type=exact``）。
 
-    与 ``ANCHORS_PATH`` 的区别：后者是曲线输入（API 实测 ``addTime``），
-    前者若混入会改变留一法误差口径与数千本作品的年度归属（实测见
-    ``analysis/references/verified-dates.md``）。``bound_type=exact`` 表示
-    等式约束，区别于网络时光机快照只能给出的上界。
+    2026-11-16 起已并入 ``ANCHORS_PATH`` 参与插值（用户批准的 low 段
+    重标定），故现行 ``estimate()`` 对这 12 个 nid 的定年即 ``created_at``、
+    ``delta_days`` 恒为 0。本函数保留用于：溯源（source / note）、
+    以及用 91 个纯 API 锚点重算**并入前**偏差（见报告 01 §1）。
 
     返回列：nid / title / created_at / bound_type / source / verified_on /
     contest / note / est_date / confidence / gap_days / delta_days。
-    ``delta_days`` = 精确创建时间 − nid 定年，正数表示插值偏早。
+    ``delta_days`` = 精确创建时间 − nid 定年。
     """
     rows = [
         json.loads(line)
@@ -212,9 +217,13 @@ def cover_timestamp(cover_url) -> pd.Series:
     )
 
 
-def leave_one_out() -> pd.DataFrame:
-    """留一法误差。留出单元 = 同一秒时间戳的整组锚点。"""
-    a = load_anchors()
+def leave_one_out(anchors: pd.DataFrame | None = None) -> pd.DataFrame:
+    """留一法误差。留出单元 = 同一秒时间戳的整组锚点。
+
+    ``anchors`` 缺省用全部锚点（103 = 91 API 实测 + 12 条用户核实）；
+    传入过滤后的锚点可对比并入前后的误差口径。
+    """
+    a = anchors if anchors is not None else load_anchors()
     recs = []
     for _, grp in a.groupby(a["addTime"].dt.floor("s"), sort=False):
         rest = a.drop(index=grp.index)

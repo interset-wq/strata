@@ -275,8 +275,8 @@ def section_supply(df: pd.DataFrame) -> tuple[str, dict]:
 
 | 分期 | 书量 | 依据 |
 |---|---:|---|
-| 2006-2014 兴趣站期 | {thousands(df[df.est_year <= 2014].shape[0])} | 年供给 76–3,412 本；2014 年商业化转型（百科词条） |
-| 2015-2016 商业化初期 | {thousands(df[(df.est_year >= 2015) & (df.est_year <= 2016)].shape[0])} | 2015 年 APP 上线；供给仍在 3–5 千本 |
+| 2006-2014 兴趣站期 | {thousands(df[df.est_year <= 2014].shape[0])} | 年供给 {df[df.est_year <= 2014].groupby('est_year').size().min()}–{df[df.est_year <= 2014].groupby('est_year').size().max():,} 本；2014 年商业化转型（百科词条） |
+| 2015-2016 商业化初期 | {thousands(df[(df.est_year >= 2015) & (df.est_year <= 2016)].shape[0])} | 2015 年 APP 上线；供给自 2.8 千本升至 5.5 千本 |
 | 2017-2022 扩张期 | {thousands(df[(df.est_year >= 2017) & (df.est_year <= 2022)].shape[0])} | 2017 年供给跳至 {jump_2017:.1f} 倍；2018 A 轮、2022 B 轮 |
 | 2023-2026 收缩期 | {thousands(df[df.est_year >= 2023].shape[0])} | 供给自峰值连续三年回落 |
 
@@ -333,6 +333,13 @@ def section_dating(df: pd.DataFrame) -> str:
     interp = loo[loo["kind"] == "interp"]
     q = interp["err_day"].abs()
 
+    # 并入前口径（仅 91 个 API 锚点）用于对比：重标定于 2026-11-16 执行
+    a_all = eras.load_anchors()
+    a_pre = a_all[a_all["source"] != "user_verified"].reset_index(drop=True)
+    loo_pre = eras.leave_one_out(a_pre)
+    interp_pre = loo_pre[loo_pre["kind"] == "interp"]
+    q_pre = interp_pre["err_day"].abs()
+
     conf = df["confidence"].value_counts(normalize=True).mul(100).round(1)
     low_years = (
         df[df["confidence"] == "low"]["est_year"].value_counts().sort_index()
@@ -353,40 +360,64 @@ def section_dating(df: pd.DataFrame) -> str:
     late_year = (q_all > 365).mean() * 100
     ext_table, ext_same, ext_n = external_works_check(df)
     ver = eras.load_verified()
+    # 并入前偏差：用 91 个纯 API 锚点现算（12 条已于 2026-11-16 并入现行曲线）
+    pre_model = eras._Model(a_pre)
+    ids_df = df["id"].to_numpy(dtype="float64")
+    pos_df = a_pre["nid"].searchsorted(ids_df)
+    lo_df = np.clip(pos_df - 1, 0, len(a_pre) - 1)
+    hi_df = np.clip(pos_df, 0, len(a_pre) - 1)
+    gap_df = np.abs(a_pre["day"].to_numpy()[hi_df] - a_pre["day"].to_numpy()[lo_df])
+    conf_pre = (
+        pd.Series(
+            np.where(gap_df <= 90, "high", np.where(gap_df <= 365, "mid", "low"))
+        )
+        .value_counts(normalize=True)
+        .mul(100)
+        .round(1)
+    )
+    ver["pre_date"] = pd.to_datetime(
+        pre_model.predict(ver["nid"].to_numpy(dtype="float64")).astype("datetime64[D]")
+    )
+    ver["pre_delta"] = (ver["created_at"] - ver["pre_date"]).dt.days
+    pos = a_pre["nid"].searchsorted(ver["nid"].to_numpy())
+    lo = np.clip(pos - 1, 0, len(a_pre) - 1)
+    hi = np.clip(pos, 0, len(a_pre) - 1)
+    ver["pre_gap"] = np.abs(a_pre["day"].to_numpy()[hi] - a_pre["day"].to_numpy()[lo])
     ver_rows = [
         [
             str(int(r.nid)), f"《{r.title}》",
             r.created_at.strftime("%Y-%m-%d"),
-            r.est_date.strftime("%Y-%m-%d"),
-            fmt_delta(r.delta_days), r.confidence,
+            r.pre_date.strftime("%Y-%m-%d"),
+            fmt_delta(r.pre_delta),
         ]
         for r in ver.itertuples()
     ]
     ver_table = md_table(
-        ver_rows, ["nid", "作品", "精确创建时间", "nid 定年", "偏差（天）", "置信"]
+        ver_rows, ["nid", "作品", "精确创建时间", "并入前定年", "并入前偏差（天）"]
     )
-    gaps = " / ".join(f"{int(x)} 天" for x in ver["gap_days"])
-    deltas = " / ".join(fmt_delta(x) for x in ver["delta_days"])
-    hi_max = int(ver[ver["confidence"] == "high"]["delta_days"].abs().max())
-    mid_max = int(ver[ver["confidence"] == "mid"]["delta_days"].abs().max())
-    ver_low = ver[ver["confidence"] == "low"]
-    low_deltas = " / ".join(fmt_delta(x) for x in ver_low["delta_days"])
+    gaps = " / ".join(f"{int(x)} 天" for x in ver["pre_gap"])
+    deltas = " / ".join(fmt_delta(x) for x in ver["pre_delta"])
+    hm = ver[ver["nid"] >= 600000]
+    hi_max = int(hm["pre_delta"].abs().max())
+    low_deltas = " / ".join(fmt_delta(x) for x in ver[ver["nid"] < 600000]["pre_delta"])
     gfs = ver[ver["nid"] == 27454].iloc[0]
-    gfs_days, gfs_gap = int(abs(gfs["delta_days"])), int(gfs["gap_days"])
+    gfs_gap = int(gfs["pre_gap"])
 
     return f"""## 1. 定年方法与误差
 
 `updated_at` 是最后更新时间，老书的一次编辑可晚于创建十年以上，不能作时间轴。
-本报告的年份由 `analysis/eras.py` 定年：91 个 API 实测锚点（作品创建时间
-`addTime`，2006-08 至 2026-06），在 log(nid) 空间分段线性插值——nid 增速
-20 年间增长约 180 倍，log 空间更接近匀速。
+本报告的年份由 `analysis/eras.py` 定年：103 个锚点——91 个 API 实测
+（作品创建时间 `addTime`，2006-08 至 2026-06）加 12 条用户核实创建时间
+（2026-11-16 经用户批准并入，发现与决策过程见下文）——在 log(nid) 空间
+分段线性插值：nid 增速 20 年间增长约 180 倍，log 空间更接近匀速。
 
 锚点插值误差用留一法实测（留出单元为同秒时间戳整组锚点，防双胞胎泄漏）：
 
 | 情形 | 锚点数 | \\|误差\\| 中位（天） | P90 | P99 |
 |---|---:|---:|---:|---:|
-| 锚点间插值 | {len(interp)} | {q.median():.0f} | {q.quantile(.9):.0f} | {q.quantile(.99):.0f} |
-| 边界外推 | {len(loo) - len(interp)} | — | — | 最大 482 |
+| 并入前（91 个 API 锚点） | {len(loo_pre)} | {q_pre.median():.0f} | {q_pre.quantile(.9):.0f} | {q_pre.quantile(.99):.0f} |
+| **并入后（103 锚点，现行口径）** | {len(loo)} | {q.median():.0f} | {q.quantile(.9):.0f} | {q.quantile(.99):.0f} |
+| 边界外推（两口径相同） | {len(loo) - len(interp)} | — | — | 最大 482 |
 
 本数据集 id 全部落在锚点区间内（无外推）。置信度分布：high {conf.get('high', 0)}%、
 mid {conf.get('mid', 0)}%、low {conf.get('low', 0)}%。低置信集中在 {low_span}
@@ -439,14 +470,14 @@ API 锚点是定年曲线的输入，留一法误差只度量插值内洽性；�
 
 {ext_table}
 
-{ext_same}/{ext_n} 部定年与史料年份一致；唯一偏差为《我是高富帅》
-（史料 2012、定年 2013-01）。外部另给出该书创建日 2012-12-12（误差 <7 天），
-与定年仅差 {gfs_days} 天——**所谓「+1 年」是年粒度比较在跨年边界上放大的
-表观偏差，不是年量级误差**，真实误差属 low 段（插值间隔 {gfs_gap} 天）的月级量级。
-该检验不依赖任何站点统计字段，是对定年曲线**绝对年代位置**的独立校准。需注意这
-{ext_n} 部作品全部集中在 2012–2016，即 low 置信段：它校准的正是锚点稀疏的早期区间。
-high/mid 段的绝对位置此前仅由密集 API 锚点保证，下节的精确创建时间校验补上这一空白；
-再下一节把 low 段误差从定性变为定量。
+{ext_same}/{ext_n} 部定年与史料年份一致（现行曲线）。《我是高富帅》在并入前
+定年 2013-01-09、与史料 2012 相差 1 年；用户核实创建日 2012-12-12 后，并入前
+偏差仅 28 天——**所谓「+1 年」是年粒度比较在跨年边界上放大的表观偏差，不是
+年量级误差**，真实误差属 low 段（并入前插值间隔 {gfs_gap} 天）的月级量级，
+并已在重标定中消解。该检验不依赖任何站点统计字段，是对定年曲线**绝对年代
+位置**的独立校准。需注意这 {ext_n} 部作品全部集中在 2012–2016，即锚点稀疏的
+早期区间。high/mid 段的绝对位置此前仅由密集 API 锚点保证，下节的用户核实
+创建时间补上这一空白，并把 low 段误差从定性变为定量、最终触发曲线修正。
 
 站点级事件亦吻合：文学频道 2006-08-23 上线，最早 API 锚点为 2006-08-26，
 相差 3 天；2010-04-05 改版将既有作品分为 15 类（含「冒险类」「爱情类」），
@@ -457,48 +488,46 @@ high/mid 段的绝对位置此前仅由密集 API 锚点保证，下节的精确
 2015-05-07 VIP 付费、2015-09-01 安卓客户端、2016-01-13 自动签约通道）
 为 §2 的分期提供依据。
 
-### 精确创建时间校验
+### 用户核实创建时间（第四条证据链，已并入）
 
-第四条证据链是外部核实的作品创建时间（`analysis/anchors/verified_dates.jsonl`，
-{len(ver)} 条，`bound_type=exact`）。它是等式约束，强于网络时光机快照只能给出的上界，
-且独立于 91 个 API 锚点；**不参与插值**，仅用于回测曲线的绝对年代位置：
+第四条证据链是用户核实的作品创建时间（`analysis/anchors/verified_dates.jsonl`，
+{len(ver)} 条，`bound_type=exact`）。它是等式约束，强于网络时光机快照只能给出的
+上界，且独立于 API 锚点。12 条最初作为独立校验集回测 91 锚点曲线；low 段 8 点
+测出段内方向一致的系统性偏差后，**经用户批准于 2026-11-16 并入插值锚点**
+（`nid_anchors.jsonl` 内 `source=user_verified`），现行曲线即并入后的 103 锚点
+口径。并入前的偏差（用 91 个纯 API 锚点现算）：
 
 {ver_table}
 
-偏差 {deltas} 天（插值间隔依次 {gaps}），分两段解读。2023–2024 段 4 条
-（high 2、mid 2）：high 段最大偏差绝对值 {hi_max} 天、mid 段 {mid_max} 天，
-均在同一月份内且方向不一致，未显示该区间存在系统性年份偏移；这 4 条首次把
-等式级独立校准覆盖到 high/mid 段（此前史料代表作全部落在 low 段）。
-low 段 8 条偏差 {low_deltas} 天，方向呈现系统性模式，见下节合并分析。
+偏差 {deltas} 天（并入前插值间隔依次 {gaps}）。2023–2024 段 4 条最大偏差绝对值
+{hi_max} 天，方向不一致，未显示该区间存在系统性年份偏移；这 4 条把等式级独立
+校准覆盖到 high/mid 段（此前史料代表作全部落在 low 段）。low 段 8 条偏差
+{low_deltas} 天，按相邻锚点区间分组方向完全一致——并入的直接动机，见下节。
 
 其中 666497 与 low 段 8 条独立给出；2023–2024 段其余三条同作者、同征文系列
 且需配对判定；n={len(ver)} 不构成统计样本，只用于绝对日期校验。配对依据、
-来源边界与量化影响见 `analysis/references/verified-dates.md`。校验集不并入
-插值锚点：并入实测将改动全库 32,232 行（13.1%）定年、其中 2,336 行跨年度
-边界，并改变留一法误差口径；low 段虽测出段内方向一致的系统性偏差（见下节），
-但其量级仅一至两个半月、证据未附可复核来源，默认不并入，重标定与否待定。
+来源边界与并入决策记录见 `analysis/references/verified-dates.md`。
 
-### low 段误差实测（8 点全精确）
+### low 段系统性偏差的发现与修正
 
-low 置信段现有 8 个外部校验点（上表 low 行），其中 3 条最初以「粗略」口径
-提供（自述误差小于 7 天），2026-11-16 经用户确认为准确时间，与其余 5 条同为
-等式级约束。8 点全部落在锚点稀疏区间（插值间隔 478–870 天），按相邻锚点
-区间分组后偏差方向完全一致：
+low 段 8 个校验点全部为用户确认的准确创建时间（其中 3 条最初以「粗略」口径
+提供、自述误差小于 7 天，后经确认升级），落在锚点稀疏区间（并入前插值间隔
+478–870 天），按相邻锚点区间分组后偏差方向完全一致：
 
-| 锚点区间 | 校验点 | 偏差（天） | 方向 |
+| 锚点区间 | 校验点 | 并入前偏差（天） | 方向 |
 |---|---|---|---|
 | 2012 段（锚点 nid 16,871 → 29,547，间隔 668 天） | 3 | −57 / −50 / −28 | 全负：定年偏晚 1–2 个月 |
 | 2015–16 段（锚点 nid 29,547 → 61,157，间隔 870 / 478 天） | 5 | +5 / +13 / +18 / +36 / +76 | 全正：定年偏早 1–2.5 个月 |
 
-这是 low 段定年误差的首个定量实测，且已从随机误差升级为**段内方向一致的
-系统性模式**：8 点均为用户确认的准确创建时间，偏差只能来自插值本身，提示该段
-log(nid) 插值的局部斜率存在可修正偏差（2012 段定年偏晚、2015–16 段偏早）。
-但修正影响面大——并入实测将改动 32,232 行（13.1%）定年、2,336 行跨年度
-边界（分段：2012 段 6,085 行偏移 −58..−1、2015 段 5,944 行与 2016 段 6,112 行
-偏移 +1..+77、扩张期 0 行、2023–24 段 14,091 行偏移 −3..+25，方向与上述
-偏差模式一致）——且证据未附可复核来源，默认不并入曲线；若确认重标定，
-将连带改变三份报告的年度统计。残差量级与「年份误差可达数月」的声明一致；
-年粒度比较在跨年边界放大小误差的现象不变（《我是高富帅》为一例）。"""
+参考日均为准确时间，偏差只能来自插值本身：low 段 log(nid) 插值的局部斜率
+存在可修正偏差（2012 段定年偏晚、2015–16 段偏早；870 天间隔内三点残差
+≤18 天，近似线性但整体偏早）。并入执行的实际影响与预模拟一致：全库
+32,232 行（13.1%）定年变化、2,336 行跨年度边界（分段：2012 段 6,085 行
+偏移 −58..−1、2015 段 5,944 行与 2016 段 6,112 行偏移 +1..+77、扩张期 0 行、
+2023–24 段 14,091 行偏移 −3..+25），与上述偏差模式方向一致。并入后留一法
+误差全面收窄（见本节开头对比表），low 置信占比自 {conf_pre.get('low', 0)}%
+降至 {conf.get('low', 0)}%；年粒度比较在跨年边界放大小误差的现象随之消解
+（《我是高富帅》定年由 2013-01-09 修正为 2012-12-12，史料「+1 年」消失）。"""
 
 
 def section_genre(df: pd.DataFrame) -> str:
