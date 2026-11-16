@@ -194,6 +194,13 @@ go-music-dl 的 `internal/appshell/server.go` 给出可直接照搬的协议：
 
 ### 4.4 存储：Go 侧 SQLite
 
+- **SQLite 驱动：`github.com/glebarez/sqlite`（GORM）→ `modernc.org/sqlite`。**
+  **必须是纯 Go 实现，不能用 `mattn/go-sqlite3`**——后者依赖 cgo，
+  而 iOS 上 Go 以 `dart:ffi` 挂 C archive 的形式嵌入（§2.3），
+  cgo 交叉编译到 iOS 不可行。`modernc.org/sqlite v1.46.1` 源码实测捆绑
+  **SQLite 3.51.2**（远高于 STRICT 表所需的 3.37），
+  且不受 Android/iOS 系统 SQLite 版本差异影响
+  （Android API 33 及以下仅 3.32）。`temp/go-music-dl` 已用同一套选型，可直接沿用。
 - **两份物理库**（见 §3.1）：`seed.db` 随包只读、`user.db` 在应用数据目录可写。
   Go 侧同时持有两个连接，`ATTACH` 做跨库查询；种子升级只替换前者的文件。
 - **种子落地方式**：`seed.db.gz` 随包（iOS bundle / Android assets）。SQLite 无法直接打开 Android
