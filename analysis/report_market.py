@@ -369,6 +369,8 @@ def section_dating(df: pd.DataFrame) -> str:
     deltas = " / ".join(fmt_delta(x) for x in ver["delta_days"])
     hi_max = int(ver[ver["confidence"] == "high"]["delta_days"].abs().max())
     mid_max = int(ver[ver["confidence"] == "mid"]["delta_days"].abs().max())
+    ver_low = ver[ver["confidence"] == "low"]
+    low_deltas = " / ".join(fmt_delta(x) for x in ver_low["delta_days"])
     approx = eras.load_approximate()
     approx_rows = [
         [
@@ -382,9 +384,6 @@ def section_dating(df: pd.DataFrame) -> str:
     approx_table = md_table(
         approx_rows, ["nid", "作品", "参考日期（±7 天）", "nid 定年", "偏差（天）", "置信"]
     )
-    approx_deltas = " / ".join(fmt_delta(x) for x in approx["delta_days"])
-    approx_max = int(approx["delta_days"].abs().max())
-    gap_lo, gap_hi = int(approx["gap_days"].min()), int(approx["gap_days"].max())
     gfs = approx[approx["nid"] == 27454].iloc[0]
     gfs_days, gfs_gap = int(abs(gfs["delta_days"])), int(gfs["gap_days"])
 
@@ -460,7 +459,7 @@ API 锚点是定年曲线的输入，留一法误差只度量插值内洽性；�
 该检验不依赖任何站点统计字段，是对定年曲线**绝对年代位置**的独立校准。需注意这
 {ext_n} 部作品全部集中在 2012–2016，即 low 置信段：它校准的正是锚点稀疏的早期区间。
 high/mid 段的绝对位置此前仅由密集 API 锚点保证，下节的精确创建时间校验补上这一空白；
-再下一节的粗略日期则把 low 段误差从定性变为定量。
+再下一节把 low 段误差从定性变为定量。
 
 站点级事件亦吻合：文学频道 2006-08-23 上线，最早 API 锚点为 2006-08-26，
 相差 3 天；2010-04-05 改版将既有作品分为 15 类（含「冒险类」「爱情类」），
@@ -479,32 +478,42 @@ high/mid 段的绝对位置此前仅由密集 API 锚点保证，下节的精确
 
 {ver_table}
 
-偏差 {deltas} 天（插值间隔依次 {gaps}），与置信分档一致：high 段最大偏差绝对值
-{hi_max} 天、mid 段 {mid_max} 天，均在同一月份内；偏差无一致方向，未显示
-2023–2024 区间存在系统性年份偏移。前述史料代表作全部落在 low 段，本组首次把
-等式级独立校准覆盖到 high/mid 段。
+偏差 {deltas} 天（插值间隔依次 {gaps}），分两段解读。2023–2024 段 4 条
+（high 2、mid 2）：high 段最大偏差绝对值 {hi_max} 天、mid 段 {mid_max} 天，
+均在同一月份内且方向不一致，未显示该区间存在系统性年份偏移；这 4 条首次把
+等式级独立校准覆盖到 high/mid 段（此前史料代表作全部落在 low 段）。
+low 段 5 条偏差 {low_deltas} 天，方向呈现系统性模式，与下节粗略日期合并分析。
 
-其中 666497 独立给出，其余三条同作者、同征文系列且需配对判定；n={len(ver)}
-不构成统计样本，只用于绝对日期校验。配对依据、来源边界与量化影响见
-`analysis/references/verified-dates.md`。校验集不并入插值锚点：并入会局部改变
-2023–2024 段的插值斜率，连带改动该区间数千本作品的年度归属与全库年度统计，
-并改变留一法误差口径；而偏差无一致方向，不存在需修正的系统性偏移。
+其中 666497 与 low 段 5 条独立给出；2023–2024 段其余三条同作者、同征文系列
+且需配对判定；n={len(ver)} 不构成统计样本，只用于绝对日期校验。配对依据、
+来源边界与量化影响见 `analysis/references/verified-dates.md`。校验集不并入
+插值锚点：并入实测将改动全库 32,181 行（13.1%）定年、其中 1,965 行跨年度
+边界，并改变留一法误差口径；low 段虽测出段内方向一致的系统性偏差（见下节），
+但其量级仅一至两个半月、证据未附可复核来源，默认不并入，重标定与否待定。
 
-### 粗略日期与 low 段误差实测
+### low 段误差实测（精确 + 粗略合并）
 
-另有 {len(approx)} 条外部参考日期（`analysis/anchors/approximate_dates.jsonl`），
-虽标注「粗略」，但**误差小于 7 天、约 80% 即为准确创建日**，可作等式级回测，
-不是月级软约束：
+low 置信段现有 8 个外部校验点：5 条精确创建时间（上表 low 行）与 3 条粗略
+参考日期（`analysis/anchors/approximate_dates.jsonl`，误差小于 7 天、约 80%
+即为准确创建日，可作等式级回测而非月级软约束）：
 
 {approx_table}
 
-三条全部落在 low 置信段（插值间隔 {gap_lo}–{gap_hi} 天），偏差
-{approx_deltas} 天，最大偏差绝对值 {approx_max} 天（约 {approx_max / 30.44:.1f} 个月），
-且方向不一致。这是 low 段定年误差的首个定量实测：参考日误差不超过 7 天，
-故上述偏差主要来自插值本身，证实锚点稀疏处会产生一至两个月的误差，
-与本节「年份误差可达数月」的声明一致，也解释了按年比较史料时跨年边界
-为何放大小误差（《我是高富帅》即为一例）。三点不足以修正曲线，
-但足以为该间隔区间的年份归属标注不确定性。"""
+8 点全部落在锚点稀疏区间（插值间隔 478–870 天），按相邻锚点区间
+分组后偏差方向完全一致：
+
+| 锚点区间 | 校验点 | 偏差（天） | 方向 |
+|---|---|---|---|
+| 2012 段（锚点 nid 16,871 → 29,547，间隔 668 天） | 3 | −57 / −50 / −28 | 全负：定年偏晚 1–2 个月 |
+| 2015–16 段（锚点 nid 29,547 → 61,157，间隔 870 / 478 天） | 5 | +5 / +13 / +18 / +36 / +76 | 全正：定年偏早 1–2.5 个月 |
+
+这是 low 段定年误差的首个定量实测，且已从随机误差升级为**段内方向一致的
+系统性模式**：参考日误差不超过 7 天，偏差只能来自插值本身，提示该段
+log(nid) 插值的局部斜率存在可修正偏差（2012 段定年偏晚、2015–16 段偏早）。
+但修正影响面大——并入实测将改动 32,181 行（13.1%）定年、1,965 行跨年度
+边界——且证据未附可复核来源，默认不并入曲线；若确认重标定，将连带改变
+三份报告的年度统计。残差量级与「年份误差可达数月」的声明一致；年粒度
+比较在跨年边界放大小误差的现象不变（《我是高富帅》为一例）。"""
 
 
 def section_genre(df: pd.DataFrame) -> str:
