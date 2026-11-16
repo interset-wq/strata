@@ -64,6 +64,11 @@ def thousands(x: float) -> str:
     return f"{x:,.0f}"
 
 
+def fmt_delta(x: float) -> str:
+    """天数偏差：0 不带正号，其余带符号。"""
+    return "0" if x == 0 else f"{int(x):+d}"
+
+
 def md_table(rows: list[list], header: list[str]) -> str:
     lines = ["| " + " | ".join(header) + " |", "|" + "---|" * len(header)]
     lines += ["| " + " | ".join(r) + " |" for r in rows]
@@ -345,6 +350,21 @@ def section_dating(df: pd.DataFrame) -> str:
     viol = d[d["delta"] < -31]
     viol_by_conf = viol.groupby("confidence").size() / d.groupby("confidence").size() * 100
     ext_table, ext_same, ext_n = external_works_check(df)
+    ver = eras.load_verified()
+    ver_rows = [
+        [
+            str(int(r.nid)), f"《{r.title}》",
+            r.created_at.strftime("%Y-%m-%d"),
+            r.est_date.strftime("%Y-%m-%d"),
+            fmt_delta(r.delta_days), r.confidence,
+        ]
+        for r in ver.itertuples()
+    ]
+    ver_table = md_table(
+        ver_rows, ["nid", "作品", "精确创建时间", "nid 定年", "偏差（天）", "置信"]
+    )
+    gaps = " / ".join(f"{int(x)} 天" for x in ver["gap_days"])
+    deltas = " / ".join(fmt_delta(x) for x in ver["delta_days"])
 
     return f"""## 1. 定年方法与误差
 
@@ -404,8 +424,8 @@ API 锚点是定年曲线的输入，留一法误差只度量插值内洽性；�
 {ext_same}/{ext_n} 部定年与史料年份一致；唯一偏差为《我是高富帅》
 （史料 2012、定年 2013-01），与本节声明的 low 段误差量级相符。该检验不依赖
 任何站点统计字段，是对定年曲线**绝对年代位置**的独立校准。需注意这 {ext_n} 部
-作品全部集中在 2012–2016，即 low 置信段：它校准的正是锚点稀疏的早期区间，
-而 high/mid 段的绝对位置仍由密集 API 锚点保证，两者互补而非重复。
+作品全部集中在 2012–2016，即 low 置信段：它校准的正是锚点稀疏的早期区间。
+high/mid 段的绝对位置此前仅由密集 API 锚点保证，下节的精确创建时间校验补上这一空白。
 
 站点级事件亦吻合：文学频道 2006-08-23 上线，最早 API 锚点为 2006-08-26，
 相差 3 天；2010-04-05 改版将既有作品分为 15 类（含「冒险类」「爱情类」），
@@ -414,7 +434,24 @@ API 锚点是定年曲线的输入，留一法误差只度量插值内洽性；�
 等日轻，与早期搬运书下架、正版授权版复用旧 id 的现象同源。
 商业化节点的精确日期（2014-12-04 iOS 客户端、2015-01-27 奥飞天使轮、
 2015-05-07 VIP 付费、2015-09-01 安卓客户端、2016-01-13 自动签约通道）
-为 §2 的分期提供依据。"""
+为 §2 的分期提供依据。
+
+### 精确创建时间校验
+
+第四条证据链是外部核实的作品创建时间（`analysis/anchors/verified_dates.jsonl`，
+{len(ver)} 条，`bound_type=exact`）。它是等式约束，强于网络时光机快照只能给出的上界，
+且独立于 91 个 API 锚点；**不参与插值**，仅用于回测曲线的绝对年代位置：
+
+{ver_table}
+
+偏差 {deltas} 天，与置信分档声明的量级一致：high 段完全命中，两条 mid 段在月级以内
+（插值间隔依次 {gaps}）。三条偏差无一致方向，未显示 2023–2024 区间存在系统性年份偏移。
+前述史料代表作全部落在 low 段，本组首次把等式级独立校准覆盖到 high/mid 段。
+
+三本同作者、同征文系列，n={len(ver)} 不构成统计样本，只用于绝对日期校验；配对依据、
+来源边界与量化影响见 `analysis/references/verified-dates.md`。校验集不并入插值锚点：
+并入会局部改变 2023–2024 段的插值斜率，连带改动该区间数千本作品的年度归属与全库
+年度统计，并改变留一法误差口径；而三条偏差无一致方向，不存在需修正的系统性偏移。"""
 
 
 def section_genre(df: pd.DataFrame) -> str:

@@ -40,6 +40,8 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parent
 ANCHORS_PATH = ROOT / "anchors" / "nid_anchors.jsonl"
+# 外部核实的精确创建时间：独立于插值输入的校验集，勿并入 ANCHORS_PATH
+VERIFIED_PATH = ROOT / "anchors" / "verified_dates.jsonl"
 
 _EPOCH = np.datetime64("1970-01-01", "D")
 
@@ -55,6 +57,33 @@ def load_anchors(path: Path | str | None = None) -> pd.DataFrame:
     df = df.sort_values("nid").reset_index(drop=True)
     df["day"] = (df["addTime"].to_numpy(dtype="datetime64[D]") - _EPOCH).astype("float64")
     return df
+
+
+def load_verified() -> pd.DataFrame:
+    """外部核实的精确创建时间，**不参与插值**，仅用于回测定年曲线。
+
+    与 ``ANCHORS_PATH`` 的区别：后者是曲线输入（API 实测 ``addTime``），
+    前者若混入会改变留一法误差口径与数千本作品的年度归属（实测见
+    ``analysis/references/verified-dates.md``）。``bound_type=exact`` 表示
+    等式约束，区别于网络时光机快照只能给出的上界。
+
+    返回列：nid / title / created_at / bound_type / source / verified_on /
+    contest / note / est_date / confidence / gap_days / delta_days。
+    ``delta_days`` = 精确创建时间 − nid 定年，正数表示插值偏早。
+    """
+    rows = [
+        json.loads(line)
+        for line in VERIFIED_PATH.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    v = pd.DataFrame(rows)
+    v["created_at"] = pd.to_datetime(v["created_at"])
+    est = estimate(v["nid"]).set_index("id")
+    v["est_date"] = pd.to_datetime(v["nid"].map(est["est_date"]))
+    v["confidence"] = v["nid"].map(est["confidence"])
+    v["gap_days"] = v["nid"].map(est["gap_days"])
+    v["delta_days"] = (v["created_at"] - v["est_date"]).dt.days
+    return v.sort_values("nid").reset_index(drop=True)
 
 
 class _Model:
