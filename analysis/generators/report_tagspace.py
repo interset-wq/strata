@@ -38,13 +38,14 @@ from sklearn.cluster import SpectralClustering  # noqa: E402
 from sklearn.manifold import MDS  # noqa: E402
 from sklearn.metrics import silhouette_score  # noqa: E402
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from lib import paths
 
-import charts  # noqa: E402
-import eras  # noqa: E402
+from lib import charts  # noqa: E402
+from lib import eras  # noqa: E402
 
-BASE = Path(__file__).resolve().parent
-OUT = BASE / "reports" / "09_tagspace.md"
+BASE = paths.ROOT
+OUT = paths.REPORTS_DIR / "09_tagspace.md"
 MIN_FREQ = 100
 SINCE = 2017
 HUB_MIN = 30  # 计算「平均 O/E」时的最小共现数（低频标签也能定义）
@@ -95,7 +96,7 @@ def gini(x: np.ndarray) -> float:
 
 
 def load_books() -> pd.DataFrame:
-    df = pd.read_csv(BASE / "out" / "novels.csv", dtype={"tags": str, "contest": str})
+    df = pd.read_csv(paths.OUT_DIR / "novels.csv", dtype={"tags": str, "contest": str})
     est = eras.estimate(df["id"])
     d = df.merge(est[["id", "est_date", "est_year"]], on="id")
     d["tl"] = d["tags"].fillna("").map(
@@ -312,7 +313,10 @@ def fig_space(tags: list[str], S: np.ndarray, lb: np.ndarray, n: np.ndarray,
               names: dict[int, str], hub: np.ndarray) -> str:
     """谱嵌入语义空间（与聚类同一几何）：点大小 ∝ 频次，颜色 = 簇。"""
     L = laplacian(sparse.csr_matrix(S), normed=True)
-    _, vec = eigsh(L.astype(float), k=3, which="SM")
+    # eigsh（ARPACK）用随机初始向量，不设 v0 则每次重跑得到略有不同的特征向量，
+    # 图不可复现。固定 v0 即可。
+    v0 = np.ones(L.shape[0], dtype=float)
+    _, vec = eigsh(L.astype(float), k=3, which="SM", v0=v0)
     XY = vec[:, 1:3]
     fig, ax = plt.subplots(figsize=(7.0, 5.4))
     palette = ["#4477AA", "#CC3311", "#009988", "#EE7733", "#EE3377", "#33BBEE",
@@ -462,8 +466,10 @@ def main() -> None:
     Dm = 1 - S
     np.fill_diagonal(Dm, 0)
     sil = silhouette_score(Dm, lb, metric="precomputed")
+    # n_jobs=1：MDS 的 SMACOF 迭代在多线程下有浮点求和顺序差异，
+    # 导致同一份输入每次重跑得到略有不同的坐标，图不可复现。串行即可。
     mds = MDS(n_components=2, metric="precomputed", init="random", random_state=0,
-              normalized_stress="auto")
+              normalized_stress="auto", n_jobs=1)
     XY = mds.fit_transform(Dm)
 
     # 词表基本量
@@ -472,7 +478,7 @@ def main() -> None:
 
     # 簇画像
     mp = d.set_index("id")
-    ranks = [json.loads(x) for x in (BASE / "out" / "monthly_ranks.jsonl").open(encoding="utf-8")]
+    ranks = [json.loads(x) for x in (paths.OUT_DIR / "monthly_ranks.jsonl").open(encoding="utf-8")]
     mt = {it["nid"] for r in ranks if r["rank"] == 0 for it in r["items"]}
     ht = {it["nid"] for r in ranks if r["rank"] == 3 for it in r["items"]}
     conv = sub[(sub["clicks"] >= 400) & (sub["clicks"] < 1500) & (sub["favs"] > 0)]

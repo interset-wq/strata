@@ -26,12 +26,13 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from lib import paths
 
-import charts  # noqa: E402
-import eras  # noqa: E402
+from lib import charts  # noqa: E402
+from lib import eras  # noqa: E402
 
-OUT = Path(__file__).resolve().parent / "reports" / "05_lifecycle_stock.md"
+OUT = paths.REPORTS_DIR / "05_lifecycle_stock.md"
 
 GENRE_ORDER = ["魔幻", "校园", "玄幻", "古风", "都市", "同人", "游戏", "科幻", "悬疑"]
 
@@ -55,7 +56,7 @@ STALE_BANDS = [
 
 def load() -> pd.DataFrame:
     df = pd.read_csv(
-        Path(__file__).resolve().parent / "out" / "novels.csv",
+        paths.OUT_DIR / "novels.csv",
         dtype={"tags": str, "contest": str},
     )
     est = eras.estimate(df["id"])

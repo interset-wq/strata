@@ -10,12 +10,13 @@ from collections import defaultdict
 import pandas as pd, numpy as np
 import matplotlib.pyplot as plt
 
-BASE = Path("E:/novly-proj/analysis")
-sys.path.insert(0, str(BASE))
-import eras, config, charts
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from lib import paths
+BASE = paths.ROOT
+from lib import eras, config, charts
 
 charts.setup_style()
-OUT = BASE / "reports"
+OUT = paths.REPORTS_DIR
 FIG = OUT / "figures"
 FIG.mkdir(parents=True, exist_ok=True)
 num = lambda x: f"{int(x):,}"
@@ -25,7 +26,7 @@ num = lambda x: f"{int(x):,}"
 def load_banner_covers() -> dict:
     """从 JSONL 恢复 banner 书的封面年月（CSV 的 dedup 把封面置空了）。"""
     rows = {}
-    for f in glob.glob(str(BASE / "data/extracted/dataset/data/meta*.jsonl")):
+    for f in glob.glob(str(paths.JSONL_DIR / "meta*.jsonl")):
         with open(f, encoding="utf-8") as fh:
             for line in fh:
                 try:
@@ -45,7 +46,7 @@ def load_banner_covers() -> dict:
 
 def load():
     cover_map, raw = load_banner_covers()
-    df = pd.read_csv(BASE / "out/novels.csv",
+    df = pd.read_csv(paths.CSV_FILE,
                      dtype={"tags": str, "contest": str, "cover_url": str})
     df = df[~df.author.isin(config.LICENSED_LN_AUTHORS)].copy()
     est = eras.estimate(df["id"])
@@ -63,7 +64,7 @@ def load():
     # 月榜（首次月票榜）
     first = {}
     months = defaultdict(list)
-    with open(BASE / "out/monthly_ranks.jsonl", encoding="utf-8") as fh:
+    with open(paths.MONTHLY_RANKS, encoding="utf-8") as fh:
         for line in fh:
             r = json.loads(line)
             if r["rank"] != 0:

@@ -30,14 +30,15 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from lib import paths
 
-import charts  # noqa: E402
-import eras  # noqa: E402
+from lib import charts  # noqa: E402
+from lib import eras  # noqa: E402
 
-BASE = Path(__file__).resolve().parent
-OUT = BASE / "reports" / "19_shortnovel.md"
-FIG = BASE / "reports" / "figures"
+BASE = paths.ROOT
+OUT = paths.REPORTS_DIR / "19_shortnovel.md"
+FIG = paths.REPORTS_DIR / "figures"
 
 # ---- 产品决策（2026-11-16 用户定案）----
 THR = 50000            # 短篇体量门槛：总字数 ≤ 5 万字
@@ -58,7 +59,7 @@ def pct(x: float) -> str:
 
 def load() -> pd.DataFrame:
     df = pd.read_csv(
-        BASE / "out" / "novels.csv", dtype={"tags": str, "contest": str},
+        paths.OUT_DIR / "novels.csv", dtype={"tags": str, "contest": str},
     )
     # 正版日轻已在 build_csv.py 阶段剔除（CSV 内已无这四个作者）
     est = eras.estimate(df["id"])
@@ -98,7 +99,7 @@ def seed_set(d: pd.DataFrame) -> set:
     s |= set(d[d.est_date >= content_end - pd.Timedelta(days=365)]["id"])
     s |= set(d[d.upd >= content_end - pd.Timedelta(days=90)]["id"])
     ranks = set()
-    with open(BASE / "out/monthly_ranks.jsonl", encoding="utf-8") as fh:
+    with open(paths.MONTHLY_RANKS, encoding="utf-8") as fh:
         for line in fh:
             for it in json.loads(line)["items"]:
                 if it.get("nid"):

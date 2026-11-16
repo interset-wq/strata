@@ -75,10 +75,10 @@
 ```bash
 cd analysis
 uv sync
-uv run --extra archive python prepare.py   # 首次：校验归档哈希并解压（已存在则跳过）
-uv run python build_csv.py                 # 从 jsonl 重建 CSV / schema / manifest
-uv run python report_timeline.py           # 生成报告 16（单份）
-for f in report_*.py; do uv run python "$f"; done   # 全部 17 份
+uv run --extra archive python pipeline/prepare.py   # 首次：校验归档哈希并解压（已存在则跳过）
+uv run python pipeline/build_csv.py                 # 从 jsonl 重建 CSV / schema / manifest
+uv run python generators/report_timeline.py         # 生成报告 16（单份）
+for f in generators/report_*.py; do uv run python "$f"; done   # 全部 19 份
 ```
 
 完整管线、目录说明、19 份报告清单和 12 条口径约束见 [`analysis/README.md`](./analysis/README.md)。

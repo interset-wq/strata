@@ -29,13 +29,14 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from lib import paths
 
-import charts  # noqa: E402
-import eras  # noqa: E402
+from lib import charts  # noqa: E402
+from lib import eras  # noqa: E402
 
-BASE = Path(__file__).resolve().parent
-OUT = BASE / "reports" / "08_engagement.md"
+BASE = paths.ROOT
+OUT = paths.REPORTS_DIR / "08_engagement.md"
 
 BINS = [2006, 2012, 2016, 2019, 2022, 2026]
 LABELS = ["2007-12", "2013-16", "2017-19", "2020-22", "2023-26"]
@@ -48,7 +49,7 @@ CLABELS = ["100-400", "400-1.5k", "1.5k-6k", "6k-30k", "30k+"]
 
 def load_books() -> pd.DataFrame:
     df = pd.read_csv(
-        BASE / "out" / "novels.csv", dtype={"tags": str, "contest": str}
+        paths.OUT_DIR / "novels.csv", dtype={"tags": str, "contest": str}
     )
     est = eras.estimate(df["id"])
     d = df.merge(est[["id", "est_date", "est_year"]], on="id")

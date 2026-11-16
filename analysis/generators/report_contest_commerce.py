@@ -14,12 +14,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-BASE = Path(__file__).resolve().parent
-sys.path.insert(0, str(BASE))
-import charts, config, eras
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from lib import paths
+BASE = paths.ROOT
+from lib import charts, config, eras
 
 charts.setup_style()
-OUT = BASE / "reports" / "15_contest_commerce.md"
+OUT = paths.REPORTS_DIR / "15_contest_commerce.md"
 
 
 def num(x: float) -> str:
@@ -43,7 +44,7 @@ def line_of(c: str) -> str:
 
 
 def load_data():
-    df = pd.read_csv(BASE / "out/novels.csv", dtype={"tags": str, "contest": str})
+    df = pd.read_csv(paths.CSV_FILE, dtype={"tags": str, "contest": str})
     df = df[~df.author.isin(config.LICENSED_LN_AUTHORS)].copy()
     est = eras.estimate(df["id"])
     df = df.merge(est[["id", "est_date", "est_year"]], on="id")
@@ -53,7 +54,7 @@ def load_data():
     df["has_contest"] = df.contest != ""
     df["is_vip"] = df.price_type.isin(["VIP", "签约"])
     first_ticket, first_hot = {}, {}
-    with open(BASE / "out/monthly_ranks.jsonl", encoding="utf-8") as fh:
+    with open(paths.MONTHLY_RANKS, encoding="utf-8") as fh:
         for line in fh:
             r = json.loads(line)
             for it in r.get("items", []):
@@ -243,7 +244,7 @@ def build() -> str:
     months = []
     import re as _re
     monthly = defaultdict(list)
-    with open(BASE / "out/monthly_ranks.jsonl", encoding="utf-8") as fh:
+    with open(paths.MONTHLY_RANKS, encoding="utf-8") as fh:
         for line in fh:
             r = json.loads(line)
             if r["rank"] == 0:

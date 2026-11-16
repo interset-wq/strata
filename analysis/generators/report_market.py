@@ -14,17 +14,18 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from lib import paths
 
 import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-import charts
-import eras
+from lib import charts
+from lib import eras
 
-OUT = Path(__file__).resolve().parent / "reports" / "01_market_structure.md"
+OUT = paths.REPORTS_DIR / "01_market_structure.md"
 
 GENRE_ORDER = ["魔幻", "玄幻", "古风", "科幻", "校园", "都市", "游戏", "同人", "悬疑"]
 
@@ -37,7 +38,7 @@ def yearly_counts(df: pd.DataFrame) -> pd.Series:
 
 def load() -> pd.DataFrame:
     df = pd.read_csv(
-        Path(__file__).resolve().parent / "out" / "novels.csv",
+        paths.OUT_DIR / "novels.csv",
         dtype={"tags": str, "contest": str},
     )
     est = eras.estimate(df["id"])

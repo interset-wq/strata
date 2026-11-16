@@ -16,13 +16,14 @@ import numpy as np
 import pandas as pd
 from wordcloud import WordCloud
 
-BASE = Path(__file__).resolve().parent
-sys.path.insert(0, str(BASE))
-import charts, config, eras
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from lib import paths
+BASE = paths.ROOT
+from lib import charts, config, eras
 
 charts.setup_style()
-TOKEN_CACHE = BASE / "out" / "title_tokens.pkl"
-OUT = BASE / "reports" / "14_titlewords.md"
+TOKEN_CACHE = paths.OUT_DIR / "title_tokens.pkl"
+OUT = paths.REPORTS_DIR / "14_titlewords.md"
 
 # 纯语法虚词过滤。与报告 12 不同：那里为识别「品牌词」滤掉「世界/变成/小姐」
 # 等叙事词；本报告研究「配方」，这些词正是分析对象，只滤无题材信息的虚词。
@@ -40,7 +41,7 @@ def num(x: float) -> str:
 
 
 def load_data():
-    df = pd.read_csv(BASE / "out/novels.csv", dtype={"tags": str, "contest": str})
+    df = pd.read_csv(paths.CSV_FILE, dtype={"tags": str, "contest": str})
     df = df[~df.author.isin(config.LICENSED_LN_AUTHORS)].copy()
     est = eras.estimate(df["id"])
     df = df.merge(est[["id", "est_date", "est_year"]], on="id")
@@ -56,7 +57,7 @@ def load_data():
     df["fav_2cond"] = df.groupby(["est_year", "n_tokens"])["favs"].rank(pct=True)
     df["fav_3cond"] = df.groupby(["est_year", "n_tokens", "genre"])["favs"].rank(pct=True)
     rank_nid = set()
-    with open(BASE / "out/monthly_ranks.jsonl", encoding="utf-8") as fh:
+    with open(paths.MONTHLY_RANKS, encoding="utf-8") as fh:
         for line in fh:
             r = json.loads(line)
             if r.get("rank") == 0:
@@ -68,11 +69,14 @@ def load_data():
 
 # ---------- 图 ----------
 def fig_cloud(word_freq: Counter, title: str, name: str) -> str:
+    # 配色用固定种子选取：词云的 random_state 只固定了词的布局，
+    # 不固定 color_func 里的随机取色，否则每次重跑图都不一样（不可复现）
+    rng = np.random.default_rng(42)
+    palette = ["4477AA", "CC3311", "009988", "777777"]
     wc = WordCloud(
         font_path="C:/Windows/Fonts/msyh.ttc",
         width=900, height=420, background_color="white",
-        color_func=lambda *_a, **_k: "#{}".format(
-            np.random.choice(["4477AA", "CC3311", "009988", "777777"])),
+        color_func=lambda *_a, **_k: "#{}".format(rng.choice(palette)),
         max_words=90, min_font_size=9, max_font_size=52,
         random_state=42, collocations=False,
     ).generate_from_frequencies(dict(word_freq))

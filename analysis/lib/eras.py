@@ -40,15 +40,17 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-ROOT = Path(__file__).resolve().parent
+from lib import paths
+
+ROOT = paths.ROOT
 # 插值输入：91 个 API 实测锚点 + 12 条用户核实锚点（source=user_verified，
 # 2026-11-16 经用户批准从 verified_dates.jsonl 并入，low 段系统性偏差修正）
-ANCHORS_PATH = ROOT / "anchors" / "nid_anchors.jsonl"
+ANCHORS_PATH = paths.NID_ANCHORS
 # 用户核实创建时间的证据档案（12 条 exact）：已并入 ANCHORS_PATH 插值，
 # 本文件保留原始记录、配对依据与溯源（source 均为 user_verified）
-VERIFIED_PATH = ROOT / "anchors" / "verified_dates.jsonl"
+VERIFIED_PATH = paths.VERIFIED_DATES
 # 粗略日期（「附近」）：现已清空；文件保留，备后续粗略日期
-APPROXIMATE_PATH = ROOT / "anchors" / "approximate_dates.jsonl"
+APPROXIMATE_PATH = paths.APPROXIMATE_DATES
 
 _EPOCH = np.datetime64("1970-01-01", "D")
 

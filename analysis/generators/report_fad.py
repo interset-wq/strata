@@ -15,12 +15,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-BASE = Path(__file__).resolve().parent
-sys.path.insert(0, str(BASE))
-import charts, config, eras
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from lib import paths
+BASE = paths.ROOT
+from lib import charts, config, eras
 
-TOKEN_CACHE = BASE / "out" / "title_tokens.pkl"
-OUT = BASE / "reports" / "13_fad.md"
+TOKEN_CACHE = paths.OUT_DIR / "title_tokens.pkl"
+OUT = paths.REPORTS_DIR / "13_fad.md"
 
 # 泛词表：不构成「品牌词」
 GENERIC = {
@@ -44,7 +45,7 @@ def is_moebattle(t: str) -> bool:
 
 
 def load_data():
-    df = pd.read_csv(BASE / "out/novels.csv", dtype={"tags": str, "contest": str})
+    df = pd.read_csv(paths.CSV_FILE, dtype={"tags": str, "contest": str})
     df = df[~df.author.isin(config.LICENSED_LN_AUTHORS)].copy()
     est = eras.estimate(df["id"])
     df = df.merge(est[["id", "est_date", "est_year"]], on="id")
@@ -56,7 +57,7 @@ def load_data():
 
 def load_ranks():
     first_mv = {}
-    with open(BASE / "out/monthly_ranks.jsonl", encoding="utf-8") as fh:
+    with open(paths.MONTHLY_RANKS, encoding="utf-8") as fh:
         for line in fh:
             r = json.loads(line)
             if r["rank"] != 0:

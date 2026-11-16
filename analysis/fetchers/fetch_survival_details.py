@@ -6,10 +6,12 @@
 """
 import json, re, time
 from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from lib import paths
 import requests
 
-BASE = Path(__file__).resolve().parent
-OUT = BASE / "out" / "survival_probe.jsonl"
+BASE = paths.ROOT
+OUT = paths.OUT_DIR / "survival_probe.jsonl"
 UA = ("Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) "
       "AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148")
 

@@ -18,12 +18,13 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from lib import paths
 
-import charts
-import eras
+from lib import charts
+from lib import eras
 
-OUT = Path(__file__).resolve().parent / "reports" / "03_author_ecology.md"
+OUT = paths.REPORTS_DIR / "03_author_ecology.md"
 
 # 分析用的「有效作品」过滤器（只在报告内使用，不改数据层）：
 # 1 万字与 config.EMPTY_WORDS 同源；10 收藏略高于全库中位 8，表示至少被读者验证过。
@@ -36,7 +37,7 @@ BOOK_LABELS = ["1", "2", "3-5", "6-10", "11-20", "21-50", "50+"]
 
 def load() -> pd.DataFrame:
     df = pd.read_csv(
-        Path(__file__).resolve().parent / "out" / "novels.csv",
+        paths.OUT_DIR / "novels.csv",
         dtype={"tags": str, "contest": str},
     )
     est = eras.estimate(df["id"])

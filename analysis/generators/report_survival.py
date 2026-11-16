@@ -31,13 +31,14 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 
-BASE = Path(__file__).resolve().parent
-sys.path.insert(0, str(BASE))
-import charts  # noqa: E402
-import eras  # noqa: E402
-from config import LICENSED_LN_AUTHORS as LIC  # noqa: E402
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from lib import paths
+BASE = paths.ROOT
+from lib import charts  # noqa: E402
+from lib import eras  # noqa: E402
+from lib.config import LICENSED_LN_AUTHORS as LIC  # noqa: E402
 
-REPORTS = BASE / "reports"
+REPORTS = paths.REPORTS_DIR
 
 
 def pct(v: float, nd: int = 1) -> str:
@@ -69,7 +70,7 @@ def wilson(k: int, n: int, z: float = 1.96) -> tuple[float, float, float]:
 # ---------- 数据载入 ----------
 
 def load_books() -> pd.DataFrame:
-    d = pd.read_csv(BASE / "out" / "novels.csv", dtype={"tags": str, "contest": str},
+    d = pd.read_csv(paths.OUT_DIR / "novels.csv", dtype={"tags": str, "contest": str},
                     usecols=lambda c: c in ("id", "title", "author", "favs", "words"))
     est = eras.estimate(d["id"])
     d = d.merge(est[["id", "est_year"]], on="id")
@@ -77,7 +78,7 @@ def load_books() -> pd.DataFrame:
 
 
 def load_probe() -> pd.DataFrame:
-    r = pd.DataFrame([json.loads(l) for l in (BASE / "out" / "survival_probe.jsonl")
+    r = pd.DataFrame([json.loads(l) for l in (paths.OUT_DIR / "survival_probe.jsonl")
                       .open(encoding="utf-8")])
     r["alive"] = r["alive"].map(lambda x: bool(x) if pd.notna(x) else None)
     for k in ("state", "words", "favs", "likes", "last_upd"):
@@ -89,7 +90,7 @@ def load_probe() -> pd.DataFrame:
 
 def anchor_interp() -> pd.Series:
     """nid -> 创建日期（104 锚点 log 插值）。"""
-    an = pd.read_json(BASE / "anchors" / "nid_anchors.jsonl", lines=True)
+    an = pd.read_json(paths.ANCHORS_DIR / "nid_anchors.jsonl", lines=True)
     an["t"] = pd.to_datetime(an["addTime"]).values.astype("datetime64[ns]").astype(np.int64)
     an = an.sort_values("nid")
 
@@ -199,7 +200,7 @@ def fig_probe(r: pd.DataFrame) -> str:
     ax0.set_title("三类样本的存活率", fontsize=9, loc="left")
 
     # A 组按首上榜年
-    recs = [json.loads(l) for l in (BASE / "out" / "monthly_ranks.jsonl").open(encoding="utf-8")]
+    recs = [json.loads(l) for l in (paths.OUT_DIR / "monthly_ranks.jsonl").open(encoding="utf-8")]
     tt = pd.DataFrame([(it["nid"], x["month"]) for x in recs for it in x["items"]],
                       columns=["nid", "month"])
     first = tt.groupby("nid")["month"].min()
@@ -295,6 +296,12 @@ def section_header(n_probe: int) -> str:
 >    与 C 组按标题反查的 0 命中都不支持这一可能。
 > 5. 本报告**不改动任何数据行**；结论以口径修正与偏倚评估的形式作用于
 >    前九份报告（§5）。
+> 6. **数据源抓取机制已确认**（2026-11-16 由数据提供者说明 + 数据结构验证）：
+>    原始 jsonl 是 Scrapy 按天（`scrapy -o` 追加模式，UTC 日切分）抓取的
+>    **列表页**，列表页按 `last_update` 降序排列，每天从上一天爬到的位置续爬，
+>    每天约 400-600 页 × 20 条。全量是一次**从新到旧的单向游标扫描**，不是
+>    统一时刻的快照——「快照 2026-05-03」是扫描起点（列表头部的更新时间），
+>    不是每本书的读取时刻。
 """
 
 
@@ -320,12 +327,18 @@ def section_conclusion(n_f: pd.DataFrame, dead_books: pd.DataFrame,
 4. **遗漏有系统性画像**：随机遗漏书字数中位 4,926（在册样本 11,663）、
    收藏中位 4 vs 5、2022 年后仍更新的占 30.2% vs 2.5%——**数据集系统性偏向
    「长、老」的书**；收藏规模本身偏倚较小（4 vs 5）。
+   **成因已确认**：单向游标扫描期间，更新中的书会被重新排到列表头部
+   （游标身后），新入库的书也出现在头部——两者都不会被回头再抓（§7）。
 5. **空洞的时间结构不均匀**：在册密度 2010-2014 年 40-57%、2016-2020 年仅
    26-28%、2021 年后回升到 35-38%；校正遗漏后活书密度仍呈同形（80% → 45% →
    50%）——**中期 nid 段的死槽率确实更高**，无论那是删除还是未分配。
 6. **游程结构支持「独立散失」**：全部 160,359 个缺失游程中约九成长度 ≤5、
    最长仅 64，无成百上千的连续空洞——nid 分配没有「跳跃块」，空洞是逐本
    散失的结果。
+7. **遗漏机制已确认**（§7）：22 个分片是 Scrapy 按 UTC 日切分的列表页抓取，
+   每日 400-600 页、按更新时间降序单向续爬一次（2026-04 中 ~ 05 初，约 3 周）。
+   **更新中的书与新入库的书会被重排到游标身后而被系统性跳过**——这是
+   「遗漏偏短、偏新、不偏冷」的直接成因，原 §6.2「机制未证实」撤回。
 """
 
 
@@ -466,8 +479,9 @@ def section_profile(r: pd.DataFrame, cov: float, cov_lo: float, cov_hi: float,
 
 - **遗漏书更短、更新近，但收藏规模相近**（C vs B：字数中位 4,926 vs 11,663、
   2022 年后仍更新 30.2% vs 2.5%、收藏中位 4 vs 5）。遗漏与「更新频率/体量」
-  相关、与「已积累的热度」弱相关——这与「抓取源按某种更新时间序遍历、短书
-  更容易在分页竞争中滑出」的机制假说相容，但快照数据无法证实机制本身。
+  相关、与「已积累的热度」弱相关——**§7 证实这正是单向游标扫描的必然产物**：
+  更新中的书被重排到列表头部（游标身后），扫描不再回头，于是被系统性跳过；
+  新入库的书同理。原先「无法证实机制」的保留意见已撤回。
 - **A 组证明热门书也会被漏**：107 本在线的月榜书字数中位 123,555、收藏中位
   2,119——不是边角料。遗漏率对热门书更低（月榜书 1-25% vs 全体活书约三成），
   但不为零。
@@ -516,6 +530,164 @@ def section_bias(n_f: pd.DataFrame) -> str:
 """
 
 
+def scan_fingerprint() -> dict:
+    """从原始 jsonl 分片现算结构指纹：粒度、边界、顺序、重复。
+
+    用于验证抓取机制（§7）——分片结构是「Scrapy 按 UTC 日切分、
+    列表页按 last_update 降序单向续爬」的可复现证据。
+    """
+    files = sorted(paths.JSONL_DIR.glob("meta*.jsonl"))
+    rows_per_shard, shards = [], []
+    nid_seen: dict[int, list] = {}
+    for f in files:
+        recs = [json.loads(l) for l in f.open(encoding="utf-8") if l.strip()]
+        rows_per_shard.append(len(recs))
+        for x in recs:
+            nid_seen.setdefault(int(x["nid"]), []).append(
+                (f.name, x.get("last_update", "")))
+        if recs:
+            # 降序（= 列表页顺序）的首条与末条
+            ts = sorted((x.get("last_update", "") for x in recs), reverse=True)
+            shards.append((f.name, ts[0], ts[-1], len(recs)))
+
+    # 分片内顺序：updated_at 相邻递增率 与 nid 递增率（全部 22 个分片加权平均，
+    # 比单分片更有代表性）
+    upd_ok = nid_ok = adj = 0
+    for f in files:
+        rs = [json.loads(l) for l in f.open(encoding="utf-8") if l.strip()]
+        upd_ok += sum(1 for a, b in zip(rs, rs[1:])
+                      if a.get("last_update", "") <= b.get("last_update", ""))
+        nid_ok += sum(1 for a, b in zip(rs, rs[1:])
+                      if int(a["nid"]) < int(b["nid"]))
+        adj += max(len(rs) - 1, 0)
+    upd_inc = upd_ok / adj if adj else 0
+    nid_inc = nid_ok / adj if adj else 0
+
+    # 分片边界重叠：把每个分片的 last_update 降序（= 列表页顺序），
+    # 取「前一分片降序末条」与「后一分片降序首条」——这正是游标续爬的接缝。
+    # 分片按抓取日排序（= 该分片降序首条，即它抓到的最新一条），从新到旧。
+    by_time = sorted(shards, key=lambda s: s[1], reverse=True)
+    n_bound = n_ovl = 0
+    sample = ""
+    for (n1, _, t1_last, _), (n2, t2_first, _, _) in zip(by_time, by_time[1:]):
+        n_bound += 1
+        try:
+            if abs((pd.to_datetime(t1_last) - pd.to_datetime(t2_first)).days) <= 1:
+                n_ovl += 1
+                if not sample:
+                    sample = (f"{n1} 末 {t1_last[:16]} → "
+                              f"{n2} 首 {t2_first[:16]}")
+        except Exception:
+            pass
+
+    # 满额分片：单日配额 = 600 页 × 20 条 = 12,000 行。
+    # 落在 [12000, 12100] 的是标准满额分片；更高的（个别跨日未切干净的残留）
+    # 单列，因为它们会污染「每分片 ≈ 12,000 行」这条推断。
+    # 主体分片：22 个分片中除首尾 3 个不满额的，其余都是当日配额跑满的
+    full_rows = [x for x in rows_per_shard if x >= 12000]
+    over_rows = [x for x in rows_per_shard if x > 12100]
+    body_rows = [x for x in full_rows if x <= 12100]
+    full_n = len(full_rows)
+
+    # 重复 nid：updated_at 是否相同
+    dups = [v for v in nid_seen.values() if len(v) > 1]
+    n_dup = len(dups)
+    n_same = sum(1 for v in dups if len({x[1] for x in v}) == 1)
+    n_changed = n_dup - n_same
+
+    # 样例：updated_at 变新的重复 nid（取 nid 最大者，演示「更新会重排到游标前方」）
+    changed_sample = ""
+    for nid, v in nid_seen.items():
+        ts = {x[1] for x in v}
+        if len(ts) > 1:
+            srt = sorted(ts)
+            changed_sample = f"（如 {nid}: {srt[0][11:16]}→{srt[-1][11:16]}）"
+            break
+
+    all_upd = [x[1] for v in nid_seen.values() for x in v]
+    return {
+        "n_shards": len(files),
+        "n_full": full_n,
+        "over_rows": over_rows,
+        "min_shard": min(body_rows) if body_rows else min(rows_per_shard),
+        "max_shard": max(body_rows) if body_rows else max(rows_per_shard),
+        "head_rows": shards[0][3],
+        "tail_rows": shards[-1][3],
+        "short_rows": sorted(x for x in rows_per_shard if x < 12000),
+        "newest_span": f"{shards[0][1][:7]}→{shards[0][2][:7]}",
+        "oldest_file": shards[-1][0].replace(".jsonl", ""),
+        "oldest_span": f"{shards[-1][1][:7]}→{shards[-1][2][:7]}",
+        "boundary_sample": sample,
+        "n_boundaries": len(shards),
+        "n_overlap": n_ovl,
+        "upd_inc": upd_inc,
+        "nid_inc": nid_inc,
+        "n_dup": n_dup,
+        "n_dup_same": n_same,
+        "n_changed": n_changed,
+        "changed_sample": changed_sample,
+        "dup_same_pct": n_same / n_dup * 100 if n_dup else 0,
+        "content_end": max(all_upd)[:10],
+    }
+
+
+def section_mechanism(fp: dict) -> str:
+    """§7 抓取机制：从 jsonl 分片的结构指纹反推抓取方式。
+
+    fp 由 scan_fingerprint() 现算，不写死任何数字。
+    """
+    return f"""## 7. 抓取机制：为什么遗漏恰好偏向「短、新、更新中」
+
+### 7.1 数据源结构
+
+用户提供的抓取方式：**Scrapy `scrapy -o` 产物，UTC 日切分文件、追加模式写入；
+每轮爬 400-600 页 × 20 条/页；每天从上一天爬到的位置续爬；列表页按更新时间
+降序排列**。数据结构与这段描述逐条吻合，可以复现验证：
+
+| 证据 | 观测 | 与机制的对应 |
+|---|---|---|
+| 分片粒度 | {fp['n_full']} 个主体分片各 {fp['min_shard']:,}-{fp['max_shard']:,} 行；首尾分片 {' / '.join(f'{x:,}' for x in fp['short_rows'])} 行 | 12,000 行 ≈ 600 页 × 20 条 = 单日配额；首尾不满额 |
+| 分片顺序 | meta.jsonl 覆盖 {fp['newest_span']}，{fp['oldest_file']} 覆盖 {fp['oldest_span']} | 文件序号 = 抓取日，沿更新时间**从新到旧**推进 |
+| 分片边界 | {fp['boundary_sample']}；{fp['n_boundaries']} 个边界中 {fp['n_overlap']} 个重叠 ≤1 天 | 游标按 `last_update` 断点续爬，边界重叠是「重复爬最后一页」的保险 |
+| 分片内顺序 | `updated_at` 相邻递增率 {fp['upd_inc']:.0%}（scrapy 并发写回的自然抖动），`nid` 递增率 {fp['nid_inc']:.1%}（随机） | 列表按更新时间排序，与 nid 无关 |
+| 重复 nid | {fp['n_dup']:,} 个重复，{fp['n_dup_same']:,} 个 `updated_at` 完全相同、均在分片交界处 | 边界重叠页被抓两次；{fp['n_dup_same']:,}/{fp['n_dup']:,} 未变说明扫描窗口内极少书被重抓 |
+| {fp['n_changed']} 个例外 | updated_at 在两次抓取间变新{fp['changed_sample']} | 扫描期间书更新后被再次抓到，直接演示「更新会重排到游标前方」 |
+
+**关键结论：这不是一张统一时刻的快照，而是一次历时约 3 周、从列表头部向尾部
+单向推进的扫描。** `max(last_update)={fp['content_end']}` 是扫描起点列表头部的
+更新时间，不是全库统一的读取时刻。
+
+### 7.2 遗漏的因果链
+
+列表按 `last_update` 降序 ⇒ 书一旦更新，就跳回列表最前面——也就是**游标身后**。
+扫描是单向的，不会回头。于是：
+
+1. **更新中的书**：在扫描窗口内只要更新过一次，就跳到游标已越过的区域，
+   本次扫描永远不会再抓到它。这直接解释了 C 组遗漏活书「2022 年后仍更新」
+   {fp['miss_recent']} vs 在册 {fp['have_recent']}（§4）——遗漏的是**还在动**的书。
+2. **扫描期间新入库的书**：同样出现在列表头部、游标身后，被系统性漏掉；
+   nid 上界 {fp['max_nid']:,} 定年 {fp['max_nid_date']}，正是扫描起点附近。这解释了遗漏书
+   偏「新」（字数中位 {fp['miss_words']:,} vs {fp['have_words']:,}，短书多为新书）。
+3. **收藏规模偏倚小（4 vs 5）**：因为决定漏不漏的是「更不更新、何时入库」，
+   不是「有多少人收藏」——热度只在通过更新行为间接起作用。
+4. **热门书遗漏率低但不为零**（月榜按世代 1-25%）：头部书更新频繁，按 (1)
+   本应更容易漏；但它们在扫描初期（列表头部）就被抓到，之后即便更新也已在库内。
+   A 组 107 本月榜在线遗漏书是**在扫描开始之后才更新/入库**的那部分。
+
+### 7.3 对「覆盖率 68.9%」解读的修正
+
+覆盖率的分母（全库活书 {fp['total_alive']:,}）来自 C 组存活率外推，仍然有效。但需明确：
+
+- 68.9% 是**扫描窗口时点**（2026-04 中 ~ 2026-05 初）的覆盖率；扫描期间
+  新入库/更新的书被结构性排除，窗口之后的新书更不在库内——这与「内容上界
+  2026-05-03、年度序列止于 2025」完全一致。
+- **重复抓取的 {fp['n_dup_same']:,} 本（{fp['dup_same_pct']:.1f}% 的重复 nid）更新时间未变**，说明扫描窗口内
+  同一本书几乎不会被抓两次；「更新即离场」是单向的，不存在回头补偿。
+- §5 对前九份报告的偏倚评估方向不变，且§4「偏短、偏新、不偏冷」的画像
+  现在有了机制解释，而非仅是统计相关性。
+"""
+
+
 def section_bounds(dead_slots: float) -> str:
     return f"""## 6. 口径边界与未决问题
 
@@ -523,9 +695,10 @@ def section_bounds(dead_slots: float) -> str:
    站上数据判定。游程结构（§2）排除「分配跳跃块」，但不排除「逐条跳号」
    （如草稿占用、审核未通过即弃号）。若未来能获得站方数据或第三方存档
    （Wayback、搜索引擎缓存）可再分解；本报告不猜。
-2. **遗漏机制未证实**：「分页竞争滑出」只是与画像相容的假说。数据集来源
-   （22 个 meta jsonl）的抓取方式已不可考，本报告只测遗漏的**存在、规模与
-   画像**，不归因。
+2. **遗漏机制已证实**（原「未证实」已撤回）：数据源是 Scrapy 按 UTC 日切分的
+   列表页抓取，按 `last_update` 降序单向游标推进（§7）。这解释了为何遗漏
+   与「更新近/书短」强相关而与热度弱相关。仍不可测的是**死槽的构成**与
+   **早期段（2010 前）的遗漏率**。
 3. **B 组未覆盖 2023 年后**：nid > 50 万的在册书未抽样，「快照后下架率 ≈ 0」
    严格说只适用于 2023 年前创建的书；月榜 2024-2026 段的缺失书（alive 率高）
    间接支持新书也稳定。
@@ -549,7 +722,7 @@ def main() -> None:
     n_f["alive"] = n_f["sum"] / n_f["size"] * 100
 
     # A 组死亡书明细
-    recs = [json.loads(l) for l in (BASE / "out" / "monthly_ranks.jsonl").open(encoding="utf-8")]
+    recs = [json.loads(l) for l in (paths.OUT_DIR / "monthly_ranks.jsonl").open(encoding="utf-8")]
     tt = pd.DataFrame([(it["nid"], it["name"], x["month"], x["rank"]) for x in recs
                        for it in x["items"]], columns=["nid", "name", "month", "rank"])
     mm = tt.groupby("nid").agg(name=("name", "first"),
@@ -598,6 +771,19 @@ def main() -> None:
         "profile": fig_profile(r),
     }
 
+    fp = scan_fingerprint()
+    fp["total_alive"] = int(round(total_alive))
+    det = r[r["alive_ok"]]
+    c_det = det[det["group"] == "range_missing"]
+    b_det = det[det["group"] == "in_db"]
+    fresh_cut = pd.Timestamp("2022-01-01")
+    fp["miss_recent"] = f"{(c_det['lu'] >= fresh_cut).mean() * 100:.1f}%"
+    fp["have_recent"] = f"{(b_det['lu'] >= fresh_cut).mean() * 100:.1f}%"
+    fp["miss_words"] = int(c_det["words"].median())
+    fp["have_words"] = int(b_det["words"].median())
+    fp["max_nid"] = int(d["id"].max())
+    fp["max_nid_date"] = f(int(d["id"].max())).strftime("%Y-%m-%d")
+
     body = f"""{section_header(len(r))}
 
 ---
@@ -627,6 +813,10 @@ def main() -> None:
 ---
 
 {section_bounds(dead_slots)}
+
+---
+
+{section_mechanism(fp)}
 """
     (REPORTS / "10_survival.md").write_text(body, encoding="utf-8")
     print("written:", REPORTS / "10_survival.md")

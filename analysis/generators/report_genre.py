@@ -21,12 +21,13 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from lib import paths
 
-import charts  # noqa: E402
-import eras  # noqa: E402
+from lib import charts  # noqa: E402
+from lib import eras  # noqa: E402
 
-OUT = Path(__file__).resolve().parent / "reports" / "04_genre_tags.md"
+OUT = paths.REPORTS_DIR / "04_genre_tags.md"
 GENRE_ORDER = ["魔幻", "玄幻", "同人", "校园", "都市", "科幻", "游戏", "古风", "悬疑"]
 
 # 世代分组（与报告 01 §2 分期一致）
@@ -64,7 +65,7 @@ TAG_COLORS = {
 
 def load() -> pd.DataFrame:
     df = pd.read_csv(
-        Path(__file__).resolve().parent / "out" / "novels.csv",
+        paths.OUT_DIR / "novels.csv",
         dtype={"tags": str, "contest": str},
     )
     est = eras.estimate(df["id"])
@@ -456,7 +457,7 @@ favs 中位 {all_med:.0f}）：
 
 def section_moebattle(d: pd.DataFrame) -> str:
     df_full = pd.read_csv(
-        Path(__file__).resolve().parent / "out" / "novels.csv",
+        paths.OUT_DIR / "novels.csv",
         dtype={"tags": str, "contest": str},
     )
     m = df_full[df_full["tags"].fillna("").str.contains("萌神")].copy()

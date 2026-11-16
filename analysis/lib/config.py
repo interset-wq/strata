@@ -7,15 +7,17 @@ from __future__ import annotations
 
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
-DATA_DIR = ROOT / "data"
-ARCHIVE = DATA_DIR / "dataset.7z"
-EXTRACT_DIR = DATA_DIR / "extracted"
-JSONL_DIR = EXTRACT_DIR / "dataset" / "data"
-OUT_DIR = ROOT / "out"
-CSV_FILE = OUT_DIR / "novels.csv"
-SQL_FILE = OUT_DIR / "schema.sql"
-MANIFEST = OUT_DIR / "manifest.json"
+from lib import paths
+
+ROOT = paths.ROOT
+DATA_DIR = paths.DATA_DIR
+ARCHIVE = paths.ARCHIVE
+EXTRACT_DIR = paths.EXTRACT_DIR
+JSONL_DIR = paths.JSONL_DIR
+OUT_DIR = paths.OUT_DIR
+CSV_FILE = paths.CSV_FILE
+SQL_FILE = paths.SQL_FILE
+MANIFEST = paths.MANIFEST
 
 SOURCE = {
     "repo": "light-nook-labs/novel_hub",

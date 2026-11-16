@@ -40,14 +40,15 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from lib import paths
 
-import charts  # noqa: E402
-import eras  # noqa: E402
+from lib import charts  # noqa: E402
+from lib import eras  # noqa: E402
 
-BASE = Path(__file__).resolve().parent
-OUT = BASE / "reports" / "07_commercial.md"
-RANKS_PATH = BASE / "out" / "monthly_ranks.jsonl"
+BASE = paths.ROOT
+OUT = paths.REPORTS_DIR / "07_commercial.md"
+RANKS_PATH = paths.OUT_DIR / "monthly_ranks.jsonl"
 
 # MonthlyBoy.ashx 的 rank 参数语义（temp/novly 源码 + 实测）
 RANK_LABEL = {0: "月票榜", 2: "新书榜", 3: "热销榜", 4: "对话月票榜"}
@@ -58,7 +59,7 @@ RANK_LABEL = {0: "月票榜", 2: "新书榜", 3: "热销榜", 4: "对话月票�
 
 def load_books() -> pd.DataFrame:
     df = pd.read_csv(
-        BASE / "out" / "novels.csv", dtype={"tags": str, "contest": str}
+        paths.OUT_DIR / "novels.csv", dtype={"tags": str, "contest": str}
     )
     est = eras.estimate(df["id"])
     d = df.merge(est[["id", "est_date", "est_year"]], on="id")

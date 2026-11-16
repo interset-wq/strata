@@ -16,9 +16,11 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from lib import paths
 import requests
 
-OUT = Path(__file__).resolve().parent / "out" / "monthly_ranks.jsonl"
+OUT = paths.OUT_DIR / "monthly_ranks.jsonl"
 URL = "https://pages.sfacg.com/ajax/act/MonthlyBoy.ashx"
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",

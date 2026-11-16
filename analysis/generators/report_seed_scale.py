@@ -10,12 +10,13 @@ from collections import Counter
 import pandas as pd, numpy as np
 import matplotlib.pyplot as plt
 
-BASE = Path("E:/novly-proj/analysis")
-sys.path.insert(0, str(BASE))
-import eras, config, charts
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from lib import paths
+BASE = paths.ROOT
+from lib import eras, config, charts
 
 charts.setup_style()
-OUT = BASE / "reports"
+OUT = paths.REPORTS_DIR
 FIG = OUT / "figures"
 FIG.mkdir(parents=True, exist_ok=True)
 num = lambda x: f"{int(x):,}"
@@ -28,7 +29,7 @@ ACTIVE_CUTOFF = pd.Timestamp("2026-02-03")  # 近 90 天仍更新
 
 # ---------- 数据加载 ----------
 def load():
-    df = pd.read_csv(BASE / "out/novels.csv",
+    df = pd.read_csv(paths.CSV_FILE,
                      dtype={"tags": str, "contest": str, "cover_url": str})
     df = df[~df.author.isin(config.LICENSED_LN_AUTHORS)].copy()
     for c in ["favs", "clicks", "praises", "words"]:
@@ -45,7 +46,7 @@ def load():
 
 def load_rank_ids():
     ids = set()
-    with open(BASE / "out/monthly_ranks.jsonl", encoding="utf-8") as fh:
+    with open(paths.MONTHLY_RANKS, encoding="utf-8") as fh:
         for line in fh:
             for it in json.loads(line)["items"]:
                 if it.get("nid"):
@@ -449,7 +450,7 @@ def main():
 
 ## 1. 口径声明
 
-1. **数据源**：{BASE.name}/out/novels.csv，{num(len(d))} 行（已剔除正版日轻）。
+1. **数据源**：`analysis/out/novels.csv`，{num(len(d))} 行（已剔除正版日轻）。
    内容上界 **{CONTENT_END.date()}**（原始 jsonl 的 `max(last_update)`，即游标扫描起点，非统一读取时刻）。
 2. **定年**：`eras.estimate()`，log(nid) 分段线性，104 锚点，LOO P99 = 50 天。
    本报告只用 `est_year` 做分层，**不用 `updated_at` 做时间轴**。

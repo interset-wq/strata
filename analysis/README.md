@@ -12,7 +12,7 @@
 | 规范化书目表 | `out/novels.csv`，245,779 行 × 15 列（构建时已剔除正版日轻 47 行） |
 | 数据内容上界 | **2026-05-03**（原始 jsonl 的 `max(last_update)`，即扫描起点，非统一读取时刻） |
 | 年份覆盖 | 2007–2026（年度序列止于 2025：上界之后创建的新书不在库内） |
-| 定年 | `eras.py`，104 个锚点、log(nid) 分段线性插值，留一法 P99 = 50 天 |
+| 定年 | `lib/eras.py`，104 个锚点、log(nid) 分段线性插值，留一法 P99 = 50 天 |
 | 在架覆盖率 | 约 68.9%（95% CI 64.2–73.5%，见报告 10） |
 | 产出 | 19 份报告（`reports/*.md`）、82 张图（`reports/figures/*.png`） |
 
@@ -27,18 +27,18 @@ cd analysis
 uv sync
 
 # 首次：校验 dataset.7z 哈希并解压（jsonl 已存在则自动跳过）
-uv run --extra archive python prepare.py
+uv run --extra archive python pipeline/prepare.py
 
 # 从 jsonl 重建书目表、schema 与清单（内置校验，失败即拒绝发布）
-uv run python build_csv.py
+uv run python pipeline/build_csv.py
 ```
 
 生成报告（各生成器相互独立，可单跑；汇总篇 16 引用前序结论但数字自算）：
 
 ```bash
-for f in report_*.py; do uv run python "$f"; done   # 全部 19 份
-uv run python report_market.py                       # 单跑 01（定年与供给）
-uv run python report_timeline.py                     # 单跑 16（收官汇总）
+for f in generators/report_*.py; do uv run python "$f"; done   # 全部 19 份
+uv run python generators/report_market.py                      # 单跑 01（定年与供给）
+uv run python generators/report_timeline.py                    # 单跑 16（收官汇总）
 ```
 
 依赖：Python ≥ 3.11，pandas、matplotlib、scipy、scikit-learn、jieba、wordcloud、requests。
@@ -49,19 +49,19 @@ uv run python report_timeline.py                     # 单跑 16（收官汇总�
 ## 数据管线
 
 ```
-dataset.7z  ──prepare.py──▶  meta*.jsonl（22 文件，唯一原始数据集）
+dataset.7z  ──pipeline/prepare.py──▶  meta*.jsonl（22 文件，唯一原始数据集）
                                   │
-                                  ├──build_csv.py──▶  out/novels.csv
-                                  │                    out/schema.sql
-                                  │                    out/manifest.json
+                                  ├──pipeline/build_csv.py──▶  out/novels.csv
+                                  │                          out/schema.sql
+                                  │                          out/manifest.json
                                   │
-                    out/monthly_ranks.jsonl ◀──fetch_monthly_ranks.py（付费刻度）
-                    out/survival_probe.jsonl ◀──fetch_survival.py（存活审计）
+                    out/monthly_ranks.jsonl ◀──fetchers/fetch_monthly_ranks.py（付费刻度）
+                    out/survival_probe.jsonl ◀──fetchers/fetch_survival.py（存活审计）
                     out/title_tokens.pkl   ◀──报告 12/14 的 jieba 切词缓存
                                   │
-                    eras.py（nid 定年）+ config.py（清洗规则）
+                    lib/eras.py（nid 定年）+ lib/config.py（清洗规则）
                                   │
-                                  └──report_*.py──▶  reports/*.md + figures/*.png
+                    generators/report_*.py──▶  reports/*.md + figures/*.png
 ```
 
 `out/` 不入库，均可由上述脚本重建；榜单与存活探测需联网重新抓取。
@@ -75,21 +75,37 @@ dataset.7z  ──prepare.py──▶  meta*.jsonl（22 文件，唯一原始数
 
 ## 目录结构
 
+代码按**职责**分四类：共享库、报告生成器、联网抓取、数据管线。
+**所有路径都从 `lib/paths.py` 派生**——脚本放在哪个目录都读到同一份数据。
+
 | 路径 | 说明 |
 | --- | --- |
-| `config.py` | 路径、来源、枚举域、清洗与行级剔除规则；字段语义断言只写在此处 |
-| `eras.py` | nid 定年、锚点加载、封面时间戳解析、快照边界、留一法误差 |
-| `charts.py` | 统一图表风格、四期配色与分期底色；所有报告共用 |
-| `build_csv.py` | jsonl → CSV 的唯一规范化入口（去重、重命名、枚举转值、文本归一、清洗、剔除） |
-| `validate.py` | CSV 格式层与取值层校验；构建时自动调用 |
-| `prepare.py` | 校验归档 SHA-256 并解压出 jsonl |
-| `fetch_*.py` | 月度榜、存活状态与详情的可选联网抓取器 |
-| `report_*.py` | 19 份报告的生成器；**报告是生成物，勿手改** |
+| `lib/` | **共享库**：`paths`（路径唯一真源）、`config`（枚举域、清洗与行级剔除规则）、`eras`（nid 定年）、`charts`（统一图表风格） |
+| `generators/` | **19 份报告的生成器**（`report_*.py`）；**报告是生成物，勿手改** |
+| `fetchers/` | 可选联网抓取器：月度榜、存活状态、存活书详情 |
+| `pipeline/` | 数据管线：`prepare`（校验归档并解压）、`build_csv`（jsonl → CSV 的唯一规范化入口）、`validate`（CSV 格式层与取值层校验，构建时自动调用） |
 | `anchors/` | 定年锚点：`nid_anchors.jsonl`（104 条插值输入）、`verified_dates.jsonl`（用户核实证据档案）、`approximate_dates.jsonl`（已清空，保留备用） |
 | `references/` | 外部查证档案：征文日期、萌神标签、榜单端点、定年取证、百科与史料等 |
 | `data/` | 归档与解压后的 jsonl（归档不入库） |
 | `out/` | 派生数据资产，可重建，不入库 |
 | `reports/` | 报告正文与图表，均由生成器产出 |
+
+### 为什么路径集中在 `lib/paths.py`
+
+早期 `config.py` / `eras.py` / `charts.py` 各自用
+`Path(__file__).resolve().parent` 推算根目录，脚本又出现 5 种拼路径的写法，
+甚至有两个生成器写死了绝对路径。移动脚本就会静默读错数据。
+
+现在：
+
+```python
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))   # analysis/ 根
+from lib import paths
+df = pd.read_csv(paths.CSV_FILE)
+```
+
+`paths.ROOT` 恒等于 `analysis/`，与脚本位置无关。
+**新增脚本一律用 `paths.*`，不要自己拼路径。**
 
 ---
 
@@ -97,25 +113,25 @@ dataset.7z  ──prepare.py──▶  meta*.jsonl（22 文件，唯一原始数
 
 | # | 报告 | 生成器 | 核心结论 |
 | --- | --- | --- | --- |
-| 01 | 市场结构 | `report_market.py` | 定年体系、单峰供给、商业化门槛加深 |
-| 02 | 注意力集中度 | `report_attention.py` | Gini 0.95 是结构常数，重心随周期迁移 |
-| 03 | 作者生态 | `report_author.py` | 新作者 2020 先见顶，收缩是作者基数流失 |
-| 04 | 题材与标签 | `report_genre.py` | 三足结构、女性向标签扩张、词表受控 |
-| 05 | 生命周期与存量 | `report_lifecycle.py` | 完结二元结构、92.8% 断更书持有 80.7% 收藏 |
-| 06 | 征文 | `report_contest.py` | 日历首尾相接、报名≠完赛 |
-| 07 | 商业化 | `report_commercial.py` | 月票与热销两条刻度、付费 2020 见顶 |
-| 08 | 互动漏斗 | `report_engagement.py` | 曝光分母效应、赞藏比断崖 |
-| 09 | 题材语义空间 | `report_tagspace.py` | 99 词受控词表、同人 = IP 命名空间 |
-| 10 | 生存与遗漏 | `report_survival.py` | 覆盖率 68.9%、游标扫描、下架推断被推翻 |
-| 11 | 速更短篇 | `report_shortform.py` | 独立品类、新手高频试水、非弃坑 |
-| 12 | 标题形态与命名史 | `report_titles.py` | 标题通胀、跟风证据分级 |
-| 13 | 跟风传播 | `report_fad.py` | 头部少造词、爆款潮是赛道共振 |
-| 14 | 标题成功配方 | `report_titlewords.py` | 条件分位剥离题材、配方题材特定 |
-| 15 | 征文到商业化 | `report_contest_commerce.py` | 优势属于人，不属于比赛 |
-| 16 | 十年结构变迁 | `report_timeline.py` | 收官汇总：统一时间轴、六条主线、对照先于因果 |
-| 17 | banner 投入 | `report_banner.py` | 作者筛选、下注/奖励二元 |
-| 18 | 种子规模决策 | `report_seed_scale.py` | 捆绑 29,396 本（gz 4.18 MB）、膨胀源是索引不是表数 |
-| 19 | 短篇生态 | `report_shortnovel.py` | 短篇=≤5万字且完结、收藏天花板、赞藏比在短篇里方向反 |
+| 01 | 市场结构 | `generators/report_market.py` | 定年体系、单峰供给、商业化门槛加深 |
+| 02 | 注意力集中度 | `generators/report_attention.py` | Gini 0.95 是结构常数，重心随周期迁移 |
+| 03 | 作者生态 | `generators/report_author.py` | 新作者 2020 先见顶，收缩是作者基数流失 |
+| 04 | 题材与标签 | `generators/report_genre.py` | 三足结构、女性向标签扩张、词表受控 |
+| 05 | 生命周期与存量 | `generators/report_lifecycle.py` | 完结二元结构、92.8% 断更书持有 80.7% 收藏 |
+| 06 | 征文 | `generators/report_contest.py` | 日历首尾相接、报名≠完赛 |
+| 07 | 商业化 | `generators/report_commercial.py` | 月票与热销两条刻度、付费 2020 见顶 |
+| 08 | 互动漏斗 | `generators/report_engagement.py` | 曝光分母效应、赞藏比断崖 |
+| 09 | 题材语义空间 | `generators/report_tagspace.py` | 99 词受控词表、同人 = IP 命名空间 |
+| 10 | 生存与遗漏 | `generators/report_survival.py` | 覆盖率 68.9%、游标扫描、下架推断被推翻 |
+| 11 | 速更短篇 | `generators/report_shortform.py` | 独立品类、新手高频试水、非弃坑 |
+| 12 | 标题形态与命名史 | `generators/report_titles.py` | 标题通胀、跟风证据分级 |
+| 13 | 跟风传播 | `generators/report_fad.py` | 头部少造词、爆款潮是赛道共振 |
+| 14 | 标题成功配方 | `generators/report_titlewords.py` | 条件分位剥离题材、配方题材特定 |
+| 15 | 征文到商业化 | `generators/report_contest_commerce.py` | 优势属于人，不属于比赛 |
+| 16 | 十年结构变迁 | `generators/report_timeline.py` | 收官汇总：统一时间轴、六条主线、对照先于因果 |
+| 17 | banner 投入 | `generators/report_banner.py` | 作者筛选、下注/奖励二元 |
+| 18 | 种子规模决策 | `generators/report_seed_scale.py` | 捆绑 29,396 本（gz 4.18 MB）、膨胀源是索引不是表数 |
+| 19 | 短篇生态 | `generators/report_shortnovel.py` | 短篇=≤5万字且完结、收藏天花板、赞藏比在短篇里方向反 |
 
 编号经过顺延，最终为 15 征文商业化、16 汇总、17 banner（banner 应要求提前）、18 种子规模、19 短篇（面向 App 品类设计）。
 

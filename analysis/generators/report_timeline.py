@@ -22,15 +22,16 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
-BASE = Path(__file__).resolve().parent
-sys.path.insert(0, str(BASE))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from lib import paths
+BASE = paths.ROOT
 
-import charts  # noqa: E402
-import config  # noqa: E402
-import eras  # noqa: E402
+from lib import charts  # noqa: E402
+from lib import config  # noqa: E402
+from lib import eras  # noqa: E402
 
 charts.setup_style()
-OUT = BASE / "reports"
+OUT = paths.REPORTS_DIR
 FIG = OUT / "figures"
 FIG.mkdir(parents=True, exist_ok=True)
 MD = OUT / "16_timeline.md"
@@ -75,7 +76,7 @@ def md_table(rows, header):
 
 # ---------- 数据 ----------
 def load():
-    df = pd.read_csv(BASE / "out/novels.csv",
+    df = pd.read_csv(paths.CSV_FILE,
                      dtype={"tags": str, "contest": str, "cover_url": str})
     df = df[~df.author.isin(config.LICENSED_LN_AUTHORS)].copy()
     est = eras.estimate(df["id"])
@@ -127,7 +128,7 @@ def load():
 
     # 月票年度总票（榜单数据，2013 起；top20 之和，非全站票量）
     votes = {}
-    with open(BASE / "out/monthly_ranks.jsonl", encoding="utf-8") as fh:
+    with open(paths.MONTHLY_RANKS, encoding="utf-8") as fh:
         for line in fh:
             r = json.loads(line)
             if r["rank"] != 0:
@@ -307,7 +308,7 @@ def build(S, figs):
     v26m = sum(vote[y] for y in [2026])  # 只有月度累加值
     # 2026 年化：用报告07口径（前11月 /11*12），从 monthly_ranks 重算需月份数
     n26 = 0; v26 = 0
-    with open(BASE / "out/monthly_ranks.jsonl", encoding="utf-8") as fh:
+    with open(paths.MONTHLY_RANKS, encoding="utf-8") as fh:
         for line in fh:
             r = json.loads(line)
             if r["rank"] == 0 and r["month"].startswith("2026"):

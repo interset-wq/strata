@@ -19,18 +19,19 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from lib import paths
 
-import charts
-import eras
+from lib import charts
+from lib import eras
 
-OUT = Path(__file__).resolve().parent / "reports" / "02_attention_concentration.md"
+OUT = paths.REPORTS_DIR / "02_attention_concentration.md"
 GENRE_ORDER = ["魔幻", "玄幻", "古风", "科幻", "校园", "都市", "游戏", "同人", "悬疑"]
 
 
 def load() -> pd.DataFrame:
     df = pd.read_csv(
-        Path(__file__).resolve().parent / "out" / "novels.csv",
+        paths.OUT_DIR / "novels.csv",
         dtype={"tags": str, "contest": str},
     )
     est = eras.estimate(df["id"])

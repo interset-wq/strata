@@ -24,12 +24,13 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from lib import paths
 
-import charts  # noqa: E402
-import eras  # noqa: E402
+from lib import charts  # noqa: E402
+from lib import eras  # noqa: E402
 
-OUT = Path(__file__).resolve().parent / "reports" / "06_contests.md"
+OUT = paths.REPORTS_DIR / "06_contests.md"
 
 # X 征（SF原创轻小说征文大赛）届次 → 年份。证据：四征 2016-07-08（规则页）、
 # 五/六征 URL 年份（zw2017/zw2018）、十二征 2024-05-04（页面 id zw20240504）、
@@ -102,7 +103,7 @@ def _is_dial(c: pd.Series) -> pd.Series:
 
 def load() -> pd.DataFrame:
     df = pd.read_csv(
-        Path(__file__).resolve().parent / "out" / "novels.csv",
+        paths.OUT_DIR / "novels.csv",
         dtype={"tags": str, "contest": str},
     )
     est = eras.estimate(df["id"])

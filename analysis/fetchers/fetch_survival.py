@@ -13,12 +13,13 @@ from pathlib import Path
 import pandas as pd
 import requests
 
-BASE = Path(__file__).resolve().parent
-sys.path.insert(0, str(BASE))
-import eras
-from config import LICENSED_LN_AUTHORS as LIC
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from lib import paths
+BASE = paths.ROOT
+from lib import eras
+from lib.config import LICENSED_LN_AUTHORS as LIC
 
-OUT = BASE / "out" / "survival_probe.jsonl"
+OUT = paths.OUT_DIR / "survival_probe.jsonl"
 UA = ("Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) "
       "AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148")
 TITLE_RE = re.compile(r"<title>(.*?)</title>", re.S)
@@ -41,7 +42,7 @@ def probe(nid: int) -> dict:
 
 
 def main():
-    df = pd.read_csv(BASE / "out" / "novels.csv", dtype={"tags": str, "contest": str},
+    df = pd.read_csv(paths.OUT_DIR / "novels.csv", dtype={"tags": str, "contest": str},
                      usecols=lambda c: c in ("id", "author"))
     df = df[~df["author"].isin(LIC)]
     have = set(df["id"])
@@ -51,7 +52,7 @@ def main():
     samples: dict[str, list[int]] = {}
 
     # A. 月榜范围内缺失（全部）
-    recs = [json.loads(l) for l in (BASE / "out" / "monthly_ranks.jsonl").open(encoding="utf-8")]
+    recs = [json.loads(l) for l in (paths.OUT_DIR / "monthly_ranks.jsonl").open(encoding="utf-8")]
     rank_nids = {it["nid"] for x in recs for it in x["items"]}
     a = sorted(n for n in rank_nids if n not in have and n <= 774850)
     samples["rank_missing"] = a

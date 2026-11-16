@@ -6,13 +6,13 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib import font_manager
 
-FIG_DIR = Path(__file__).resolve().parent / "reports" / "figures"
+from lib import paths
+
+FIG_DIR = paths.FIGURES_DIR
 
 # 分期底色（与报告分期一致）
 PERIODS = [

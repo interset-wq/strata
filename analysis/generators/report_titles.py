@@ -16,12 +16,14 @@ import numpy as np
 import pandas as pd
 
 jieba.setLogLevel(60)
-BASE = Path(__file__).resolve().parent
-sys.path.insert(0, str(BASE))
-import charts, config, eras
 
-TOKEN_CACHE = BASE / "out" / "title_tokens.pkl"
-OUT = BASE / "reports" / "12_titles.md"
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from lib import paths
+BASE = paths.ROOT
+from lib import charts, config, eras
+
+TOKEN_CACHE = paths.OUT_DIR / "title_tokens.pkl"
+OUT = paths.REPORTS_DIR / "12_titles.md"
 
 # 被排除的通用词：爆款标题里的高频虚词/泛词，不构成「品牌词」
 GENERIC = {
@@ -39,7 +41,7 @@ def num(x: float) -> str:
 
 
 def load_data():
-    df = pd.read_csv(BASE / "out/novels.csv", dtype={"tags": str, "contest": str})
+    df = pd.read_csv(paths.CSV_FILE, dtype={"tags": str, "contest": str})
     df = df[~df.author.isin(config.LICENSED_LN_AUTHORS)].copy()
     est = eras.estimate(df["id"])
     df = df.merge(est[["id", "est_date", "est_year"]], on="id")
@@ -64,7 +66,7 @@ def load_tokens(df):
 
 def load_ranks():
     first = defaultdict(list)  # nid -> [(month, name, ticketNum, rank)]
-    with open(BASE / "out/monthly_ranks.jsonl", encoding="utf-8") as fh:
+    with open(paths.MONTHLY_RANKS, encoding="utf-8") as fh:
         for line in fh:
             r = json.loads(line)
             for it in r.get("items", []):

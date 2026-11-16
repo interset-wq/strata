@@ -28,12 +28,13 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from lib import paths
 
-import charts  # noqa: E402
-import eras  # noqa: E402
+from lib import charts  # noqa: E402
+from lib import eras  # noqa: E402
 
-OUT = Path(__file__).resolve().parent / "reports" / "11_shortform.md"
+OUT = paths.REPORTS_DIR / "11_shortform.md"
 
 YEAR_BINS = [2000, 2014, 2017, 2019, 2021, 2023, 2027]
 YEAR_LABELS = ["≤2014", "2015-17", "2018-19", "2020-21", "2022-23", "2024-26"]
@@ -43,7 +44,7 @@ WORD_LABELS = ["≤1k", "1-3k", "3-6k", "6-12k", "12-30k", "30k+"]
 
 def load() -> pd.DataFrame:
     df = pd.read_csv(
-        Path(__file__).resolve().parent / "out" / "novels.csv",
+        paths.OUT_DIR / "novels.csv",
         dtype={"tags": str, "contest": str},
     )
     est = eras.estimate(df["id"])
