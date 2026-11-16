@@ -331,9 +331,9 @@ def section_dating(df: pd.DataFrame) -> str:
     interp = loo[loo["kind"] == "interp"]
     q = interp["err_day"].abs()
 
-    # 并入前口径（仅 91 个 API 锚点）用于对比：重标定于 2026-11-16 执行
+    # 并入前口径（仅 API 实测锚点）用于对比：重标定于 2026-11-16 执行
     a_all = eras.load_anchors()
-    a_pre = a_all[a_all["source"] != "user_verified"].reset_index(drop=True)
+    a_pre = a_all[~a_all["source"].isin(["user_verified", "contest_page"])].reset_index(drop=True)
     loo_pre = eras.leave_one_out(a_pre)
     interp_pre = loo_pre[loo_pre["kind"] == "interp"]
     q_pre = interp_pre["err_day"].abs()
@@ -358,7 +358,7 @@ def section_dating(df: pd.DataFrame) -> str:
     late_year = (q_all > 365).mean() * 100
     ext_table, ext_same, ext_n = external_works_check(df)
     ver = eras.load_verified()
-    # 并入前偏差：用 91 个纯 API 锚点现算（12 条已于 2026-11-16 并入现行曲线）
+    # 并入前偏差：用纯 API 锚点现算（user_verified 12 条与 contest_page 1 条已并入现行曲线）
     pre_model = eras._Model(a_pre)
     ids_df = df["id"].to_numpy(dtype="float64")
     pos_df = a_pre["nid"].searchsorted(ids_df)
@@ -404,17 +404,19 @@ def section_dating(df: pd.DataFrame) -> str:
     return f"""## 1. 定年方法与误差
 
 `updated_at` 是最后更新时间，老书的一次编辑可晚于创建十年以上，不能作时间轴。
-本报告的年份由 `analysis/eras.py` 定年：103 个锚点——91 个 API 实测
-（作品创建时间 `addTime`，2006-08 至 2026-06）加 12 条用户核实创建时间
-（2026-11-16 经用户批准并入，发现与决策过程见下文）——在 log(nid) 空间
+本报告的年份由 `analysis/eras.py` 定年：{len(a_all)} 个锚点——{len(a_pre)} 个 API 实测
+（作品创建时间 `addTime`，2006-08 至 2026-06）、12 条用户核实创建时间
+（2026-11-16 经用户批准并入，发现与决策过程见下文）与 1 条征文官方页锚点
+（四征 2016-07-08 上线日 × 参赛 cohort 窗口下界 nid 52388，`source=contest_page`，
+详见 `references/contest-editions.md`）——在 log(nid) 空间
 分段线性插值：nid 增速 20 年间增长约 180 倍，log 空间更接近匀速。
 
 锚点插值误差用留一法实测（留出单元为同秒时间戳整组锚点，防双胞胎泄漏）：
 
 | 情形 | 锚点数 | \\|误差\\| 中位（天） | P90 | P99 |
 |---|---:|---:|---:|---:|
-| 并入前（91 个 API 锚点） | {len(loo_pre)} | {q_pre.median():.0f} | {q_pre.quantile(.9):.0f} | {q_pre.quantile(.99):.0f} |
-| **并入后（103 锚点，现行口径）** | {len(loo)} | {q.median():.0f} | {q.quantile(.9):.0f} | {q.quantile(.99):.0f} |
+| 并入前（{len(a_pre)} 个 API 锚点） | {len(loo_pre)} | {q_pre.median():.0f} | {q_pre.quantile(.9):.0f} | {q_pre.quantile(.99):.0f} |
+| **并入后（{len(a_all)} 锚点，现行口径）** | {len(loo)} | {q.median():.0f} | {q.quantile(.9):.0f} | {q.quantile(.99):.0f} |
 | 边界外推（两口径相同） | {len(loo) - len(interp)} | — | — | 最大 482 |
 
 本数据集 id 全部落在锚点区间内（无外推）。置信度分布：high {conf.get('high', 0)}%、
@@ -492,8 +494,8 @@ API 锚点是定年曲线的输入，留一法误差只度量插值内洽性；�
 {len(ver)} 条，`bound_type=exact`）。它是等式约束，强于网络时光机快照只能给出的
 上界，且独立于 API 锚点。12 条最初作为独立校验集回测 91 锚点曲线；low 段 8 点
 测出段内方向一致的系统性偏差后，**经用户批准于 2026-11-16 并入插值锚点**
-（`nid_anchors.jsonl` 内 `source=user_verified`），现行曲线即并入后的 103 锚点
-口径。并入前的偏差（用 91 个纯 API 锚点现算）：
+（`nid_anchors.jsonl` 内 `source=user_verified`），现行曲线即并入后的 {len(a_all)} 锚点
+口径。并入前的偏差（用 {len(a_pre)} 个纯 API 锚点现算）：
 
 {ver_table}
 

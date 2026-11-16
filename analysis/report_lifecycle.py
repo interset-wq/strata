@@ -200,7 +200,7 @@ def section_header(d: pd.DataFrame, sb: dict) -> str:
 
 > 口径声明：
 > 1. 数据源 `analysis/out/novels.csv`，{len(d):,} 行（原始 jsonl 的派生表），
->    数据内容上界 {sb['date']}，在册存活口径；年份由 nid 定年（103 个锚点，
+>    数据内容上界 {sb['date']}，在册存活口径；年份由 nid 定年（锚点插值，
 >    报告 01 §1），非 `updated_at`。
 > 2. **「连载中」不等于在更**：构建时把「断更」并入「连载中」（判据见
 >    `analysis/config.py` 的 status 清洗规则），故状态字段不含任何活跃度信息。
