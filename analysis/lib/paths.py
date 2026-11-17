@@ -40,6 +40,8 @@ SQL_FILE = OUT_DIR / "schema.sql"
 MANIFEST = OUT_DIR / "manifest.json"
 MONTHLY_RANKS = OUT_DIR / "monthly_ranks.jsonl"
 SURVIVAL_PROBE = OUT_DIR / "survival_probe.jsonl"
+APP_API_NOVELS = OUT_DIR / "app_api_novels.jsonl"          # 官方 App API 书目枚举（可选、部分）
+EXTERNAL_DATES = OUT_DIR / "external_dates_full.jsonl"     # 第三方站 addTime 旁证（可选）
 
 # ---- 报告产物 ----
 REPORTS_DIR = ROOT / "reports"
@@ -50,4 +52,5 @@ __all__ = [
     "ANCHORS_DIR", "NID_ANCHORS", "VERIFIED_DATES", "APPROXIMATE_DATES",
     "REFERENCES_DIR", "OUT_DIR", "CSV_FILE", "SQL_FILE", "MANIFEST",
     "MONTHLY_RANKS", "SURVIVAL_PROBE", "REPORTS_DIR", "FIGURES_DIR",
+    "APP_API_NOVELS", "EXTERNAL_DATES",
 ]
