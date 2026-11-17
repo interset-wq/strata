@@ -1,7 +1,10 @@
 import 'dart:io';
 
+import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+// Riverpod 3 moved StateProvider to the legacy namespace.
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../data/api/strata_api.dart';
@@ -67,6 +70,9 @@ final shelfProvider = FutureProvider<List<ShelfItem>>((ref) async {
   final handle = await ref.watch(bootProvider.future);
   return handle.api.shelfList();
 });
+
+/// 外观主题：默认跟随系统（设置页可切浅色/深色）。
+final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.system);
 
 typedef YearGenre = ({int year, String? genre});
 

@@ -89,7 +89,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                               Image.network(
                             _defaultCover,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => ColoredBox(
+                            errorBuilder: (_, _, _) => ColoredBox(
                                 color: scheme.primary.withValues(alpha: .15)),
                           ),
                         ),

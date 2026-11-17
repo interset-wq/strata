@@ -6,6 +6,7 @@ import '../pages/boot_page.dart';
 import '../pages/home_page.dart';
 import '../pages/rankings_page.dart';
 import '../pages/search_page.dart';
+import '../pages/settings_page.dart';
 import '../pages/shelf_page.dart';
 
 /// 底部 Tab 承载 4 个一级页；详情页是二级页，在 Shell 之外全屏推入。
@@ -43,6 +44,11 @@ final router = GoRouter(
               selectedIcon: Icon(Icons.collections_bookmark),
               label: '书架',
             ),
+            NavigationDestination(
+              icon: Icon(Icons.settings_outlined),
+              selectedIcon: Icon(Icons.settings),
+              label: '设置',
+            ),
           ],
         ),
       ),
@@ -58,6 +64,9 @@ final router = GoRouter(
         ]),
         StatefulShellBranch(routes: [
           GoRoute(path: '/shelf', builder: (_, _) => const ShelfPage()),
+        ]),
+        StatefulShellBranch(routes: [
+          GoRoute(path: '/settings', builder: (_, _) => const SettingsPage()),
         ]),
       ],
     ),
