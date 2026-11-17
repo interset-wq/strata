@@ -349,6 +349,30 @@ class _ShortCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
+              Container(
+                width: 40,
+                height: 56,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(6),
+                  boxShadow: [
+                    BoxShadow(
+                        color: scheme.primary.withValues(alpha: .25),
+                        offset: const Offset(-4, 4)),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: Image.network(
+                    (item.coverUrl == null || item.coverUrl!.isEmpty)
+                        ? _defaultCover
+                        : 'https://rss.sfacg.com/web/novel/images/NovelCover/Big/${item.coverUrl}',
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => ColoredBox(
+                        color: scheme.primary.withValues(alpha: .15)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

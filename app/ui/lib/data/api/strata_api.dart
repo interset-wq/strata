@@ -266,6 +266,7 @@ class ShortItem {
   final int estYear;
   final int favs;
   final int? words;
+  final String? coverUrl;
 
   ShortItem.fromJson(Map<String, dynamic> m)
       : rank = m['rank'] as int,
@@ -275,7 +276,8 @@ class ShortItem {
         genre = m['genre'] as String?,
         estYear = m['est_year'] as int,
         favs = m['favs'] as int,
-        words = m['words'] as int?;
+        words = m['words'] as int?,
+        coverUrl = m['cover_url'] as String?;
 }
 
 class SearchItem {

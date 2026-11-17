@@ -364,19 +364,20 @@ ORDER BY d.rank_no ASC LIMIT ?`
 }
 
 type ShortItem struct {
-	Rank    int     `json:"rank"`
-	NID     int64   `json:"nid"`
-	Title   string  `json:"title"`
-	Author  string  `json:"author"`
-	Genre   *string `json:"genre"`
-	EstYear int     `json:"est_year"`
-	Favs    *int64  `json:"favs"`
-	Words   *int64  `json:"words"`
+	Rank     int     `json:"rank"`
+	NID      int64   `json:"nid"`
+	Title    string  `json:"title"`
+	Author   string  `json:"author"`
+	Genre    *string `json:"genre"`
+	EstYear  int     `json:"est_year"`
+	Favs     *int64  `json:"favs"`
+	Words    *int64  `json:"words"`
+	CoverURL *string `json:"cover_url"`
 }
 
 func (s *Store) RankingShort(ctx context.Context, limit int) ([]ShortItem, error) {
 	const q = `
-SELECT nid, title, author, genre, est_year, favs, words
+SELECT nid, title, author, genre, est_year, favs, words, cover_url
 FROM seed.books
 WHERE words <= 50000 AND status = '已完结' AND is_licensed = 0
 ORDER BY favs DESC, nid ASC
@@ -395,7 +396,7 @@ LIMIT ?`
 			words sql.NullInt64
 		)
 		if err := rows.Scan(&item.NID, &item.Title, &item.Author, &gen,
-			&item.EstYear, &favs, &words); err != nil {
+			&item.EstYear, &favs, &words, &item.CoverURL); err != nil {
 			return nil, err
 		}
 		item.Rank = len(items) + 1
