@@ -17,7 +17,7 @@
 | **seed.db 表** | `books`（单表扁平 23 列）+ `book_tags`（反范式 2 列），**共 2 张表** |
 | **seed.db 索引** | 9 个，含 1 个**部分索引**（短篇专用）与 2 个**复合索引**（世代×分位） |
 | **seed.db 体积** | SQLite **15.22 MB** / gzip **6.27 MB**（30,831 本，518 B/本） |
-| **user.db 表** | 7 张：`observations` / `discovered` / `shelf` + `shelf_lists` / `annotations` / `search_history` / `prefs` / `user_stats` |
+| **user.db 表** | 8 张：`observations` / `discovered` / **`watchlist`**（07 观测列表）/ `shelf` + `shelf_lists` / `annotations` / `search_history` / `prefs` / `user_stats` |
 | **user.db 增长** | 观测行 **≈59 B/行**；10 万行观测 ≈ 5.8 MB（单表） |
 | **跨库关联** | 只用 `nid`；**禁止用 rowid**（种子重发后 rowid 重排） |
 | **预计算列** | 5 列分位/比率随种子携带，代价 **+25 B/本**；其中 `pr`（赞藏比）单列换 **800× 查询加速** |
@@ -290,10 +290,12 @@ CREATE TABLE book_tags(nid INTEGER NOT NULL, tag TEXT NOT NULL);
 CREATE TABLE observations(
   nid         INTEGER NOT NULL,
   observed_at INTEGER NOT NULL,   -- unix 秒
-  clicks      INTEGER,
+  clicks      INTEGER,              -- 仅 watchlist 订阅点击追踪的书写入绝对值（07 §4.3）；一般读者 NULL
   favs        INTEGER,
   praises     INTEGER,
   words       INTEGER,
+  short_comments INTEGER,           -- 07 §4.4：watchlist 书抓评论时写入；NULL=未抓，非 0
+  long_comments  INTEGER,           -- 同上，长评数（精确整数）
   status      TEXT,
   updated_at  TEXT,
   source      TEXT NOT NULL DEFAULT 'detail',  -- detail | search | rank
@@ -301,6 +303,11 @@ CREATE TABLE observations(
 );
 CREATE INDEX idx_obs_time ON observations(observed_at DESC);
 ```
+
+> **07 作者工作台新增两列**：`short_comments` / `long_comments`（07 §4.4，精确整数，可做变化观测）。
+> 它们对一般读者为 NULL（评论只对 `watchlist` 书抓）。
+> `clicks` 列则从"v1 恒 NULL 死列"恢复为"仅订阅点击追踪时写绝对值"（07 §4.3），
+> 但**点击变化量仍不做**——`user_stats.click_delta_30d` 保持恒 NULL（05 §5.4、07 §4.3）。
 
 | 项 | 实测 |
 | --- | --- |
@@ -310,6 +317,10 @@ CREATE INDEX idx_obs_time ON observations(observed_at DESC);
 | 20,000 行 | 1.4 MB |
 | 100,000 行 | 5.8 MB |
 | gzip 后 | 100,000 行 → 2.6 MB |
+
+> **体积基线说明**：以上是 07 加列前的实测。新增 `short_comments`/`long_comments` 两列后，
+> 一般读者这两列恒 NULL、不占行内空间（SQLite 的 NULL 存 NULL 位图），体积基本不变；
+> 仅作者订阅的书会因评论计数有值而略增。若需精确数字，按新 schema 重测后再更新本表。
 
 **保留策略**：全保留 10 万行是 5.8 MB，单用户可接受。
 但**端上必须做保留期裁剪**——90 天前的观测对「近 30 天涨幅」榜单已无用。
@@ -378,17 +389,42 @@ CREATE INDEX idx_sh_at ON search_history(at DESC);
 
 -- 3.6 用户偏好（题材/标签/字数范围/排序偏好）
 CREATE TABLE prefs(key TEXT PRIMARY KEY, value TEXT);
+-- 作者端全勤阈值也存这里（07 §2.5）：key 如 'quanqin.daily_words'=3000、
+-- 'quanqin.monthly_bonus'=500、'quanqin.source'='i.sfacg.com/fuli.shtml'。
+-- 两个官方页面口径冲突，阈值不硬编码、由用户可改（07 §9 #11）。
 
 -- 3.7 本机统计缓存（自算，不进种子）
 CREATE TABLE user_stats(
   nid            INTEGER PRIMARY KEY,
   fav_delta_30d  INTEGER,
-  click_delta_30d INTEGER,
+  click_delta_30d INTEGER,  -- 恒 NULL：点击只显示绝对值不做变化（05 §3.4、07 §4.3）
   obs_count      INTEGER,
   first_seen     INTEGER,
   last_seen      INTEGER
 );
 ```
+
+```sql
+-- 3.8 观测列表（07 作者工作台）：用户主动订阅要追踪的书
+CREATE TABLE watchlist(
+  nid           INTEGER PRIMARY KEY,       -- 与 books / discovered 共用 nid
+  role          TEXT NOT NULL DEFAULT 'self', -- 'self' 本人作品 | 'peer' 同期对照（07 §1.5）
+  added_at      INTEGER NOT NULL,
+  poll_enabled  INTEGER NOT NULL DEFAULT 1, -- 是否订阅后台定期爬取
+  poll_interval INTEGER NOT NULL DEFAULT 86400, -- 秒，最小 21600（6h）
+  last_poll_at  INTEGER,                   -- NULL=从未后台爬取；前台打开不更新此字段
+  note          TEXT
+);
+CREATE INDEX idx_watch_poll ON watchlist(poll_enabled, last_poll_at);
+CREATE INDEX idx_watch_role ON watchlist(role);
+```
+
+**`watchlist` 与 `shelf` 语义不同**（07 §1.2）：`shelf` 是"想读"，`watchlist` 是"追踪数据"。
+作者把自己的书放进 `watchlist`，不需要（也不应该）放进 `shelf`。同一 nid 可同时存在两表，互不干扰。
+`role` 区分本人作品与**同期对照书**（07 §1.5）：作者不只追踪自己的书，还要和同期其他作者的作品比较；
+累计指标只有同期比较才合法（报告 02/08），定年差 > 2 年给软警告。
+复合指标（赞藏比 / 评论率 / 日增）由端上现算，**不落表、不加列**（07 §4.7）。
+`watchlist` 是 U5 后台爬取的**唯一对象**（07 §5）；`discovered` 清理时对 `watchlist` 中的条目豁免（04 §5.2、06 §5.2）。
 
 ### 3.1 「用得越多越准」的落地
 
@@ -540,6 +576,9 @@ seed.db (15.22 MB) → gzip (6.27 MB) → 随包分发
 
 ## 7. 待决问题
 
+> **2026-11-17 清理**：下表 10 条的"当前建议"列**均已在正文给出结论并落地**（实测支撑），
+> 不是悬而未决——保留此表是为可追溯，不是等拍板。真正待定的只有实现期的参数微调，已标注在列内。
+
 | # | 问题 | 当前建议 | 依据 |
 | --- | --- | --- | --- |
 | 1 | 标题前缀联想的端上结构 | v1 全键扫描 3.89 ms；v2 换有序数组二分 | §4.3 实测 |
@@ -552,6 +591,7 @@ seed.db (15.22 MB) → gzip (6.27 MB) → 随包分发
 | 8 | `user_stats` 是否需要独立表 | v1 需要（L2/L3 榜单要全表聚合） | §3.1 |
 | 9 | 是否给字符串列加长度约束 | **都不加**。`CHECK` 会让爬虫遇超长标题整批回滚；枚举 CHECK 写入慢 3.5×（58→201 ms/10 万行）。改由 Go 侧常量 + 逐条 `IntegrityError` 降级 | §2.1.1 实测 |
 | 10 | 种子库是否启用 `STRICT` 表 | **不启用**。技术上可行（Go 侧捆绑 SQLite 3.51.2 ≥ 3.37），但 STRICT 只约束类型不约束长度，对本项目无增益；而 `ANY` 类型会让 `books` 失去列级语义 | §2.1.1 |
+| 11 | 短篇是否建独立分类体系（报告 19 结论 5 留待本篇） | **不建**：同人 IP 随时间迁移（报告 09），写死独立分类会过期；短篇题材差异用现有 `tags` 表达，短篇题材榜按 `genre` 展示 | 报告 19 §结论 3/5、03 §8 #8 已拍板 |
 
 ---
 

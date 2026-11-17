@@ -15,7 +15,7 @@
 | `pages.sfacg.com/ajax/act/MonthlyBoy.ashx?op=getRanks&date={YYYY-MM}&rank={N}` | 无 | **可用，且可查任意月份（历史月票库）**。rank: 0=月票榜(top20, ticketNum=月票)、2=新书榜(top10)、3=热销榜(top20)、4=对话月票榜(top20)；rank=1 为 novly 未收录的未知榜。**2013-03 起连续有数据**（2013-02 及更早实测为空），每月一期、月度清零。语义证据：temp/novly/utils/{monthlyApi,urls,months}.ts + app/monthly/[ym].tsx。抓取器：`analysis/fetch_monthly_ranks.py` → `out/monthly_ranks.jsonl` |
 | `api.sfacg.com/novels/{nid}?expand=...,ticket,...` | Basic（`SFACG_AUTH`） | 本机无认证串，未测。单书月票（含周/月）只能走此端点 |
 
-补充：`docs/data-findings.md` §13.5 记录 App 有 11 榜（推荐/人气/畅销/新书/
+补充：`archive/data-findings.md` §13.5 记录 App 有 11 榜（推荐/人气/畅销/新书/
 收藏/月票/打赏/种草/粉丝/角色/完结），其中种草/角色/完结 web 无对应页；
 App 榜单端点当时未公开暴露（待抓包）。种草指数被证实为黑箱当期值。
 
@@ -84,7 +84,7 @@ App 榜单端点当时未公开暴露（待抓包）。种草指数被证实为�
    （`status=已完结` 且末次更新早于上榜月）后，热销榜 2015–2023 年「该月已完结」
    ≤0.4%、月票榜同期为 0，两张月度榜的席位几乎全部由正在更新的书占据；
    完结后仅在榜 1–4 月（2024 起 6 本）。详见报告 07 §6.2。旧叙事
-   （`docs/data-findings.md` §7）基于人气榜位快照，与月度热销榜的真实行为不符。
+   （`archive/data-findings.md` §7）基于人气榜位快照，与月度热销榜的真实行为不符。
 5. 收藏榜/新书榜几乎整体超出快照上界 → 「当期收藏增速」集中在最近几个月的新书。
 
 ## 4. 使用规则

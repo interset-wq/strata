@@ -17,11 +17,37 @@
 | --- | --- | --- |
 | 研究 | [`analysis/`](./analysis/) | **已完成**：19 份报告、82 张图，数据管线可重建 |
 | 产品 | [`app/`](./app/) | **设计中**：Flutter UI + 内嵌 Go 服务，见 [APP 设计文档 01](./app/docs/01-tech-stack.md) |
-| 设计档案 | [`docs/`](./docs/) | **历史稿**：含实测事实与早期方案，数字口径已过时，见 [文档索引](./docs/README.md) |
+| 接口档案 | [`analysis/references/sfacg-endpoints.md`](./analysis/references/sfacg-endpoints.md) | **SFACG 接口唯一权威事实档案**：端点/参数/字段/状态码/限流；动手前必读，不要猜 API |
+| 归档 | [`archive/`](./archive/) | **历史实测档案，不是设计文档**：4 份实测细节仅供参考，数字口径已过时，见 [归档索引](./archive/README.md) |
 
 **引用任何数字之前，先读 [`analysis/README.md`](./analysis/README.md) 的口径约束。**
-`docs/` 下的报告基于早期数据集（246,045 本、2026-06 快照、`quarry/` 管线），
+`archive/` 下的报告基于早期数据集（246,045 本、2026-06 快照、`quarry/` 管线），
 其数字与结论已被后续分析修正，不作为当前口径。
+
+---
+
+## SFACG 接口事实档案（动手前必读）
+
+**任何涉及 SFACG 端点、参数、字段、状态码或抓取的工作，
+先读 [`analysis/references/sfacg-endpoints.md`](./analysis/references/sfacg-endpoints.md)。**
+这是全库唯一权威的接口事实档案，含 15 端点总表、三类搜索接口字段覆盖、
+`novelbytype` 枚举、详情页/目录/评论/榜单选择器、静默限流与失败模式、复现命令。
+**不要凭印象猜 API**——本项目已多次因猜测踩坑：
+
+| 想当然的写法 | 实测真相 |
+| --- | --- |
+| 搜索参数用 `q` / `key` / `s` | 只有 `keyword` 可用，其余报 501 |
+| `novelbytype` 用 GET | 必须 POST + `Referer`，GET 报 501 |
+| 无效 nid 返回 404 | 返回 **HTTP 200** + 文案「小说不存在」/「出错啦」，状态码零信息量 |
+| 搜索能翻页拿全量 | HTML 硬截断 30 条，连约 17 次静默限流返回「0 结果」不报错 |
+| 按「>5 KB 含书名」判存活 | 僵尸页 13–15 KB、与存活页体积中位只差 35 B，必须看 `div.book_Catalog` 有无 `<a>` |
+
+档案的实测依据来自 2026-11-16 现网请求，探针为
+`analysis/fetchers/probe_sfacg_api.py` 与 `probe_novelbytype.py`；
+上游实现参照 `temp/sfacg_tools/sfacglib/`（不入库）。
+产品侧的接口用法另见 [`app/docs/04-search.md`](./app/docs/04-search.md) 与
+[`app/docs/05-detail-fetch.md`](./app/docs/05-detail-fetch.md)；
+**`archive/search.md` 是旧稿，已被档案实测否定，不得作为接口依据。**
 
 ---
 
@@ -33,7 +59,7 @@
 | 规范化书目表 | `analysis/out/novels.csv`，245,779 行 × 15 列（构建时已剔除正版日轻 47 行） |
 | 数据内容上界 | **2026-05-03**（原始 jsonl 的 `max(last_update)`，即扫描起点，非统一读取时刻） |
 | 上架年定年 | `analysis/eras.py`，104 锚点、log(nid) 分段线性，留一法 P99 = 50 天 |
-| 在架覆盖率 | 约 68.9%（95% CI 64.2–73.5%，报告 10） |
+| 在架覆盖率 | 约 69.3%（报告 10 已重写：三态判据 + 按 nid 段分层加权；旧 68.9% 量级未变、口径已改） |
 | 产出 | 19 份报告、82 张图，均由生成器产出 |
 
 抓取方式决定了数据的边界：原始 jsonl 是 Scrapy 按天切分、追加写入的产物，
@@ -62,7 +88,7 @@
 5. **平台识别的是作者能力，不是单本爆款**。banner 授予对代表作收藏分位 <90% 的作者
    精确为 0（报告 17）；征文的上榜优势控制 VIP 后反转、作者内对照仅 1.18 倍（报告 15）；
    跟风书的高热度是选择效应（报告 12、13）。三类看似因果的优势逐层对照后收敛到「筛选的是人」。
-6. **图景有一面带盲区的镜子**。覆盖率 68.9%，遗漏偏短、新、更新中；
+6. **图景有一面带盲区的镜子**。覆盖率 69.3%，遗漏偏短、新、更新中；
    快照状态不等于当期状态；上界之后的新书完全不在库内。
    全部发现都是结构描述，**先拆混杂，再谈差异**。
 
@@ -88,7 +114,7 @@ for f in generators/report_*.py; do uv run python "$f"; done   # 全部 19 份
 
 ## 从早期文档保留的事实
 
-这些是 `docs/` 里经页面/API 实测得到、且未被后续分析推翻的部分。
+这些是 `archive/` 里经页面/API 实测得到、且未被后续分析推翻的部分。
 具体数字以原档案的实测日期为准，**不视为当前快照口径**。
 
 - **官方榜全是当期榜**：App 有 11 个榜（推荐/人气/畅销/新书/收藏/月票/打赏/种草/粉丝/角色/完结），
@@ -119,13 +145,11 @@ for f in generators/report_*.py; do uv run python "$f"; done   # 全部 19 份
 | --- | --- | --- |
 | [`analysis/README.md`](./analysis/README.md) | 数据管线、报告清单、口径约束 | **当前口径，先读** |
 | [`analysis/reports/`](./analysis/reports/) | 19 份报告正文与 82 张图 | **当前结论** |
-| [`docs/README.md`](./docs/README.md) | 早期设计档案索引与失效清单 | 历史稿，待重新设计 |
-| [`docs/data-findings.md`](./docs/data-findings.md) | 早期全量实测（字段陷阱、榜单机制、banner、标签） | 实测事实可参考，数字过时 |
-| [`docs/search.md`](./docs/search.md) | 三个官方接口实测边界与搜索方案 | 接口事实可参考，方案待重设 |
-| [`docs/architecture.md`](./docs/architecture.md) | 早期架构、六个入口、种子策略 | 方案待重新设计 |
-| [`docs/cloud.md`](./docs/cloud.md) | 轻后端 P2 蓝图 | 未实现，待重新设计 |
-| [`docs/schema.sql`](./docs/schema.sql) / `schema-map.html` | 早期 17 表结构 | 待重新设计 |
-| [`app/README.md`](./app/README.md) | 产品预留位与设计文档索引 | 技术栈已定，见 [`app/docs/01-tech-stack.md`](./app/docs/01-tech-stack.md) |
+| [`archive/README.md`](./archive/README.md) | 早期实测档案索引与失效清单 | 历史稿，4 份实测细节可参考 |
+| [`archive/data-findings.md`](./archive/data-findings.md) | 早期全量实测（字段陷阱、榜单机制、banner、标签） | 实测细节可参考，数字过时 |
+| [`archive/search.md`](./archive/search.md) | 三个官方接口实测边界与搜索方案 | 接口事实可参考，方案已重设为 `app/docs/04-search.md` |
+| [`archive/architecture.md`](./archive/architecture.md) | 早期架构、六个入口、种子策略 | 方案已重设为 `app/docs/01`–`07`；§6.5 末保留服务端四条进入条件 |
+| [`app/README.md`](./app/README.md) | 产品设计与文档索引（01–07） | **当前方案**，见 [`app/docs/01-tech-stack.md`](./app/docs/01-tech-stack.md) |
 
 `temp/` 下是参考项目与原始抓取脚本，不进版本库。
 
@@ -138,8 +162,9 @@ for f in generators/report_*.py; do uv run python "$f"; done   # 全部 19 份
 - 产品正式名称（早期用 Novly 占位）
 - 是否接入 SFACG 登录（涉及书架同步与合规风险）
 - 是否需要 iOS 版（采集与后台任务受限更多）
-- 是否建服务端（早期条件写在 `docs/cloud.md` §7：爬虫稳定 ≥4 周、
-  种子周期 >2 周、端上闭包外占比 >5%、日活 ≥50 条新观测，四条同时成立才动手）
+- 是否建服务端（四条条件见 `archive/architecture.md` §6.5 末：爬虫稳定 ≥4 周、
+  种子周期 >2 周、端上闭包外占比 >5%、日活 ≥50 条新观测，四条同时成立才动手；
+  **当前 app 设计 v1 明确无服务端**，见 [`app/docs/01-tech-stack.md`](./app/docs/01-tech-stack.md)）
 
 ---
 
