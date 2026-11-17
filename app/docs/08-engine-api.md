@@ -70,12 +70,15 @@ UI 启动轮询即打这个端点（200ms 间隔、15s 超时），`status=="ok"
   "tags": ["…"],
   "local": <Observation|null>,
   "effective": { "clicks": …, "favs": …, "praises": …, "words": …,
-                 "status": …, "updated_at": … }
+                 "status": …, "updated_at": … },
+  "cover": "https://…novelCover…" | null
 }
 ```
 
 `effective` = 种子值被 `local`（最新观测）覆盖后的展示值。Phase 4 之后
-`local != null` 即 `source == "local"`。
+`local != null` 即 `source == "local"`。`cover` = App API 通路抓到的本地封面
+直链（`user.db.covers`），种子 `cover_url` 列大量为空（上游爬虫缺前缀，已知
+问题，待 seed builder 修复），客户端须对空值使用官方默认封面兜底。
 
 ### GET /strata/rankings/favs?year=&genre=&limit=
 
@@ -156,6 +159,22 @@ v1 为**同步调用**（限速器已串行化，一次前台刷新只占一个�
 // 200，死亡/僵尸（不写观测，UI 按态标注）：
 { "state": "dead" | "zombie", "written": false }
 ```
+
+**App API 增强通路（实验性，默认关闭）**：环境变量 `STRATA_APP_API=1` 启用。
+启用后 refresh 先走 `api.sfacg.com/novels/{id}`（App 内置公共凭据自签，共用全局限速器，
+前台优先）；成功时以 App 精确值写入观测（`clicks`= `viewTimes` 精确整数、
+`favs`=`markCount`、`words`=`charCount`），响应为：
+
+```json
+{ "state": "alive", "written": true, "source": "app", "add_time": "2024-12-27T19:03:11",
+  "detail": { "clicks": 33353509, "favs": 281034, "words": 2978118,
+              "status": "已完结", "updated_at": "...", "cover": "https://...", "point": 7.2 } }
+```
+
+**降级**：App API 任何失败（签名 417/未知 nid/超时/结构变更）**静默回落**移动版
+HTML 基线，响应不带 `source` 字段——调用方无需区分。**独立判据**：App API 只判
+`status.httpCode==200 && data.novelId>0`（可用/不可用两态），死亡/僵尸三态判定仍
+以 HTML 基线为准；`addTime` 仅作端上补充记录，不进定年（05 §3.5）。
 
 ### GET /strata/books/:nid/observations（**已实现**）
 

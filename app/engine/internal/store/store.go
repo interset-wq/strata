@@ -471,12 +471,12 @@ type SearchItem struct {
 // only source of metric truth; (nid, observed_at) dedupes same-second
 // fetches). Only seed.db stays untouched; this writes user.db.
 func (s *Store) InsertObservation(ctx context.Context, nid, observedAt int64,
-	favs, praises, words *int64, status, updatedAt *string) error {
+	clicks, favs, praises, words *int64, status, updatedAt *string) error {
 	_, err := s.DB.ExecContext(ctx, `
-INSERT OR IGNORE INTO observations(nid, observed_at, favs, praises, words,
+INSERT OR IGNORE INTO observations(nid, observed_at, clicks, favs, praises, words,
  status, updated_at, source)
-VALUES (?, ?, ?, ?, ?, ?, ?, 'detail')`,
-		nid, observedAt, favs, praises, words, status, updatedAt)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'detail')`,
+		nid, observedAt, clicks, favs, praises, words, status, updatedAt)
 	return err
 }
 
@@ -603,9 +603,9 @@ ORDER BY favs DESC LIMIT ?`, limit)
 	items := []FeaturedBook{}
 	for rows.Next() {
 		var (
-			it      FeaturedBook
-			cover   sql.NullString
-			favs    sql.NullInt64
+			it    FeaturedBook
+			cover sql.NullString
+			favs  sql.NullInt64
 		)
 		if err := rows.Scan(&it.NID, &it.Title, &it.Author, &cover, &favs); err != nil {
 			return nil, err
@@ -615,6 +615,31 @@ ORDER BY favs DESC LIMIT ?`, limit)
 		items = append(items, it)
 	}
 	return items, rows.Err()
+}
+
+// UpsertCover stores an App API novelCover under the nid. Covers are
+// book attributes (not observations) and live only in user.db.
+func (s *Store) UpsertCover(ctx context.Context, nid int64, cover string, fetchedAt int64) error {
+	_, err := s.DB.ExecContext(ctx, `
+INSERT INTO covers(nid, cover, source, fetched_at) VALUES (?, ?, 'app', ?)
+ON CONFLICT(nid) DO UPDATE SET cover=excluded.cover,
+ source=excluded.source, fetched_at=excluded.fetched_at`,
+		nid, cover, fetchedAt)
+	return err
+}
+
+// Cover returns the locally fetched cover path for a nid, if any.
+func (s *Store) Cover(ctx context.Context, nid int64) (string, error) {
+	var cover string
+	err := s.DB.QueryRowContext(ctx,
+		`SELECT cover FROM covers WHERE nid = ?`, nid).Scan(&cover)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return cover, nil
 }
 
 func strPtr(v sql.NullString) *string {

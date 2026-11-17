@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -33,6 +34,10 @@ type Server struct {
 	store   *store.Store
 	limiter *crawl.Limiter
 	client  *http.Client
+
+	// App API is the optional enhancement pathway (docs/05 §3.5): off by
+	// default, any failure silently degrades to the mobile HTML baseline.
+	appAPI bool
 
 	// Refresh debounce: same nid within the window returns the last
 	// verdict without touching the limiter (docs/08).
@@ -69,6 +74,7 @@ func New(s *store.Store) *gin.Engine {
 		limiter:     crawl.NewLimiter(crawl.DefaultInterval),
 		client:      client,
 		refreshLast: map[int64]refreshEntry{},
+		appAPI:      os.Getenv("STRATA_APP_API") == "1",
 	}
 	group := r.Group("/strata")
 	group.GET("/healthz", srv.healthz)
@@ -134,6 +140,9 @@ func (s *Server) book(c *gin.Context) {
 	if detail.Local != nil {
 		source = "local"
 	}
+	// Locally fetched cover (App API novelCover) takes priority over the
+	// seed column, which is empty for many books (upstream crawler bug).
+	cover, _ := s.store.Cover(c.Request.Context(), nid)
 	c.JSON(http.StatusOK, gin.H{
 		"source":    source,
 		"data_end":  s.store.Manifest.ContentEnd,
@@ -141,6 +150,7 @@ func (s *Server) book(c *gin.Context) {
 		"tags":      detail.Tags,
 		"local":     detail.Local,
 		"effective": effective(detail),
+		"cover":     cover,
 	})
 }
 
@@ -368,6 +378,43 @@ func (s *Server) bookRefresh(c *gin.Context) {
 
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
 	defer cancel()
+
+	// App API enhancement (docs/05 §3.5): opt-in via STRATA_APP_API=1.
+	// On success the precise metadata replaces the HTML-parsed values and
+	// the cover is cached; ANY failure silently falls through to the
+	// mobile HTML baseline — no retry, no user-visible error.
+	if s.appAPI {
+		if app, aerr := crawl.FetchAppNovel(ctx, s.client, s.limiter, nid, true); aerr == nil {
+			clicks, favs, words := app.ViewTimes, app.MarkCount, app.CharCount
+			status := map[bool]string{true: "已完结", false: "连载中"}[app.IsFinish]
+			updatedAt := app.LastUpdateTime
+			observedAt := time.Now().Unix()
+			if err := s.store.InsertObservation(ctx, nid, observedAt,
+				&clicks, &favs, nil, &words, &status, &updatedAt); err == nil {
+				if app.NovelCover != "" {
+					_ = s.store.UpsertCover(ctx, nid, app.NovelCover, observedAt)
+				}
+				resp := gin.H{
+					"state":    "alive",
+					"written":  true,
+					"source":   "app",
+					"add_time": app.AddTime,
+					"detail": gin.H{
+						"clicks": clicks, "favs": favs, "words": words,
+						"status": status, "updated_at": updatedAt,
+						"cover": app.NovelCover, "point": app.Point,
+					},
+				}
+				s.refreshMu.Lock()
+				s.refreshLast[nid] = refreshEntry{verdict: resp, at: time.Now()}
+				s.refreshMu.Unlock()
+				c.JSON(http.StatusOK, resp)
+				return
+			}
+		}
+		// fall through: silent degrade to the HTML baseline
+	}
+
 	state, d, observedAt, err := crawl.FetchDetail(ctx, s.client, s.limiter, nid, true)
 	if err != nil {
 		fail(c, http.StatusInternalServerError, "internal", err.Error())
@@ -381,7 +428,7 @@ func (s *Server) bookRefresh(c *gin.Context) {
 		favs, praises, words := d.Favs, d.Praises, d.Words
 		status, updatedAt := d.Status, d.UpdatedAt
 		if err := s.store.InsertObservation(ctx, nid, observedAt,
-			&favs, &praises, &words, &status, &updatedAt); err != nil {
+			nil, &favs, &praises, &words, &status, &updatedAt); err != nil {
 			fail(c, http.StatusInternalServerError, "internal", err.Error())
 			return
 		}

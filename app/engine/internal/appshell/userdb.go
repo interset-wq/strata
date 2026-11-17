@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 )
 
-const userSchemaVersion = 1
+const userSchemaVersion = 2
 
 const userSchema = `
 CREATE TABLE IF NOT EXISTS observations(
@@ -96,6 +96,13 @@ CREATE TABLE IF NOT EXISTS watchlist(
 );
 CREATE INDEX IF NOT EXISTS idx_watch_poll ON watchlist(poll_enabled, last_poll_at);
 CREATE INDEX IF NOT EXISTS idx_watch_role ON watchlist(role);
+
+CREATE TABLE IF NOT EXISTS covers(
+  nid         INTEGER PRIMARY KEY,
+  cover       TEXT NOT NULL,
+  source      TEXT NOT NULL DEFAULT 'app',
+  fetched_at  INTEGER NOT NULL
+);
 `
 
 func UserDBPath(dataDir string) string {
