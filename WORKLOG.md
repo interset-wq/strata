@@ -43,6 +43,31 @@ Never delete or rewrite other agents' entries.
 
 ---
 
+## 2026-11-17 — AtomCode (glm5.3-flash), session 3 (Phase 2)
+
+- **Did** (Phase 2 COMPLETE, verified on device):
+  - `app/ui/lib/data/api/strata_api.dart` (new): typed HTTP client for the contract —
+    `healthz`/`meta`/`books/:nid`/`rankings/favs`/`rankings/short`, unified
+    `StrataApiException` (status + code + message).
+  - `app/ui/lib/core/providers.dart` (new): `bootProvider` (FutureProvider: extract
+    bundled assets → FFI start → healthz poll → ready `StrataApi`; failure carries the
+    diagnostic message; `ref.invalidate` = retry, no loop) and `metaProvider`.
+  - `app/ui/lib/app/` (new): go_router (`/boot`, `/home`) + M3 theme (light/dark).
+  - `app/ui/lib/pages/` (new): BootPage (progress/failure+retry, routes to /home on ok),
+    HomePage (renders /strata/meta). `main.dart` now ProviderScope + MaterialApp.router.
+  - Deps: flutter_riverpod 3.5.0, go_router 18.1.4.
+- **Verified**: `flutter analyze` clean; debug APK on device shows
+  `/strata/meta` data (seed 20260503.1, book_count=30878, licensed_count=47,
+  tags 105/111828). Screenshot: `temp/ffi-build/phase2_home.png`.
+- **Next** (Phase 3, reader MVP): Go store/API for 分位榜/题材榜/短篇榜/新书榜/详情/L1
+  search if missing; Flutter ranking list + book detail + local search pages; keep
+  `is_licensed=1` excluded from percentile rankings.
+- **Notes**: commits 6aba8ac (docs), 72bb027 (engine), 21696f4 (ui spike),
+  85d4b3d (ui shell). Nothing pushed.
+
+
+---
+
 ## 2026-11-17 — AtomCode (glm5.3-flash), session 2
 
 - **Did** (Phase 0 + Phase 1 COMPLETE, FFI spike validated on a real device):
