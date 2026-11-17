@@ -99,6 +99,9 @@ UI 启动轮询即打这个端点（200ms 间隔、15s 超时），`status=="ok"
 
 分位只按种子池（`is_licensed=0`）计算；`licensed_excluded` 恒为 true，榜单永不出现授权书。
 
+**二级页过滤参数（宫格入口，已实现）**：`status=已完结|连载中`（精确匹配，非法值 400）、
+`contest=1`（`contest` 列非空即参赛作品）。与 `genre` 可组合，均在分位榜口径内过滤。
+
 ### GET /strata/rankings/short?limit=
 
 200：同上结构，`meta.kind="short"`、`ordering="favs"`、`short_max_words=50000`，

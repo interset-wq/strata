@@ -72,7 +72,7 @@ func TestBookNotFound(t *testing.T) {
 
 func TestRankingFavsExcludesLicensedAndOtherYears(t *testing.T) {
 	st := openTestStore(t)
-	items, err := st.RankingFavs(context.Background(), 2010, "", 10)
+	items, err := st.RankingFavs(context.Background(), 2010, "", "", "", 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +91,7 @@ func TestRankingFavsExcludesLicensedAndOtherYears(t *testing.T) {
 
 func TestRankingFavsGenreFilter(t *testing.T) {
 	st := openTestStore(t)
-	items, err := st.RankingFavs(context.Background(), 2010, "魔幻", 10)
+	items, err := st.RankingFavs(context.Background(), 2010, "魔幻", "", "", 10)
 	if err != nil {
 		t.Fatal(err)
 	}

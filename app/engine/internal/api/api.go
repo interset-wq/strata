@@ -210,7 +210,15 @@ func (s *Server) rankingFavs(c *gin.Context) {
 		return
 	}
 
-	items, err := s.store.RankingFavs(c.Request.Context(), year, genre, limit)
+	// 二级页过滤维度（宫格入口）：状态精确匹配；比赛=contest 非空。
+	status := c.Query("status")
+	if status != "" && status != "已完结" && status != "连载中" {
+		fail(c, http.StatusBadRequest, "invalid_argument", "unknown status")
+		return
+	}
+	contest := c.Query("contest")
+
+	items, err := s.store.RankingFavs(c.Request.Context(), year, genre, status, contest, limit)
 	if err != nil {
 		fail(c, http.StatusInternalServerError, "internal", err.Error())
 		return

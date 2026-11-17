@@ -48,12 +48,16 @@ class StrataApi {
   Future<List<RankItem>> rankingFavs({
     required int year,
     String? genre,
+    String? status,
+    String? contest,
     int limit = 50,
   }) async {
     final body = await _get('/rankings/favs', {
       'year': '$year',
       'limit': '$limit',
       'genre': ?genre,
+      'status': ?status,
+      'contest': ?contest,
     });
     return (body['items'] as List)
         .map((e) => RankItem.fromJson(e as Map<String, dynamic>))

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../core/providers.dart';
 import '../widgets/banner_carousel.dart';
+import 'browse_page.dart';
 
 /// 首页：编辑精选轮播 → 入口宫格 → 分类找书 → 继续浏览。
 /// 不暴露种子统计——定位是找书 App（用户反馈 2026-11-17）。
@@ -78,10 +79,10 @@ class HomePage extends ConsumerWidget {
   Widget _entryGrid(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final entries = [
-      ('类', '分类', '/rankings'),
-      ('态', '状态', '/rankings'),
-      ('赛', '比赛', '/rankings'),
-      ('篇', '短篇', '/rankings'),
+      ('类', '分类', BrowseMode.category),
+      ('态', '状态', BrowseMode.status),
+      ('赛', '比赛', BrowseMode.contest),
+      ('篇', '短篇', BrowseMode.short),
     ];
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -90,10 +91,10 @@ class HomePage extends ConsumerWidget {
           padding: const EdgeInsets.symmetric(vertical: 12),
           child: Row(
             children: [
-              for (final (glyph, label, route) in entries)
+              for (final (glyph, label, mode) in entries)
                 Expanded(
                   child: InkWell(
-                    onTap: () => context.go(route),
+                    onTap: () => context.push('/browse?mode=${mode.name}'),
                     borderRadius: BorderRadius.circular(12),
                     child: Column(
                       children: [

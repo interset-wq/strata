@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../pages/book_detail_page.dart';
 import '../pages/boot_page.dart';
+import '../pages/browse_page.dart';
 import '../pages/home_page.dart';
 import '../pages/rankings_page.dart';
 import '../pages/search_page.dart';
@@ -74,6 +75,15 @@ final router = GoRouter(
       path: '/book/:nid',
       builder: (_, state) => BookDetailPage(
         nid: int.parse(state.pathParameters['nid']!),
+      ),
+    ),
+    GoRoute(
+      path: '/browse',
+      builder: (_, state) => BrowsePage(
+        mode: BrowseMode.values.firstWhere(
+          (m) => m.name == (state.uri.queryParameters['mode'] ?? ''),
+          orElse: () => BrowseMode.category,
+        ),
       ),
     ),
   ],

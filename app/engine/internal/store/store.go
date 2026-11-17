@@ -251,7 +251,7 @@ type RankItem struct {
 	FavPctl float64 `json:"fav_pctl"`
 }
 
-func (s *Store) RankingFavs(ctx context.Context, year int, genre string, limit int) ([]RankItem, error) {
+func (s *Store) RankingFavs(ctx context.Context, year int, genre, status, contest string, limit int) ([]RankItem, error) {
 	query := `
 SELECT nid, title, author, genre, est_year, favs, fav_pctl
 FROM seed.books
@@ -260,6 +260,14 @@ WHERE est_year = ? AND is_licensed = 0 AND fav_pctl IS NOT NULL`
 	if genre != "" {
 		query += " AND genre = ?"
 		args = append(args, genre)
+	}
+	if status != "" {
+		query += " AND status = ?"
+		args = append(args, status)
+	}
+	if contest != "" {
+		// contest stores the contest name; non-empty means a contest entry.
+		query += " AND contest != ''"
 	}
 	query += " ORDER BY fav_pctl DESC, nid ASC LIMIT ?"
 	args = append(args, limit)
