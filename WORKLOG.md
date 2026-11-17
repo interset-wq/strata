@@ -65,6 +65,33 @@ Never delete or rewrite other agents' entries.
 - **Notes**: commits 6aba8ac (docs), 72bb027 (engine), 21696f4 (ui spike),
   85d4b3d (ui shell). Nothing pushed.
 
+---
+
+## 2026-11-17 — AtomCode (glm5.3-flash), session 4 (Phase 3)
+
+- **Did** (Phase 3 COMPLETE, verified on device):
+  - Go: `GET /strata/search?q=` (L1 local LIKE search over seed, licensed included)
+    and `GET /strata/rankings/new` (est_year >= gen_max-1 by fav_pctl, licensed
+    excluded) in `internal/store` + `internal/api`; testseed gained a 2025-gen book
+    (book_count 5→6 in fixtures); docs/08 contract updated to "已实现".
+  - `cmd/ffi/main.go`: `strata_start` is now IDEMPOTENT — activity recreation without
+    process death returns the live engine info instead of "engine already running"
+    (bug found during device acceptance).
+  - Flutter: RankingsPage (4 tabs: 分位榜 year selector / 题材榜 year+genre /
+    短篇榜 / 新书榜), SearchPage, BookDetailPage; home page got leaderboard/search
+    entries; Dart models gained `rank` + `SearchItem`.
+- **Verified**: `go test ./...` all ok; `flutter analyze` clean; device acceptance:
+  rankings tabs render (same-generation pctl ordering), detail page shows seed +
+  effective values + licensed badge, search "JK" returns favs-ordered results.
+  Screenshots: `temp/ffi-build/phase3_*.png`.
+- **Next** (Phase 4 per plan): rate limiter, mobile detail fetch, three-state check,
+  parser golden tests, observations write-back, official search L2, shelf + retention.
+  BUT another agent is evaluating a higher-quality external API and may rewrite
+  `analysis/references/sfacg-app-api.md`, docs/05 and related design — coordinate
+  before starting Phase 4 crawler work; do not duplicate API research.
+- **Notes**: commits 0bf141f (engine), 059f1af (ui). The other agent's uncommitted
+  doc edits (sfacg-app-api.md, 05-detail-fetch.md) were left untouched.
+
 
 ---
 

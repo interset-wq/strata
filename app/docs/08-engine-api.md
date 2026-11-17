@@ -105,10 +105,36 @@ UI 启动轮询即打这个端点（200ms 间隔、15s 超时），`status=="ok"
 
 ### GET /strata/search?q=&limit=
 
-L1 本地搜索：种子库内 `title`/`author` 的 LIKE 匹配（v1 无 FTS5）。响应结构复用
-榜单：`meta.kind="search"` + `items`（Book 精简列）。空 `q` 返回 `invalid_argument`。
-官方搜索 L2（30 条硬上限 + 静默限流识别）走 Phase 4，端点预留
-`POST /strata/search/remote`，响应附 `rate_limited: bool`。
+L1 本地搜索（**已实现**）：种子库内 `title`/`author` LIKE 匹配（v1 无 FTS5）。
+`q` 必填（非空），`limit` 同分页规则。
+
+```json
+{
+  "meta": { "kind": "search", "pool": "seed", "q": "…", "limit": 50,
+            "includes": "licensed", "content_end": "…" },
+  "items": [ { "nid": 123, "title": "…", "author": "…", "genre": "…",
+               "est_year": 2019, "favs": 12345 } ]
+}
+```
+
+**授权书可被搜索**（`includes:"licensed"`），只是不参与榜单与统计。
+按 `favs DESC` 排序。官方搜索 L2（30 条硬上限 + 静默限流识别）走 Phase 4，
+端点预留 `POST /strata/search/remote`，响应附 `rate_limited: bool`。
+
+### GET /strata/rankings/new?limit=
+
+新书/新作榜（**已实现**）：近两代（`est_year >= gen_max-1`）按同代分位
+`fav_pctl DESC` 排序（docs/03「按代查询再合并」的等价单查询），
+`is_licensed=0`。
+
+```json
+{
+  "meta": { "kind": "new", "pool": "seed", "ordering": "fav_pctl",
+            "content_end": "…", "min_est_year": 2024, "limit": 50,
+            "licensed_excluded": true },
+  "items": [ <RankItem 同分位榜> ]
+}
+```
 
 ### POST /strata/books/:nid/refresh
 
