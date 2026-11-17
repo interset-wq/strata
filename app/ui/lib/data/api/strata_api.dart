@@ -84,6 +84,62 @@ class StrataApi {
         .toList();
   }
 
+  /// Triggers a mobile-page detail fetch (sync; global limiter serializes).
+  /// state: alive | dead | zombie; written: observation appended.
+  Future<RefreshResult> refresh(int nid) async {
+    final body = await _post('/books/$nid/refresh');
+    return RefreshResult.fromJson(body);
+  }
+
+  Future<List<ObservationRow>> observations(int nid) async {
+    final body = await _get('/books/$nid/observations');
+    return (body['items'] as List)
+        .map((e) => ObservationRow.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> shelfAdd(int nid) async {
+    await _postBody('/shelf', {'nid': nid});
+  }
+
+  Future<void> shelfRemove(int nid) async {
+    await _delete('/shelf/$nid');
+  }
+
+  Future<dynamic> _post(String path) async {
+    final req = await _client.openUrl('POST', _uri(path));
+    final resp = await req.close();
+    final text = await resp.transform(utf8.decoder).join();
+    if (resp.statusCode != 200) {
+      throw StrataApiException(
+          status: resp.statusCode, code: 'internal', message: text);
+    }
+    return jsonDecode(text);
+  }
+
+  Future<dynamic> _postBody(String path, Map<String, dynamic> body) async {
+    final req = await _client.openUrl('POST', _uri(path));
+    req.headers.contentType = ContentType.json;
+    req.write(jsonEncode(body));
+    final resp = await req.close();
+    final text = await resp.transform(utf8.decoder).join();
+    if (resp.statusCode != 200) {
+      throw StrataApiException(
+          status: resp.statusCode, code: 'internal', message: text);
+    }
+    return jsonDecode(text);
+  }
+
+  Future<void> _delete(String path) async {
+    final req = await _client.openUrl('DELETE', _uri(path));
+    final resp = await req.close();
+    await resp.transform(utf8.decoder).drain();
+    if (resp.statusCode != 200) {
+      throw StrataApiException(
+          status: resp.statusCode, code: 'internal', message: 'delete failed');
+    }
+  }
+
   Future<void> close() async => _client.close();
 }
 
@@ -216,15 +272,45 @@ class SearchItem {
         favs = m['favs'] as int?;
 }
 
+class RefreshResult {
+  final String state; // alive | dead | zombie
+  final bool written;
+  final Map<String, dynamic>? detail;
+
+  RefreshResult.fromJson(Map<String, dynamic> m)
+      : state = m['state'] as String,
+        written = m['written'] as bool,
+        detail = m['detail'] as Map<String, dynamic>?;
+}
+
+class ObservationRow {
+  final int observedAt;
+  final int? favs;
+  final int? praises;
+  final int? words;
+  final String? status;
+  final String? updatedAt;
+
+  ObservationRow.fromJson(Map<String, dynamic> m)
+      : observedAt = m['observed_at'] as int,
+        favs = m['favs'] as int?,
+        praises = m['praises'] as int?,
+        words = m['words'] as int?,
+        status = m['status'] as String?,
+        updatedAt = m['updated_at'] as String?;
+}
+
 class BookDetail {
   final String source; // seed | local
   final String dataEnd;
   final Map<String, dynamic> book;
   final List<String> tags;
+  final Map<String, dynamic>? effective;
 
   BookDetail.fromJson(Map<String, dynamic> m)
       : source = m['source'] as String,
         dataEnd = m['data_end'] as String,
         book = m['book'] as Map<String, dynamic>,
-        tags = (m['tags'] as List).cast<String>();
+        tags = (m['tags'] as List).cast<String>(),
+        effective = m['effective'] as Map<String, dynamic>?;
 }

@@ -136,25 +136,44 @@ L1 本地搜索（**已实现**）：种子库内 `title`/`author` LIKE 匹配�
 }
 ```
 
-### POST /strata/books/:nid/refresh
+### POST /strata/books/:nid/refresh（**已实现**）
 
-触发一次移动版详情抓取（共用限速器，前台优先）。202 接受 → 轮询该 nid 详情直到
-`source` 变化或 `meta` 报错；失败分类沿用 05 号文档三态判据
-（`ok` / `not_found` / `transient`）。绝不写 `seed.db`。
+触发一次移动版详情抓取（`m.sfacg.com/b/{nid}/`，共用全局限速器，前台优先）。
+v1 为**同步调用**（限速器已串行化，一次前台刷新只占一个槽位；不再用 202+轮询）。
 
-### GET /strata/books/:nid/observations
+三态判据按 05 号文档 §4.3：死亡（「出错啦」否定文案）/ 僵尸（目录容器无链接、
+负数计数）/ 存活。仅存活态写入 `user.db.observations`（追加，`(nid, observed_at)`
+去重），`seed.db` 永远只读。
 
-按 `observed_at` 倒序返回该书的观测数组（`Observation[]`），供六指标折线。
-分页预留 `before=`（早于某时间戳）。
+```json
+// 200，存活：
+{ "state": "alive", "written": true,
+  "detail": { "favs": 281988, "praises": 89171, "words": 5446886,
+              "status": "已完结", "updated_at": "2024-03-25 20:57:00" } }
+// 200，死亡/僵尸（不写观测，UI 按态标注）：
+{ "state": "dead" | "zombie", "written": false }
+```
+
+### GET /strata/books/:nid/observations（**已实现**）
+
+```json
+{ "items": [ { "observed_at": 1700000000, "clicks": null, "favs": 281988,
+               "praises": 89171, "words": 5446886, "short_comments": null,
+               "long_comments": null, "status": "已完结",
+               "updated_at": "2024-03-25 20:57:00" } ] }
+```
+
+`observed_at` 倒序；`null` 表示该字段本次未抓（不是 0）。
 
 ### 书架 / watchlist（Phase 4/5）
 
 | 端点 | 方法 | 语义 |
 | --- | --- | --- |
-| `/strata/shelf` | GET | 书架列表（本地收藏） |
-| `/strata/shelf` | PUT/DELETE | 收藏/取消，body 只有 `nid` |
-| `/strata/watchlist` | GET | 观测列表（含 `role: self\|peer`） |
-| `/strata/watchlist` | POST/DELETE | 增删（`nid` + `role`） |
+| `/strata/shelf` | GET（**已实现**） | 书架列表，`items: [{nid, title, author, genre, added_at}]`，与种子 JOIN 取书名 |
+| `/strata/shelf` | PUT（**已实现**） | 收藏，body `{ "nid": 123456 }` |
+| `/strata/shelf/:nid` | DELETE（**已实现**） | 取消收藏 |
+| `/strata/watchlist` | GET | 观测列表（含 `role: self\|peer`，Phase 5） |
+| `/strata/watchlist` | POST/DELETE | 增删（`nid` + `role`，Phase 5） |
 
 只写 `user.db`；与种子的关联**只用 `nid`**（rowid 每次种子发布都会重排）。
 
