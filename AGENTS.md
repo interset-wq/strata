@@ -6,7 +6,7 @@ Windows + PowerShell environment.
 
 ## Read first (do not scan the whole repo)
 
-- `analysis/README.md` — data pipeline, 19 reports, and the 12 caliber constraints. Authoritative for any number.
+- `analysis/README.md` — data pipeline, 20 reports (19 baseline + 1 supplement), and the 12 caliber constraints. Authoritative for any number.
 - `app/README.md` + `app/docs/01-07` — product design (Chinese). `01-tech-stack.md` and `02-data-model.md` are the binding ones.
 - `analysis/references/sfacg-endpoints.md` — the only authoritative SFACG endpoint fact file. Read before any fetching work.
 - `archive/` is intentionally stale (old dataset, old `quarry/` pipeline). Never cite its numbers or APIs.
@@ -34,7 +34,7 @@ uv sync
 uv run --extra archive python pipeline/prepare.py   # first run only: verify + unpack dataset.7z
 uv run python pipeline/build_csv.py                 # jsonl -> out/novels.csv + out/manifest.json
 uv run python generators/report_market.py           # one report
-Get-ChildItem generators/report_*.py | ForEach-Object { uv run python $_.FullName }  # all 19
+Get-ChildItem generators/report_*.py | ForEach-Object { uv run python $_.FullName }  # all 20
 ```
 
 - Reports and figures are generated: edit `generators/report_*.py`, never `reports/*.md` or `figures/*.png`.

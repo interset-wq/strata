@@ -180,3 +180,20 @@ Never delete or rewrite other agents' entries.
 - **Notes**: `app_api_coverage.json` (17:36: 43,901 / 262 true missing) is stale because it used a partial enumeration;
   do not cite it as final.
 
+---
+
+## 2026-11-17 — WorkBuddy (report 20, supplement only)
+
+- **Did**: Created `analysis/generators/report_20_app_api_crosscheck.py` → `analysis/reports/20_app_api_crosscheck.md`
+  plus two figures. Added `APP_API_NOVELS` / `EXTERNAL_DATES` path constants to `analysis/lib/paths.py`.
+  Updated report counts in root README, `analysis/README.md`, AGENTS.md and project memory to
+  19 baseline + 1 supplement / 84 figures.
+- **Hard constraint honored**: report 10 (`10_survival.md`), `lib/eras.py` and every `app/docs/*` file were NOT touched.
+  Report 20 is explicitly a supplement: no new coverage number, no change to the U/inverted-U conclusion,
+  no App field emitted, and no network requests at generation time (missing inputs cause a hard error).
+- **Verified**: generator runs clean; slot occupancy 44.3→24.0→40.1% (U shape confirmed with report 10's own bands),
+  in-catalog hit rate 98.79–99.88% (flat, 99.63% overall), 315/85,852 pre-bound out-of-library books in tid=21,
+  external addTime cross-check n=31,229, median 2 d, P99 10 d, max 11 d, 100% ≤30 d.
+- **Next**: none required. If more validation is wanted, keep it offline under report 20 or a new supplement;
+  do not edit report 10 or the dating model.
+
