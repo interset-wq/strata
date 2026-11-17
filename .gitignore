@@ -67,3 +67,6 @@ Thumbs.db
 .workbuddy/
 .atomcode/
 *.log
+
+# generated seed archive (rebuild with app/tools/seedbuild/build_seed.py)
+app/assets/seed.db.gz
