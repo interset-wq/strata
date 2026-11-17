@@ -215,3 +215,68 @@ Never delete or rewrite other agents' entries.
 - **Next**: experimental App API pipeline (JSON parse + own three-state,
   default off, fallback to HTML baseline) or Phase 5 watchlist/background
   fetch. Push still pending user approval.
+
+---
+
+## 2026-11-17 — D2 implementation (full-universe generation Top200)
+
+- **Did**: user chose D2 over D1. Added `app/tools/seedbuild/deep_ranks.py` (shared, full-universe
+  generation Top200 for favs/clicks/praises/pr), `analysis/generators/report_21_deep_ranks.py`
+  → `reports/21_deep_ranks.md` + 2 figures. Extended seed schema to v2 with an additive
+  `deep_ranks` table, rebuilt `app/assets/seed.db.gz` / `manifest.json`, and added
+  `GET /strata/rankings/deep` with store method, testseed fixture and Go tests.
+  Documented in `app/docs/10-deep-ranks.md`; 09 proposal appendix B records execution.
+- **Verified**: 241,758-row universe → 76 boards / 14,626 rows; seed pool covers only
+  7,534/14,626 (51.5%), 2007 generation 7/76 — proving `limit=200` on the seed-pool
+  endpoint was not a deep board. `books` unchanged at 30,878 / 24 columns; gz 6.67 → 7.45 MB.
+  `go test ./...` all green; real-asset query returns depth 200 (2010 favs) and 32 (2007 pr).
+- **Hard constraint honored**: report 10, `lib/eras.py`, and app docs 01–08 untouched;
+  no network requests; 4,553 deep-rank books were NOT merged into the seed book list.
+- **Next**: D1 (near-30-day new-book Top200) remains unstarted and needs the enumeration gap closed;
+  depth 500 rejected for now (new-book top200 threshold only 8 favs).
+
+---
+
+## 2026-11-17 — Cover refresh proposal (offline planning only)
+
+- **Did**: user paused front-end deep-board integration (UI still being designed) and asked to plan a
+  high-quality-seed crawler for covers. Added `app/docs/11-cover-refresh-proposal.md` (proposal, not
+  executed). All figures recomputed offline from novels.csv / seed.db.gz / raw jsonl / local App sample.
+- **Key finding**: seed pool 30,831 non-licensed books, 18,724 (60.7%) have empty `cover_url`, BUT
+  16,976 (90.7%) of those had a real URL in raw jsonl that `dedup_covers` nulled as a known
+  novel_hub selector bug (same cover on many books; owner match 89.8% vs non-owner 19.5%). Those URLs
+  are WRONG and cannot be backfilled. Only 1,748 are true default placeholders. So the real target is
+  16,976 books, not 18,724 and not the 131,814 empty in the full universe.
+- **App API**: `novelCover` full https URL present in 114,381/114,381 local samples. 6,457 of the
+  16,976 are already in the local sample (zero requests); 10,519 need fetching.
+- **Cost**: plan A (store URL only) = 10,519 detail requests (~88 min @0.5s); list deep-scan = 5,108
+  pages (not worth it). Downloading images = 829 MB for 16,976 / 1.4 GB for all seeds — infeasible.
+  Recommended: additive `covers` table, URL only, default-image fallback for the 1,748.
+- **Blockers for execution**: UI currently renders NO covers at all (no Image.network in app/ui/lib),
+  so "seed must have covers" is a data-quality goal, not a UI blocker. 5 decision points listed in §5;
+  suggested first step is a 30-book validation of URL correctness before any full crawl.
+- **Hard constraint**: no requests made; report 10, eras.py, app docs 01–10 untouched. Front-end
+  deep-board work remains paused; engine `in_seed` change (store/api/test) is done and go tests green.
+---
+
+## 2026-11-17 — AtomCode (glm5.3-flash), session 7 (UI design system)
+
+- **Did**: app-wide UI design per user review round-trips (mockups at
+  temp/ui-design/mockups.html, v5): "文房纸墨" dual theme (paper #F6F2E9 /
+  night #181511, cinnabar accent, serif display), bottom NavigationBar with
+  4 top-level tabs, home rebuilt as a book-finding surface (featured banner
+  carousel with novly-style 1.45x offset for 4.47:1 images, entry grid,
+  genre chips, continue-browsing from shelf), detail page data-dense
+  (metric grid, percentile bars, PR badge, full metadata).
+- **User decisions**: no seed-stats exposure on home (find-books app, not a
+  database dashboard); no fabricated "hot this week" — seed is static, only
+  honest sources (editor picks / local footprint / random); tab count 4 with
+  novly-style entry-grid distribution for secondary pages; detail page
+  maximizes data display; intro text comes from mobile HTML
+  (.book_bk_qs1) — parser support still TODO.
+- **Verified**: go test + flutter analyze clean; device screenshots
+  (home carousel live images, rankings, shelf, detail) all good; commits
+  1add3da (engine featured endpoint) + 0a22fb4 (ui landing).
+- **Next**: rankings/search/shelf pages only re-themed, still need layout
+  polish; detail intro section awaits engine parser support; author
+  workbench (Phase 5) untouched. Push still pending user approval.
