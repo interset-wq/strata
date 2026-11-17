@@ -56,6 +56,18 @@ final metaProvider = FutureProvider<Meta>((ref) async {
   return handle.api.meta();
 });
 
+/// 编辑精选轮播（featured=1，构建期人工选定）。
+final featuredProvider = FutureProvider<List<FeaturedItem>>((ref) async {
+  final handle = await ref.watch(bootProvider.future);
+  return handle.api.featured();
+});
+
+/// 书架（“想读”，首页“继续浏览”数据源）。
+final shelfProvider = FutureProvider<List<ShelfItem>>((ref) async {
+  final handle = await ref.watch(bootProvider.future);
+  return handle.api.shelfList();
+});
+
 typedef YearGenre = ({int year, String? genre});
 
 /// 分位榜（可选题材过滤）。

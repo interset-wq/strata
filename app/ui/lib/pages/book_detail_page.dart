@@ -33,10 +33,6 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
           final b = d.book;
           // effective = 种子值被最新本地观测覆盖后的展示值（契约 08）。
           final eff = (d.effective ?? const {}).cast<String, dynamic>();
-          String? effStr(String key, {Object? seed}) {
-            final v = eff[key] ?? seed;
-            return v?.toString();
-          }
 
           String? s(Object? v) => v?.toString();
           final licensed = b['is_licensed'] == true;
@@ -45,7 +41,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
             children: [
               Text(s(b['title']) ?? '',
                   style: Theme.of(context).textTheme.headlineSmall),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Text('${s(b['author']) ?? ''} · ${s(b['est_year']) ?? ''}'
                   '${s(b['genre']) != null ? ' · ${s(b['genre'])}' : ''}'),
               const SizedBox(height: 12),
@@ -64,14 +60,10 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                     style: TextStyle(color: Colors.deepOrange),
                   ),
                 ),
-              _row('收藏', effStr('favs', seed: b['favs'])),
-              _row('点击', effStr('clicks', seed: b['clicks'])),
-              _row('推荐', effStr('praises', seed: b['praises'])),
-              _row('字数', effStr('words', seed: b['words'])),
-              _row('状态', effStr('status', seed: b['status'])),
-              _row('更新时间', effStr('updated_at', seed: b['updated_at'])),
-              _row('数据来源', d.source == 'local' ? '本地观测' : '种子'),
-              _row('数据截止', d.dataEnd),
+              // 六指标格：点击/收藏/推荐/字数（短评/长评来自观测，种子无）
+              _metricGrid(context, eff, b),
+              _pctlCard(context, b),
+              _metaCard(context, d, eff, b),
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -197,18 +189,173 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
     );
   }
 
-  Widget _row(String label, String? value) {
-    if (value == null || value.isEmpty || value == 'null') {
-      return const SizedBox.shrink();
+  String? _num(Object? v) {
+    if (v == null) return null;
+    final s = v.toString();
+    if (s.isEmpty || s == 'null') return null;
+    final n = int.tryParse(s);
+    if (n == null) return s;
+    // 大数字缩写：≥1亿用亿、≥1万用万，避免溢出换行
+    final abs = n.abs();
+    if (abs >= 100000000) {
+      return '${(n / 100000000).toStringAsFixed(2)}亿';
     }
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    if (abs >= 10000) {
+      return '${(n / 10000).toStringAsFixed(1)}万';
+    }
+    return n.toString();
+  }
+
+  /// 六指标格（设计稿：尽可能多展示数据；短评/长评由观测通路提供，待接入）。
+  Widget _metricGrid(BuildContext context, Map<String, dynamic> eff,
+      Map<String, dynamic> b) {
+    String v(String key) => _num(eff[key] ?? b[key]) ?? '—';
+    final scheme = Theme.of(context).colorScheme;
+    final labels = [('点击', 'clicks'), ('收藏', 'favs'), ('推荐', 'praises'), ('字数', 'words')];
+    return Row(
+      children: [
+        for (final (label, key) in labels)
+          Expanded(
+            child: Card(
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                child: Column(
+                  children: [
+                    Text(label,
+                        style: TextStyle(
+                            fontSize: 10, color: scheme.onSurfaceVariant)),
+                    const SizedBox(height: 3),
+                    Text(v(key),
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleLarge
+                            ?.copyWith(fontSize: 15)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// 同代分位对照条（种子的 fav/click/praise 分位 + PR 复合指标）。
+  Widget _pctlCard(BuildContext context, Map<String, dynamic> b) {
+    final scheme = Theme.of(context).colorScheme;
+    double? pct(Object? v) {
+      final d = double.tryParse(v?.toString() ?? '');
+      return d;
+    }
+
+    Widget bar(String label, double? p) {
+      final shown = p == null ? null : (p.clamp(0, 1) * 100);
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(label,
+                  style: TextStyle(
+                      fontSize: 11, color: scheme.onSurfaceVariant)),
+              Text(shown == null ? '—' : '${shown.toStringAsFixed(1)}%',
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: scheme.primary)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: shown == null ? 0 : shown / 100,
+              minHeight: 6,
+              backgroundColor: scheme.primary.withValues(alpha: .12),
+            ),
+          ),
+          const SizedBox(height: 10),
         ],
+      );
+    }
+
+    final pr = pct(b['pr']);
+    return Card(
+      margin: const EdgeInsets.only(top: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('同代分位（est_year 参照系）',
+                style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+            const SizedBox(height: 10),
+            bar('收藏分位', pct(b['fav_pctl'])),
+            bar('点击分位', pct(b['click_pctl'])),
+            bar('推荐分位', pct(b['praise_pctl'])),
+            if (pr != null)
+              Text('PR（赞/藏）${pr.toStringAsFixed(3)}',
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: scheme.secondary)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 完整元数据卡（数据全展示原则）。
+  Widget _metaCard(BuildContext context, BookDetail d, Map<String, dynamic> eff,
+      Map<String, dynamic> b) {
+    String? s(Object? v) => v?.toString();
+    Widget row(String label, String? value) {
+      if (value == null || value.isEmpty || value == 'null') {
+        return const SizedBox.shrink();
+      }
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 3),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label,
+                style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant)),
+            Flexible(
+              child: Text(value,
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(fontSize: 12)),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Card(
+      margin: const EdgeInsets.only(top: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('元数据',
+                style: TextStyle(
+                    fontSize: 12,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant)),
+            const SizedBox(height: 6),
+            row('状态', eff['status']?.toString() ?? s(b['status'])),
+            row('上架日期', s(b['est_date'])),
+            row('收录置信度', s(b['est_conf'])),
+            row('价格类型', s(b['price_type'])),
+            row('比赛', s(b['contest'])),
+            row('featured', b['featured'] == true ? '是（编辑精选）' : null),
+            row('官方更新时间', s(b['updated_at'])),
+            row('数据来源', d.source == 'local' ? '本地观测' : '种子'),
+            row('数据截止', d.dataEnd),
+          ],
+        ),
       ),
     );
   }

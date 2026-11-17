@@ -105,6 +105,14 @@ class StrataApi {
         .toList();
   }
 
+  /// 编辑精选（seed featured=1，构建期人工选定，非"热门"）。
+  Future<List<FeaturedItem>> featured({int limit = 6}) async {
+    final body = await _get('/featured', {'limit': '$limit'});
+    return (body['items'] as List)
+        .map((e) => FeaturedItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<void> shelfAdd(int nid) async {
     await _postBody('/shelf', {'nid': nid});
   }
@@ -276,6 +284,21 @@ class SearchItem {
         author = m['author'] as String,
         genre = m['genre'] as String?,
         estYear = m['est_year'] as int,
+        favs = m['favs'] as int?;
+}
+
+class FeaturedItem {
+  final int nid;
+  final String title;
+  final String author;
+  final String? coverUrl;
+  final int? favs;
+
+  FeaturedItem.fromJson(Map<String, dynamic> m)
+      : nid = m['nid'] as int,
+        title = m['title'] as String,
+        author = m['author'] as String,
+        coverUrl = m['cover_url'] as String?,
         favs = m['favs'] as int?;
 }
 

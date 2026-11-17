@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../pages/book_detail_page.dart';
@@ -7,14 +8,59 @@ import '../pages/rankings_page.dart';
 import '../pages/search_page.dart';
 import '../pages/shelf_page.dart';
 
+/// 底部 Tab 承载 4 个一级页；详情页是二级页，在 Shell 之外全屏推入。
 final router = GoRouter(
   initialLocation: '/boot',
   routes: [
     GoRoute(path: '/boot', builder: (_, _) => const BootPage()),
-    GoRoute(path: '/home', builder: (_, _) => const HomePage()),
-    GoRoute(path: '/rankings', builder: (_, _) => const RankingsPage()),
-    GoRoute(path: '/search', builder: (_, _) => const SearchPage()),
-    GoRoute(path: '/shelf', builder: (_, _) => const ShelfPage()),
+    StatefulShellRoute.indexedStack(
+      builder: (context, state, shell) => Scaffold(
+        body: shell,
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: shell.currentIndex,
+          onDestinationSelected: (i) => shell.goBranch(
+            i,
+            initialLocation: i == shell.currentIndex,
+          ),
+          destinations: const [
+            NavigationDestination(
+              icon: Icon(Icons.home_outlined),
+              selectedIcon: Icon(Icons.home),
+              label: '首页',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.leaderboard_outlined),
+              selectedIcon: Icon(Icons.leaderboard),
+              label: '榜单',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.search_outlined),
+              selectedIcon: Icon(Icons.search),
+              label: '搜索',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.collections_bookmark_outlined),
+              selectedIcon: Icon(Icons.collections_bookmark),
+              label: '书架',
+            ),
+          ],
+        ),
+      ),
+      branches: [
+        StatefulShellBranch(routes: [
+          GoRoute(path: '/home', builder: (_, _) => const HomePage()),
+        ]),
+        StatefulShellBranch(routes: [
+          GoRoute(path: '/rankings', builder: (_, _) => const RankingsPage()),
+        ]),
+        StatefulShellBranch(routes: [
+          GoRoute(path: '/search', builder: (_, _) => const SearchPage()),
+        ]),
+        StatefulShellBranch(routes: [
+          GoRoute(path: '/shelf', builder: (_, _) => const ShelfPage()),
+        ]),
+      ],
+    ),
     GoRoute(
       path: '/book/:nid',
       builder: (_, state) => BookDetailPage(
