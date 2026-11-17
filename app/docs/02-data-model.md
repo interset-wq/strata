@@ -18,7 +18,7 @@
 | **seed.db 表** | `books`（单表扁平 24 列）+ `book_tags`（反范式 2 列）+ `seed_meta`，**共 3 张表** |
 | **seed.db 索引** | 9 个，含 1 个**部分索引**（短篇专用）与 2 个**复合索引**（世代×分位） |
 | **seed.db 体积** | SQLite **16.02 MB** / gzip **6.67 MB**（30,878 本，519 B/本） |
-| **user.db 表** | 8 张：`observations` / `discovered` / **`watchlist`**（07 观测列表）/ `shelf` + `shelf_lists` / `annotations` / `search_history` / `prefs` / `user_stats` |
+| **user.db 表** | 9 张：`observations` / `discovered` / **`watchlist`**（07 观测列表）/ **`novel_chapters`**（07 章节快照）/ `shelf` + `shelf_lists` / `annotations` / `search_history` / `prefs` / `user_stats` |
 | **user.db 增长** | 观测行 **≈59 B/行**；10 万行观测 ≈ 5.8 MB（单表） |
 | **跨库关联** | 只用 `nid`；**禁止用 rowid**（种子重发后 rowid 重排） |
 | **预计算列** | 5 列分位/比率随种子携带，代价 **+25 B/本**；其中 `pr`（赞藏比）单列换 **800× 查询加速** |
@@ -404,7 +404,7 @@ CREATE TABLE prefs(key TEXT PRIMARY KEY, value TEXT);
 CREATE TABLE user_stats(
   nid            INTEGER PRIMARY KEY,
   fav_delta_30d  INTEGER,
-  click_delta_30d INTEGER,  -- 恒 NULL：点击只显示绝对值不做变化（05 §3.4、07 §4.3）
+  click_delta_30d INTEGER,  -- 恒 NULL：跨书点击变化不做（需曝光分母分档，07 §4.3）
   obs_count      INTEGER,
   first_seen     INTEGER,
   last_seen      INTEGER
@@ -432,6 +432,35 @@ CREATE INDEX idx_watch_role ON watchlist(role);
 累计指标只有同期比较才合法（报告 02/08），定年差 > 2 年给软警告。
 复合指标（赞藏比 / 评论率 / 日增）由端上现算，**不落表、不加列**（07 §4.7）。
 `watchlist` 是 U5 后台爬取的**唯一对象**（07 §5）；`discovered` 清理时对 `watchlist` 中的条目豁免（04 §5.2、06 §5.2）。
+
+```sql
+-- 3.9 章节快照（07 §7.1）：更新热力图的主方案数据源
+CREATE TABLE novel_chapters(
+  nid          INTEGER NOT NULL,
+  chap_id      INTEGER NOT NULL,   -- App API 的 chapId
+  added_at     TEXT,                -- 章节创建时间 ISO 8601（归因键）
+  updated_at   TEXT,                -- 章节更新时间
+  char_count   INTEGER,             -- 本章字数（正文口径）
+  is_vip       INTEGER,             -- 0/1
+  is_rubbish   INTEGER,             -- 0/1
+  audit_status INTEGER,             -- 1 待审 / -1 正常（语义待查）
+  fetched_at   INTEGER NOT NULL,    -- 本机抓取时刻 unix 秒（不是归因依据）
+  PRIMARY KEY(nid, chap_id)
+);
+CREATE INDEX idx_chap_added ON novel_chapters(nid, added_at);
+```
+
+**`novel_chapters` 与 `observations` 语义不同，必须分表**：
+`observations` 是「逐本**当前值**的时间序列」（一次抓取一行），
+`novel_chapters` 是「**章节级事实**快照」（一章一行，内容不随时间变）。
+07 的更新热力图**主方案**按 `added_at` 分组求 `char_count` 之和，直接得到某日更新字数——
+因此"用户没打开 App"不再造成数据缺口（07 §4.5.1）。
+
+**只在 `watchlist` 订阅书上填充**：数据来自官方 App API 的
+`GET /novels/{id}/chaps`（744 章 222 KB、1,740 章 489 KB，一次性）。
+该通路**无契约、随时可能变**，因此它是**可选增强**——失效时热力图回退到
+`observations` 的 `words` 差分推断（07 §4.5.1 的回退方案），
+**基线通路（移动版 HTML）始终可用**（05 §3.5）。
 
 ### 3.1 「用得越多越准」的落地
 
