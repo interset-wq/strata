@@ -102,53 +102,93 @@ def anchor_interp() -> pd.Series:
 
 LO, HI = 2657, 774850
 
+# nid 数值分层。游标从上新到旧扫描，按 nid（≈创建先后）分段才能看出
+# 「中段遗漏高、两端低」；按建年分段会把这个形状抹平（见 §2）。
+BANDS = [(2657, 49999), (50000, 99999), (100000, 199999), (200000, 349999),
+         (350000, 499999), (500000, 649999), (650000, 774850)]
+BAND_LABELS = ["2–50k", "50–100k", "100–200k", "200–350k", "350–500k", "500–650k", "650–774k"]
+BAND_EDGES = [b[0] for b in BANDS] + [BANDS[-1][1] + 1]
+
+
+def band_of(nid: int) -> str:
+    return BAND_LABELS[int(np.searchsorted(BAND_EDGES, nid, side="right")) - 1]
+
+
+def dropped_ids() -> set[int]:
+    """构建 CSV 时主动剔除的 nid（原始 jsonl 里都已抓到，不是抓取遗漏）。"""
+    mf = paths.OUT_DIR / "manifest.json"
+    if not mf.exists():
+        return set()
+    return set(json.load(mf.open(encoding="utf-8"))["dropped"]["ids"])
+
+
+def stratum(r: pd.DataFrame, d: pd.DataFrame) -> pd.DataFrame:
+    """按 nid 段算在册密度、缺失槽位、缺失槽位存活率、剔除集，供分层估计用。
+
+    C 组 299 个缺失槽位样本按 nid 近似均匀抽取，故每段存活率可代表该段
+    「缺失槽位里有多少是真活书（抓取遗漏）」。段内样本量小，Wilson CI 单列。
+    """
+    have = set(d["id"])
+    drop = dropped_ids()
+    c = r[(r["group"] == "range_missing") & r["alive"].notna()].copy()
+    c["band"] = c["nid"].map(band_of)
+    rows = []
+    for i, (lo, hi) in enumerate(BANDS):
+        seg_n = hi - lo + 1
+        in_db = len(have & set(range(lo, hi + 1)))
+        # 剔除集与在册不重叠（在册是剔除后集合），从缺失槽位里扣掉
+        drop_here = len(drop & set(range(lo, hi + 1)))
+        miss = seg_n - in_db
+        sub = c[c["band"] == BAND_LABELS[i]]
+        k, n = int(sub["alive_ok"].sum()), len(sub)
+        rate = k / n * 100 if n else float("nan")
+        rows.append({
+            "band": BAND_LABELS[i], "seg": seg_n, "in_db": in_db,
+            "drop": drop_here, "miss": miss, "sample": n, "alive_k": k,
+            "rate": rate,
+        })
+    out = pd.DataFrame(rows)
+    out["miss_net"] = out["miss"] - out["drop"]  # 扣剔除集后的待解释缺失
+    out["miss_alive"] = out["miss_net"] * out["rate"] / 100
+    return out
+
 
 # ---------- 图 ----------
 
-def fig_density(d: pd.DataFrame, n_f: pd.DataFrame, c_lo: float, c_hi: float) -> str:
-    """左：按 nid 时间的在册密度与校正活书密度；右：逐年估算。"""
-    have = set(d["id"])
-    mids = np.arange(LO + 100, HI, 200)
-    f = anchor_interp()
-    seg = pd.to_datetime([f(n) for n in mids])
-    yrs = seg.year.values
-    occ = np.array([1 if n in have else 0 for n in mids])
-    g = pd.DataFrame({"y": yrs, "occ": occ}).groupby("y")["occ"].agg(["size", "sum"])
-    g = g[(g.index >= 2010) & (g.index <= 2025)]
-    dens = g["sum"] / g["size"] * 100
-    # 校正活书密度 = 在册密度 + alive 率 × 缺失密度（C 组 21.07%）
-    pr = n_f.at["range_missing", "alive"] / 100
-    live = dens + pr * (100 - dens)
+def fig_density(st: pd.DataFrame) -> str:
+    """左：分段在册密度 vs 校正活书密度（分层遗漏率）；右：分段存活率与样本量。"""
+    x = np.arange(len(st))
+    dens = st["in_db"] / st["seg"] * 100
+    # 校正活书密度：在册 + 该段缺失槽位存活率 × 净缺失（已扣剔除集）
+    live = dens + st["rate"] / 100 * (100 - dens)
 
     fig, (ax0, ax1) = plt.subplots(1, 2, figsize=(7.8, 3.0))
-    ax0.plot(dens.index, dens.values, "o-", ms=3, lw=1.2, color=charts.C["blue"],
-             label="在册密度（数据集口径）")
-    ax0.plot(live.index, live.values, "s--", ms=3, lw=1.2, color=charts.C["red"],
-             label="校正活书密度（+C 组遗漏估计）")
-    ax0.fill_between(live.index, dens + c_lo / 100 * (100 - dens),
-                     dens + c_hi / 100 * (100 - dens),
-                     color=charts.C["red"], alpha=0.15, lw=0)
-    ax0.set_xlabel("nid 创建年（104 锚点插值）")
-    ax0.set_ylabel("nid 槽位占用 %")
-    ax0.set_ylim(0, 85)
+    ax0.plot(x, dens, "o-", ms=4, lw=1.3, color=charts.C["blue"],
+             label="在册密度（数据集）")
+    ax0.plot(x, live, "s--", ms=4, lw=1.3, color=charts.C["red"],
+             label="校正活书密度（+分段遗漏估计）")
+    ax0.fill_between(x, dens, live, color=charts.C["red"], alpha=0.12, lw=0)
+    ax0.set_xticks(x, BAND_LABELS, fontsize=7)
+    ax0.set_xlabel("nid 段（≈创建先后）")
+    ax0.set_ylabel("槽位占用 %")
+    ax0.set_ylim(0, 80)
     ax0.legend(frameon=False, fontsize=7, loc="lower left")
-    ax0.set_title("空洞不是均匀的：中期（2016-20）最稀", fontsize=9, loc="left")
+    ax0.set_title("在册密度中段低 → 校正后活书密度被中段抬起", fontsize=9, loc="left")
     ax0.grid(alpha=0.25)
-    charts.shade_periods(ax0, pd.Series(live.index), 0.94)
 
-    # 右：三种成分的堆叠
-    miss_share = 100 - dens
-    alive_miss = pr * miss_share
-    dead = miss_share - alive_miss
-    ax1.stackplot(dens.index, dens.values, alive_miss.values, dead.values,
-                  labels=["在册（数据集）", "活书遗漏（C 组估计）", "死槽（已删除 ∪ 未分配）"],
-                  colors=[charts.C["blue"], charts.C["green"], "#DDDDDD"], alpha=0.85)
-    ax1.set_ylim(0, 100)
-    ax1.set_xlabel("nid 创建年")
-    ax1.set_ylabel("槽位构成 %")
-    ax1.set_xticks([2010, 2013, 2016, 2019, 2022, 2025])
-    ax1.legend(frameon=False, fontsize=6.8, loc="lower left")
-    ax1.set_title("缺失槽位分解：约 1/5 是活书遗漏", fontsize=9, loc="left")
+    # 右：分段缺失槽位存活率（柱）+ 样本量标注
+    bars = ax1.bar(x, st["rate"], color=charts.C["green"], alpha=0.85, width=0.62)
+    for xi, b, n in zip(x, bars, st["sample"]):
+        ax1.text(xi, b.get_height() + 1, f"{n}", ha="center", fontsize=6.6,
+                 color=charts.C["gray"])
+    ax1.axhline(st["rate"].mean(), lw=0.9, ls="--", color=charts.C["red"],
+                label=f"均值 {st['rate'].mean():.1f}%")
+    ax1.set_xticks(x, BAND_LABELS, fontsize=7)
+    ax1.set_xlabel("nid 段（柱上数字 = C 组样本数）")
+    ax1.set_ylabel("缺失槽位存活率 %")
+    ax1.set_ylim(0, max(45, st["rate"].max() * 1.35))
+    ax1.legend(frameon=False, fontsize=7)
+    ax1.set_title("中段缺失里活书占比更高（游标遗留，样本量小）", fontsize=9, loc="left")
     fig.tight_layout()
     return charts.save(fig, "10_density.png")
 
@@ -279,17 +319,23 @@ def fig_profile(r: pd.DataFrame) -> str:
 def section_header(n_probe: int) -> str:
     return f"""# 10 · 生存与遗漏审计：526,415 个空洞是什么
 
-> 口径声明：
-> 1. **存活判定**：`m.sfacg.com/b/{{nid}}/`，活书页 >5KB 且含书名，死页为 3.6KB
->    的「出错」页。验证：无 URL 重定向；B 组 400 本的站上标题与库内逐一一致；
->    遗漏书按标题反查库内 0 例同标题异 nid（排除重复收录假象）。探测时间
->    2026-11-16，在数据快照（2026-05-03）之后 {n_probe:,} 次请求。
-> 2. **三类样本**（见下文 §3）：A 组 118 本「上榜但不在库」全测；B 组在册
->    随机 400 本（nid ≤ 50 万分层，老段样本不代表 2023 年后）；C 组缺失 nid
->    随机 299 个（有效性检验）。C 组覆盖率估计的 95% 置信区间用 Wilson 法。
-> 3. **死槽不可分解**：C 组死掉的槽位（约 79%）无法区分「已删除的书」与
->    「从未分配的 nid」——两者在站上都表现为同一个出错页。本报告对此只给
->    上界与结构证据（游程分布），不给点估计。
+> 口径声明（**本篇已重写**：判活改三态、分母先扣剔除集、遗漏率改按 nid 段分层；
+> 旧稿 68.9% 的总量口径量级未变，但「可访问 = 在架可发现」的解读作废，
+> 且遗漏的分布形状须按 §2.1 重读。见 `references/sfacg-endpoints.md` §5.1 / §5.2 / §11.5）：
+> 1. **三态判定**（比旧稿「>5KB 含书名」严格）：`m.sfacg.com/b/{{nid}}/` 上——
+>    **死亡** = 页面文案「小说不存在」/「出错啦」（HTTP 仍 **200**，状态码不可信）；
+>    **僵尸** = 有详情页但 `div.book_Catalog` 无 `<a>`（无阅读入口）或数字字段非法；
+>    **存活** = 有详情页 + 阅读入口 + 数字合法。复测 C 组 63 本旧判「活」者
+>    63/63 均真存活，故**判活本身未污染**；问题是口径错配（分母定义 + 把「可访问」
+>    当「在架可发现」，§4.1）。探测 2026-11-16，
+>    快照（2026-05-03）之后 {n_probe:,} 次请求。下架原因不进判据（多数僵尸页不写声明）。
+> 2. **三类样本**（见 §3）：A 组 118 本「上榜但不在库」全测；B 组在册随机 400 本
+>    （nid ≤ 50 万分层，老段不代表 2023 年后）；C 组缺失 nid 随机 299 个。
+>    **覆盖率改用按 nid 段分层加权**（§2.1），不再用单一 uniform 21.1%；
+>    段内样本仅 14–70 个，分段差异是方向性证据。
+> 3. **分母先扣构建剔除集**：`manifest.json` 剔除的 2,451 本（其中 2,287 本僵尸）
+>    在原始 jsonl 里都已抓到，**不是抓取遗漏**，从待解释缺失中扣除后再估计。
+>    C 组剩余「死槽」（约 79%）仍不可区分「已删除」与「从未分配」，只给上界与游程证据。
 > 4. **nid 复用问题**：本项目已知的唯一复用是正版日轻授权版复用盗版条目旧 id
 >    （47 行，库内仍在）；未发现其他复用证据。若站上存在大规模 nid 复用，
 >    本报告的「活书遗漏」估计会被高估，但 A 组证据（上榜书不在库却在线）
@@ -311,27 +357,37 @@ def section_conclusion(n_f: pd.DataFrame, dead_books: pd.DataFrame,
     a_alive = n_f.at["rank_missing", "alive"]
     return f"""## 0. 结论
 
-1. **空洞的主体不是下架，是抓取源遗漏 + 不可分解的死槽**。范围内缺失
-   {thousands(miss_alive + dead_slots)} 个槽位中，按 C 组存活率外推约
-   {thousands(miss_alive)} 个（{pct(miss_alive / (miss_alive + dead_slots) * 100)}）
-   是**活书的遗漏**；其余 {thousands(dead_slots)} 个为死槽（已删除 ∪ 未分配，
-   不可分解）。
+1. **空洞的主体是死槽 + 抓取源遗漏，且要先扣构建剔除集**。标题的 526,415 个
+   空洞是未扣剔除的原始数；扣掉构建时已剔除的 2,451 本（其中 2,412 本落在本报告
+   nid 范围内）后，待解释缺失为 {thousands(miss_alive + dead_slots)} 个。
+   这 2,451 本在原始 jsonl 里早抓到、非漏抓。
+   按**分层存活率**外推约
+   {thousands(miss_alive)} 个是**抓取遗漏活书**；其余 {thousands(dead_slots)} 个
+   为死槽（已删除 ∪ 未分配 ∪ 死亡页，不可分解）。分层加权的总量与旧 uniform
+   外推（11.1 万）量级一致——**本篇重写的价值不在总量数字，而在解释遗漏的
+   分布形状与分母构成**（§2.1、§4.1）。
 2. **「上榜书被下架」的推断被推翻**：月榜缺失的 118 本逐一探测，
    {pct(a_alive)} 仍在线且书名与榜单一致；只有 11 本真正消失
    （9 本为 2015-2017 年热销榜、2 本为 2024-2025 年）。B 组在册 400 本
    5.5 个月内 0 本下架——**站点对在架书（尤其头部）的删除率极低**。
-3. **数据集是对在架书约 {pct(cov)} 的样本**（95% CI {pct(cov_lo)}-{pct(cov_hi)}）：
-   全库（nid 范围内）活书约 {thousands(245779 / (cov / 100))} 本，库内
-   245,779 本，漏约 {thousands(miss_alive)} 本。遗漏率对**热门长书远低于平均**：
-   月榜书按世代 1-25%，而全体活书约三成被漏。
+3. **数据集覆盖率：分层加权约 {pct(cov)}（区间 {pct(cov_lo)}-{pct(cov_hi)}）**。
+   旧稿 68.9%，本篇微调到 {pct(cov)}——先扣剔除集、改用分段存活率，
+   但**量级未变**；「偏低」的实质是口径混用（分母混入已剔除与死亡页、
+   把「可访问」当成「在架可发现」），而非某个具体百分点的算术错误。全库
+   （nid 范围内）可访问活书约 {thousands(int(245779 / (cov / 100)))} 本，库内
+   245,779 本。真正的补爬对象是「在目录 ∩ 有阅读入口 ∩ 不在库」者，按悬疑
+   普查仅约 **1 千本**（§4.1）——这才是种子质量该用的数。
 4. **遗漏有系统性画像**：随机遗漏书字数中位 4,926（在册样本 11,663）、
    收藏中位 4 vs 5、2022 年后仍更新的占 30.2% vs 2.5%——**数据集系统性偏向
    「长、老」的书**；收藏规模本身偏倚较小（4 vs 5）。
    **成因已确认**：单向游标扫描期间，更新中的书会被重新排到列表头部
    （游标身后），新入库的书也出现在头部——两者都不会被回头再抓（§7）。
-5. **空洞的时间结构不均匀**：在册密度 2010-2014 年 40-57%、2016-2020 年仅
-   26-28%、2021 年后回升到 35-38%；校正遗漏后活书密度仍呈同形（80% → 45% →
-   50%）——**中期 nid 段的死槽率确实更高**，无论那是删除还是未分配。
+5. **空洞与遗漏都集中在中段 nid，呈 U 型/倒 U 型配对**（§2.1）：在册密度两端
+   36–42%、中段 27–33%（U 型）；缺失槽位里的存活率却相反，中段 50–100k 达
+   34.6%、200–350k 24.3%，两端仅 14–17%（倒 U 型）。旧稿把中段稀疏解释为
+   「死槽率更高」，**该解释已撤回**——它是**单向游标扫描**的形状：中段连载
+   更新最活跃，反复被重排到游标身后被跳过；新书扫描起点即被抓，老书多已完结
+   位置稳定。段内 C 组样本仅 14–70 个，这是方向性证据而非精确分段估计。
 6. **游程结构支持「独立散失」**：全部 160,359 个缺失游程中约九成长度 ≤5、
    最长仅 64，无成百上千的连续空洞——nid 分配没有「跳跃块」，空洞是逐本
    散失的结果。
@@ -359,18 +415,99 @@ def section_method() -> str:
 """
 
 
-def section_holes(d: pd.DataFrame, runs: pd.DataFrame, fig_d: str, fig_r: str) -> str:
-    have = set(d["id"])
-    mids = np.arange(LO + 100, HI, 200)
-    f = anchor_interp()
-    seg = pd.to_datetime([f(n) for n in mids])
-    yrs = seg.year.values
-    occ = np.array([1 if n in have else 0 for n in mids])
-    g = pd.DataFrame({"y": yrs, "occ": occ}).groupby("y")["occ"].agg(["size", "sum"])
-    g = g[(g.index >= 2010) & (g.index <= 2025)]
-    rows = [[str(int(y)), thousands(int(r["size"])), f"{r['sum'] / r['size'] * 100:.1f}"]
-            for y, r in g.iterrows()]
-    tab = md_table(rows, ["nid 创建年", "抽样槽位数", "在册密度 %"])
+def section_stratum(st: pd.DataFrame, miss_alive_uniform: float,
+                    miss_alive: float, p: float, fig_d: str) -> str:
+    """分层估计：用分段存活率替代 uniform，暴露「中段遗漏高」的游标特征。"""
+    rows = []
+    for _, s in st.iterrows():
+        rows.append([
+            s["band"], thousands(int(s["seg"])), f"{s['in_db'] / s['seg'] * 100:.1f}",
+            thousands(int(s["miss"])), thousands(int(s["drop"])),
+            str(int(s["sample"])), str(int(s["alive_k"])),
+            f"{s['rate']:.1f}" if s["sample"] else "—",
+            thousands(int(s["miss_alive"])),
+        ])
+    net_all = st["miss_net"].sum()
+    rows.append(["**合计**", thousands(int(st["seg"].sum())),
+                 f"{st['in_db'].sum() / st['seg'].sum() * 100:.1f}",
+                 thousands(int(st["miss"].sum())), thousands(int(st["drop"].sum())),
+                 str(int(st["sample"].sum())), str(int(st["alive_k"].sum())),
+                 f"{st['alive_k'].sum() / st['sample'].sum() * 100:.1f}",
+                 thousands(int(miss_alive))])
+    tab = md_table(rows, ["nid 段", "槽位数", "在册密度%", "缺失槽位", "构建剔除",
+                          "C组样本", "判活", "存活率%", "遗漏活书估计"])
+    return f"""## 2.1 分层估计：中段遗漏更高（游标扫描的形状）
+
+![]({fig_d})
+
+{tab}
+
+**读法**：
+
+1. **在册密度呈 U 型**（两端 36–42%，中段 27–33%），而**缺失槽位存活率呈倒 U 型**
+   （中段 50–100k 达 34.6%、200–350k 24.3%，两端 14–17%）。两者相乘，
+   「中段缺失里真漏抓的活书更多」——这正是游标**从新到旧单向扫描**的预期：
+   中段连载更新最活跃，反复被重排到列表头部（游标身后）被跳过；两端要么在扫描
+   起点已被抓（新书），要么已完结位置稳定（老书）。
+2. **别忽略样本量**：各段 C 组样本只有 14–70 个，存活率的 95% Wilson 区间宽度
+   可达 ±10–20 个百分点，**段间差异只是方向性证据**，不足以给每段一个精确遗漏率。
+   因此总量估计以分层
+   加权（{thousands(miss_alive)} 本）给出，同时保留旧 uniform 口径
+   （{thousands(miss_alive_uniform)} 本）作对照，两者量级一致。
+3. **分母已先扣构建剔除集**：剔除的 {thousands(int(st['drop'].sum()))} 本里
+   {thousands(int(st.iloc[0]['drop']))} 本落在 2–50k 段（僵尸，原始 jsonl 早抓到），
+   它们**不是抓取遗漏**，已从待解释缺失中扣除。因其只占缺失槽位不到 0.5%，
+   扣除对总量影响很小，但**低 nid 段是系统性污染**（该段剔除 2,272/26,374 ≈ 8.6%），
+   必须分层看（§4.1）。
+"""
+
+
+def section_backfill(st: pd.DataFrame, miss_alive: float) -> str:
+    """补爬量口径：真正值得补的只有「可访问 ∩ 有阅读入口 ∩ 不在库」。"""
+    drop_total = int(st["drop"].sum())
+    return f"""## 4.1 覆盖率偏低的确切原因与补爬量
+
+**旧稿覆盖率 68.9% 的口径错配，不在 C 组那 63 本的判活**：复测确认 63/63
+都有阅读入口、`book_Catalog` 非空，19/25 能被官方搜索命中自身——它们是真活书，
+21.1% 这个比率没被僵尸污染。问题在**分母的定义**：旧稿用 526,415 个「缺失槽位」
+乘 21.1%，而这个槽位池混进了两类**根本不是漏抓**的 nid：
+
+| 混入分母的东西 | 数量 | 为什么不是漏抓 |
+| --- | --- | --- |
+| 构建时主动剔除 | {thousands(drop_total)}（其中 {thousands(int(st.iloc[0]['drop']))} 本僵尸） | 原始 jsonl 里**早就抓到**，只是清洗时移出 CSV |
+| 真死亡页（200 + 否定文案） | 见 §3，含在旧判「死槽」里 | 页面不存在，不可补爬 |
+
+把它们算进「站上有、我们没有」的分母，是覆盖率偏低的**口径原因**。
+**一句话：不是把死书判成活书，而是把「本地已有 / 已下架」算进了「漏抓」。**
+但要说清量级：剔除集仅 {thousands(int(st['drop'].sum()))} 本（占 52.6 万缺失槽位
+不到 0.5%），所以**扣除后总量几乎不变**——真正的修正价值是：① 澄清分母构成，
+② 揭示遗漏的分布形状（§2.1），③ 给出正确的补爬口径（下文）。把偏差全部归咎于
+这 2,412 本是不诚实的；「覆盖率偏低」更多是**把「可访问」当成了「在架可发现」**
+这一口径错配。
+
+**因此本文给的是分层加权估计**：全库可访问活书约
+{thousands(int(st['in_db'].sum()) + int(miss_alive))} 本、遗漏活书约
+{thousands(miss_alive)} 本，覆盖率对应
+{100 * st['in_db'].sum() / (st['in_db'].sum() + miss_alive):.1f}%。
+但该值仍含「可访问但不在目录」的书（约 10% 库内书查不到目录，悬疑实证），
+**不等于「用户能发现的全集」覆盖率**——后者需要「可访问 ∩ 在目录 ∩ 有阅读入口」的
+联合抽样，本文给的是上界口径。
+
+**补爬量的正确问法**不是「全站有多少遗漏活书」，而是「在 `nid ≤ 774,850` 内、
+三态判据为存活、有阅读入口、且不在 CSV 里的 nid 有多少」。按悬疑整类普查的
+同范围真遗漏率 **0.47%**（库外 187 本中 165 本是快照后新建，真遗漏仅 22 本）
+外推，量级约 **1 千本**，不是 11.1 万。这才是种子补全真正要抓的数量。
+详见 `references/sfacg-endpoints.md` §5.1 / §11.5。
+"""
+
+
+def section_holes(d: pd.DataFrame, runs: pd.DataFrame, st: pd.DataFrame,
+                  fig_d: str, fig_r: str) -> str:
+    rows = [[s["band"], thousands(int(s["seg"])),
+             f"{s['in_db'] / s['seg'] * 100:.1f}",
+             f"{(s['seg'] - s['in_db']) / s['seg'] * 100:.1f}"]
+            for _, s in st.iterrows()]
+    tab = md_table(rows, ["nid 段", "槽位数", "在册密度 %", "缺失率 %"])
 
     eras = ["07-12", "13-16", "17-20", "21-23", "24-26"]
     rows2 = []
@@ -385,11 +522,11 @@ def section_holes(d: pd.DataFrame, runs: pd.DataFrame, fig_d: str, fig_r: str) -
 
 ![]({fig_d})
 
-在册密度（数据集口径）按 nid 创建年分布并不均匀：
+在册密度（数据集口径）按 nid 数值段分布并不均匀，呈 U 型：
 
 {tab}
 
-*抽样为每 200 个 nid 取 1 个槽位（步长 200 网格），密度为该年网格点在册占比。*
+*密度为各段内「在 CSV 的 nid / 段槽位总数」；nid 段近似对应创建先后（定年见报告 01）。*
 
 ![]({fig_r})
 
@@ -399,9 +536,12 @@ def section_holes(d: pd.DataFrame, runs: pd.DataFrame, fig_d: str, fig_r: str) -
 
 两点结构观察：
 
-- **2016-2020 年段最稀**（在册密度 26-28%），两头都更高。这不是抓取源的选择
-  性偏好——C 组遗漏率在该段与前后段几乎相同（23.1% vs 17.7-25.0%，§3）——
-  所以**稀疏主要来自死槽**：中期 nid 段有更高比例的书被删除（或 id 从未分配）。
+- **中段最稀，两端更高**（nid 100k–500k 在册密度 27–33%，两端 36–42%）。
+  旧稿把稀疏归因为「死槽率中期更高」，**该解释已撤回**：按 nid 段测的
+  **缺失槽位存活率同样中段更高**（§3.1、§2.1）——50–100k 段 34.6%、
+  200–350k 段 24.3%，而两端仅 14–17%。这正是**单向游标扫描**的形状：
+  中段是连载更新最活跃的书，反复被重排到列表头部（游标身后）而被跳过；
+  新书在扫描起点就被抓到，老书多已完结、位置稳定——故两端缺失率低（§7）。
 - **游程小而无块**：各时代游程长度的中位数只有 2-3，最长的 64 个连续空洞
   （nid 348,927 起）也远小于任何「批次分配」的量级。若 nid 空间曾整块划给
   其他内容类型或计数器跳号，应出现成百上千的连续空洞；没有。**逐本散失**
@@ -485,9 +625,11 @@ def section_profile(r: pd.DataFrame, cov: float, cov_lo: float, cov_hi: float,
 - **A 组证明热门书也会被漏**：107 本在线的月榜书字数中位 123,555、收藏中位
   2,119——不是边角料。遗漏率对热门书更低（月榜书 1-25% vs 全体活书约三成），
   但不为零。
-- **覆盖率估计**：C 组存活率 21.1%（Wilson 95% CI 17.0-25.8%）× 范围内缺失
-  槽位 526,415 ≈ **遗漏活书 {thousands(miss_alive)} 本**；全库活书约
-  {thousands(245779 / (cov / 100))} 本，数据集覆盖率 **{pct(cov)}（{pct(cov_lo)}-{pct(cov_hi)}）**。
+- **覆盖率估计**（本篇已改分层加权、先扣剔除集）：按 nid 段存活率加权 × 净缺失
+  ≈ **遗漏活书 {thousands(miss_alive)} 本**；全库活书约
+  {thousands(int(245779 / (cov / 100)))} 本，数据集覆盖率 **{pct(cov)}（{pct(cov_lo)}-{pct(cov_hi)}）**。
+  旧稿 uniform 21.1% × 526,415 得 68.9%，本篇 69.3%——量级一致，但口径已改
+  （先扣剔除集、分母定义澄清、分段加权），见 §4.1。
 - **遗漏书持有的收藏量**：按 C 组中位数（{c["favs"].median():.0f} 收藏/本）外推约
   {thousands(miss_alive * c["favs"].median())} 收藏（占全库 {thousands(tot_favs)} 的
   {pct(miss_alive * c["favs"].median() / tot_favs * 100, 1)}）；按均值（{c_mean:.1f}，
@@ -507,7 +649,7 @@ def section_bias(n_f: pd.DataFrame) -> str:
 
 | 报告 | 受影响结论 | 偏倚方向 | 严重度 |
 |---|---|---|---|
-| 01 市场结构 | 各世代新增书数、头部占比 | 绝对量低估约三成；若遗漏与世代无关则**相对形状稳健**（C 组遗漏率按世代 17.7-25.0%，近均匀） | 低 |
+| 01 市场结构 | 各世代新增书数、头部占比 | 绝对量被低估；遗漏率**按 nid 段非均匀**（中段缺失槽位存活率 24-35%、两端 14-17%，§2.1）→ 世代相对形状有中度漂移 | 中 |
 | 02 注意力集中 | 收藏基尼、头部份额 | 遗漏书收藏与在册相近（4 vs 5），且热门书遗漏率更低 → 尾部被削薄 → **集中度被小幅高估** | 低-中 |
 | 03 作者生态 | 人均作品数、马甲结构 | 同一作者的短书更易被漏 → **单作者作品数被低估**，作者级结论的尾部偏薄 | 中 |
 | 04 题材标签 | 标签覆盖率、题材占比 | 遗漏书更短更近，短文的标签行为未知 → 题材份额可能有未知的几个百分点漂移 | 低-中 |
@@ -524,9 +666,10 @@ def section_bias(n_f: pd.DataFrame) -> str:
    「库内断更率」（在册书的属性），量级结论不变，语义需限定。
 2. **报告 07 已修正**：榜单缺失的主体是遗漏而非下架，头部名单的完整性反而
    **变好了**（十六年 top20 里的书九成仍在架）。
-3. **所有绝对计数应加约 ±30% 的覆盖带**：凡引用「全库 X 本书」「X 万收藏」，
-   真实站上存量约为其 1/0.69 ≈ 1.45 倍（活书口径），但**排序与相对比较基本
-   稳健**——遗漏率近均匀于世代、弱反相关于热度，不与任何被解释变量强相关。
+3. **所有绝对计数应加覆盖带**：凡引用「全库 X 本书」「X 万收藏」，须按本篇
+   分层加权后的覆盖率换算，并注明口径（旧稿的 1.45 倍已作废）。**排序与相对
+   比较基本稳健**——遗漏与热度弱相关，但**按 nid 段非均匀**（§2.1：中段遗漏
+   更高），涉及**世代绝对量**的比较须显式标注这一 U 型偏倚。
 """
 
 
@@ -674,27 +817,32 @@ def section_mechanism(fp: dict) -> str:
    本应更容易漏；但它们在扫描初期（列表头部）就被抓到，之后即便更新也已在库内。
    A 组 107 本月榜在线遗漏书是**在扫描开始之后才更新/入库**的那部分。
 
-### 7.3 对「覆盖率 68.9%」解读的修正
+### 7.3 对旧「覆盖率 68.9%」的修正
 
-覆盖率的分母（全库活书 {fp['total_alive']:,}）来自 C 组存活率外推，仍然有效。但需明确：
+旧稿的 68.9% 有两个缺陷，本篇已就地修正（§2.1、§4.1）：
+**一是分母**——526,415 个缺失槽位混进了构建时已剔除的 {fp.get('drop_total', 2451):,} 本
+（原始 jsonl 早抓到）与真死亡页，二者都不是漏抓；**二是口径**——用单一 21.1%
+uniform 外推，掩盖了「中段遗漏高、两端低」的游标形状。本篇改用分层加权、
+先扣剔除集后的估计（{fp['total_alive']:,} 本为分母口径）。但需明确：
 
-- 68.9% 是**扫描窗口时点**（2026-04 中 ~ 2026-05 初）的覆盖率；扫描期间
-  新入库/更新的书被结构性排除，窗口之后的新书更不在库内——这与「内容上界
-  2026-05-03、年度序列止于 2025」完全一致。
+- 覆盖率对应**扫描窗口时点**（2026-04 中 ~ 2026-05 初）；扫描期间新入库/更新的
+  书被结构性排除，窗口之后的新书更不在库内——与「内容上界 2026-05-03、
+  年度序列止于 2025」一致。
 - **重复抓取的 {fp['n_dup_same']:,} 本（{fp['dup_same_pct']:.1f}% 的重复 nid）更新时间未变**，说明扫描窗口内
   同一本书几乎不会被抓两次；「更新即离场」是单向的，不存在回头补偿。
-- §5 对前九份报告的偏倚评估方向不变，且§4「偏短、偏新、不偏冷」的画像
-  现在有了机制解释，而非仅是统计相关性。
+- §2.1 的分层曲线是「中段遗漏高」的**方向性证据**（段内 C 组样本仅 14–70 个），
+  不足以给每段精确遗漏率；§5 对前九份报告的偏倚评估方向不变，但「偏短、
+  偏新、不偏冷」的画像现在有了游标机制的解释，而非仅是统计相关性。
 """
 
 
 def section_bounds(dead_slots: float) -> str:
     return f"""## 6. 口径边界与未决问题
 
-1. **死槽不可分解**（已删除 ∪ 未分配）：约 {dead_slots:,.0f} 个死槽的比例无法从
-   站上数据判定。游程结构（§2）排除「分配跳跃块」，但不排除「逐条跳号」
-   （如草稿占用、审核未通过即弃号）。若未来能获得站方数据或第三方存档
-   （Wayback、搜索引擎缓存）可再分解；本报告不猜。
+1. **死槽不可分解**（已删除 ∪ 未分配 ∪ 死亡页）：约 {dead_slots:,.0f} 个死槽
+   （已扣构建剔除集）的比例无法从站上数据判定。游程结构（§2）排除「分配跳跃块」，
+   但不排除「逐条跳号」（如草稿占用、审核未通过即弃号）。若未来能获得站方数据
+   或第三方存档（Wayback、搜索引擎缓存）可再分解；本报告不猜。
 2. **遗漏机制已证实**（原「未证实」已撤回）：数据源是 Scrapy 按 UTC 日切分的
    列表页抓取，按 `last_update` 降序单向游标推进（§7）。这解释了为何遗漏
    与「更新近/书短」强相关而与热度弱相关。仍不可测的是**死槽的构成**与
@@ -731,16 +879,23 @@ def main() -> None:
     dead = r[(r["group"] == "rank_missing") & r["alive"].isna().eq(False) & ~r["alive_ok"]]
     dead_books = mm.loc[[n for n in dead["nid"] if n in mm.index]].reset_index()
 
-    # C 组覆盖估计
+    # C 组覆盖估计（分层加权 + 先扣构建剔除集）
     c = r[r["group"] == "range_missing"].dropna(subset=["alive"])
     p, lo_p, hi_p = wilson(int(c["alive"].sum()), int(c["alive"].notna().sum()))
+    st = stratum(r, d)
+    drop = dropped_ids()
     miss_slots = HI - LO + 1 - len(set(d["id"]) & set(range(LO, HI + 1)))
-    miss_alive = miss_slots * p / 100
-    dead_slots = miss_slots - miss_alive
+    # 分母扣掉已抓到却被清洗移除的 nid（僵尸为主）——它们不是「站上有、我们没有」
+    miss_net = miss_slots - len(drop & set(range(LO, HI + 1)))
+    miss_alive = float(st["miss_alive"].sum())          # 分层加权遗漏活书
+    miss_alive_uniform = miss_net * p / 100              # 旧法（uniform）对照
+    dead_slots = miss_net - miss_alive
     total_alive = len(d) + miss_alive
     cov = len(d) / total_alive * 100
-    cov_lo = len(d) / (len(d) + miss_slots * hi_p / 100) * 100
-    cov_hi = len(d) / (len(d) + miss_slots * lo_p / 100) * 100
+    # 区间：各段存活率整体上下浮动（用 C 组全局 Wilson CI 的相对宽度）
+    rel_lo, rel_hi = lo_p / p, hi_p / p
+    cov_lo = len(d) / (len(d) + miss_alive * rel_hi) * 100
+    cov_hi = len(d) / (len(d) + miss_alive * rel_lo) * 100
 
     # 游程
     have = np.zeros(HI + 1, bool)
@@ -765,7 +920,7 @@ def main() -> None:
     runs = pd.DataFrame(runs, columns=["start", "len", "era"])
 
     figs = {
-        "density": fig_density(d, n_f, lo_p, hi_p),
+        "density": fig_density(st),
         "runs": fig_runs(runs),
         "probe": fig_probe(r),
         "profile": fig_profile(r),
@@ -773,6 +928,7 @@ def main() -> None:
 
     fp = scan_fingerprint()
     fp["total_alive"] = int(round(total_alive))
+    fp["drop_total"] = int(st["drop"].sum())
     det = r[r["alive_ok"]]
     c_det = det[det["group"] == "range_missing"]
     b_det = det[det["group"] == "in_db"]
@@ -796,7 +952,11 @@ def main() -> None:
 
 ---
 
-{section_holes(d, runs, figs['density'], figs['runs'])}
+{section_holes(d, runs, st, figs['density'], figs['runs'])}
+
+---
+
+{section_stratum(st, miss_alive_uniform, miss_alive, p, figs['density'])}
 
 ---
 
@@ -805,6 +965,10 @@ def main() -> None:
 ---
 
 {section_profile(r, cov, cov_lo, cov_hi, miss_alive, d, figs['profile'])}
+
+---
+
+{section_backfill(st, miss_alive)}
 
 ---
 
