@@ -17,7 +17,7 @@
 | --- | --- | --- |
 | 研究 | [`analysis/`](./analysis/) | **已完成**：19 份报告、82 张图，数据管线可重建 |
 | 产品 | [`app/`](./app/) | **设计中**：Flutter UI + 内嵌 Go 服务，见 [APP 设计文档 01](./app/docs/01-tech-stack.md) |
-| 接口档案 | [`analysis/references/sfacg-endpoints.md`](./analysis/references/sfacg-endpoints.md) | **SFACG 接口唯一权威事实档案**：端点/参数/字段/状态码/限流；动手前必读，不要猜 API |
+| 接口档案 | [`analysis/references/sfacg-endpoints.md`](./analysis/references/sfacg-endpoints.md)（PC 端）+ [`sfacg-app-api.md`](./analysis/references/sfacg-app-api.md)（官方 App API） | **SFACG 接口唯一权威事实档案**：端点/参数/字段/状态码/限流；动手前必读，不要猜 API |
 | 归档 | [`archive/`](./archive/) | **历史实测档案，不是设计文档**：4 份实测细节仅供参考，数字口径已过时，见 [归档索引](./archive/README.md) |
 
 **引用任何数字之前，先读 [`analysis/README.md`](./analysis/README.md) 的口径约束。**
@@ -29,9 +29,13 @@
 ## SFACG 接口事实档案（动手前必读）
 
 **任何涉及 SFACG 端点、参数、字段、状态码或抓取的工作，
-先读 [`analysis/references/sfacg-endpoints.md`](./analysis/references/sfacg-endpoints.md)。**
-这是全库唯一权威的接口事实档案，含 15 端点总表、三类搜索接口字段覆盖、
-`novelbytype` 枚举、详情页/目录/评论/榜单选择器、静默限流与失败模式、复现命令。
+先读下面两档——对应哪一端就读哪一档，不要凭印象猜 API。**
+
+| 档案 | 覆盖 | 关键差异 |
+| --- | --- | --- |
+| [`analysis/references/sfacg-endpoints.md`](./analysis/references/sfacg-endpoints.md) | **PC 端** HTML + `HTML5.ashx`：15 端点总表、三类搜索接口字段覆盖、`novelbytype` 枚举、详情页/目录/评论/榜单选择器、静默限流与失败模式 | 点击数带「万」量化（±500）；**无上架时间** |
+| [`analysis/references/sfacg-app-api.md`](./analysis/references/sfacg-app-api.md) | **官方移动端 App** `api.sfacg.com`：认证机制、19 字段字典、77 个推送位、**逐章时间戳** | 单本仅 0.7 KB；**`addTime` 精确到秒**、**`viewTimes` 精确整数** |
+
 **不要凭印象猜 API**——本项目已多次因猜测踩坑：
 
 | 想当然的写法 | 实测真相 |
@@ -41,9 +45,10 @@
 | 无效 nid 返回 404 | 返回 **HTTP 200** + 文案「小说不存在」/「出错啦」，状态码零信息量 |
 | 搜索能翻页拿全量 | HTML 硬截断 30 条，连约 17 次静默限流返回「0 结果」不报错 |
 | 按「>5 KB 含书名」判存活 | 僵尸页 13–15 KB、与存活页体积中位只差 35 B，必须看 `div.book_Catalog` 有无 `<a>` |
+| App API 需要用户账号 | 用 App 内置固定凭据 + 每次请求自签即可；**但正文接口无权限，不取正文** |
 
-档案的实测依据来自 2026-11-16 现网请求，探针为
-`analysis/fetchers/probe_sfacg_api.py` 与 `probe_novelbytype.py`；
+档案的实测依据来自 2026-11-16 / 2026-11-17 现网请求，探针为
+`analysis/fetchers/probe_sfacg_api.py`、`probe_novelbytype.py`、`probe_sfacg_app_api.py`；
 上游实现参照 `temp/sfacg_tools/sfacglib/`（不入库）。
 产品侧的接口用法另见 [`app/docs/04-search.md`](./app/docs/04-search.md) 与
 [`app/docs/05-detail-fetch.md`](./app/docs/05-detail-fetch.md)；
