@@ -45,8 +45,20 @@ func strata_start(assetsDir, dataDir *C.char) *C.char {
 	mu.Lock()
 	defer mu.Unlock()
 
+	// Idempotent: if the engine is already running in this process, report
+	// its live state instead of failing (Flutter may recreate the activity
+	// without killing the process).
 	if current != nil {
-		return reply(startResult{Error: "engine already running"})
+		e := current
+		m := e.Manifest()
+		return reply(startResult{
+			OK:            true,
+			Addr:          e.Addr(),
+			SeedVersion:   m.SeedVersion,
+			BookCount:     m.BookCount,
+			LicensedCount: m.LicensedCount,
+			ContentEnd:    m.ContentEnd,
+		})
 	}
 	e, err := engine.Start(C.GoString(assetsDir), C.GoString(dataDir))
 	if err != nil {

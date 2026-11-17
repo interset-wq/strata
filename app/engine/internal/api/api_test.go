@@ -54,7 +54,7 @@ func getJSON(t *testing.T, url string, status int) map[string]any {
 func TestHealthz(t *testing.T) {
 	srv, _ := newTestServer(t)
 	body := getJSON(t, srv.URL+"/strata/healthz", http.StatusOK)
-	if body["book_count"].(float64) != 5 || body["seed_version"] != "test-1" {
+	if body["book_count"].(float64) != 6 || body["seed_version"] != "test-1" {
 		t.Fatalf("body = %v", body)
 	}
 }
@@ -120,6 +120,53 @@ func TestRankingShort(t *testing.T) {
 	}
 	if items[0].(map[string]any)["nid"].(float64) != 1002 {
 		t.Fatalf("first = %v", items[0])
+	}
+}
+
+func TestRankingNew(t *testing.T) {
+	srv, _ := newTestServer(t)
+	body := getJSON(t, srv.URL+"/strata/rankings/new?limit=10", http.StatusOK)
+	meta := body["meta"].(map[string]any)
+	if meta["min_est_year"].(float64) != 2024 {
+		t.Fatalf("min_est_year = %v", meta["min_est_year"])
+	}
+	items := body["items"].([]any)
+	if len(items) != 1 {
+		t.Fatalf("items = %d, want only nid 1005", len(items))
+	}
+	first := items[0].(map[string]any)
+	if first["nid"].(float64) != 1005 || first["fav_pctl"].(float64) != 0.95 {
+		t.Fatalf("first = %v", first)
+	}
+}
+
+func TestSearch(t *testing.T) {
+	srv, _ := newTestServer(t)
+	// Search must find licensed books too (they are searchable, only
+	// excluded from rankings).
+	body := getJSON(t, srv.URL+"/strata/search?q=%E5%A4%A9%E9%97%BB", http.StatusOK)
+	items := body["items"].([]any)
+	if len(items) != 1 || items[0].(map[string]any)["nid"].(float64) != 2001 {
+		t.Fatalf("licensed search = %v", items)
+	}
+
+	body = getJSON(t, srv.URL+"/strata/search?q=Long", http.StatusOK)
+	items = body["items"].([]any)
+	if len(items) != 2 {
+		t.Fatalf("Long search = %d items", len(items))
+	}
+	if items[0].(map[string]any)["nid"].(float64) != 1003 {
+		t.Fatalf("order = %v (higher favs first)", items)
+	}
+}
+
+func TestSearchInvalidInput(t *testing.T) {
+	srv, _ := newTestServer(t)
+	for _, path := range []string{"/strata/search"} {
+		body := getJSON(t, srv.URL+path, http.StatusBadRequest)
+		if body["error"].(map[string]any)["code"] != "invalid_argument" {
+			t.Fatalf("%s: body = %v", path, body)
+		}
 	}
 }
 

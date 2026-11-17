@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	"strata/engine/internal/appshell"
 
@@ -330,6 +331,84 @@ LIMIT ?`
 		items = append(items, item)
 	}
 	return items, rows.Err()
+}
+
+// Search is the L1 local search over the bundled seed (title/author LIKE).
+// Licensed books are included: they are searchable and detail-visible by
+// design, just excluded from percentile rankings.
+func (s *Store) Search(ctx context.Context, q string, limit int) ([]SearchItem, error) {
+	const esc = `\\`
+	pattern := "%" + strings.NewReplacer("%", esc+"%", "_", esc+"_", "\\", esc+esc).Replace(q) + "%"
+	rows, err := s.DB.QueryContext(ctx, `
+SELECT nid, title, author, genre, est_year, favs
+FROM seed.books
+WHERE (title LIKE ? ESCAPE '\' OR author LIKE ? ESCAPE '\')
+ORDER BY favs DESC, nid ASC
+LIMIT ?`, pattern, pattern, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := make([]SearchItem, 0, limit)
+	for rows.Next() {
+		var (
+			item  SearchItem
+			gen   sql.NullString
+			favs  sql.NullInt64
+		)
+		if err := rows.Scan(&item.NID, &item.Title, &item.Author, &gen,
+			&item.EstYear, &favs); err != nil {
+			return nil, err
+		}
+		item.Genre = strPtr(gen)
+		item.Favs = intPtr(favs)
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
+// RankingNew is the new-work ranking: last two generations (est_year >=
+// gen_max-1) ordered by same-generation percentile, per docs/03. Licensed
+// books are excluded.
+func (s *Store) RankingNew(ctx context.Context, limit int) ([]RankItem, error) {
+	rows, err := s.DB.QueryContext(ctx, `
+SELECT nid, title, author, genre, est_year, favs, fav_pctl
+FROM seed.books
+WHERE est_year >= ? AND is_licensed = 0 AND fav_pctl IS NOT NULL
+ORDER BY fav_pctl DESC, est_date DESC, nid ASC
+LIMIT ?`, s.Manifest.GenMax-1, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := make([]RankItem, 0, limit)
+	for rows.Next() {
+		var (
+			item RankItem
+			gen  sql.NullString
+			favs sql.NullInt64
+			pctl float64
+		)
+		if err := rows.Scan(&item.NID, &item.Title, &item.Author, &gen,
+			&item.EstYear, &favs, &pctl); err != nil {
+			return nil, err
+		}
+		item.Rank = len(items) + 1
+		item.Genre = strPtr(gen)
+		item.Favs = intPtr(favs)
+		item.FavPctl = pctl
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
+type SearchItem struct {
+	NID     int64   `json:"nid"`
+	Title   string  `json:"title"`
+	Author  string  `json:"author"`
+	Genre   *string `json:"genre"`
+	EstYear int     `json:"est_year"`
+	Favs    *int64  `json:"favs"`
 }
 
 func strPtr(v sql.NullString) *string {

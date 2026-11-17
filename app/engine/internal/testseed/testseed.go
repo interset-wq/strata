@@ -46,6 +46,7 @@ var books = []book{
 	{nid: 1003, title: "Long C", author: "Author C", genre: "科幻", status: "连载中", words: 200000, favs: 900, pctl: 0.99, year: 2011},
 	{nid: 1004, title: "Short D", author: "Author D", genre: "魔幻", status: "已完结", words: 40000, favs: 50, pctl: 0.1, year: 2010},
 	{nid: 2001, title: "Licensed", author: "天闻角川", genre: "魔幻", status: "已完结", words: 90000, favs: 99999, pctl: nil, licensed: 1, year: 2008},
+	{nid: 1005, title: "New E", author: "Author E", genre: "都市", status: "连载中", words: 150000, favs: 300, pctl: 0.95, year: 2025},
 }
 
 // Build writes assets/seed.db.gz + manifest.json and a user.db with one
@@ -91,7 +92,7 @@ VALUES(?,?,?,?, '免费', ?, NULL, ?, 1000, ?, 10, 0, NULL, '2026-04-01T00:00:00
 	meta := map[string]string{
 		"schema_version": "1", "seed_version": "test-1",
 		"content_end": "2026-05-03", "built_at": "2026-11-17T00:00:00Z",
-		"book_count": "5", "tag_count": "2", "tag_rows": "4",
+		"book_count": "6", "tag_count": "2", "tag_rows": "4",
 		"gen_min": "2007", "gen_max": "2025", "licensed_count": "1",
 	}
 	for k, v := range meta {

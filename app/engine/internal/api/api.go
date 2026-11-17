@@ -36,6 +36,8 @@ func New(s *store.Store) *gin.Engine {
 	group.GET("/books/:nid", srv.book)
 	group.GET("/rankings/favs", srv.rankingFavs)
 	group.GET("/rankings/short", srv.rankingShort)
+	group.GET("/rankings/new", srv.rankingNew)
+	group.GET("/search", srv.search)
 	return r
 }
 
@@ -194,6 +196,58 @@ func (s *Server) rankingShort(c *gin.Context) {
 			"limit":             limit,
 			"short_max_words":   50000,
 			"licensed_excluded": true,
+		},
+		"items": items,
+	})
+}
+
+func (s *Server) rankingNew(c *gin.Context) {
+	limit, ok := parseLimit(c)
+	if !ok {
+		return
+	}
+	items, err := s.store.RankingNew(c.Request.Context(), limit)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"meta": gin.H{
+			"kind":              "new",
+			"pool":              "seed",
+			"ordering":          "fav_pctl",
+			"content_end":       s.store.Manifest.ContentEnd,
+			"min_est_year":      s.store.Manifest.GenMax - 1,
+			"limit":             limit,
+			"licensed_excluded": true,
+		},
+		"items": items,
+	})
+}
+
+func (s *Server) search(c *gin.Context) {
+	q := c.Query("q")
+	if q == "" {
+		fail(c, http.StatusBadRequest, "invalid_argument", "q is required")
+		return
+	}
+	limit, ok := parseLimit(c)
+	if !ok {
+		return
+	}
+	items, err := s.store.Search(c.Request.Context(), q, limit)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"meta": gin.H{
+			"kind":        "search",
+			"pool":        "seed",
+			"q":           q,
+			"limit":       limit,
+			"includes":    "licensed",
+			"content_end": s.store.Manifest.ContentEnd,
 		},
 		"items": items,
 	})

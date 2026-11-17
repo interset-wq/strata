@@ -120,7 +120,7 @@ func TestSeedMeta(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if meta["book_count"] != "5" || meta["licensed_count"] != "1" {
+	if meta["book_count"] != "6" || meta["licensed_count"] != "1" {
 		t.Fatalf("meta = %v", meta)
 	}
 }
