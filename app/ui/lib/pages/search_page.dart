@@ -56,7 +56,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                               '${it.author} · ${it.estYear}'
                               '${it.genre != null ? ' · ${it.genre}' : ''}'),
                           trailing: Text('${it.favs ?? 0} 收藏'),
-                          onTap: () => context.go('/book/${it.nid}'),
+                          onTap: () => context.push('/book/${it.nid}'),
                         );
                       },
                     ),

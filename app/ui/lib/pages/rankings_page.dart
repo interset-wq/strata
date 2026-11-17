@@ -140,7 +140,7 @@ class _ShortTab extends ConsumerWidget {
                   title: Text(it.title),
                   subtitle: Text('${it.author} · ${it.estYear}'),
                   trailing: Text('${it.favs} 收藏'),
-                  onTap: () => context.go('/book/${it.nid}'),
+                  onTap: () => context.push('/book/${it.nid}'),
                 );
               },
             ),
@@ -180,7 +180,7 @@ class _RankTile extends StatelessWidget {
         'pctl ${item.favPctl.toStringAsFixed(1)}',
         style: Theme.of(context).textTheme.bodySmall,
       ),
-      onTap: () => context.go('/book/${item.nid}'),
+      onTap: () => context.push('/book/${item.nid}'),
     );
   }
 }

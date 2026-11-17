@@ -32,7 +32,7 @@ class HomePage extends ConsumerWidget {
           children: [
             BannerCarousel(
               items: items,
-              onTap: (it) => context.go('/book/${it.nid}'),
+              onTap: (it) => context.push('/book/${it.nid}'),
             ),
             const SizedBox(height: 8),
             _sectionTitle(context, '找书入口'),
@@ -180,7 +180,7 @@ class _ContinueBrowsing extends ConsumerWidget {
               return Padding(
                 padding: const EdgeInsets.only(right: 12),
                 child: InkWell(
-                  onTap: () => context.go('/book/${it.nid}'),
+                  onTap: () => context.push('/book/${it.nid}'),
                   borderRadius: BorderRadius.circular(10),
                   child: SizedBox(
                     width: 96,

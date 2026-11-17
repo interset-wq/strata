@@ -70,7 +70,7 @@ class _ShelfPageState extends ConsumerState<ShelfPage> {
                     tooltip: '移出书架',
                     onPressed: () => _remove(it),
                   ),
-                  onTap: () => context.go('/book/${it.nid}'),
+                  onTap: () => context.push('/book/${it.nid}'),
                 );
               },
             ),

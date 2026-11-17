@@ -15,6 +15,10 @@ class BookDetailPage extends ConsumerStatefulWidget {
 }
 
 class _BookDetailPageState extends ConsumerState<BookDetailPage> {
+  /// 官方兜底封面：部分作品在 CDN 无封面图（Big/{nid}.jpg 404）
+  static const _defaultCover =
+      'https://rs.sfacg.com/web/novel/images/NovelCover/Big/default.jpg';
+
   bool refreshing = false;
   String? refreshMessage;
   Color? refreshColor;
@@ -25,7 +29,20 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
   Widget build(BuildContext context) {
     final detail = ref.watch(bookProvider(widget.nid));
     return Scaffold(
-      appBar: AppBar(title: Text(detail.value?.book['title']?.toString() ?? '详情')),
+      appBar: AppBar(
+        // 设计稿 03：‹ 返回 + 居中"书籍详情" + 收藏心形
+        title: const Text('书籍详情'),
+        centerTitle: true,
+        actions: [
+          IconButton(
+            icon: onShelf
+                ? const Icon(Icons.favorite)
+                : const Icon(Icons.favorite_border),
+            tooltip: onShelf ? '移出书架' : '收藏',
+            onPressed: onShelf ? _removeShelf : _addShelf,
+          ),
+        ],
+      ),
       body: detail.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('加载失败：$e')),
@@ -36,14 +53,75 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
 
           String? s(Object? v) => v?.toString();
           final licensed = b['is_licensed'] == true;
+          final scheme = Theme.of(context).colorScheme;
+          // 种子 cover_url 存相对路径（无前缀，上游爬虫缺前缀为已知问题）：
+          // 有值拼 CDN 前缀；空值用官方默认封面兜底（用户拍板 2026-11-17）。
+          final raw = s(b['cover_url']);
+          final cover = (raw == null || raw.isEmpty)
+              ? _defaultCover
+              : 'https://rss.sfacg.com/web/novel/images/NovelCover/Big/$raw';
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              Text(s(b['title']) ?? '',
-                  style: Theme.of(context).textTheme.headlineSmall),
-              const SizedBox(height: 6),
-              Text('${s(b['author']) ?? ''} · ${s(b['est_year']) ?? ''}'
-                  '${s(b['genre']) != null ? ' · ${s(b['genre'])}' : ''}'),
+              // 书头：封面（朱砂错位投影）+ 标题/作者/徽章（设计稿 03）
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: [
+                        BoxShadow(
+                          color: scheme.primary.withValues(alpha: .25),
+                          offset: const Offset(5, 5),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: SizedBox(
+                        width: 92,
+                        height: 128,
+                        child: Image.network(
+                          cover,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              Image.network(
+                            _defaultCover,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => ColoredBox(
+                                color: scheme.primary.withValues(alpha: .15)),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(s(b['title']) ?? '',
+                            style: Theme.of(context).textTheme.headlineSmall),
+                        const SizedBox(height: 6),
+                        Text(s(b['author']) ?? '',
+                            style: TextStyle(
+                                fontSize: 12, color: scheme.onSurfaceVariant)),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 6,
+                          children: [
+                            if (s(b['status']) != null)
+                              _badge(context, s(b['status'])!, filled: true),
+                            if (s(b['est_year']) != null)
+                              _badge(context, '${s(b['est_year'])} 代'),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
               const SizedBox(height: 12),
               Wrap(
                 spacing: 8,
@@ -204,6 +282,26 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
       return '${(n / 10000).toStringAsFixed(1)}万';
     }
     return n.toString();
+  }
+
+  /// 设计稿徽章：filled=朱砂底，否则描边。
+  Widget _badge(BuildContext context, String text, {bool filled = false}) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+      decoration: BoxDecoration(
+        color: filled ? scheme.primary.withValues(alpha: .12) : null,
+        border: filled ? null : Border.all(color: scheme.outline),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 10,
+          color: filled ? scheme.primary : scheme.onSurfaceVariant,
+        ),
+      ),
+    );
   }
 
   /// 六指标格（设计稿：尽可能多展示数据；短评/长评由观测通路提供，待接入）。
