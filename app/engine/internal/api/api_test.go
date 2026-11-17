@@ -111,6 +111,43 @@ func TestRankingFavs(t *testing.T) {
 	}
 }
 
+func TestRankingDeep(t *testing.T) {
+	srv, _ := newTestServer(t)
+	body := getJSON(t, srv.URL+"/strata/rankings/deep?year=2010&metric=favs&limit=10", http.StatusOK)
+	meta := body["meta"].(map[string]any)
+	if meta["pool"] != "universe" || meta["ordering"] != "favs" {
+		t.Fatalf("meta = %v", meta)
+	}
+	if meta["depth"].(float64) != 2 {
+		t.Fatalf("depth = %v, want 2", meta["depth"])
+	}
+	items := body["items"].([]any)
+	if len(items) != 2 {
+		t.Fatalf("items = %d", len(items))
+	}
+	first := items[0].(map[string]any)
+	if first["nid"].(float64) != 1001 || first["value"].(float64) != 500 {
+		t.Fatalf("first = %v", first)
+	}
+	if first["in_seed"] != true {
+		t.Fatalf("seed book not marked in_seed: %v", first)
+	}
+	// 7777 is deliberately absent from books: deep boards are full-universe.
+	second := items[1].(map[string]any)
+	if second["nid"].(float64) != 7777 {
+		t.Fatalf("second = %v", second)
+	}
+	if second["in_seed"] != false {
+		t.Fatalf("library-external book wrongly marked in_seed: %v", second)
+	}
+
+	body = getJSON(t, srv.URL+"/strata/rankings/deep?year=2010&metric=pr", http.StatusOK)
+	items = body["items"].([]any)
+	if len(items) != 1 || items[0].(map[string]any)["nid"].(float64) != 1001 {
+		t.Fatalf("pr board = %v", items)
+	}
+}
+
 func TestRankingShort(t *testing.T) {
 	srv, _ := newTestServer(t)
 	body := getJSON(t, srv.URL+"/strata/rankings/short?limit=5", http.StatusOK)
@@ -179,6 +216,10 @@ func TestInvalidInputs(t *testing.T) {
 		"/strata/rankings/favs?year=2006",
 		"/strata/rankings/favs?year=2010&genre=nope",
 		"/strata/rankings/favs?year=2010&limit=0",
+		"/strata/rankings/deep",
+		"/strata/rankings/deep?year=2010&metric=nope",
+		"/strata/rankings/deep?year=2010&metric=favs&limit=0",
+		"/strata/rankings/deep?year=2006&metric=favs",
 	}
 	for _, path := range cases {
 		body := getJSON(t, srv.URL+path, http.StatusBadRequest)

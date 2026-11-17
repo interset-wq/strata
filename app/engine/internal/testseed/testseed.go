@@ -28,6 +28,12 @@ CREATE TABLE books(
   is_licensed INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE book_tags(nid INTEGER NOT NULL, tag TEXT NOT NULL);
+CREATE TABLE deep_ranks(
+  est_year INTEGER NOT NULL, metric TEXT NOT NULL, rank_no INTEGER NOT NULL,
+  nid INTEGER NOT NULL, title TEXT NOT NULL, author TEXT NOT NULL,
+  genre TEXT, value REAL, pctl REAL, cover_url TEXT,
+  PRIMARY KEY(est_year, metric, rank_no)
+);
 CREATE TABLE seed_meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
 `
 
@@ -89,8 +95,17 @@ VALUES(?,?,?,?, '免费', ?, NULL, ?, 1000, ?, 10, 0, NULL, '2026-04-01T00:00:00
 		db.Close()
 		return nil, err
 	}
+	if _, err := db.Exec(`INSERT INTO deep_ranks
+	 (est_year,metric,rank_no,nid,title,author,genre,value,pctl,cover_url) VALUES
+	 (2010,'favs',1,1001,'Long A','Author A','魔幻',500,0.9,NULL),
+	 (2010,'favs',2,7777,'Deep Only','Author Z','都市',250,0.5,NULL),
+	 (2010,'pr',1,1001,'Long A','Author A','魔幻',0.02,0.8,NULL),
+	 (2025,'favs',1,1005,'New E','Author E','都市',300,0.95,NULL)`); err != nil {
+		db.Close()
+		return nil, err
+	}
 	meta := map[string]string{
-		"schema_version": "1", "seed_version": "test-1",
+		"schema_version": "2", "seed_version": "test-1",
 		"content_end": "2026-05-03", "built_at": "2026-11-17T00:00:00Z",
 		"book_count": "6", "tag_count": "2", "tag_rows": "4",
 		"gen_min": "2007", "gen_max": "2025", "licensed_count": "1",
@@ -117,7 +132,7 @@ VALUES(?,?,?,?, '免费', ?, NULL, ?, 1000, ?, 10, 0, NULL, '2026-04-01T00:00:00
 	}
 
 	m := &appshell.Manifest{
-		SchemaVersion: 1,
+		SchemaVersion: 2,
 		SeedVersion:   "test-1",
 		ContentEnd:    "2026-05-03",
 		BuiltAt:       "2026-11-17T00:00:00Z",

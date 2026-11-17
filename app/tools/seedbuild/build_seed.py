@@ -37,12 +37,15 @@ from pipeline import build_csv as B  # noqa: E402
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import validate as V  # noqa: E402
+from deep_ranks import DEEP_COLUMNS, METRICS as DEEP_METRICS  # noqa: E402
+from deep_ranks import TOP_N as DEEP_TOP_N  # noqa: E402
+from deep_ranks import build_deep_ranks, seed_coverage  # noqa: E402
 
 ASSETS = REPO / "app" / "assets"
 SCHEMA = Path(__file__).resolve().parent / "schema.sql"
 
-SCHEMA_VERSION = 1
-SEED_VERSION = "20260503.1"
+SCHEMA_VERSION = 2
+SEED_VERSION = "20260503.2"
 CONTENT_END = pd.Timestamp("2026-05-03")
 GEN_MIN, GEN_MAX = 2007, 2025
 
@@ -226,6 +229,12 @@ def build_frames() -> tuple[pd.DataFrame, dict]:
         / denom
     )
 
+    # D2 deep ranks: full-universe generation Top-200, additive table in seed.db.
+    # Computed here because the frame already carries the five build-time
+    # percentiles. The curated seed book list and its percentile denominator
+    # are deliberately left untouched.
+    deep = build_deep_ranks(universe, DEEP_TOP_N)
+
     universe["upd"] = pd.to_datetime(universe["updated_at"], errors="coerce")
     base, base_detail = seed_set(universe)
     short_add, short_total = short_supplement(universe, base)
@@ -260,6 +269,7 @@ def build_frames() -> tuple[pd.DataFrame, dict]:
         "licensed_banner": int((ln_df["featured"] == 1).sum()),
         "tally": tally,
         "genre_fixes": fixes,
+        "deep_ranks": deep,
     }
     return seed, meta
 
@@ -295,6 +305,13 @@ def write_db(seed: pd.DataFrame, meta: dict, db_path: Path) -> dict:
             conn.executemany(
                 "INSERT INTO book_tags(nid, tag) VALUES(?, ?)", tag_pairs
             )
+            deep = meta["deep_ranks"]
+            conn.executemany(
+                f"INSERT INTO deep_ranks({','.join(DEEP_COLUMNS)})"
+                f" VALUES({','.join('?' * len(DEEP_COLUMNS))})",
+                [tuple(bind(v) for v in row)
+                 for row in deep.itertuples(index=False, name=None)],
+            )
             conn.executemany(
                 "INSERT INTO seed_meta(key, value) VALUES(?, ?)",
                 [
@@ -311,6 +328,11 @@ def write_db(seed: pd.DataFrame, meta: dict, db_path: Path) -> dict:
                     ("base_count", str(meta["base"])),
                     ("short_added", str(meta["short_added"])),
                     ("stats_universe", str(meta["universe_rows"])),
+                    ("deep_metrics", ",".join(DEEP_METRICS)),
+                    ("deep_top_n", str(DEEP_TOP_N)),
+                    ("deep_rank_rows", str(len(meta["deep_ranks"]))),
+                    ("deep_seed_hit", str(int(meta["deep_ranks"]["nid"]
+                                              .isin(set(seed["nid"])).sum()))),
                 ],
             )
         conn.execute("VACUUM")
@@ -351,6 +373,8 @@ def main() -> int:
     seed, meta = build_frames()
     log(f"seed rows: {len(seed)} (base {meta['base']} + short "
         f"{meta['short_added']} + licensed {meta['licensed_rows']})")
+    log(f"deep ranks: {len(meta['deep_ranks'])} rows "
+        f"({len(DEEP_METRICS)} metrics x top {DEEP_TOP_N}, full universe)")
 
     work = REPO / "temp" / "seedbuild"
     work.mkdir(parents=True, exist_ok=True)
@@ -380,6 +404,7 @@ def main() -> int:
             "short_added": meta["short_added"],
             "licensed_added": meta["licensed_rows"],
             "seed": len(seed),
+            "deep_rank_rows": len(meta["deep_ranks"]),
         },
         "source": {
             "dataset": C.SOURCE["repo"],

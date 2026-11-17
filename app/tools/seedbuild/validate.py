@@ -8,11 +8,12 @@ from pathlib import Path
 
 import pandas as pd
 
-SCHEMA_VERSION = 1
-EXPECTED_TABLES = {"books", "book_tags", "seed_meta"}
+SCHEMA_VERSION = 2
+EXPECTED_TABLES = {"books", "book_tags", "seed_meta", "deep_ranks"}
 EXPECTED_INDEXES = {
     "idx_bt", "idx_updated", "idx_author", "idx_year_favpctl",
     "idx_year_clickpctl", "idx_genre_favs", "idx_favs", "idx_pr", "idx_shortfav",
+    "idx_deep_lookup",
 }
 
 
@@ -64,8 +65,37 @@ def check_db(db_path: Path, seed: pd.DataFrame, meta: dict) -> None:
         if orphan_tags:
             _fail(errors, f"{orphan_tags} tags reference missing nids")
 
+        # D2 deep ranks: additive, full-universe, never a percentile denominator.
+        deep_rows = conn.execute("SELECT COUNT(*) FROM deep_ranks").fetchone()[0]
+        deep_expected = len(meta.get("deep_ranks", []))
+        if deep_rows == 0 or (deep_expected and deep_rows != deep_expected):
+            _fail(errors, f"deep_ranks {deep_rows} != expected {deep_expected}")
+        dup_deep = conn.execute(
+            "SELECT COUNT(*) - COUNT(DISTINCT est_year || '|' || metric || '|' || rank_no)"
+            " FROM deep_ranks").fetchone()[0]
+        if dup_deep:
+            _fail(errors, f"{dup_deep} duplicate deep rank positions")
+        deep_metrics = {r[0] for r in conn.execute("SELECT DISTINCT metric FROM deep_ranks")}
+        if deep_metrics != {"favs", "clicks", "praises", "pr"}:
+            _fail(errors, f"deep metrics {sorted(deep_metrics)} != expected four")
+        bad_deep = conn.execute(
+            "SELECT COUNT(*) FROM deep_ranks WHERE pctl IS NULL OR pctl <= 0 OR pctl > 1"
+            " OR rank_no < 1 OR est_year NOT BETWEEN 2007 AND 2025").fetchone()[0]
+        if bad_deep:
+            _fail(errors, f"{bad_deep} deep rows have invalid rank/pctl/year")
+        pr_gate = conn.execute(
+            "SELECT COUNT(*) FROM deep_ranks d JOIN books b ON b.nid=d.nid"
+            " WHERE d.metric='pr' AND b.favs < 10").fetchone()[0]
+        if pr_gate:
+            _fail(errors, f"{pr_gate} pr deep rows violate favs>=10 gate")
+        deep_meta_row = conn.execute(
+            "SELECT value FROM seed_meta WHERE key='deep_rank_rows'").fetchone()
+        if deep_meta_row is None or int(deep_meta_row[0]) != deep_rows:
+            _fail(errors, "seed_meta deep_rank_rows mismatch")
+
         required = {"schema_version", "seed_version", "content_end", "built_at",
-                    "book_count", "tag_count", "gen_min", "gen_max", "licensed_count"}
+                    "book_count", "tag_count", "gen_min", "gen_max", "licensed_count",
+                    "deep_metrics", "deep_top_n", "deep_rank_rows", "deep_seed_hit"}
         meta_keys = {r["key"] for r in conn.execute("SELECT key FROM seed_meta")}
         if not required <= meta_keys:
             _fail(errors, f"seed_meta missing {sorted(required - meta_keys)}")

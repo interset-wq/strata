@@ -1,7 +1,7 @@
 # analysis · SFACG 书层数据分析
 
 对菠萝包轻小说（SFACG）二十年书目数据的可复现研究。数据从原始爬虫产物出发，
-经规范化建成单张宽表，再按专题产出 19 份基准报告 + 1 份补充报告与 84 张图表。
+经规范化建成单张宽表，再按专题产出 19 份基准报告 + 2 份补充报告与 86 张图表。
 
 **定位**：官方榜单回答「现在什么火」，本分析回答「过去十年结构如何变化」。
 这是一个观察性书目研究，不含正文内容，也不含营收、付费人数或用户事件数据。
@@ -14,7 +14,7 @@
 | 年份覆盖 | 2007–2026（年度序列止于 2025：上界之后创建的新书不在库内） |
 | 定年 | `lib/eras.py`，104 个锚点、log(nid) 分段线性插值，留一法 P99 = 50 天 |
 | 在架覆盖率 | 约 69.3%（95% CI 64.6–73.9，分层加权，见报告 10）；**补爬对象约 1 千本**，非 11.1 万 |
-| 产出 | 19 份基准报告 + 1 份补充报告（`reports/*.md`）、84 张图（`reports/figures/*.png`） |
+| 产出 | 19 份基准报告 + 2 份补充报告（`reports/*.md`）、86 张图（`reports/figures/*.png`） |
 
 ---
 
@@ -36,7 +36,7 @@ uv run python pipeline/build_csv.py
 生成报告（各生成器相互独立，可单跑；汇总篇 16 引用前序结论但数字自算）：
 
 ```bash
-for f in generators/report_*.py; do uv run python "$f"; done   # 全部 20 份（19 基准 + 1 补充）
+for f in generators/report_*.py; do uv run python "$f"; done   # 全部 21 份（19 基准 + 2 补充）
 uv run python generators/report_market.py                      # 单跑 01（定年与供给）
 uv run python generators/report_timeline.py                    # 单跑 16（收官汇总）
 ```
@@ -81,7 +81,7 @@ dataset.7z  ──pipeline/prepare.py──▶  meta*.jsonl（22 文件，唯一
 | 路径 | 说明 |
 | --- | --- |
 | `lib/` | **共享库**：`paths`（路径唯一真源）、`config`（枚举域、清洗与行级剔除规则）、`eras`（nid 定年）、`charts`（统一图表风格） |
-| `generators/` | **20 份报告的生成器**（`report_*.py`，19 基准 + 1 补充）；**报告是生成物，勿手改** |
+| `generators/` | **21 份报告的生成器**（`report_*.py`，19 基准 + 2 补充）；**报告是生成物，勿手改** |
 | `fetchers/` | 可选联网抓取器：月度榜、存活状态、存活书详情 |
 | `pipeline/` | 数据管线：`prepare`（校验归档并解压）、`build_csv`（jsonl → CSV 的唯一规范化入口）、`validate`（CSV 格式层与取值层校验，构建时自动调用） |
 | `anchors/` | 定年锚点：`nid_anchors.jsonl`（104 条插值输入）、`verified_dates.jsonl`（用户核实证据档案）、`approximate_dates.jsonl`（已清空，保留备用） |
@@ -133,8 +133,9 @@ df = pd.read_csv(paths.CSV_FILE)
 | 18 | 种子规模决策 | `generators/report_seed_scale.py` | 捆绑 29,396 本（gz 4.18 MB）、膨胀源是索引不是表数 |
 | 19 | 短篇生态 | `generators/report_shortnovel.py` | 短篇=≤5万字且完结、收藏天花板、赞藏比在短篇里方向反 |
 | 20 | App API 离线复核（**补充**） | `generators/report_20_app_api_crosscheck.py` | **不改报告 10 / 定年 / App 设计**：把「在册密度 U 型」拆成 nid 槽位分母（U 型）与官方目录内命中率（98.79%–99.88%，平坦）；31,229 条旁证误差中位 2 天、P99 10 天，印证 `log(nid)` 定年。不联网、不重算覆盖率 |
+| 21 | 全库世代深榜 D2（**补充**） | `generators/report_21_deep_ranks.py` | 全库 241,758 行按 `est_year`×四指标出 14,626 行深榜；种子池只覆盖 51.5%，故用 seed.db 追加 `deep_ranks` 表而非改种子；零请求，报告 10/定年/01–08 未动 |
 
-编号经过顺延，最终为 15 征文商业化、16 汇总、17 banner（banner 应要求提前）、18 种子规模、19 短篇（面向 App 品类设计）。20 为后续补充报告，不参与前 19 份的编号与定案。
+编号经过顺延，最终为 15 征文商业化、16 汇总、17 banner（banner 应要求提前）、18 种子规模、19 短篇（面向 App 品类设计）。20/21 为后续补充报告，不参与前 19 份的编号与定案。
 
 ---
 
