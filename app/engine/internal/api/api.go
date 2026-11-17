@@ -1,12 +1,15 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
+	"strata/engine/internal/crawl"
 	"strata/engine/internal/store"
 )
 
@@ -21,7 +24,9 @@ const (
 )
 
 type Server struct {
-	store *store.Store
+	store   *store.Store
+	limiter *crawl.Limiter
+	client  *http.Client
 }
 
 func New(s *store.Store) *gin.Engine {
@@ -29,15 +34,35 @@ func New(s *store.Store) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
 
-	srv := &Server{store: s}
+	srv := &Server{
+		store:   s,
+		limiter: crawl.NewLimiter(crawl.DefaultInterval),
+		client: &http.Client{
+			Timeout: 30 * time.Second,
+			// cmd/ffi sets GODEBUG=netdns=cgo so DNS goes through bionic
+			// getaddrinfo (Go's pure resolver cannot read /etc/resolv.conf
+			// on Android). Device-side DNS can be poisoned, so the dialer
+			// prefers verified static IPs and keeps TLS ServerName intact.
+			Transport: &http.Transport{
+				DialContext: crawl.NewHostsDialer(map[string][]string{
+					"m.sfacg.com": {"106.54.231.107"},
+				}, 10*time.Second).DialContext,
+			},
+		},
+	}
 	group := r.Group("/strata")
 	group.GET("/healthz", srv.healthz)
 	group.GET("/meta", srv.meta)
 	group.GET("/books/:nid", srv.book)
+	group.POST("/books/:nid/refresh", srv.bookRefresh)
+	group.GET("/books/:nid/observations", srv.observations)
 	group.GET("/rankings/favs", srv.rankingFavs)
 	group.GET("/rankings/short", srv.rankingShort)
 	group.GET("/rankings/new", srv.rankingNew)
 	group.GET("/search", srv.search)
+	group.GET("/shelf", srv.shelfList)
+	group.PUT("/shelf", srv.shelfAdd)
+	group.DELETE("/shelf/:nid", srv.shelfRemove)
 	return r
 }
 
@@ -251,6 +276,94 @@ func (s *Server) search(c *gin.Context) {
 		},
 		"items": items,
 	})
+}
+
+// bookRefresh fetches the mobile detail page and classifies the result
+// (docs/05 §4.3 three-state verdict). Alive pages get an observation row
+// appended to user.db; dead/zombie pages are reported and never written.
+// The call is synchronous: the global limiter already serializes requests,
+// and a user-triggered refresh takes exactly one foreground slot.
+func (s *Server) bookRefresh(c *gin.Context) {
+	nid, err := strconv.ParseInt(c.Param("nid"), 10, 64)
+	if err != nil || nid <= 0 {
+		fail(c, http.StatusBadRequest, "invalid_argument", "nid must be a positive integer")
+		return
+	}
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+	defer cancel()
+	state, d, observedAt, err := crawl.FetchDetail(ctx, s.client, s.limiter, nid, true)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	resp := gin.H{"state": state.String(), "written": false}
+	if d != nil {
+		resp["detail"] = d
+	}
+	if state == crawl.DetailAlive {
+		favs, praises, words := d.Favs, d.Praises, d.Words
+		status, updatedAt := d.Status, d.UpdatedAt
+		if err := s.store.InsertObservation(ctx, nid, observedAt,
+			&favs, &praises, &words, &status, &updatedAt); err != nil {
+			fail(c, http.StatusInternalServerError, "internal", err.Error())
+			return
+		}
+		resp["written"] = true
+	}
+	c.JSON(http.StatusOK, resp)
+}
+
+// observations returns a nid's observation history, newest first.
+func (s *Server) observations(c *gin.Context) {
+	nid, err := strconv.ParseInt(c.Param("nid"), 10, 64)
+	if err != nil || nid <= 0 {
+		fail(c, http.StatusBadRequest, "invalid_argument", "nid must be a positive integer")
+		return
+	}
+	items, err := s.store.Observations(c.Request.Context(), nid)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"items": items})
+}
+
+// shelfList returns the local shelf joined with seed titles.
+func (s *Server) shelfList(c *gin.Context) {
+	items, err := s.store.ShelfList(c.Request.Context())
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"items": items})
+}
+
+func (s *Server) shelfAdd(c *gin.Context) {
+	var body struct {
+		NID int64 `json:"nid"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil || body.NID <= 0 {
+		fail(c, http.StatusBadRequest, "invalid_argument", "nid is required")
+		return
+	}
+	if err := s.store.ShelfAdd(c.Request.Context(), body.NID, time.Now().Unix()); err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+func (s *Server) shelfRemove(c *gin.Context) {
+	nid, err := strconv.ParseInt(c.Param("nid"), 10, 64)
+	if err != nil || nid <= 0 {
+		fail(c, http.StatusBadRequest, "invalid_argument", "nid must be a positive integer")
+		return
+	}
+	if err := s.store.ShelfRemove(c.Request.Context(), nid); err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
 func parseLimit(c *gin.Context) (int, bool) {

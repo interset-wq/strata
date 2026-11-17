@@ -10,12 +10,20 @@ import "C"
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"sync"
 	"time"
 	"unsafe"
 
 	"strata/engine/internal/engine"
 )
+
+// Android has no /etc/resolv.conf, so Go's pure resolver hangs; route DNS
+// through bionic's getaddrinfo (the cgo resolver), which consults the
+// system DNS (netd / private DNS). Must run before the first net lookup.
+func init() {
+	_ = os.Setenv("GODEBUG", "netdns=cgo")
+}
 
 var (
 	mu      sync.Mutex

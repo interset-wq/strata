@@ -411,6 +411,101 @@ type SearchItem struct {
 	Favs    *int64  `json:"favs"`
 }
 
+// InsertObservation appends an alive-state observation (docs/05 §5.1: the
+// only source of metric truth; (nid, observed_at) dedupes same-second
+// fetches). Only seed.db stays untouched; this writes user.db.
+func (s *Store) InsertObservation(ctx context.Context, nid, observedAt int64,
+	favs, praises, words *int64, status, updatedAt *string) error {
+	_, err := s.DB.ExecContext(ctx, `
+INSERT OR IGNORE INTO observations(nid, observed_at, favs, praises, words,
+ status, updated_at, source)
+VALUES (?, ?, ?, ?, ?, ?, ?, 'detail')`,
+		nid, observedAt, favs, praises, words, status, updatedAt)
+	return err
+}
+
+// Observations returns a nid's observation history, newest first.
+func (s *Store) Observations(ctx context.Context, nid int64) ([]Observation, error) {
+	rows, err := s.DB.QueryContext(ctx, `
+SELECT observed_at, clicks, favs, praises, words, short_comments,
+       long_comments, status, updated_at
+FROM observations WHERE nid = ? ORDER BY observed_at DESC`, nid)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	// Non-nil empty slice: JSON must be [] not null (Dart side expects a list).
+	items := []Observation{}
+	for rows.Next() {
+		var (
+			o                             Observation
+			clicks, favs, praises         sql.NullInt64
+			words, shortC, longC          sql.NullInt64
+			status, updatedAt             sql.NullString
+		)
+		if err := rows.Scan(&o.ObservedAt, &clicks, &favs, &praises, &words,
+			&shortC, &longC, &status, &updatedAt); err != nil {
+			return nil, err
+		}
+		o.Clicks = intPtr(clicks)
+		o.Favs = intPtr(favs)
+		o.Praises = intPtr(praises)
+		o.Words = intPtr(words)
+		o.ShortComments = intPtr(shortC)
+		o.LongComments = intPtr(longC)
+		o.Status = strPtr(status)
+		o.UpdatedAt = strPtr(updatedAt)
+		items = append(items, o)
+	}
+	return items, rows.Err()
+}
+
+type ShelfItem struct {
+	NID    int64   `json:"nid"`
+	Title  string  `json:"title"`
+	Author string  `json:"author"`
+	Genre  *string `json:"genre"`
+	AddAt  int64   `json:"added_at"`
+}
+
+// ShelfAdd records a book into the local shelf (user.db only).
+func (s *Store) ShelfAdd(ctx context.Context, nid int64, addedAt int64) error {
+	_, err := s.DB.ExecContext(ctx, `
+INSERT OR IGNORE INTO shelf(nid, added_at) VALUES (?, ?)`, nid, addedAt)
+	return err
+}
+
+// ShelfRemove drops a book from the shelf.
+func (s *Store) ShelfRemove(ctx context.Context, nid int64) error {
+	_, err := s.DB.ExecContext(ctx, `DELETE FROM shelf WHERE nid = ?`, nid)
+	return err
+}
+
+// ShelfList joins the shelf with seed titles.
+func (s *Store) ShelfList(ctx context.Context) ([]ShelfItem, error) {
+	rows, err := s.DB.QueryContext(ctx, `
+SELECT s.nid, b.title, b.author, b.genre, s.added_at
+FROM shelf s JOIN seed.books b ON b.nid = s.nid
+ORDER BY s.added_at DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ShelfItem{}
+	for rows.Next() {
+		var (
+			it    ShelfItem
+			genre sql.NullString
+		)
+		if err := rows.Scan(&it.NID, &it.Title, &it.Author, &genre, &it.AddAt); err != nil {
+			return nil, err
+		}
+		it.Genre = strPtr(genre)
+		items = append(items, it)
+	}
+	return items, rows.Err()
+}
+
 func strPtr(v sql.NullString) *string {
 	if !v.Valid {
 		return nil
