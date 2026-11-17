@@ -241,6 +241,8 @@ class RankItem {
   final int estYear;
   final int favs;
   final double favPctl;
+  final String? contest;
+  final String? coverUrl;
 
   RankItem.fromJson(Map<String, dynamic> m)
       : rank = m['rank'] as int,
@@ -250,7 +252,9 @@ class RankItem {
         genre = m['genre'] as String?,
         estYear = m['est_year'] as int,
         favs = m['favs'] as int,
-        favPctl = (m['fav_pctl'] as num?)?.toDouble() ?? 0;
+        favPctl = (m['fav_pctl'] as num?)?.toDouble() ?? 0,
+        contest = m['contest'] as String?,
+        coverUrl = m['cover_url'] as String?;
 }
 
 class ShortItem {

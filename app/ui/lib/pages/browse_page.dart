@@ -8,8 +8,11 @@ import '../data/api/strata_api.dart';
 /// 二级浏览页模式：宫格四入口共用，数据维度不同。
 enum BrowseMode { category, status, contest, short }
 
+const _defaultCover =
+    'https://rs.sfacg.com/web/novel/images/NovelCover/Big/default.jpg';
+
 /// 二级浏览页：分类（题材榜）/ 状态（连载/完结）/ 比赛（征文作品）/
-/// 短篇（短篇榜）。榜单卡片按分位展示，口径与榜单页一致（排除授权书）。
+/// 短篇（短篇榜）。按 mockups.html 06–09 屏落地，口径与榜单页一致。
 class BrowsePage extends ConsumerStatefulWidget {
   final BrowseMode mode;
 
@@ -20,14 +23,13 @@ class BrowsePage extends ConsumerStatefulWidget {
 }
 
 class _BrowsePageState extends ConsumerState<BrowsePage> {
-  String? _filter; // 分类页=题材名；状态页=状态文案；比赛页恒 "1"
-
-  static const _genres = ['魔幻', '玄幻', '古风', '科幻', '校园', '都市', '游戏', '悬疑'];
+  String? _filter; // 分类页=题材名；状态页=状态文案
+  String _contest = ''; // 比赛页：'' = 全部参赛作品；否则具体届次名
 
   String get _title => switch (widget.mode) {
         BrowseMode.category => '分类找书',
         BrowseMode.status => '按状态浏览',
-        BrowseMode.contest => '征文比赛作品',
+        BrowseMode.contest => '征文比赛',
         BrowseMode.short => '短篇榜',
       };
 
@@ -36,115 +38,182 @@ class _BrowsePageState extends ConsumerState<BrowsePage> {
     final meta = ref.watch(metaProvider);
     final year = meta.value?.manifest.genMax;
     return Scaffold(
-      appBar: AppBar(title: Text(_title)),
+      appBar: AppBar(
+        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        title: Text(_title),
+        actions: const [
+          IconButton(icon: Icon(Icons.search), onPressed: null),
+        ],
+      ),
       body: year == null
           ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                if (widget.mode == BrowseMode.category) _genreChips(context),
-                if (widget.mode == BrowseMode.status) _statusChips(context),
-                if (widget.mode != BrowseMode.short)
-                  _BoardCards(
-                    key: ValueKey('${widget.mode}-$_filter-$year'),
-                    year: year,
-                    mode: widget.mode,
-                    filter: _filter,
-                  ),
-                if (widget.mode == BrowseMode.short)
-                  _ShortCards(key: ValueKey('short-$year'), year: year),
-              ],
-            ),
-    );
-  }
-
-  Widget _genreChips(BuildContext context) {
-    return _filterChips(
-      context,
-      _genres,
-      _filter,
-      (g) => setState(() => _filter = g),
-    );
-  }
-
-  Widget _statusChips(BuildContext context) {
-    return _filterChips(
-      context,
-      const ['连载中', '已完结'],
-      _filter,
-      (s) => setState(() => _filter = s),
+          : _Body(mode: widget.mode, year: year, filter: _filter, contest: _contest, onFilter: (f) => setState(() => _filter = f), onContest: (c) => setState(() => _contest = c)),
     );
   }
 }
 
-class _BoardCards extends ConsumerWidget {
-  final int year;
+class _Body extends ConsumerWidget {
   final BrowseMode mode;
+  final int year;
   final String? filter;
+  final String contest;
+  final void Function(String?) onFilter;
+  final void Function(String) onContest;
 
-  const _BoardCards({super.key, required this.year, required this.mode, this.filter});
+  const _Body({
+    required this.mode,
+    required this.year,
+    required this.filter,
+    required this.contest,
+    required this.onFilter,
+    required this.onContest,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final handleRef = ref.watch(bootProvider.future);
-    return FutureBuilder(
-      future: handleRef.then((h) => h.api.rankingFavs(
-            year: year,
-            genre: mode == BrowseMode.category ? filter : null,
-            status: mode == BrowseMode.status ? filter : null,
-            contest: mode == BrowseMode.contest ? '1' : null,
-          )),
-      builder: (context, snap) {
-        if (snap.connectionState != ConnectionState.done) {
-          return const Center(
-              child: Padding(
-            padding: EdgeInsets.all(24),
-            child: CircularProgressIndicator(),
-          ));
-        }
-        if (snap.hasError) {
-          return Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text('加载失败：${snap.error}'),
-          );
-        }
-        final items = snap.data ?? const <RankItem>[];
-        if (items.isEmpty) {
-          return const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text('该筛选下暂无作品', style: TextStyle(color: Colors.grey)),
-          );
-        }
-        return Column(
+    final scheme = Theme.of(context).colorScheme;
+    final mode = this.mode;
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Text(_caliberNote(mode),
+            style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant)),
+        const SizedBox(height: 10),
+        if (mode == BrowseMode.category) _chips(context, const ['魔幻', '玄幻', '古风', '科幻', '校园', '都市', '游戏', '悬疑'], filter, onFilter),
+        if (mode == BrowseMode.status) _chips(context, const ['连载中', '已完结'], filter, onFilter),
+        if (mode == BrowseMode.contest)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: ActionChip(
+              label: Text(
+                contest == '' ? '全部比赛 ▾' : contest,
+                style: TextStyle(fontSize: 12, color: scheme.secondary),
+              ),
+              side: BorderSide(color: scheme.secondary),
+              onPressed: () => _pickContest(context, ref),
+            ),
+          ),
+        const SizedBox(height: 12),
+        if (mode == BrowseMode.contest && contest == '')
+          _contestBanner(context),
+        if (mode == BrowseMode.short)
+          ref.watch(shortRankingProvider).when(
+                loading: () => const Center(
+                    child: Padding(
+                        padding: EdgeInsets.all(24),
+                        child: CircularProgressIndicator())),
+                error: (e, _) => Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text('加载失败：$e')),
+                data: (items) => Column(
+                  children: [
+                    for (final it in items) _ShortCard(item: it),
+                  ],
+                ),
+              ),
+        if (mode != BrowseMode.short)
+          ..._rankItems(context, ref).map(
+            (it) => _BoardCard(item: it),
+          ),
+      ],
+    );
+  }
+
+  String _caliberNote(BrowseMode mode) => switch (mode) {
+        BrowseMode.contest => '历年征文比赛参赛作品',
+        BrowseMode.short => '2 万字以下短篇 · 同代收藏分位排序',
+        _ => '同代收藏分位排序 · 排除授权作品',
+      };
+
+  Iterable<RankItem> _rankItems(BuildContext context, WidgetRef ref) {
+    final items = ref.watch(_browseProvider((mode: mode, year: year, filter: filter ?? '', contest: contest)));
+    return items.value ?? const [];
+  }
+
+  Future<void> _pickContest(BuildContext context, WidgetRef ref) async {
+    final handle = await ref.read(bootProvider.future);
+    final items = await handle.api
+        .rankingFavs(year: year, contest: '1', limit: 200);
+    final contests = <String>{
+      for (final it in items)
+        if (it.contest != null && it.contest!.isNotEmpty) it.contest!,
+    }.toList()
+      ..sort();
+    if (!context.mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: ListView(
+          shrinkWrap: true,
           children: [
-            for (final it in items) _BoardCard(item: it),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text('选择征文比赛（共 ${contests.length} 届）',
+                  style: Theme.of(context).textTheme.titleLarge),
+            ),
+            for (final c in contests)
+              ListTile(
+                title: Text(c),
+                onTap: () {
+                  onContest(c);
+                  Navigator.pop(context);
+                },
+              ),
           ],
-        );
-      },
+        ),
+      ),
     );
   }
 }
 
-class _ShortCards extends ConsumerWidget {
-  final int year;
+// ---------------------------------------------------------------------------
+// 数据
 
-  const _ShortCards({super.key, required this.year});
+typedef _BrowseQuery = ({BrowseMode mode, int year, String filter, String contest});
 
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return ref.watch(shortRankingProvider).when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text('加载失败：$e'),
-          ),
-          data: (items) => Column(
-            children: [
-              for (final it in items) _ShortCard(item: it),
-            ],
-          ),
-        );
-  }
+final _browseProvider = FutureProvider.autoDispose
+    .family<List<RankItem>, _BrowseQuery>((ref, q) async {
+  final handle = await ref.watch(bootProvider.future);
+  return handle.api.rankingFavs(
+    year: q.year,
+    genre: q.mode == BrowseMode.category ? q.filter : null,
+    status: q.mode == BrowseMode.status ? q.filter : null,
+    contest: q.mode == BrowseMode.contest ? (q.contest == '' ? '1' : q.contest) : null,
+  );
+});
+
+// ---------------------------------------------------------------------------
+// 卡片
+
+Widget _contestBanner(BuildContext context) {
+  final scheme = Theme.of(context).colorScheme;
+  return Container(
+    width: double.infinity,
+    margin: const EdgeInsets.only(bottom: 12),
+    padding: const EdgeInsets.all(10),
+    decoration: BoxDecoration(
+      color: scheme.primary.withValues(alpha: .12),
+      borderRadius: BorderRadius.circular(16),
+    ),
+    child: Text('❋ 征文比赛作品 · 选择一届查看',
+        style: TextStyle(fontSize: 11.5, color: scheme.onSurfaceVariant)),
+  );
+}
+
+Widget _chips(
+    BuildContext context, List<String> labels, String? selected, void Function(String?) onTap) {
+  return Wrap(
+    spacing: 8,
+    runSpacing: 8,
+    children: [
+      for (final label in labels)
+        FilterChip(
+          label: Text(label),
+          selected: selected == label,
+          onSelected: (sel) => onTap(sel ? label : null),
+        ),
+    ],
+  );
 }
 
 class _BoardCard extends StatelessWidget {
@@ -155,26 +224,56 @@ class _BoardCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final cover = (item.coverUrl == null || item.coverUrl!.isEmpty)
+        ? _defaultCover
+        : 'https://rss.sfacg.com/web/novel/images/NovelCover/Big/${item.coverUrl}';
+    final top = item.rank <= 3;
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: InkWell(
         onTap: () => context.push('/book/${item.nid}'),
         borderRadius: BorderRadius.circular(16),
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(12),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               SizedBox(
-                width: 34,
-                child: Text('#${item.rank}',
-                    style: TextStyle(
-                        fontFamily: 'serif',
-                        fontSize: 14,
-                        color: item.rank <= 3
-                            ? scheme.primary
-                            : scheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w700)),
+                width: 30,
+                child: Text(
+                  '${item.rank}',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: 'serif',
+                    fontSize: top ? 20 : 18,
+                    fontWeight: FontWeight.w700,
+                    color: top ? scheme.primary : scheme.onSurfaceVariant,
+                  ),
+                ),
               ),
+              const SizedBox(width: 12),
+              Container(
+                width: 40,
+                height: 56,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(6),
+                  boxShadow: [
+                    BoxShadow(
+                        color: scheme.primary.withValues(alpha: .25),
+                        offset: const Offset(-4, 4)),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: Image.network(
+                    cover,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => ColoredBox(
+                        color: scheme.primary.withValues(alpha: .15)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -185,29 +284,29 @@ class _BoardCard extends StatelessWidget {
                         style: Theme.of(context)
                             .textTheme
                             .titleLarge
-                            ?.copyWith(fontSize: 15)),
-                    const SizedBox(height: 4),
+                            ?.copyWith(fontSize: 13.5)),
+                    const SizedBox(height: 3),
                     Text(
                       '${item.author} · ${item.genre ?? '未分类'} · ${item.estYear} 代',
                       style: TextStyle(
                           fontSize: 11, color: scheme.onSurfaceVariant),
                     ),
+                    const SizedBox(height: 5),
+                    Wrap(
+                      spacing: 4,
+                      runSpacing: 4,
+                      children: [
+                        if (item.contest != null && item.contest!.isNotEmpty)
+                          _badge(context, item.contest!,
+                              fg: scheme.primary, bg: scheme.primary.withValues(alpha: .12)),
+                        _badge(context, '收藏 ${_wan(item.favs)}',
+                            fg: scheme.onSurfaceVariant),
+                        _badge(context, '分位 ${item.favPctl.toStringAsFixed(1)}%',
+                            fg: scheme.secondary),
+                      ],
+                    ),
                   ],
                 ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text('${_wan(item.favs)} 收藏',
-                      style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: scheme.primary)),
-                  const SizedBox(height: 4),
-                  Text('分位 ${item.favPctl.toStringAsFixed(1)}%',
-                      style: TextStyle(
-                          fontSize: 10, color: scheme.onSurfaceVariant)),
-                ],
               ),
             ],
           ),
@@ -225,26 +324,31 @@ class _ShortCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final top = item.rank <= 3;
+    final words = item.words;
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: InkWell(
         onTap: () => context.push('/book/${item.nid}'),
         borderRadius: BorderRadius.circular(16),
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.all(12),
           child: Row(
             children: [
               SizedBox(
-                width: 34,
-                child: Text('#${item.rank}',
-                    style: TextStyle(
-                        fontFamily: 'serif',
-                        fontSize: 14,
-                        color: item.rank <= 3
-                            ? scheme.primary
-                            : scheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w700)),
+                width: 30,
+                child: Text(
+                  '${item.rank}',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: 'serif',
+                    fontSize: top ? 20 : 18,
+                    fontWeight: FontWeight.w700,
+                    color: top ? scheme.primary : scheme.onSurfaceVariant,
+                  ),
+                ),
               ),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -255,11 +359,22 @@ class _ShortCard extends StatelessWidget {
                         style: Theme.of(context)
                             .textTheme
                             .titleLarge
-                            ?.copyWith(fontSize: 15)),
-                    const SizedBox(height: 4),
+                            ?.copyWith(fontSize: 13.5)),
+                    const SizedBox(height: 3),
                     Text(item.author,
                         style: TextStyle(
                             fontSize: 11, color: scheme.onSurfaceVariant)),
+                    const SizedBox(height: 5),
+                    Wrap(
+                      spacing: 4,
+                      children: [
+                        if (words != null)
+                          _badge(context, _wan(words),
+                              fg: scheme.onSurfaceVariant),
+                        _badge(context, '收藏 ${_wan(item.favs)}',
+                            fg: scheme.secondary),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -271,19 +386,16 @@ class _ShortCard extends StatelessWidget {
   }
 }
 
-Widget _filterChips(
-    BuildContext context, List<String> labels, String? selected, void Function(String?) onTap) {
-  return Wrap(
-    spacing: 8,
-    runSpacing: 8,
-    children: [
-      for (final label in labels)
-        FilterChip(
-          label: Text(label),
-          selected: selected == label,
-          onSelected: (sel) => onTap(sel ? label : null),
-        ),
-    ],
+Widget _badge(BuildContext context, String text, {Color? fg, Color? bg}) {
+  final scheme = Theme.of(context).colorScheme;
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+    decoration: BoxDecoration(
+      color: bg ?? Colors.transparent,
+      border: Border.all(color: scheme.outline.withValues(alpha: .5)),
+      borderRadius: BorderRadius.circular(999),
+    ),
+    child: Text(text, style: TextStyle(fontSize: 10, color: fg ?? scheme.onSurfaceVariant)),
   );
 }
 

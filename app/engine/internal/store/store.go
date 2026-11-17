@@ -241,19 +241,21 @@ LIMIT 1`
 }
 
 type RankItem struct {
-	Rank    int     `json:"rank"`
-	NID     int64   `json:"nid"`
-	Title   string  `json:"title"`
-	Author  string  `json:"author"`
-	Genre   *string `json:"genre"`
-	EstYear int     `json:"est_year"`
-	Favs    *int64  `json:"favs"`
-	FavPctl float64 `json:"fav_pctl"`
+	Rank     int     `json:"rank"`
+	NID      int64   `json:"nid"`
+	Title    string  `json:"title"`
+	Author   string  `json:"author"`
+	Genre    *string `json:"genre"`
+	EstYear  int     `json:"est_year"`
+	Favs     *int64  `json:"favs"`
+	FavPctl  float64 `json:"fav_pctl"`
+	Contest  *string `json:"contest"`
+	CoverURL *string `json:"cover_url"`
 }
 
 func (s *Store) RankingFavs(ctx context.Context, year int, genre, status, contest string, limit int) ([]RankItem, error) {
 	query := `
-SELECT nid, title, author, genre, est_year, favs, fav_pctl
+SELECT nid, title, author, genre, est_year, favs, fav_pctl, contest, cover_url
 FROM seed.books
 WHERE est_year = ? AND is_licensed = 0 AND fav_pctl IS NOT NULL`
 	args := []any{year}
@@ -266,8 +268,14 @@ WHERE est_year = ? AND is_licensed = 0 AND fav_pctl IS NOT NULL`
 		args = append(args, status)
 	}
 	if contest != "" {
-		// contest stores the contest name; non-empty means a contest entry.
-		query += " AND contest != ''"
+		// contest=1 means "any contest entry"; any other value matches one
+		// specific contest name exactly.
+		if contest == "1" {
+			query += " AND contest != ''"
+		} else {
+			query += " AND contest = ?"
+			args = append(args, contest)
+		}
 	}
 	query += " ORDER BY fav_pctl DESC, nid ASC LIMIT ?"
 	args = append(args, limit)
@@ -280,19 +288,21 @@ WHERE est_year = ? AND is_licensed = 0 AND fav_pctl IS NOT NULL`
 	items := make([]RankItem, 0, limit)
 	for rows.Next() {
 		var (
-			item RankItem
-			gen  sql.NullString
-			favs sql.NullInt64
-			pctl float64
+			item    RankItem
+			gen     sql.NullString
+			favs    sql.NullInt64
+			pctl    float64
+			contest sql.NullString
 		)
 		if err := rows.Scan(&item.NID, &item.Title, &item.Author, &gen,
-			&item.EstYear, &favs, &pctl); err != nil {
+			&item.EstYear, &favs, &pctl, &contest, &item.CoverURL); err != nil {
 			return nil, err
 		}
 		item.Rank = len(items) + 1
 		item.Genre = strPtr(gen)
 		item.Favs = intPtr(favs)
 		item.FavPctl = pctl
+		item.Contest = strPtr(contest)
 		items = append(items, item)
 	}
 	return items, rows.Err()
