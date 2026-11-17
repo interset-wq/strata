@@ -67,6 +67,23 @@ class StrataApi {
         .toList();
   }
 
+  Future<List<RankItem>> rankingNew({int limit = 50}) async {
+    final body = await _get('/rankings/new', {'limit': '$limit'});
+    return (body['items'] as List)
+        .map((e) => RankItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<List<SearchItem>> search(String q, {int limit = 50}) async {
+    final body = await _get('/search', {
+      'q': q,
+      'limit': '$limit',
+    });
+    return (body['items'] as List)
+        .map((e) => SearchItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<void> close() async => _client.close();
 }
 
@@ -141,6 +158,7 @@ class Manifest {
 }
 
 class RankItem {
+  final int rank;
   final int nid;
   final String title;
   final String author;
@@ -150,7 +168,8 @@ class RankItem {
   final double favPctl;
 
   RankItem.fromJson(Map<String, dynamic> m)
-      : nid = m['nid'] as int,
+      : rank = m['rank'] as int,
+        nid = m['nid'] as int,
         title = m['title'] as String,
         author = m['author'] as String,
         genre = m['genre'] as String?,
@@ -160,6 +179,7 @@ class RankItem {
 }
 
 class ShortItem {
+  final int rank;
   final int nid;
   final String title;
   final String author;
@@ -169,13 +189,31 @@ class ShortItem {
   final int? words;
 
   ShortItem.fromJson(Map<String, dynamic> m)
-      : nid = m['nid'] as int,
+      : rank = m['rank'] as int,
+        nid = m['nid'] as int,
         title = m['title'] as String,
         author = m['author'] as String,
         genre = m['genre'] as String?,
         estYear = m['est_year'] as int,
         favs = m['favs'] as int,
         words = m['words'] as int?;
+}
+
+class SearchItem {
+  final int nid;
+  final String title;
+  final String author;
+  final String? genre;
+  final int estYear;
+  final int? favs;
+
+  SearchItem.fromJson(Map<String, dynamic> m)
+      : nid = m['nid'] as int,
+        title = m['title'] as String,
+        author = m['author'] as String,
+        genre = m['genre'] as String?,
+        estYear = m['est_year'] as int,
+        favs = m['favs'] as int?;
 }
 
 class BookDetail {

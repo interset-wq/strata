@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../core/providers.dart';
 
@@ -14,6 +15,16 @@ class HomePage extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Strata'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.leaderboard),
+            tooltip: '榜单',
+            onPressed: () => context.go('/rankings'),
+          ),
+          IconButton(
+            icon: const Icon(Icons.search),
+            tooltip: '搜索',
+            onPressed: () => context.go('/search'),
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: '刷新 meta',

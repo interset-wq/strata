@@ -56,6 +56,38 @@ final metaProvider = FutureProvider<Meta>((ref) async {
   return handle.api.meta();
 });
 
+typedef YearGenre = ({int year, String? genre});
+
+/// 分位榜（可选题材过滤）。
+final favsRankingProvider =
+    FutureProvider.family<List<RankItem>, YearGenre>((ref, arg) async {
+  final handle = await ref.watch(bootProvider.future);
+  return handle.api.rankingFavs(year: arg.year, genre: arg.genre);
+});
+
+/// 题材榜：分位榜 + genre 必选，二者共用同一端点。
+final shortRankingProvider =
+    FutureProvider<List<ShortItem>>((ref) async {
+  final handle = await ref.watch(bootProvider.future);
+  return handle.api.rankingShort();
+});
+
+final newRankingProvider = FutureProvider<List<RankItem>>((ref) async {
+  final handle = await ref.watch(bootProvider.future);
+  return handle.api.rankingNew();
+});
+
+final searchProvider =
+    FutureProvider.family<List<SearchItem>, String>((ref, q) async {
+  final handle = await ref.watch(bootProvider.future);
+  return handle.api.search(q);
+});
+
+final bookProvider = FutureProvider.family<BookDetail, int>((ref, nid) async {
+  final handle = await ref.watch(bootProvider.future);
+  return handle.api.book(nid);
+});
+
 Future<String> _extractAssets(String dirPath) async {
   final dir = Directory(dirPath);
   await dir.create(recursive: true);
