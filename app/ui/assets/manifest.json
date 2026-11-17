@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "seed_version": "20260503.1",
+  "content_end": "2026-05-03",
+  "built_at": "2026-11-17T07:36:33+00:00",
+  "book_count": 30878,
+  "licensed_count": 47,
+  "tag_count": 105,
+  "tag_rows": 111828,
+  "gen_min": 2007,
+  "gen_max": 2025,
+  "counts": {
+    "stats_universe": 241758,
+    "base": 29433,
+    "short_added": 1398,
+    "licensed_added": 47,
+    "seed": 30878
+  },
+  "source": {
+    "dataset": "light-nook-labs/novel_hub",
+    "asset": "dataset.7z",
+    "files": 22,
+    "lines": 249832,
+    "unique_nids": 248230,
+    "analysis_rows": 245779,
+    "dropped_rows": 2451
+  },
+  "files": {
+    "db": {
+      "name": "seed.db",
+      "bytes": 16019456,
+      "sha256": "0aab13e3ad8309a9c1844e4679010ce4fe2a5e0242f0d9d4b62f223cc60d7dea"
+    },
+    "gz": {
+      "name": "seed.db.gz",
+      "bytes": 6668428,
+      "sha256": "ddc370dba8b99aeb1c8825e71f8c20df2b9a15b1b2e035abce8d3e0556b78a67"
+    }
+  }
+}
