@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import json
 import random
+import re
 import sys
 import time
 from pathlib import Path
@@ -46,6 +47,10 @@ FEATURES = [
 ]
 DEAD_TEXT = ("小说不存在", "出错啦")
 READABLE = "点击阅读"
+# 结构化判据：div.book_Catalog 下是否有 <a>。比全文关键词更稳定，
+# 不依赖下架声明文案（多数僵尸页不写声明）。正则避免引入 bs4 依赖。
+_CATALOG_RE = re.compile(r'<div[^>]*class="[^"]*book_Catalog[^"]*"[^>]*>(.*?)</div>', re.S)
+_ANCHOR_RE = re.compile(r'<a\b', re.I)
 
 _EMPTY_TALLY = {
     "text": {},
@@ -76,11 +81,15 @@ def drop_reasons() -> dict[str, list[int]]:
     return {name: df.loc[mask, "id"].tolist() for name, mask in drop_mask(df).items()}
 
 
-def classify(features: dict[str, bool], numeric_illegal: bool = False) -> str:
-    """三态判据：死亡（否定文案）> 僵尸（无阅读入口或数字非法）> 存活。"""
-    if any(features.get(text) for text in DEAD_TEXT):
+def classify(row: dict, numeric_illegal: bool = False) -> str:
+    """三态判据：死亡（否定文案）> 僵尸（无阅读入口或数字非法）> 存活。
+
+    主判据是 div.book_Catalog 是否含 <a>（结构化），关键词仅作 fallback。
+    """
+    if any(row.get(text) for text in DEAD_TEXT):
         return "死亡"
-    if numeric_illegal or not features.get(READABLE):
+    has_link = row.get("catalog_has_link", not row.get(READABLE, False))
+    if numeric_illegal or not has_link:
         return "僵尸"
     return "存活"
 
@@ -91,10 +100,12 @@ def probe(nid: int, retries: int = 3) -> dict:
             r = requests.get(BASE.format(nid=nid), headers={"User-Agent": UA}, timeout=25)
             r.encoding = "utf-8"
             text = r.text
+            catalog = _CATALOG_RE.search(text)
             return {
                 "nid": nid,
                 "status": r.status_code,
                 "size": len(r.content),
+                "catalog_has_link": bool(catalog and _ANCHOR_RE.search(catalog.group(1))),
                 **{k: k in text for k in FEATURES},
             }
         except requests.RequestException as exc:
