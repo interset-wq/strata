@@ -5,6 +5,7 @@ import '../pages/boot_page.dart';
 import '../pages/home_page.dart';
 import '../pages/rankings_page.dart';
 import '../pages/search_page.dart';
+import '../pages/shelf_page.dart';
 
 final router = GoRouter(
   initialLocation: '/boot',
@@ -13,6 +14,7 @@ final router = GoRouter(
     GoRoute(path: '/home', builder: (_, _) => const HomePage()),
     GoRoute(path: '/rankings', builder: (_, _) => const RankingsPage()),
     GoRoute(path: '/search', builder: (_, _) => const SearchPage()),
+    GoRoute(path: '/shelf', builder: (_, _) => const ShelfPage()),
     GoRoute(
       path: '/book/:nid',
       builder: (_, state) => BookDetailPage(

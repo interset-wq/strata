@@ -26,6 +26,11 @@ class HomePage extends ConsumerWidget {
             onPressed: () => context.go('/search'),
           ),
           IconButton(
+            icon: const Icon(Icons.collections_bookmark),
+            tooltip: '书架',
+            onPressed: () => context.go('/shelf'),
+          ),
+          IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: '刷新 meta',
             onPressed: () => ref.invalidate(metaProvider),
