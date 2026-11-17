@@ -197,3 +197,21 @@ Never delete or rewrite other agents' entries.
 - **Next**: none required. If more validation is wanted, keep it offline under report 20 or a new supplement;
   do not edit report 10 or the dating model.
 
+---
+
+## 2026-11-17 — AtomCode (glm5.3-flash), session 6 (Phase 4 wrap-up)
+
+- **Did**: observation retention prune at startup (180d, docs 02 §3.1); refresh
+  debounce (same nid <60s replays verdict with cached:true); shelf page
+  (/shelf route + home entry + shelfList in Dart client); contract docs/08
+  updated with both semantics.
+- **Verified**: go test + flutter analyze clean; device: shelf list shows
+  favorited book (731325 神女大人…), second refresh returns cached:true,
+  prune ran at startup without touching recent observations.
+- **Pitfall**: testseed nid 1005 is NOT in the real bundled seed — "book not
+  in seed" on device; use a real ranking nid for device-side shelf/refresh
+  checks. Also: UI favorite taps kept missing — verify shelf via adb forward
+  + curl against the engine port (find it via /proc/net/tcp on device).
+- **Next**: experimental App API pipeline (JSON parse + own three-state,
+  default off, fallback to HTML baseline) or Phase 5 watchlist/background
+  fetch. Push still pending user approval.
