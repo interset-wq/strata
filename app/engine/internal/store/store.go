@@ -290,6 +290,61 @@ WHERE est_year = ? AND is_licensed = 0 AND fav_pctl IS NOT NULL`
 	return items, rows.Err()
 }
 
+type DeepRankItem struct {
+	Rank    int      `json:"rank"`
+	NID     int64    `json:"nid"`
+	Title   string   `json:"title"`
+	Author  string   `json:"author"`
+	Genre   *string  `json:"genre"`
+	EstYear int      `json:"est_year"`
+	Value   *float64 `json:"value"`
+	Pctl    *float64 `json:"pctl"`
+	InSeed  bool     `json:"in_seed"`
+}
+
+// RankingDeep reads the additive D2 table. The candidate pool is the full
+// statistical universe at build time, not the curated seed book list. Depth is
+// the actual board size (min(200, eligible books)); it is returned so the UI can
+// show a honest "N of M" instead of pretending every board has 200 entries.
+// in_seed marks whether the nid is in the curated books table: the UI uses it
+// to route taps to the detail page only for seed books (others currently 404).
+func (s *Store) RankingDeep(ctx context.Context, year int, metric string, limit int) ([]DeepRankItem, int, error) {
+	const q = `
+SELECT d.rank_no, d.nid, d.title, d.author, d.genre, d.est_year, d.value, d.pctl,
+       COUNT(*) OVER() AS board_depth,
+       CASE WHEN b.nid IS NULL THEN 0 ELSE 1 END AS in_seed
+FROM seed.deep_ranks d
+LEFT JOIN seed.books b ON b.nid = d.nid
+WHERE d.est_year = ? AND d.metric = ?
+ORDER BY d.rank_no ASC LIMIT ?`
+	rows, err := s.DB.QueryContext(ctx, q, year, metric, limit)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	items := make([]DeepRankItem, 0, limit)
+	depth := 0
+	for rows.Next() {
+		var (
+			item   DeepRankItem
+			gen    sql.NullString
+			value  sql.NullFloat64
+			pctl   sql.NullFloat64
+			inSeed int
+		)
+		if err := rows.Scan(&item.Rank, &item.NID, &item.Title, &item.Author,
+			&gen, &item.EstYear, &value, &pctl, &depth, &inSeed); err != nil {
+			return nil, 0, err
+		}
+		item.Genre = strPtr(gen)
+		item.Value = floatPtr(value)
+		item.Pctl = floatPtr(pctl)
+		item.InSeed = inSeed != 0
+		items = append(items, item)
+	}
+	return items, depth, rows.Err()
+}
+
 type ShortItem struct {
 	Rank    int     `json:"rank"`
 	NID     int64   `json:"nid"`
@@ -353,9 +408,9 @@ LIMIT ?`, pattern, pattern, limit)
 	items := make([]SearchItem, 0, limit)
 	for rows.Next() {
 		var (
-			item  SearchItem
-			gen   sql.NullString
-			favs  sql.NullInt64
+			item SearchItem
+			gen  sql.NullString
+			favs sql.NullInt64
 		)
 		if err := rows.Scan(&item.NID, &item.Title, &item.Author, &gen,
 			&item.EstYear, &favs); err != nil {
@@ -439,10 +494,10 @@ FROM observations WHERE nid = ? ORDER BY observed_at DESC`, nid)
 	items := []Observation{}
 	for rows.Next() {
 		var (
-			o                             Observation
-			clicks, favs, praises         sql.NullInt64
-			words, shortC, longC          sql.NullInt64
-			status, updatedAt             sql.NullString
+			o                     Observation
+			clicks, favs, praises sql.NullInt64
+			words, shortC, longC  sql.NullInt64
+			status, updatedAt     sql.NullString
 		)
 		if err := rows.Scan(&o.ObservedAt, &clicks, &favs, &praises, &words,
 			&shortC, &longC, &status, &updatedAt); err != nil {
@@ -523,6 +578,43 @@ func (s *Store) PruneObservations(ctx context.Context, now time.Time) (int64, er
 	}
 	n, _ := res.RowsAffected()
 	return n, nil
+}
+
+// FeaturedBook is a carousel entry: featured=1 works chosen at seed build
+// time (编辑精选).
+type FeaturedBook struct {
+	NID      int64   `json:"nid"`
+	Title    string  `json:"title"`
+	Author   string  `json:"author"`
+	CoverURL *string `json:"cover_url"`
+	Favs     *int64  `json:"favs"`
+}
+
+// FeaturedBooks returns up to limit featured books for the home carousel.
+func (s *Store) FeaturedBooks(ctx context.Context, limit int) ([]FeaturedBook, error) {
+	rows, err := s.DB.QueryContext(ctx, `
+SELECT nid, title, author, cover_url, favs
+FROM seed.books WHERE featured = 1
+ORDER BY favs DESC LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []FeaturedBook{}
+	for rows.Next() {
+		var (
+			it      FeaturedBook
+			cover   sql.NullString
+			favs    sql.NullInt64
+		)
+		if err := rows.Scan(&it.NID, &it.Title, &it.Author, &cover, &favs); err != nil {
+			return nil, err
+		}
+		it.CoverURL = strPtr(cover)
+		it.Favs = intPtr(favs)
+		items = append(items, it)
+	}
+	return items, rows.Err()
 }
 
 func strPtr(v sql.NullString) *string {

@@ -19,6 +19,11 @@ var genres = map[string]bool{
 	"都市": true, "游戏": true, "同人": true, "悬疑": true,
 }
 
+// D2 deep-rank metrics. Keep in sync with app/tools/seedbuild/deep_ranks.py.
+var deepMetrics = map[string]bool{
+	"favs": true, "clicks": true, "praises": true, "pr": true,
+}
+
 const (
 	defaultLimit = 50
 	maxLimit     = 200
@@ -72,9 +77,11 @@ func New(s *store.Store) *gin.Engine {
 	group.POST("/books/:nid/refresh", srv.bookRefresh)
 	group.GET("/books/:nid/observations", srv.observations)
 	group.GET("/rankings/favs", srv.rankingFavs)
+	group.GET("/rankings/deep", srv.rankingDeep)
 	group.GET("/rankings/short", srv.rankingShort)
 	group.GET("/rankings/new", srv.rankingNew)
 	group.GET("/search", srv.search)
+	group.GET("/featured", srv.featured)
 	group.GET("/shelf", srv.shelfList)
 	group.PUT("/shelf", srv.shelfAdd)
 	group.DELETE("/shelf/:nid", srv.shelfRemove)
@@ -265,6 +272,49 @@ func (s *Server) rankingNew(c *gin.Context) {
 	})
 }
 
+// rankingDeep serves the D2 full-universe generation boards. Unlike
+// /rankings/favs (which reads the curated seed pool), the candidate universe
+// here is the 241,758-row statistical frame, so early generations really do
+// have a Top200 board. See app/docs/10-deep-ranks.md.
+func (s *Server) rankingDeep(c *gin.Context) {
+	rawYear := c.Query("year")
+	year, err := strconv.Atoi(rawYear)
+	if err != nil || year < s.store.Manifest.GenMin || year > s.store.Manifest.GenMax {
+		fail(c, http.StatusBadRequest, "invalid_argument",
+			"year must be between gen_min and gen_max")
+		return
+	}
+	metric := c.Query("metric")
+	if !deepMetrics[metric] {
+		fail(c, http.StatusBadRequest, "invalid_argument",
+			"metric must be favs, clicks, praises or pr")
+		return
+	}
+	limit, ok := parseLimit(c)
+	if !ok {
+		return
+	}
+	items, depth, err := s.store.RankingDeep(c.Request.Context(), year, metric, limit)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"meta": gin.H{
+			"kind":              "deep",
+			"pool":              "universe",
+			"ordering":          metric,
+			"content_end":       s.store.Manifest.ContentEnd,
+			"year":              year,
+			"metric":            metric,
+			"limit":             limit,
+			"depth":             depth,
+			"licensed_excluded": true,
+		},
+		"items": items,
+	})
+}
+
 func (s *Server) search(c *gin.Context) {
 	q := c.Query("q")
 	if q == "" {
@@ -361,6 +411,21 @@ func (s *Server) observations(c *gin.Context) {
 		return
 	}
 	items, err := s.store.Observations(c.Request.Context(), nid)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"items": items})
+}
+
+// featured returns editor-picked books (seed featured=1) for the home
+// carousel — a static, build-time curation, never presented as "hot".
+func (s *Server) featured(c *gin.Context) {
+	limit, ok := parseLimit(c)
+	if !ok {
+		return
+	}
+	items, err := s.store.FeaturedBooks(c.Request.Context(), limit)
 	if err != nil {
 		fail(c, http.StatusInternalServerError, "internal", err.Error())
 		return
