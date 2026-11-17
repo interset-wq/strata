@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -27,6 +28,18 @@ type Server struct {
 	store   *store.Store
 	limiter *crawl.Limiter
 	client  *http.Client
+
+	// Refresh debounce: same nid within the window returns the last
+	// verdict without touching the limiter (docs/08).
+	refreshMu   sync.Mutex
+	refreshLast map[int64]refreshEntry
+}
+
+const refreshDebounce = time.Minute
+
+type refreshEntry struct {
+	verdict gin.H
+	at      time.Time
 }
 
 func New(s *store.Store) *gin.Engine {
@@ -34,21 +47,23 @@ func New(s *store.Store) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Recovery())
 
-	srv := &Server{
-		store:   s,
-		limiter: crawl.NewLimiter(crawl.DefaultInterval),
-		client: &http.Client{
-			Timeout: 30 * time.Second,
-			// cmd/ffi sets GODEBUG=netdns=cgo so DNS goes through bionic
-			// getaddrinfo (Go's pure resolver cannot read /etc/resolv.conf
-			// on Android). Device-side DNS can be poisoned, so the dialer
-			// prefers verified static IPs and keeps TLS ServerName intact.
-			Transport: &http.Transport{
-				DialContext: crawl.NewHostsDialer(map[string][]string{
-					"m.sfacg.com": {"106.54.231.107"},
-				}, 10*time.Second).DialContext,
-			},
+	// cmd/ffi sets GODEBUG=netdns=cgo so DNS goes through bionic getaddrinfo
+	// (Go's pure resolver cannot read /etc/resolv.conf on Android). Device-side
+	// DNS can be poisoned, so the dialer prefers verified static IPs and keeps
+	// TLS ServerName intact.
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+		Transport: &http.Transport{
+			DialContext: crawl.NewHostsDialer(map[string][]string{
+				"m.sfacg.com": {"106.54.231.107"},
+			}, 10*time.Second).DialContext,
 		},
+	}
+	srv := &Server{
+		store:       s,
+		limiter:     crawl.NewLimiter(crawl.DefaultInterval),
+		client:      client,
+		refreshLast: map[int64]refreshEntry{},
 	}
 	group := r.Group("/strata")
 	group.GET("/healthz", srv.healthz)
@@ -289,6 +304,18 @@ func (s *Server) bookRefresh(c *gin.Context) {
 		fail(c, http.StatusBadRequest, "invalid_argument", "nid must be a positive integer")
 		return
 	}
+	// Debounce: an identical nid within the window replays the last verdict
+	// without a fetch or a limiter slot.
+	s.refreshMu.Lock()
+	if e, ok := s.refreshLast[nid]; ok && time.Since(e.at) < refreshDebounce {
+		resp := cloneVerdict(e.verdict)
+		resp["cached"] = true
+		s.refreshMu.Unlock()
+		c.JSON(http.StatusOK, resp)
+		return
+	}
+	s.refreshMu.Unlock()
+
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
 	defer cancel()
 	state, d, observedAt, err := crawl.FetchDetail(ctx, s.client, s.limiter, nid, true)
@@ -310,7 +337,20 @@ func (s *Server) bookRefresh(c *gin.Context) {
 		}
 		resp["written"] = true
 	}
+	s.refreshMu.Lock()
+	s.refreshLast[nid] = refreshEntry{verdict: resp, at: time.Now()}
+	s.refreshMu.Unlock()
 	c.JSON(http.StatusOK, resp)
+}
+
+// cloneVerdict shallow-copies a cached verdict so callers cannot mutate the
+// cache entry.
+func cloneVerdict(v gin.H) gin.H {
+	out := make(gin.H, len(v)+1)
+	for k, val := range v {
+		out[k] = val
+	}
+	return out
 }
 
 // observations returns a nid's observation history, newest first.

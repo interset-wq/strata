@@ -65,6 +65,14 @@ func StartPaths(paths appshell.Paths) (*Engine, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Retention (docs 02 §3.1): drop observations older than 180 days at
+	// startup; user.db only.
+	if n, err := st.PruneObservations(context.Background(), time.Now()); err != nil {
+		st.Close()
+		return nil, fmt.Errorf("prune observations: %w", err)
+	} else if n > 0 {
+		fmt.Printf("STRATA_PRUNED=%d\n", n)
+	}
 
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"strata/engine/internal/appshell"
 
@@ -504,6 +505,24 @@ ORDER BY s.added_at DESC`)
 		items = append(items, it)
 	}
 	return items, rows.Err()
+}
+
+// RetentionDays is the observation retention window (docs 02 §3.1:
+// keep 180 days, delete in bulk, no VACUUM).
+const RetentionDays = 180
+
+// PruneObservations deletes observations older than the retention window
+// and returns the number of rows removed. It runs at engine start and only
+// ever touches user.db.
+func (s *Store) PruneObservations(ctx context.Context, now time.Time) (int64, error) {
+	cutoff := now.AddDate(0, 0, -RetentionDays).Unix()
+	res, err := s.DB.ExecContext(ctx,
+		`DELETE FROM observations WHERE observed_at < ?`, cutoff)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	return n, nil
 }
 
 func strPtr(v sql.NullString) *string {
