@@ -59,6 +59,10 @@ Never delete or rewrite other agents' entries.
 - **Verified**: `flutter analyze` clean; debug APK on device shows
   `/strata/meta` data (seed 20260503.1, book_count=30878, licensed_count=47,
   tags 105/111828). Screenshot: `temp/ffi-build/phase2_home.png`.
+---
+
+## 2026-11-17 — AtomCode (glm5.3-flash), session 4 (Phase 3)
+
 - **Next** (Phase 3, reader MVP): Go store/API for 分位榜/题材榜/短篇榜/新书榜/详情/L1
   search if missing; Flutter ranking list + book detail + local search pages; keep
   `is_licensed=1` excluded from percentile rankings.
@@ -67,7 +71,33 @@ Never delete or rewrite other agents' entries.
 
 ---
 
-## 2026-11-17 — AtomCode (glm5.3-flash), session 4 (Phase 3)
+## 2026-11-17 — AtomCode (glm5.3-flash), session 5 (Phase 4)
+
+- **Did** (Phase 4 core COMPLETE, verified on device):
+  - `internal/crawl` (new): global limiter (foreground priority, queue-overflow
+    dropped), mobile detail fetcher, pure three-state parser (dead/zombie/alive
+    per docs/05 §4.3) with golden test on `temp/_page_48704.html` (skip if absent).
+  - API (new endpoints): POST `/books/:nid/refresh` (synchronous, classified
+    verdict, alive → observation appended), GET `/books/:nid/observations`,
+    shelf GET/PUT/DELETE. Contract docs/08 updated to "已实现".
+  - `cmd/ffi`: `GODEBUG=netdns=cgo` at init (Go pure resolver can't read
+    /etc/resolv.conf on Android → DNS hang); HostsDialer pins verified SFACG IPs
+    (device DNS poisoned: wrong IP answered TLS). DoH dialer kept in crawl/ as
+    an alternative but not wired.
+  - Flutter: detail page refresh button with verdict message, observation
+    history, shelf add/remove, effective-value display (local observation
+    overrides seed).
+- **Verified**: go test all ok; flutter analyze clean; device: refresh wrote
+  observations (favs/praises/words updated, source=local), seed.db sha256
+  unchanged across refreshes (0aab13e3…), user.db grew. Note: the phone had NO
+  internet during first attempts — 3 "failures" were environmental.
+- **Next** (Phase 4 leftovers → Phase 5): watchlist + subscription-style
+  background fetch, update heatmap/six-metric charts, retention cleanup (180d),
+  official search L2 — pending the other agent's experimental App API results.
+- **Notes**: commits 7869fdf (engine), 7c78d46 (ui). soundisle reference clone
+  in temp/soundisle (uses gomobile AAR + plain Go net; no DNS workaround needed
+  on their network — our netdns=cgo + HostsDialer stays). Another agent owns
+  API-doc rewrites: sfacg-app-api.md, 05, 07 were left untouched by us.
 
 - **Did** (Phase 3 COMPLETE, verified on device):
   - Go: `GET /strata/search?q=` (L1 local LIKE search over seed, licensed included)
@@ -128,4 +158,25 @@ Never delete or rewrite other agents' entries.
   - pub.dev here resolves `ffi: ^2.2.0` (2.3.0 unavailable in this network/mirror).
   - `test/widget_test.dart` was reduced to a placeholder (default test referenced MyApp).
   - Nothing committed yet; all changes are in the working tree.
+
+---
+
+## 2026-11-17 — WorkBuddy (session handoff, offline validation only)
+
+- **Did**: Located the previous agent's interrupted background job: `analysis/fetchers/fetch_app_api_novels.py --all --delay 0.6`,
+  whose output `analysis/out/app_api_novels.jsonl` stopped at 18:05 when that session ended. Briefly resumed it, then
+  STOPPED all crawling on user instruction and reverted the temporary script edits (`--start-page`, flushed prints);
+  the fetcher is back to its committed state. No network requests from this point on.
+- **Validated (offline, no requests)**: Used the complete magic-category enumeration (tid=21, 88,528 books) to test
+  report 10's "U-shaped in-register density" claim *within one category*, with the report's own nid bands.
+  Within nid 2,657–774,850 there are 85,852 catalog books; 85,537 (99.6%) are in `out/novels.csv`.
+  Band-wise in-register rates are 98.8–99.9% — **no U shape**; the lowest band is 650–774k (196 out-of-library books),
+  all other bands have 9–33. Interpretation: the report's U shape describes nid-slot occupancy (denominator includes
+  never-existing ids), not crawl completeness inside the live catalog. Consistent with report 10's revised conclusion
+  that the real re-crawl target is ~1k books, not 111k.
+- **Verified**: offline Python only; 111,331 unique nids in the enumeration file, zero duplicates.
+- **Next**: validate other report 10 inferences from existing data only (e.g. missing-books skew toward short/recent,
+  month-rank books not systematically delisted). Do NOT resume enumeration or hit external sites without explicit approval.
+- **Notes**: `app_api_coverage.json` (17:36: 43,901 / 262 true missing) is stale because it used a partial enumeration;
+  do not cite it as final.
 
