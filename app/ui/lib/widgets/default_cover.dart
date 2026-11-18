@@ -9,6 +9,12 @@ const _defaultCovers = [
 
 String defaultCoverUrl(int nid) => _defaultCovers[nid.abs() % 2];
 
+/// 封面加载占位：加载中显示底色块而不是空槽；加载完成原样渲染。
+Widget coverLoadingBuilder(BuildContext context, Widget child, ImageChunkEvent? progress) =>
+    progress == null
+        ? child
+        : ColoredBox(color: const Color(0x59B8AE9E), child: child);
+
 /// 封面 URL 归一化（与详情页口径一致）：
 /// - seed 静态值是相对路径（如 2025/12/xx.jpg）→ 拼 CDN 前缀；
 /// - 观测封面是完整 https URL 或 // 协议相对 → 原样/补协议；
@@ -22,7 +28,11 @@ String? coverImageUrl(String? raw) {
 
 /// 默认封面兜底图。radius>0 时裁圆角（与封面卡一致的 10）。
 Widget defaultCover(int nid, {BoxFit fit = BoxFit.cover, double radius = 0}) {
-  final image = Image.network(defaultCoverUrl(nid), fit: fit);
+  final image = Image.network(
+    defaultCoverUrl(nid),
+    fit: fit,
+    loadingBuilder: coverLoadingBuilder,
+  );
   return radius > 0
       ? ClipRRect(borderRadius: BorderRadius.circular(radius), child: image)
       : image;

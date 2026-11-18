@@ -191,8 +191,9 @@ class _DiscoverCard extends StatelessWidget {
                     ? ClipRRect(
                         borderRadius: BorderRadius.circular(6),
                         child: Image.network(
-                          coverImageUrl(coverUrl)!,
+                          'https://rs.sfacg.com/web/novel/images/images/beitouNew/\${it.nid}.jpg',
                           fit: BoxFit.cover,
+                          loadingBuilder: coverLoadingBuilder,
                           errorBuilder: (_, _, _) => defaultCover(item.nid, radius: 10),
                         ),
                       )

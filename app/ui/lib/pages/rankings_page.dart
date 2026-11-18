@@ -248,6 +248,7 @@ class _BoardCard extends StatelessWidget {
                       child: Image.network(
                         coverImageUrl(coverUrl)!,
                         fit: BoxFit.cover,
+                        loadingBuilder: coverLoadingBuilder,
                         errorBuilder: (_, _, _) => defaultCover(item.nid, radius: 10),
                       ),
                     )

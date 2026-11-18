@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../widgets/default_cover.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/providers.dart';
@@ -109,10 +111,12 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                         child: Image.network(
                           cover,
                           fit: BoxFit.cover,
+                          loadingBuilder: coverLoadingBuilder,
                           errorBuilder: (context, error, stackTrace) =>
                               Image.network(
-                            _defaultCover,
+                                _defaultCover,
                             fit: BoxFit.cover,
+                            loadingBuilder: coverLoadingBuilder,
                             errorBuilder: (_, _, _) => ColoredBox(
                                 color: scheme.primary.withValues(alpha: .15)),
                           ),

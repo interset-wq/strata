@@ -363,6 +363,7 @@ class _CoverCard extends StatelessWidget {
                           child: Image.network(
                             coverImageUrl(coverUrl)!,
                             fit: BoxFit.cover,
+                            loadingBuilder: coverLoadingBuilder,
                             errorBuilder: (_, _, _) =>
                                 _spine(context, item.nid),
                           ),
@@ -439,6 +440,7 @@ class _Spotlight extends ConsumerWidget {
                     child: Image.network(
                       'https://rs.sfacg.com/web/novel/images/images/beitouNew/${it.nid}.jpg',
                       fit: BoxFit.cover,
+                      loadingBuilder: coverLoadingBuilder,
                       errorBuilder: (_, _, _) => ColoredBox(
                         color: scheme.primary.withValues(alpha: .15),
                       ),
