@@ -34,6 +34,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from lib import paths
 
 from lib import charts  # noqa: E402
+from lib import dialogue_form  # noqa: E402
 from lib import eras  # noqa: E402
 
 BASE = paths.ROOT
@@ -143,6 +144,14 @@ def main() -> str:
     }
     rep = short[short.favs >= 200]
     rep_long = long[long.favs >= 200]
+
+    # 敏感性对比：短篇池含对话/互动小说（报告 22 §5）
+    dlg = dialogue_form.mark(d)
+    dlg["is_dlg"] = dlg["morph"] | dlg["marked"]
+    sm = (dlg["words"] <= THR) & dlg["done"]
+    short_dlg_share = dlg[sm]["is_dlg"].mean() * 100
+    short_ex = dlg[sm & ~dlg["is_dlg"]]
+    rep_ex = short_ex[short_ex["favs"] >= 200]
 
     # ---- 排序刻度对比 ----
     scales = {}
@@ -362,7 +371,12 @@ def main() -> str:
 7. **样本是低估**：报告 10 §7 证实抓取是按更新时间降序的单向游标扫描，短书被漏得最多，
    本报告所有**绝对计数**都是库内下界；相对比较方向稳健。
 8. **体积与覆盖均为实测**：种子体积由报告 18 的建库实测得出（381 B/本，扁平单表 + 3 索引 + 反范式标签表）。
-9. **所有数字现算**自 `out/novels.csv`，图表由本生成器产出，勿手改正文。
+9. **短篇池含对话/互动小说**（报告 22）：短篇集合里 {pct(short_dlg_share)}% 为对话/互动形态
+   （同人 + 未签约 + 整本 ≤2 万字判据）。剔除后敏感性对比：短篇 {num(len(short))} → {num(len(short_ex))} 本、
+   收藏中位 {short.favs.median():.0f} → {short_ex.favs.median():.0f}、
+   口碑层 {num(len(rep))} → {num(len(rep_ex))} 本。结论 6「口碑层是同人品类」
+   主体是对话小说产品线，不是传统同人短篇；剔除后排序结论方向不变。
+10. **所有数字现算**自 `out/novels.csv`，图表由本生成器产出，勿手改正文。
 
 ---
 

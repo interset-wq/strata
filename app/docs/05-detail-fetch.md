@@ -59,8 +59,9 @@ App API 无选择器解析，但三态判据不同：读 `status.httpCode`（200
 `point` 为官方废弃字段（App 不展示、值集中占位常量无区分度），**采集层直接丢弃**。
 
 解析器签名 `parse_detail(html, url) -> Result<DetailState, ParseError>`：不碰网络/数据库/时钟。
-fixture 每态至少一份真实 HTML（存活样本已有；死亡/僵尸原文待从构建剔除集中补入
-`engine/parser/testdata/`——补齐前 golden test 只覆盖存活态）。
+fixture 每态一份真实 HTML，存 `app/engine/internal/crawl/testdata/`（`alive_48704` /
+`dead_73900` / `zombie_4733`，来源与特征见该目录 README），由 `detail_fixture_test.go`
+校验三态；`detail_test.go` 的内联最小 HTML 用例保留，验证判据本身。
 站方改版：先改 fixture 与期望值 → 测试红 → 改解析器 → 绿，禁止反序。
 
 ### 三态判据（先判态，再解析）
@@ -165,5 +166,4 @@ ON CONFLICT(nid) DO UPDATE SET ...;
 
 ## 8. 待决
 
-死亡/僵尸 HTML fixture 补入 testdata（实现前置）；详情页日上限初值（建议 300 本/日）；
-30 秒去重窗口按实测调；`YY-MM-DD` 补世纪仅适用 2000 年代。
+详情页日上限初值（建议 300 本/日）；30 秒去重窗口按实测调；`YY-MM-DD` 补世纪仅适用 2000 年代。

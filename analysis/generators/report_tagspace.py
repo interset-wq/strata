@@ -42,6 +42,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from lib import paths
 
 from lib import charts  # noqa: E402
+from lib import dialogue_form  # noqa: E402
 from lib import eras  # noqa: E402
 
 BASE = paths.ROOT
@@ -655,6 +656,10 @@ def sec_vocab(d, all_tags, cnt_all, tags, n, gini_tag, fig, n_zero) -> str:
         elif cy.get(2022, 0) < 20 and cy.get(2024, 0) >= 20:
             born.append(t)
     died_str = "、".join(f"「{t}」" for t in sorted(died))
+    # 2023 年「同人」峰值里对话/互动形态占比（报告 22 §2）
+    t23 = d[(d["est_year"] == 2023) & (
+        (d["genre"] == "同人") | d["tl"].map(lambda L: "同人" in L))]
+    tong23_share = dialogue_form.mark(t23)["morph"].mean() * 100 if len(t23) else 0.0
     born_str = "、".join(f"「{t}」" for t in sorted(born))
     top = cnt_all.head(20)
     rows = [[t, f"{v:,}", f"{v / len(d) * 100:.1f}"] for t, v in top.items()]
@@ -706,6 +711,11 @@ def sec_vocab(d, all_tags, cnt_all, tags, n, gini_tag, fig, n_zero) -> str:
 3,595 本创峰值），说明同人书还在投，只是不再挂 IP 词。最可能的解释是平台对
 词表收紧管理（IP 词的版权风险或词表去重）；2026 年含「死亡」标签的书回升到
 523 本，提示部分恢复或批量回填，需要另行核实。
+
+> **口径注记（报告 22）**：这个 3,595 本的峰值同时是**对话/互动小说放量**——
+> 2023 年的同人书里 {tong23_share:.1f}% 为对话/互动形态。标签层面的「同人还在投」
+> 成立于产品线层面：投的是对话小说，不是传统同人长篇。同人 genre 峰值在 2021、
+> 同人 tag 峰值在 2023，两个峰驱动的不是同一批书。详见报告 22。
 
 **其二，2023-24 换血**。{len(born)} 个标签在 2022 年沉寂、2024 年重新活跃：
 {born_str}。同期橘味（2022 年 89 本 → 2024 年 2,894 本）、变身（73 → 2,663）、

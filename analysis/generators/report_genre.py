@@ -25,6 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from lib import paths
 
 from lib import charts  # noqa: E402
+from lib import dialogue_form  # noqa: E402
 from lib import eras  # noqa: E402
 
 OUT = paths.REPORTS_DIR / "04_genre_tags.md"
@@ -309,6 +310,10 @@ def section_genre(d: pd.DataFrame) -> str:
     )
 
     same = old[old["genre"] == "同人"]
+    # 同人类的主体是对话/互动产品线（报告 22 §2）：形态判据占比现算
+    tr_all = d[d["genre"] == "同人"]
+    tr_dlg = dialogue_form.mark(tr_all)
+    tr_dlg_share = tr_dlg["morph"].mean() * 100 if len(tr_dlg) else 0.0
     tr = d[d["genre"] == "同人"].groupby("est_year")["id"].count()
     mh_1718 = (d[(d["est_year"] >= 2017) & (d["est_year"] <= 2018)]["genre"] == "魔幻").mean() * 100
     return f"""## 1. 分类：魔幻的长期主导与「同人」类的登场
@@ -332,6 +337,13 @@ VIP 率 {pct((same["price_type"] == "VIP").mean() * 100)}%（≈零付费）、�
 {int(same["words"].median()):,} 字（九类最短）、完结率
 {pct((same["status"] == "已完结").mean() * 100)}%（九类最高）——
 免费、轻量、快完结的二创货架，与原创商业连载互不挤占。
+
+> **口径注记（报告 22）**：「同人类兴起」的主体不是传统同人长篇，而是**对话/互动
+> 小说产品线**——同人挂常规长篇无法进入 VIP 体系，故同人标签/类目高度集中在不走
+> VIP 的对话/互动。本地按形态判据，同人类中 {pct(tr_dlg_share)}% 为对话/互动形态
+> （每章约 500 字、整本可长，不以字数判形态）。本报告的份额与序列不受影响，
+> 受影响的是对「同人」的解读：这是产品线结构变化，不是题材口味变化。
+> 详见报告 22。
 
 各分类的供给份额与收藏份额错位（2007-2025 全口径）：
 

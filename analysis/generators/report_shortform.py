@@ -32,6 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from lib import paths
 
 from lib import charts  # noqa: E402
+from lib import dialogue_form  # noqa: E402
 from lib import eras  # noqa: E402
 
 OUT = paths.REPORTS_DIR / "11_shortform.md"
@@ -207,6 +208,16 @@ def build() -> str:
     g = author_frame(d)
     f = d[d["fast"]]
     done = d[d["status"] == "已完结"]
+
+    # 敏感性对比：短篇池含对话/互动小说（报告 22 §5），剔除后重算关键比例
+    dlg = dialogue_form.mark(d)
+    dlg["is_dlg"] = dlg["morph"] | dlg["marked"]
+    f_dlg_share = dlg[dlg["fast"]]["is_dlg"].mean() * 100
+    keep = ~dlg["is_dlg"]
+    fast_all = dlg["fast"].sum() / (dlg["status"] == "已完结").sum() * 100
+    fast_ex = (dlg["fast"] & keep).sum() / ((dlg["status"] == "已完结") & keep).sum() * 100
+    words_med_all = dlg[dlg["fast"]]["words"].median()
+    words_med_ex = dlg[dlg["fast"] & keep]["words"].median()
 
     fa = g[g["fast_n"] > 0]
     first_fast = g[g["first_fast"]]
@@ -467,6 +478,12 @@ featured 率 0.00%——620 本 featured 书里没有一本速更短篇。
 5. **定年误差**：完结时长依赖 nid 定年（LOO P99 = 50 天），0–7 天档
    在 low 段的误差足以把 8–30 天档错分进来；本报告沿用报告 05 的
    口径，不重新标定。
+6. **短篇池含对话/互动小说**（报告 22）：本地无品类字段，按形态判据
+   速更档里 {pct(f_dlg_share)}% 为对话/互动形态。剔除后敏感性对比：
+   速更占完结书 {pct(fast_all)}% → {pct(fast_ex)}%、字数中位
+   {int(words_med_all):,} → {int(words_med_ex):,} 字。方向与结论不变
+   （对话小说同样每章约 500 字、整本可长，不是本报告定义的「速更短篇」
+   的产品替代品），但「短篇」一词在本报告指篇幅，不含产品形态。
 """]
 
     OUT.write_text("\n".join(parts), encoding="utf-8")

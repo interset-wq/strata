@@ -20,7 +20,6 @@ out/novels.csv + out/monthly_ranks.jsonl + anchors/，缺文件报错。所有�
 
 from __future__ import annotations
 
-import re
 import sys
 from pathlib import Path
 
@@ -34,23 +33,14 @@ REPO = Path(__file__).resolve().parents[2]
 ANALYSIS = REPO / "analysis"
 sys.path.insert(0, str(ANALYSIS))
 
-from lib import charts, eras, paths  # noqa: E402
+from lib import charts, dialogue_form, eras, paths  # noqa: E402
 
 OUT = paths.REPORTS_DIR / "22_dialogue_fiction.md"
 
-# 用户通过 App 逐条目验判为对话小说的 7 个征文（无「对话/点鸭」字样，属隐藏标记）
-USER_VERIFIED_T = [
-    "怪谈异闻主题征文长篇", "春节征文长篇", "穿越主题征文", "星穹小说家征文",
-    "春节征文短篇", "战斗主题征文", "怪谈异闻主题征文短篇",
-]
-# 形态判据阈值
-MORPH_MAX_WORDS = 20_000
-# 标题 IP 特征词（米哈游系为主，对话小说同人集中区）
-IP_PATTERN = re.compile(
-    "原神|崩坏|星穹|星铁|芙宁娜|钟离|纳西妲|琪亚娜|芽衣|姬子|雷电|梅比乌斯|"
-    "奥托|布洛妮娅|希儿|舰长|女武神|米忽悠|胡桃|甘雨|刻晴|迪卢克|温迪|魈|"
-    "宵宫|万叶|绫华|心海|雷真|死士|律者|卡芙卡|镜流|景元|流萤|花火|黄泉"
-)
+# 判据与常量统一维护于 lib/dialogue_form.py（报告 04/09/11/19 共用）
+USER_VERIFIED_T = dialogue_form.USER_VERIFIED_T
+MORPH_MAX_WORDS = dialogue_form.MORPH_MAX_WORDS
+IP_PATTERN = dialogue_form.IP_PATTERN
 
 
 def num(x: float) -> str:
@@ -83,19 +73,8 @@ def load() -> pd.DataFrame:
     est = eras.estimate(df["id"]).rename(columns={"confidence": "est_conf"})
     df = df.merge(est[["id", "est_year", "est_date"]], on="id", how="left")
     df["year"] = df["est_year"].astype("Int64")
-    # 判据 1：征文标记（A 对话/点鸭 + 用户目验 7 个）
-    df["mA"] = df["contest"].str.contains("对话|点鸭", na=False)
-    df["mT"] = df["contest"].isin(USER_VERIFIED_T)
-    df["marked"] = df["mA"] | df["mT"]
-    # 判据 2：同人 + 未签约 + 短字数
-    df["tg"] = df["genre"] == "同人"
-    df["tt"] = df["tags"].str.contains("同人", na=False)
-    df["tong"] = df["tg"] | df["tt"]
-    df["unsigned"] = ~df["price"].isin(["VIP", "签约"])
-    df["morph"] = df["tong"] & df["unsigned"] & (df["words"] <= MORPH_MAX_WORDS)
-    df["hidden"] = df["morph"] & ~df["marked"]  # 无征文标记的隐藏对话/互动
-    # 判据 3：标题 IP 特征
-    df["ip_title"] = df["title"].str.contains(IP_PATTERN, na=False)
+    # 三判据统一由 lib/dialogue_form.py 打标（tg/tt 合并为 tong）
+    df = dialogue_form.mark(df)
     return df
 
 
@@ -198,9 +177,10 @@ def main() -> None:
     L.append("> 口径声明：")
     L.append("> 1. 数据 `analysis/out/novels.csv`（245,779 行，内容上界 2026-05-03，")
     L.append(">    在册存活口径），年份由 nid 定年（104 锚点，报告 01 §1），年度序列止于 2025。")
-    L.append("> 2. **本报告是新增分析，不修订任何既有报告正文**，也不改 `lib/eras.py`")
-    L.append(">    的 log(nid) 定年体系与种子。它给报告 04/09/11/19 提出口径注记建议，")
-    L.append(">    是否采纳由用户决定。")
+    L.append("> 2. **本报告是新增分析**，不改 `lib/eras.py` 的 log(nid) 定年体系与种子。")
+    L.append(">    它给报告 04/09/11/19 提的口径注记已于 2026-11-18 写入各自生成器")
+    L.append(">    （04/09 加注不改数字；11/19 加剔除对话形态后的敏感性对比），")
+    L.append(">    判据统一在 `lib/dialogue_form.py`。")
     L.append("> 3. **本地数据没有「对话/互动小说」品类的直接字段**（无 typeId/categoryId，")
     L.append(">    `genre` 只有同人/魔幻等题材标签）。三条判据都是**推断**，不是官方品类标记：")
     L.append(">    ① `contest` 含「对话/点鸭」= 对话小说（用户核实，确定性）；")
@@ -303,18 +283,27 @@ def main() -> None:
     L.append("长尾对话小说标题未必含 IP 词，故只作辅助，不用于规模估计。")
     L.append("")
 
-    L.append("## 5. 对既有报告的修订建议（未实施，待用户拍板）")
+    L.append("## 5. 对既有报告的修订（已实施，2026-11-18）")
     L.append("")
+    # 报告 04 的序列止于 2025，这里同口径取 2007–2025 以便对上
+    g4 = df[(df["genre"] == "同人") & df["year"].between(2007, 2025)]
+    g4_share = g4["morph"].mean() if len(g4) else 0.0
+    g9 = df[(df["year"] == 2023) & df["tong"]]
+    g9_share = g9["morph"].mean() if len(g9) else 0.0
     L.append(md_table(
-        ["报告", "现有表述", "建议修订", "是否改数字"],
+        ["报告", "原表述", "已写入的修订", "数字"],
         [
-            ["04 题材标签", "同人 genre 2019 上线、份额升至 17.5%", "加注：主体是对话/互动产品线（同人 genre 里约 72% 为对话形态）；非传统同人长篇兴起", "不改"],
-            ["09 标签空间", "tags 同人 2023 峰值 3,595=同人书仍在投", "加注：该峰值同时是对话小说放量（同人书里 2023 约 79% 对话形态）；genre 峰值 2021 与 tag 峰值 2023 驱动不同", "不改"],
-            ["11 短篇形态", "短篇池统计", "加口径声明：短篇池含对话小说，剔除后敏感性对比", "敏感性对比新增"],
-            ["19 短小说", "≤5 万字且完结", "同上；对话小说字数中位 4,021，污染集中在极小字数段", "敏感性对比新增"],
+            ["04 题材标签", "同人 genre 2019 上线、份额升至 17.5%",
+             f"注记：主体是对话/互动产品线（同人 genre 里 {pct(g4_share)} 为对话形态）", "原序列不改"],
+            ["09 标签空间", "tags 同人 2023 峰值 3,595=同人书仍在投",
+             f"注记：2023 同人书里 {pct(g9_share)} 为对话形态；genre 峰值 2021 与 tag 峰值 2023 驱动不同", "原序列不改"],
+            ["11 短篇形态", "短篇池统计", "口径声明 + 剔除对话形态的敏感性对比（§5 第 6 条）", "新增对比"],
+            ["19 短小说", "≤5 万字且完结", "口径声明 + 剔除对话形态的敏感性对比（§1 第 9 条）", "新增对比"],
         ]))
     L.append("")
-    L.append("本报告只给建议，不改 04/09/11/19 正文。是否采纳、是否重算数字，由用户逐份决定。")
+    L.append("上表四项均已落在各报告的生成器里：04 §1、09 §1.1 为注记（数字现算，")
+    L.append("不改变原有序列）；11 §5、19 §1 为口径声明 + 剔除对话形态后的敏感性对比。")
+    L.append("判据实现见 `analysis/lib/dialogue_form.py`，04/09/11/19 与本报告共用同一份。")
     L.append("")
 
     L.append("## 6. 可复现与局限")
