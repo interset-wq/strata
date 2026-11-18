@@ -11,11 +11,12 @@
 | 结论 |
 | --- |
 | 三条通路：**移动版 HTML = 稳定基线（默认）**；PC 版 = 补充（限观测列表点击追踪）；App API = 可选增强（失效即降级） |
+| **全字段刷新**：详情页触发的每次成功抓取，响应内所有可解析字段一次落库——成绩进 `observations` 时序、书目属性进 `book_meta` 覆盖层、封面直链进 `covers`；UI 一律覆盖层优先、种子兜底，保证本地数据不落后 |
 | 点击变化：PC 版量化 ±500 不可做；App API `viewTimes` 精确整数可做单书曲线；跨书点击变化榜不做（无曝光分母） |
 | 本站状态码零信息量（无效 nid 返回 200），判活必须匹配否定文案或结构缺陷 |
 | 三态分级写入：只有**存活**写观测；死亡/僵尸回落本地值不写 |
 | 标签不抓（无写回目标）；评论与章节仅 `watchlist` 书抓 |
-| `addTime` 只作本书补充记录，**不进定年**（定年 = `log(nid)` 反推，内插中位误差 2 天 / P99 9 天） |
+| `addTime` 不进定年**模型**（`log(nid)` 曲线不动）；命中 addTime 的书种子侧为 `est_conf=exact`、est_date 即官方值；端上写入 `book_meta.add_time`，展示「官方上架于 …」 |
 
 ## 1. 端点
 
@@ -38,7 +39,7 @@ App API 规则：
 - 移动版必须始终可用，不得出现"只有 App API 能跑"的路径；
 - 认证用 App 内置固定常量，不引入用户账号/cookie；
 - **正文绝不取**（`/Chaps/{id}?expand=content` 实测 401/507，有权限也不取）；
-- `addTime` 不进定年，只显示"官方上架于 …"。
+- `addTime` 不改变定年模型；本书展示用官方值（`book_meta.add_time`），种子侧对应 `est_conf=exact` 档。
 
 ## 2. 解析（纯函数 + golden test）
 
@@ -78,17 +79,36 @@ fixture 每态至少一份真实 HTML（存活样本已有；死亡/僵尸原文
 
 ## 3. 写回
 
-仅存活态，Go 侧单事务：
+仅存活态。**全字段刷新原则：一次请求拿到的所有可用字段都必须落库，不能只取 favs，
+也不能挑"看起来有用"的字段**——少写一个字段，本地数据就多旧一分。观测流水与
+书目覆盖层分两次写入；同一 `(nid, observed_at)` 已存在时观测行不重复：
 
 ```sql
 INSERT INTO observations(nid, observed_at, favs, praises, words, status, updated_at, source)
 VALUES (?, ?, ?, ?, ?, ?, ?, 'detail');
--- clicks：仅订阅点击追踪抓 PC/App API 时同事务 UPDATE；
+-- clicks：仅订阅点击追踪抓 PC/App API 时同事务写；
 -- short_comments / long_comments：仅作者工作台抓评论时；NULL=未抓，非 0
+
+-- 最新书目元数据覆盖层（user.db），每次成功抓取整体 UPSERT。
+-- 本次未返回的字段用 COALESCE 保留旧值（HTML 无 clicks，App API 无 praises/简介）。
+INSERT INTO book_meta(nid, source, fetched_at, title, author, author_id,
+  genre, type_id, price_type, status, cover_url, summary, words, favs, praises,
+  clicks, updated_at, add_time, point, bg_banner, category_id, is_sensitive,
+  allow_down)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(nid) DO UPDATE SET ...;
 ```
 
-- `discovered` 回填：原为 NULL 的字段用本次值填，已有值不覆盖；`source` 保留原值；
-  仍不进 `books`、不参与统计。
+- 移动版 HTML：书名、作者、分类、签约状态、封面、简介、收藏、赞、字数、状态、
+  更新时间全部解析并写入 `book_meta`；无 clicks，不伪造。
+- App API：`novelName/authorName/authorId/addTime/lastUpdateTime/markCount/
+  viewTimes/charCount/point/isFinish/signStatus/typeId/categoryId/isSensitive/
+  allowDown/novelCover/bgBanner` 全部写入；无 praises/简介，保留旧值。
+- **UI 读取顺序：书目属性（书名/作者/分类/签约/封面/简介/字数/状态/更新时间）
+  一律 `book_meta` 优先、`seed.books` 兜底**；成绩数值走 `observations` 最新观测。
+  覆盖层有值就用覆盖层，时间标注见 §5——这是"本地数据不落后"的机制保证。
+- `covers` 继续同步一份封面直链，兼容旧读路径；UI 优先读 `book_meta.cover_url`。
+- `discovered` 仍只用于官方搜索命中、种子未录入的书；不覆盖 `book_meta`。
 - **绝不写 `books`**：种子只读；写进去升级即丢、污染分位分母、与发布版本脱钩。
 - `user_stats` 增量：`fav_delta_30d`（30 天前观测相减，不足则 NULL）、
   `click_delta_30d` 恒 NULL、`obs_count`+1、`first_seen`/`last_seen`。
@@ -129,7 +149,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, 'detail');
 | 维度 | 规则 |
 | --- | --- |
 | 评论 | `op=getcomment` 精确整数（须过滤 `CommentID=0` 置顶公告）；**仅 `watchlist` 书抓**，写 `observations` 两列；全库统计不可做，观测列表内时间序列可行 |
-| 标签 | 只有 PC 版结构化，但无写回目标，不抓 |
+| 标签 | 移动版无结构化标签、App API 不返回（仅 PC 版有）；`book_meta` 可挂 `tags` 列，待需求出现再抓，v1 不抓 |
 | 章节 | 移动版目录页 168 KB 不抓；**App API `chaps` 仅 `watchlist` 书抓**（一次性快照）：逐章 `addTime`（更新热力图数据源）、`charCount`（正文口径）、VIP/废章/待审标记；落 `novel_chapters` 独立表，失败即回落 |
 
 ## 7. 不做
@@ -137,7 +157,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, 'detail');
 全库后台批量（订阅式除外）；一般读者抓 PC 版；跨书点击变化榜；一般读者抓评论；
 抓标签；移动版目录页；写 `books`；死亡/僵尸写成 0 值观测；靠状态码判活；
 按体积判活；细究下架原因；上传抓取结果/日志；App API 取代移动版基线；取正文；
-`addTime` 替换定年；为抓取引入用户凭据。
+`addTime` 整体替换定年模型；为抓取引入用户凭据。
 
 ## 8. 待决
 

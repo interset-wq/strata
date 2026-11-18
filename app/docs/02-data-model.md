@@ -10,7 +10,7 @@
 | 物理库       | `seed.db`（只读随包）+ `user.db`（可写持久），跨库只认 `nid`，禁 rowid                                                                                                                 |
 | seed.db      | `books` 24 列 + `book_tags` 2 列 + `seed_meta`，共 3 表 9 索引；唯一约束：`UNIQUE(cover_url)`、`book_tags` 主键 `(nid,tag)`、`deep_ranks` `UNIQUE(est_year,metric,nid)`（随下次种子重建生效）                                                                                                                         |
 | seed.db 体积 | SQLite 16.02 MB（519 B/本）/ gzip 6.67 MB；索引占 6.12 MB（38.2%）                                                                                                                           |
-| user.db      | 9 表：`observations` / `discovered` / `watchlist` / `novel_chapters` / `shelf`+`shelf_lists` / `annotations` / `search_history` / `prefs` / `user_stats`；观测 ≈59 B/行 |
+| user.db      | 12 表：`observations` / `book_meta` / `covers` / `discovered` / `watchlist` / `novel_chapters` / `shelf`+`shelf_lists` / `annotations` / `search_history` / `prefs` / `user_stats` / `refresh_attempts`；观测 ≈59 B/行 |
 | 预计算       | 五列分位/比率随种子携带（+25 B/本）；`pr` 预计算使赞藏比榜 44.9ms→0.056ms（800×）                                                                                                        |
 | 不建         | `tags`/`authors`/`contests` 维度表；枚举码表；FTS5；分片；STRICT 表                                                                                                                    |
 | 字符串       | 全 `TEXT`，不用 `VARCHAR(n)`（`n` 被 SQLite 忽略，零约束零信息）；不加长度/CHECK 约束——CHECK 逐行求值使 10 万行写入 58→201ms，超长标题会整批回滚；合法性由 Go 侧常量 + 逐条降级保证 |
@@ -45,7 +45,7 @@
 | 14     | `updated_at`                                                         | TEXT       | 只可作时长用，不可作时间轴                                                                          |
 | 15     | `est_year`                                                           | INTEGER    | 定年（log-nid，104 锚点）；分位与世代榜分组键                                                       |
 | 16     | `est_date`                                                           | TEXT       | 定年日期                                                                                            |
-| 17     | `est_conf`                                                           | TEXT       | high/mid/low（锚点间隔 ≤90/≤365/更远）                                                            |
+| 17     | `est_conf`                                                           | TEXT       | exact/high/mid/low（exact=App API `addTime` 直接核实的锚点书；high/mid/low=锚点间隔 ≤90/≤365/更远）|
 | 18     | `tags`                                                               | TEXT       | 管道串，仅展示与兜底；查询走 `book_tags`                                                          |
 | 19–23 | `fav_pctl` / `click_pctl` / `praise_pctl` / `pr` / `pctl_pr` | REAL       | 世代内分位 + 赞藏比（`favs<10` 时 `pr`/`pctl_pr` NULL）                                       |
 | 24     | `is_licensed`                                                        | INTEGER    | 正版日轻 47 本；为 1 时五列分位全 NULL，不进 A 类榜与统计                                           |
@@ -122,6 +122,23 @@ CREATE TABLE observations(
 CREATE INDEX idx_obs_time ON observations(observed_at DESC);
 -- 保留 180 天，按月 DELETE 裁剪，不做 VACUUM
 
+-- 最新书目元数据覆盖层：一次成功抓取返回的所有字段都写这里。
+-- seed.books 只读；读取时用本表覆盖显示值，不回写种子。
+CREATE TABLE book_meta(
+  nid INTEGER PRIMARY KEY, source TEXT NOT NULL, fetched_at INTEGER NOT NULL,
+  title TEXT, author TEXT, author_id INTEGER, genre TEXT, type_id INTEGER,
+  price_type TEXT, status TEXT, cover_url TEXT, summary TEXT,
+  words INTEGER, favs INTEGER, praises INTEGER, clicks INTEGER,
+  updated_at TEXT, add_time TEXT, point REAL, bg_banner TEXT,
+  category_id INTEGER, is_sensitive INTEGER, allow_down INTEGER
+);
+-- HTML 有简介/赞、无 clicks；App API 有 clicks/addTime/point、无简介/赞。
+-- UPSERT 时本次缺失字段保留旧值，两通路可互补。
+
+-- 封面直链缓存（兼容旧读路径，book_meta.cover_url 优先）
+CREATE TABLE covers(nid INTEGER PRIMARY KEY, cover TEXT NOT NULL,
+                    source TEXT NOT NULL DEFAULT 'app', fetched_at INTEGER NOT NULL);
+
 -- 官方搜索命中、种子未收录
 CREATE TABLE discovered(
   nid INTEGER PRIMARY KEY, title TEXT NOT NULL, author TEXT, genre TEXT,
@@ -164,6 +181,32 @@ CREATE TABLE novel_chapters(
   PRIMARY KEY(nid, chap_id)
 );
 CREATE INDEX idx_chap_added ON novel_chapters(nid, added_at);
+
+-- 封面直链缓存：兼容旧读路径；UI 优先读 book_meta.cover_url
+CREATE TABLE covers(
+  nid INTEGER PRIMARY KEY, cover TEXT NOT NULL,
+  source TEXT NOT NULL DEFAULT 'app', fetched_at INTEGER NOT NULL
+);
+
+-- 详情页成功抓取的书目覆盖层（本地数据保鲜的核心）：每次抓取把响应内
+-- 所有可解析字段整体 UPSERT，本次未返回的字段 COALESCE 保留旧值
+-- （HTML 无 clicks，App API 无 praises/简介）。字段可超种子列
+-- （summary/add_time 等）。UI 书目属性一律覆盖层优先、seed.books 兜底。
+CREATE TABLE book_meta(
+  nid INTEGER PRIMARY KEY, source TEXT NOT NULL, fetched_at INTEGER NOT NULL,
+  title TEXT, author TEXT, author_id INTEGER, genre TEXT, type_id INTEGER,
+  price_type TEXT, status TEXT, cover_url TEXT, summary TEXT,
+  words INTEGER, favs INTEGER, praises INTEGER, clicks INTEGER,
+  updated_at TEXT, add_time TEXT, point REAL, bg_banner TEXT,
+  category_id INTEGER, is_sensitive INTEGER, allow_down INTEGER
+);
+
+-- 每 nid 记一次出站详情尝试：请求前打点（失败也计入冷却窗口），
+-- 事后回填三态供诊断；不参与 UI 展示
+CREATE TABLE refresh_attempts(
+  nid INTEGER PRIMARY KEY, attempted_at INTEGER NOT NULL,
+  state TEXT NOT NULL DEFAULT 'pending'
+);
 ```
 
 跨库取较新值：

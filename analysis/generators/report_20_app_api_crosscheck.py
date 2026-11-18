@@ -162,7 +162,7 @@ def figure_dating(err: np.ndarray, conf: pd.DataFrame) -> str:
     ax.set_title(f"锚点内插段误差分布（n={len(err):,}）")
 
     ax = axs[1]
-    order = ["high", "mid", "low"]
+    order = ["exact", "high", "mid", "low"]
     groups = [conf.loc[conf.confidence == c, "err"].to_numpy() for c in order]
     valid = [(c, g) for c, g in zip(order, groups) if len(g)]
     xs = np.arange(len(valid))
@@ -199,7 +199,7 @@ def main() -> None:
     in_short = sum(w <= 10000 for w in in_words) / max(1, len(inside))
 
     conf_rows = []
-    for c in ["high", "mid", "low"]:
+    for c in ["exact", "high", "mid", "low"]:
         g = conf.loc[conf.confidence == c, "err"].to_numpy()
         if len(g):
             conf_rows.append([c, num(len(g)), num(np.median(g)), num(np.percentile(g, 99)),

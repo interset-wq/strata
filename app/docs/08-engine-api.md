@@ -69,16 +69,24 @@ UI 启动轮询即打这个端点（200ms 间隔、15s 超时），`status=="ok"
   "book": { …24 列 Book… },
   "tags": ["…"],
   "local": <Observation|null>,
-  "effective": { "clicks": …, "favs": …, "praises": …, "words": …,
-                 "status": …, "updated_at": … },
-  "cover": "https://…novelCover…" | null
+  "meta": <BookMeta|null>,
+  "effective": { "title": …, "author": …, "genre": …, "price_type": …,
+                 "clicks": …, "favs": …, "praises": …, "words": …,
+                 "status": …, "cover_url": …, "summary": …,
+                 "updated_at": …, "add_time": …, "point": …,
+                 "author_id": …, "type_id": …, "category_id": …,
+                 "is_sensitive": …, "allow_down": … },
+  "cover": "https://…cover…" | null
 }
 ```
 
-`effective` = 种子值被 `local`（最新观测）覆盖后的展示值。Phase 4 之后
-`local != null` 即 `source == "local"`。`cover` = App API 通路抓到的本地封面
-直链（`user.db.covers`），种子 `cover_url` 列大量为空（上游爬虫缺前缀，已知
-问题，待 seed builder 修复），客户端须对空值使用官方默认封面兜底。
+`effective` = 种子值依次被 `meta`（最近一次抓取的全部书目元数据）和
+`local`（最新观测）覆盖后的展示值；`local != null || meta != null` 即
+`source == "local"`。`cover` 优先取本地封面直链，种子 `cover_url` 大量为空
+或为相对路径，客户端须兼容相对路径并使用官方默认封面兜底。
+`POST /strata/books/:nid/refresh` 的 `detail` 同样返回本次请求解析到的全部字段：
+HTML 含书名/作者/分类/签约/封面/简介/收藏/赞/字数/状态/更新时间；App API 含
+`markCount/viewTimes/charCount/point/addTime/signStatus/typeId/categoryId/...`。
 
 ### GET /strata/rankings/favs?year=&genre=&limit=
 
@@ -213,7 +221,7 @@ v1 为**同步调用**（限速器已串行化，一次前台刷新只占一个�
 **降级**：App API 任何失败（签名 417/未知 nid/超时/结构变更）**静默回落**移动版
 HTML 基线，响应不带 `source` 字段——调用方无需区分。**独立判据**：App API 只判
 `status.httpCode==200 && data.novelId>0`（可用/不可用两态），死亡/僵尸三态判定仍
-以 HTML 基线为准；`addTime` 仅作端上补充记录，不进定年（05 §3.5）。
+以 HTML 基线为准；`addTime` 不进定年模型，命中书为种子 `est_conf=exact` 档（05 §0）。
 
 ### GET /strata/books/:nid/observations（**已实现**）
 

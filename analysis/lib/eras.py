@@ -12,8 +12,9 @@ log 空间更接近匀速。两端用边界段斜率外推，标记 ``extrap``�
 分位点各抓 2 本相邻 nid，末段锚点常共享同一秒级时间戳，外推斜率必须跳过
 同刻点，否则超界 nid 会被压到同一天。
 
-置信度按两侧锚点的**日期跨度**分档（不是 nid 跨度）：隔一季内 high，
-隔一年内 mid，更远 low；外推区一律 low。
+置信度按两侧锚点的**日期跨度**分档（不是 nid 跨度）：锚点书自身（App API
+``addTime`` 直接核实）为 ``exact``；隔一季内 high，隔一年内 mid，更远 low；
+外推区一律 low。
 
 误差
 ----
@@ -153,7 +154,11 @@ class _Model:
 
 
 def estimate(ids) -> pd.DataFrame:
-    """给一组 nid 定年。返回 id / est_date / est_year / confidence / mode。"""
+    """给一组 nid 定年。返回 id / est_date / est_year / confidence / mode。
+
+    confidence 四档：``exact``（锚点书，est_date 即官方 addTime，非估计）、
+    ``high``/``mid``/``low``（内插，按两侧锚点日期跨度）、外推一律 ``low``。
+    """
     anchors = load_anchors()
     model = _Model(anchors)
     ids = np.asarray(ids, dtype="float64")
@@ -170,6 +175,10 @@ def estimate(ids) -> pd.DataFrame:
     )
     conf = np.where(gap_day <= 90, "high", np.where(gap_day <= 365, "mid", "low"))
     conf = np.where(mode == "interp", conf, "low")
+    # Anchor nids carry the official App API addTime; np.interp reproduces
+    # their exact day, so est_date is already the official value — only the
+    # tier needs overriding (docs/metrics-definitions.md §1.1).
+    conf = np.where(np.isin(ids, model.nid), "exact", conf)
 
     return pd.DataFrame(
         {
