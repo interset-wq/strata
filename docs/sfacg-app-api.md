@@ -19,7 +19,7 @@
 | 4 | **`GET /novels/{id}/chaps` 返回逐章 `addTime` + `charCount`**                      | 更新热力图与全勤看板有了**精确数据源**，不必靠观测差值推断 |
 | 5 | `GET /specialpush` 返回 **77 个推送位**（42 个非空）                                   | App 首页/榜位的完整位代码表                                      |
 | 6 | **App API 不提供历史时序**（`history`/`trend`/`statistics` 全空）                  | 时序仍须自建，但每次抓取只要 0.7 KB（PC 版 15.7 KB，降 22 倍）   |
-| 7 | **`GET /adpworks/novelId/{id}` 一次请求给出改编漫画/有声的 id**（`0`=无）          | App「看漫画/听有声」按钮的数据源；衍生作品可作 IP 改编维度       |
+| 7 | **`GET /adpworks/novelId/{id}` 一次请求给出改编漫画/有声的 id**（`0`=无）          | App「看漫画/听有声」按钮的数据源；改编全站 <200 本，只作详情页入口，**不作分析维度或推荐信号** |
 
 > **正文不取**：`GET /Chaps/{id}?expand=content` 实测 **401 / errorCode 507「没有访问接口的权限」**，
 > 无需也无法绕过。本档案只覆盖书目元数据。
@@ -109,6 +109,8 @@ resp = requests.get("https://api.sfacg.com/novels/730611",
 | `GET /novels/{id}/actpushes?filter=android&pageType=` | 200           | 书内活动推送，实测 `pageType=0` 为空                            |
 | `GET /adpworks/novelId/{id}`                          | 200           | **衍生作品**：`{novelId, albumId, comicId, *LastUpdateDate}`，`0`=无 |
 | `GET /adpworks/comicId/{comic-id}`                    | 200           | 漫画 → 原著小说（同上结构，反向）                                |
+| `GET /comics/{id}`                                    | 200           | 漫画详情：`comicName`/`folderName`（Web 入口路径）/`typeId`/`viewTimes`/`isFinished`/`latestChapterTitle`/`signStatus` |
+| `GET /albums/{id}`                                    | 200           | 有声详情：`novelId`（原著）/`name`/`visitTimes`/`latestChapterId`/`coverBig\|Small\|Medium`；**无 URL 或 folderName 字段** |
 | `GET /novels/{id}/reviews`                            | **404** | `zymelaii/ubook-rs/doc/api.md` 记的路径无效（书评端点另在别处） |
 | `GET /Chaps/{id}?expand=content`                      | **401** | errorCode 507「没有访问接口的权限」——**正文不可取**       |
 | `GET /user`                                           | **401** | 「需要登录才能访问该资源」                                        |
@@ -212,6 +214,15 @@ App 详情页的「看漫画 / 听有声」按钮数据源。实测 2026-11-18�
 
 **推论**：改编不适合作全库维度或推荐信号——样本量不足（<200 本）、且被 `featured` 覆盖。
 只在展示层按需单本查询（详情页"看漫画/听有声"按钮）。
+
+**Web 入口 URL**（2026-11-18 实测）：
+
+| 类型 | 模板 | 结果 |
+| --- | --- | --- |
+| 漫画 | `http://manhua.sfacg.com/mh/{folderName}/`（`folderName` 来自 `GET /comics/{comicId}`） | 官方 `sfacg.com/catalog?tid=10` 分类页仍用此格式，但逐条实测（含官方页上的 `XJYQS`、`ZCMGT`）返回「糟糕,页面找不到了」；`mh.sfacg.com` 返回 403。**漫画 Web 端疑似下线或限区域** |
+| 有声 | 无 | 仅有 `albumId`，`book.sfacg.com/Album/{id}/`、`m.sfacg.com/a\|album\|audio/{id}/`、`sfacg.com/album\|audio/{id}/` 全部 404 / 「出错啦」 |
+
+端上按漫画模板拼装、失败由浏览器兜底；有声目前不给链接，只标「有改编」。
 
 **陷阱（与 `GetTicketNum` 同型）**：无效 nid、已死亡的书、无衍生作品的书，三者响应的
 `status` 都是 200 且 `comicId/albumId` 全 0——**不能用来判活，也不能区分「查无此书」

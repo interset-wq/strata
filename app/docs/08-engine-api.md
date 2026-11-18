@@ -89,6 +89,17 @@ HTML 含书名/作者/分类/签约/封面/简介/收藏/赞/字数/状态/更�
 `tickets`（当月月票，`GetTicketNum.ashx` 追加请求，失败为 null）；App API 含
 `markCount/viewTimes/charCount/point/addTime/signStatus/typeId/categoryId/...`。
 
+详情响应另含衍生作品入口（05 §6、§6.1），字段只在已抓到时出现：
+
+```json
+{ "comic_id": 2937, "album_id": 97, "comic_folder": "XJYQS",
+  "comic_url": "http://manhua.sfacg.com/mh/XJYQS/" }
+```
+
+`comic_url` 由本地按模板拼装，零请求；`album_id>0` 时**不给链接**（无官方 Web
+模板），UI 只标「有有声改编」。`comic_id`/`album_id` 为 `null`（未抓/失败）与
+`0`（确认无改编）都表示不显示入口。
+
 ### GET /strata/rankings/favs?year=&genre=&limit=
 
 - `year` 必填，须在 `gen_min..gen_max` 内，否则 400。
