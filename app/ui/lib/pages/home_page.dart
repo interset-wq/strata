@@ -3,8 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/providers.dart';
+import '../data/api/strata_api.dart';
 import '../widgets/banner_carousel.dart';
 import 'browse_page.dart';
+
+/// Classic 排行行卡数据（board 端点），kind: finish / popular。
+final boardProvider =
+    FutureProvider.autoDispose.family<List<RankItem>, String>((ref, kind) async {
+  final handle = await ref.watch(bootProvider.future);
+  return handle.api.rankingBoard(kind: kind, limit: 3);
+});
 
 /// 首页：编辑精选轮播 → 入口宫格 → 分类找书 → 继续浏览。
 /// 不暴露种子统计——定位是找书 App（用户反馈 2026-11-17）。
@@ -40,6 +48,10 @@ class HomePage extends ConsumerWidget {
             _entryGrid(context),
             _sectionTitle(context, '分类找书'),
             _genreChips(context),
+            _sectionTitle(context, '完本推荐'),
+            const _RecommendSection(kind: 'finish'),
+            _sectionTitle(context, '热门书'),
+            const _RecommendSection(kind: 'popular'),
             _sectionTitle(context, '继续浏览'),
             const _ContinueBrowsing(),
           ],
@@ -145,6 +157,137 @@ class HomePage extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// 推荐流分区（novly 模式）：完结库/全库按平台累计值的行卡列表，
+/// 取前 3 本。锚点是平台点击数——展示层口径（docs/12 §1），不进推荐打分。
+class _RecommendSection extends ConsumerWidget {
+  final String kind;
+
+  const _RecommendSection({required this.kind});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final items = ref.watch(boardProvider(kind));
+    return items.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.all(16),
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (e, _) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Text('加载失败：$e',
+            style: TextStyle(fontSize: 12, color: Colors.grey)),
+      ),
+      data: (list) => Column(
+        children: [
+          for (final it in list.take(3))
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+              child: _RecommendCard(item: it),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 行卡：封面/书脊 + 标题 + 作者·题材 + 点击数徽章（mockup 01 定稿）。
+class _RecommendCard extends StatelessWidget {
+  final RankItem item;
+
+  const _RecommendCard({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final coverUrl = item.coverUrl;
+    final hasCover = coverUrl != null && coverUrl.isNotEmpty;
+    return Card(
+      margin: EdgeInsets.zero,
+      child: InkWell(
+        onTap: () => context.push('/book/${item.nid}'),
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 44,
+                height: 60,
+                child: hasCover
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: Image.network(
+                          'https://rss.sfacg.com/web/novel/images/NovelCover/Big/$coverUrl',
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, _, _) =>
+                              _spine(context, item.title),
+                        ),
+                      )
+                    : _spine(context, item.title),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(item.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleLarge
+                            ?.copyWith(fontSize: 13)),
+                    const SizedBox(height: 2),
+                    Text(
+                      item.genre != null
+                          ? '${item.author} · ${item.genre}'
+                          : item.author,
+                      style: TextStyle(
+                          fontSize: 11, color: scheme.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
+                decoration: BoxDecoration(
+                    border: Border.all(
+                        color: scheme.outline.withValues(alpha: .5)),
+                    borderRadius: BorderRadius.circular(999)),
+                child: Text('点击 ${_wan(item.clicks ?? 0)}',
+                    style: TextStyle(
+                        fontSize: 10, color: scheme.onSurfaceVariant)),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+Widget _spine(BuildContext context, String title) {
+  final scheme = Theme.of(context).colorScheme;
+  return Container(
+    decoration: BoxDecoration(
+      color: scheme.surface,
+      border: Border.all(color: scheme.outline.withValues(alpha: .4)),
+      borderRadius: BorderRadius.circular(6),
+    ),
+    alignment: Alignment.center,
+    child: Text(title.isEmpty ? '书' : title.characters.first,
+        style: TextStyle(
+            fontFamily: 'serif', fontSize: 18, color: scheme.onSurfaceVariant)),
+  );
+}
+
+String _wan(int n) {
+  if (n >= 10000) return '${(n / 10000).toStringAsFixed(0)}万';
+  return '$n';
 }
 
 /// 继续浏览：书架里的书（本地足迹随使用增长）。
