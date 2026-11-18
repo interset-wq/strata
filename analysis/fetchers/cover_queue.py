@@ -1,4 +1,4 @@
-"""队列模式的种子封面补全采集器（只存 URL，不下载图片）。
+"""队列模式的种子封面补全采集器（存 URL + 一次请求的全部有用字段当期快照）。
 
 设计目标：把一个大任务（10,519 次 `GET /novels/{nid}`）拆成可持久化的队列，
 支持「批量入队 → 批量出队 → 回填」，并为后续 CI 分片执行预留接口。
@@ -16,7 +16,8 @@
   `--shard` 按 `nid % n == i` 取子集，供 CI matrix 并行（无共享可变状态）。
 - `ack --result FILE`：回填结果；失败按 `attempts` 重试，超限沉底。
 - `requeue-expired`：把超时未 ack 的 `running` 重置为 `pending`（worker 崩溃恢复）。
-- `export`：导出 `done` 的 URL 为 jsonl，供 `build_seed.py` 追加 `covers` 表。
+- `export`：导出 `done` 的 URL 为 jsonl，供 `build_seed.py` 追加 `covers` 表；
+  `--snapshots PATH` 另导出完整当期快照（见下）。
 - `fetch`：单进程 convenience worker（内部循环 dequeue→请求→ack）。CI 用 dequeue/ack 分离。
 
 ## 持久化与 CI
@@ -29,9 +30,20 @@
 
 ## 合规（继承 references/sfacg-app-api.md）
 
-只取书目元数据中的 `novelCover`，不取正文、不登录、不用用户 cookie；
+只取书目元数据，不取正文、不登录、不用用户 cookie；
 认证复用 `fetch_app_api_novels.make_headers()`（App 内置固定凭据 + 自签）；
 串行 + 间隔 ≥0.5s（脚本强制下限）。App API 是可选增强通路，失效即降级。
+
+## 一次请求、全字段落盘（2026-11-18 用户定案）
+
+每次 `GET /novels/{nid}` 返回 19 个字段，封面只是其一。成功记录在结果 jsonl
+附带 `snapshot`，落盘其余有用字段的**当期值**（对照 `docs/api-field-mapping.md`）：
+`markCount`(=favs) / `viewTimes`(=clicks) / `charCount`(=words) /
+`lastUpdateTime`(=updated_at) / `isFinish` / `signStatus` / `typeId` /
+`categoryId` / `addTime` / `authorId` / `bgBanner` / `isSensitive` / `allowDown` 等。
+**`point` 采集层直接丢弃**（官方废弃：App 不展示、值集中于占位常量无区分度）。
+快照只进结果 jsonl，**不就地覆盖 `books`**（分位分母/pr/定年红线见
+`docs/api-field-mapping.md` §5），写回策略待拍板。
 
 ## 用法
 
@@ -51,8 +63,9 @@
     #   …外部按 batch.json 请求，产出 result.jsonl…
     uv run python fetchers/cover_queue.py ack --result result.jsonl
 
-    # 3) 导出给种子构建器
+    # 3) 导出给种子构建器（URL 表）；--snapshots 另出当期快照 jsonl
     uv run python fetchers/cover_queue.py export
+    uv run python fetchers/cover_queue.py export --snapshots cover_snapshots.jsonl
 """
 from __future__ import annotations
 
@@ -78,6 +91,16 @@ import fetch_app_api_novels as F  # noqa: E402
 QUEUE_DB = paths.OUT_DIR / "cover_queue.db"
 RESULTS = paths.OUT_DIR / "cover_urls.jsonl"
 MIN_DELAY = 0.5  # 合规下限（秒），fetch 强制 clamp
+
+# 一次请求里除 novelCover 外要落盘的当期快照字段（docs/api-field-mapping.md §2）。
+# point 官方废弃（App 不展示、96.8% 恒 6.0 无区分度）——直接丢弃。
+SNAPSHOT_FIELDS = (
+    "novelName", "authorId", "authorName",
+    "markCount", "viewTimes", "charCount",
+    "lastUpdateTime", "addTime",
+    "isFinish", "signStatus", "typeId", "categoryId",
+    "bgBanner", "isSensitive", "allowDown",
+)
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS jobs(
@@ -197,13 +220,17 @@ def append_results(path: Path, records: list[dict]) -> int:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as fh:
         for r in fresh:
-            fh.write(json.dumps({
+            out = {
                 "nid": int(r["nid"]),
                 "cover_url": r["cover_url"],
                 "source": "app_api",
                 "http": int(r.get("http") or 0),
                 "fetched_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
-            }, ensure_ascii=False) + "\n")
+            }
+            snap = r.get("snapshot") or {}
+            if snap:
+                out["snapshot"] = snap
+            fh.write(json.dumps(out, ensure_ascii=False) + "\n")
     return len(fresh)
 
 
@@ -384,7 +411,8 @@ def cmd_ack(args: argparse.Namespace) -> None:
                     "claimed_by=NULL, claimed_at=NULL, updated_at=? WHERE nid=?",
                     (cover, http, now, nid),
                 )
-                successes.append({"nid": nid, "cover_url": cover, "http": http})
+                successes.append({"nid": nid, "cover_url": cover, "http": http,
+                                  "snapshot": rec.get("snapshot") or {}})
                 ok += 1
             else:
                 row = con.execute("SELECT attempts FROM jobs WHERE nid=?", (nid,)).fetchone()
@@ -424,6 +452,14 @@ def cmd_requeue_expired(args: argparse.Namespace) -> None:
 
 
 def cmd_export(args: argparse.Namespace) -> None:
+    # 快照来源=结果 jsonl（唯一持久状态），先读后写，避免 out 覆盖 results
+    snap_records = []
+    if getattr(args, "snapshots", None):
+        for rec in load_results(Path(args.results)).values():
+            snap = rec.get("snapshot") or {}
+            if snap:
+                snap_records.append({"nid": rec["nid"], "fetched_at": rec.get("fetched_at"),
+                                     "snapshot": snap})
     con = connect(Path(args.db))
     rows = con.execute(
         "SELECT nid, cover_url, source, updated_at FROM jobs "
@@ -441,15 +477,34 @@ def cmd_export(args: argparse.Namespace) -> None:
                 "fetched_at": time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(r["updated_at"])),
             }, ensure_ascii=False) + "\n")
     print(f"导出 {len(rows):,d} 条 URL → {out}")
+    # 可选：另导出成功记录的完整当期快照（来源=结果 jsonl，db 不存快照列）
+    if snap_records:
+        sp = Path(args.snapshots)
+        sp.parent.mkdir(parents=True, exist_ok=True)
+        with sp.open("w", encoding="utf-8") as fh:
+            for s in sorted(snap_records, key=lambda x: x["nid"]):
+                fh.write(json.dumps(s, ensure_ascii=False) + "\n")
+        print(f"导出 {len(snap_records):,d} 条当期快照 → {sp}")
 
 
 def _fetch_one(session: requests.Session, nid: int, timeout: float) -> dict:
-    rec = {"nid": nid, "cover_url": "", "http": 0, "error": ""}
+    """请求单本详情：封面 + 当期快照（一次请求全字段落盘）。
+
+    App 软失败（HTTP 200 但 status.httpCode≠200）按失败处理，交队列重试。
+    """
+    rec: dict = {"nid": nid, "cover_url": "", "http": 0, "error": "", "snapshot": {}}
     try:
         r = session.get(f"{F.API.rstrip('/')}/{nid}", timeout=timeout)
         rec["http"] = r.status_code
-        data = (r.json() or {}).get("data") or {}
+        body = r.json() or {}
+        biz = int(((body.get("status") or {}).get("httpCode")) or 0)
+        if biz and biz != 200:
+            msg = (body.get("status") or {}).get("msg") or ""
+            rec["error"] = f"soft-fail httpCode={biz} {msg}".strip()[:300]
+            return rec
+        data = body.get("data") or {}
         rec["cover_url"] = data.get("novelCover") or ""
+        rec["snapshot"] = {k: data[k] for k in SNAPSHOT_FIELDS if k in data}
         if not rec["cover_url"]:
             rec["error"] = "no novelCover"
     except Exception as exc:  # noqa: BLE001 - 单本失败不中断整轮
@@ -522,7 +577,8 @@ def cmd_fetch(args: argparse.Namespace) -> None:
                         (cover, int(rec.get("http") or 0), now, nid),
                     )
                     successes.append({"nid": nid, "cover_url": cover,
-                                      "http": int(rec.get("http") or 0)})
+                                      "http": int(rec.get("http") or 0),
+                                      "snapshot": rec.get("snapshot") or {}})
                 else:
                     row = con.execute("SELECT attempts FROM jobs WHERE nid=?", (nid,)).fetchone()
                     attempts = (row["attempts"] + 1) if row else 1
@@ -577,7 +633,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("ack", help="批量回填结果")
     common(p)
-    p.add_argument("--result", required=True, help="结果 jsonl：nid/cover_url/http/error")
+    p.add_argument("--result", required=True,
+                   help="结果 jsonl：nid/cover_url/http/error[/snapshot]")
     p.add_argument("--max-attempts", type=int, default=3)
     p.set_defaults(func=cmd_ack)
 
@@ -586,9 +643,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--lease", type=float, default=600)
     p.set_defaults(func=cmd_requeue_expired)
 
-    p = sub.add_parser("export", help="导出已完成的 URL")
+    p = sub.add_parser("export", help="导出已完成的 URL（--snapshots 另导当期快照）")
     common(p)
-    p.add_argument("--out", default=str(RESULTS))
+    p.add_argument("--out", default=str(paths.OUT_DIR / "cover_export.jsonl"),
+                   help="URL 导出路径（默认独立文件，避免覆盖 results 持久状态）")
+    p.add_argument("--snapshots", help="快照导出路径（含 markCount/viewTimes 等当期字段）")
     p.set_defaults(func=cmd_export)
 
     p = sub.add_parser("fetch", help="单进程 worker：出队→请求→回填")

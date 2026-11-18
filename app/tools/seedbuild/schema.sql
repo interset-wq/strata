@@ -3,6 +3,9 @@
 -- Percentiles are computed at build time over the analysis universe
 -- (is_licensed = 0, est_year in 2007..2025). Licensed books carry NULL percentiles.
 -- v2 adds the additive deep_ranks table (D2); the 24-column books table is unchanged.
+-- Uniqueness: cover_url is unique per book on the platform (NULL for missing
+-- covers); title is unique on the platform but snapshots can carry rename-window
+-- artifacts, so title duplicates are checked in validate.py, not constrained here.
 
 PRAGMA page_size = 4096;
 
@@ -30,12 +33,14 @@ CREATE TABLE books(
   praise_pctl REAL,
   pr          REAL,
   pctl_pr     REAL,
-  is_licensed INTEGER NOT NULL DEFAULT 0
+  is_licensed INTEGER NOT NULL DEFAULT 0,
+  UNIQUE(cover_url)
 );
 
 CREATE TABLE book_tags(
   nid INTEGER NOT NULL,
-  tag TEXT    NOT NULL
+  tag TEXT    NOT NULL,
+  PRIMARY KEY(nid, tag)
 );
 
 -- D2 full-universe generation Top-200 boards (see analysis/reports/21_deep_ranks.md).
@@ -52,7 +57,8 @@ CREATE TABLE deep_ranks(
   value     REAL,
   pctl      REAL,
   cover_url TEXT,
-  PRIMARY KEY(est_year, metric, rank_no)
+  PRIMARY KEY(est_year, metric, rank_no),
+  UNIQUE(est_year, metric, nid)
 );
 
 CREATE INDEX idx_deep_lookup ON deep_ranks(metric, est_year, rank_no);

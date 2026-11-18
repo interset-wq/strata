@@ -43,7 +43,8 @@
 | `pctl` | REAL | 该指标在全库同世代内的分位（构建期已算好） |
 | `cover_url` | TEXT | 封面；允许 NULL |
 
-主键 `(est_year, metric, rank_no)`，附加索引 `idx_deep_lookup(metric, est_year, rank_no)`。
+主键 `(est_year, metric, rank_no)`，另加 `UNIQUE(est_year, metric, nid)`（同一本书在
+同一榜单至多占一位），附加索引 `idx_deep_lookup(metric, est_year, rank_no)`。
 **只读、追加、不参与任何分位计算、不作为搜索或详情的数据源。**
 
 ### 1.2 榜单口径

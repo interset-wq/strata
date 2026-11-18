@@ -1,8 +1,8 @@
 # 书层 Strata
 
-![](https://img.shields.io/badge/status-research-blue) ![](https://img.shields.io/badge/data-245%2C779%20novels-green)
+![](https://img.shields.io/badge/status-research-blue) ![](<https://img.shields.io/badge/data-245%2C779%20novels-green>)
 
-对 SF 轻小说（菠萝包轻小说）二十年书目数据的可复现研究，以及一个尚未开工的产品位。
+对 SF 轻小说（菠萝包轻小说）二十年书目数据的可复现研究，并基于研究结果开发app用于帮助用户高效找书。
 
 **核心判断**：官方榜单回答「现在什么火」，本研究回答「过去十年结构如何变化」。
 一本 2015 年完结的作品不再给站方带来收入，因此不会进入任何当期榜；
@@ -13,12 +13,12 @@
 
 ## 当前状态
 
-| 层 | 目录 | 状态 |
-| --- | --- | --- |
-| 研究 | [`analysis/`](./analysis/) | **已完成**：19 份基准报告 + 3 份补充报告、88 张图，数据管线可重建 |
-| 产品 | [`app/`](./app/) | **设计中**：Flutter UI + 内嵌 Go 服务，见 [APP 设计文档 01](./app/docs/01-tech-stack.md) |
-| 接口档案 | [`analysis/references/sfacg-endpoints.md`](./analysis/references/sfacg-endpoints.md)（PC 端）+ [`sfacg-app-api.md`](./analysis/references/sfacg-app-api.md)（官方 App API） | **SFACG 接口唯一权威事实档案**：端点/参数/字段/状态码/限流；动手前必读，不要猜 API |
-| 归档 | [`archive/`](./archive/) | **历史实测档案，不是设计文档**：4 份实测细节仅供参考，数字口径已过时，见 [归档索引](./archive/README.md) |
+| 层       | 目录                                                                                                                                                           | 状态                                                                                                          |
+| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| 研究     | [`analysis/`](./analysis/)                                                                                                                                    | **已完成**：可复现的数据分析                                                                            |
+| 产品     | [`app/`](./app/)                                                                                                                                              | **开发中**：Flutter UI + 内嵌 Go 服务，见 [APP 设计文档 01](./app/docs/01-tech-stack.md)                 |
+| 接口档案 | [`docs/sfacg-endpoints.md`](./analysis/references/sfacg-endpoints.md)（PC 端）+ [`sfacg-app-api.md`](./analysis/references/sfacg-app-api.md)（官方 App API） | **SFACG 接口唯一权威事实档案**：端点/参数/字段/状态码/限流；动手前必读，不要猜 API                      |
+| 归档     | [`archive/`](./archive/)                                                                                                                                      | **历史实测档案，不是设计文档**：4 份实测细节仅供参考，数字口径已过时，见 [归档索引](./archive/README.md) |
 
 **引用任何数字之前，先读 [`analysis/README.md`](./analysis/README.md) 的口径约束。**
 `archive/` 下的报告基于早期数据集（246,045 本、2026-06 快照、`quarry/` 管线），
@@ -31,25 +31,31 @@
 **任何涉及 SFACG 端点、参数、字段、状态码或抓取的工作，
 先读下面两档——对应哪一端就读哪一档，不要凭印象猜 API。**
 
-| 档案 | 覆盖 | 关键差异 |
-| --- | --- | --- |
-| [`analysis/references/sfacg-endpoints.md`](./analysis/references/sfacg-endpoints.md) | **PC 端** HTML + `HTML5.ashx`：15 端点总表、三类搜索接口字段覆盖、`novelbytype` 枚举、详情页/目录/评论/榜单选择器、静默限流与失败模式 | 点击数带「万」量化（±500）；**无上架时间** |
-| [`analysis/references/sfacg-app-api.md`](./analysis/references/sfacg-app-api.md) | **官方移动端 App** `api.sfacg.com`：认证机制、19 字段字典、77 个推送位、**逐章时间戳** | 单本仅 0.7 KB；**`addTime` 精确到秒**、**`viewTimes` 精确整数** |
+| 档案                                                                                  | 覆盖                                                                                                                                            | 关键差异                                                                        |
+| ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| [`analysis/references/sfacg-endpoints.md`](./analysis/references/sfacg-endpoints.md) | **PC 端** HTML + `HTML5.ashx`：15 端点总表、三类搜索接口字段覆盖、`novelbytype` 枚举、详情页/目录/评论/榜单选择器、静默限流与失败模式 | 点击数带「万」量化（±500）；**无上架时间**                               |
+| [`analysis/references/sfacg-app-api.md`](./analysis/references/sfacg-app-api.md)     | **官方移动端 App** `api.sfacg.com`：认证机制、19 字段字典、77 个推送位、**逐章时间戳**                                            | 单本仅 0.7 KB；**`addTime` 精确到秒**、**`viewTimes` 精确整数** |
 
 **不要凭印象猜 API**——本项目已多次因猜测踩坑：
 
-| 想当然的写法 | 实测真相 |
-| --- | --- |
-| 搜索参数用 `q` / `key` / `s` | 只有 `keyword` 可用，其余报 501 |
-| `novelbytype` 用 GET | 必须 POST + `Referer`，GET 报 501 |
-| 无效 nid 返回 404 | 返回 **HTTP 200** + 文案「小说不存在」/「出错啦」，状态码零信息量 |
-| 搜索能翻页拿全量 | HTML 硬截断 30 条，连约 17 次静默限流返回「0 结果」不报错 |
-| 按「>5 KB 含书名」判存活 | 僵尸页 13–15 KB、与存活页体积中位只差 35 B，必须看 `div.book_Catalog` 有无 `<a>` |
-| App API 需要用户账号 | 用 App 内置固定凭据 + 每次请求自签即可；**但正文接口无权限，不取正文** |
+| 想当然的写法                       | 实测真相                                                                              |
+| ---------------------------------- | ------------------------------------------------------------------------------------- |
+| 搜索参数用 `q` / `key` / `s` | 只有 `keyword` 可用，其余报 501                                                     |
+| `novelbytype` 用 GET             | 必须 POST + `Referer`，GET 报 501                                                   |
+| 无效 nid 返回 404                  | 返回 **HTTP 200** + 文案「小说不存在」/「出错啦」，状态码零信息量               |
+| 搜索能翻页拿全量                   | HTML 硬截断 30 条，连约 17 次静默限流返回「0 结果」不报错                             |
+| 按「>5 KB 含书名」判存活           | 僵尸页 13–15 KB、与存活页体积中位只差 35 B，必须看 `div.book_Catalog` 有无 `<a>` |
+| App API 需要用户账号               | 用 App 内置固定凭据 + 每次请求自签即可；**但正文接口无权限，不取正文**          |
 
 档案的实测依据来自 2026-11-16 / 2026-11-17 现网请求，探针为
 `analysis/fetchers/probe_sfacg_api.py`、`probe_novelbytype.py`、`probe_sfacg_app_api.py`；
-上游实现参照 `temp/sfacg_tools/sfacglib/`（不入库）。
+上游实现参照 [sfacg_tools](https://github.com/light-nook-labs/sfacg_tools)（`sfacglib/`）。
+
+想临时看某个端点**实际返回哪些字段**，用根目录的极简脚本
+[`tools/api_inspect.py`](./tools/api_inspect.py)：`uv run --project analysis python tools/api_inspect.py`
+直接跑，里面是现成的 `res = requests.get(...)` + `dump(res)` 例子（改 URL 即可看别的端点，
+注释里列了详情/章节/列表/搜索/推送位/榜单等）。只依赖 requests，无 CLI、无 main。
+遵守同一套合规边界（只取书目元数据、不取正文、不登录、串行、低频）。
 产品侧的接口用法另见 [`app/docs/04-search.md`](./app/docs/04-search.md) 与
 [`app/docs/05-detail-fetch.md`](./app/docs/05-detail-fetch.md)；
 **`archive/search.md` 是旧稿，已被档案实测否定，不得作为接口依据。**
@@ -58,14 +64,14 @@
 
 ## 数据速览
 
-| 项 | 值 |
-| --- | --- |
-| 唯一原始数据集 | `analysis/data/extracted/dataset/data/meta*.jsonl`，22 文件 / 249,832 行 |
-| 规范化书目表 | `analysis/out/novels.csv`，245,779 行 × 15 列（构建时已剔除正版日轻 47 行） |
-| 数据内容上界 | **2026-05-03**（原始 jsonl 的 `max(last_update)`，即扫描起点，非统一读取时刻） |
-| 上架年定年 | `analysis/lib/eras.py`，104 锚点、log(nid) 分段线性，留一法 P99 = 50 天 |
-| 在架覆盖率 | 约 69.3%（报告 10 已重写：三态判据 + 按 nid 段分层加权；旧 68.9% 量级未变、口径已改） |
-| 产出 | 19 份基准报告 + 3 份补充报告、88 张图，均由生成器产出 |
+| 项             | 值                                                                                     |
+| -------------- | -------------------------------------------------------------------------------------- |
+| 唯一原始数据集 | `analysis/data/extracted/dataset/data/meta*.jsonl`，22 文件 / 249,832 行             |
+| 规范化书目表   | `analysis/out/novels.csv`，245,779 行 × 15 列（构建时已剔除正版日轻 47 行）         |
+| 数据内容上界   | **2026-05-03**（原始 jsonl 的 `max(last_update)`，即扫描起点，非统一读取时刻） |
+| 上架年定年     | `analysis/lib/eras.py`，104 锚点、log(nid) 分段线性，留一法 P99 = 50 天              |
+| 在架覆盖率     | 约 69.3%（报告 10 已重写：三态判据 + 按 nid 段分层加权；旧 68.9% 量级未变、口径已改）  |
+| 产出           | 19 份基准报告 + 3 份补充报告、88 张图，均由生成器产出                                  |
 
 抓取方式决定了数据的边界：原始 jsonl 是 Scrapy 按天切分、追加写入的产物，
 列表页按 `last_update` 降序、每天从上一天断点续爬。全量是一次约三周、
@@ -146,17 +152,17 @@ for f in generators/report_*.py; do uv run python "$f"; done   # 全部 22 份�
 
 ## 文档索引
 
-| 文档 | 用途 | 状态 |
-| --- | --- | --- |
-| [`analysis/README.md`](./analysis/README.md) | 数据管线、报告清单、口径约束 | **当前口径，先读** |
-| [`analysis/reports/`](./analysis/reports/) | 19 份基准报告 + 3 份补充报告正文与 88 张图 | **当前结论** |
-| [`archive/README.md`](./archive/README.md) | 早期实测档案索引与失效清单 | 历史稿，4 份实测细节可参考 |
-| [`archive/data-findings.md`](./archive/data-findings.md) | 早期全量实测（字段陷阱、榜单机制、banner、标签） | 实测细节可参考，数字过时 |
-| [`archive/search.md`](./archive/search.md) | 三个官方接口实测边界与搜索方案 | 接口事实可参考，方案已重设为 `app/docs/04-search.md` |
-| [`archive/architecture.md`](./archive/architecture.md) | 早期架构、六个入口、种子策略 | 方案已重设为 `app/docs/01`–`07`；§6.5 末保留服务端四条进入条件 |
-| [`app/README.md`](./app/README.md) | 产品设计与文档索引（01–07） | **当前方案**，见 [`app/docs/01-tech-stack.md`](./app/docs/01-tech-stack.md) |
+| 文档                                                      | 用途                                             | 状态                                                                               |
+| --------------------------------------------------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| [`analysis/README.md`](./analysis/README.md)             | 数据管线、报告清单、口径约束                     | **当前口径，先读**                                                           |
+| [`analysis/reports/`](./analysis/reports/)               | 19 份基准报告 + 3 份补充报告正文与 88 张图       | **当前结论**                                                                 |
+| [`archive/README.md`](./archive/README.md)               | 早期实测档案索引与失效清单                       | 历史稿，4 份实测细节可参考                                                         |
+| [`archive/data-findings.md`](./archive/data-findings.md) | 早期全量实测（字段陷阱、榜单机制、banner、标签） | 实测细节可参考，数字过时                                                           |
+| [`archive/search.md`](./archive/search.md)               | 三个官方接口实测边界与搜索方案                   | 接口事实可参考，方案已重设为 `app/docs/04-search.md`                             |
+| [`archive/architecture.md`](./archive/architecture.md)   | 早期架构、六个入口、种子策略                     | 方案已重设为 `app/docs/01`–`07`；§6.5 末保留服务端四条进入条件               |
+| [`app/README.md`](./app/README.md)                       | 产品设计与文档索引（01–07）                     | **当前方案**，见 [`app/docs/01-tech-stack.md`](./app/docs/01-tech-stack.md) |
 
-`temp/` 下是参考项目与原始抓取脚本，不进版本库。
+`temp/` 下是参考项目的本地镜像（上游见各文档链接：[sfacg_tools](https://github.com/light-nook-labs/sfacg_tools)、[novly](https://github.com/light-nook-labs/novly)、[go-music-dl](https://github.com/guohuiyuan/go-music-dl)）与原始抓取脚本，不进版本库。
 
 ---
 
@@ -183,20 +189,3 @@ for f in generators/report_*.py; do uv run python "$f"; done   # 全部 22 份�
 本项目以 **GNU Affero 通用公共许可证第 3 版（AGPL-3.0）** 授权，
 Copyright (C) 2026 interset-wq，许可证全文见 [`LICENSE`](./LICENSE)。
 分析文字与图表版权归作者所有。
-
-**为什么用 AGPL 而不是宽松许可**：本项目包含面向第三方站点的抓取与解析代码。
-AGPL 第 13 条要求，若将（修改后的）程序作为网络服务提供给他人使用，
-必须向使用者提供完整的对应源码。这使「拿本项目搭一套抓取服务、闭源运营」
-的合法成本提高到需要公开自己的改动。
-
-**它的边界，需要说清楚**：
-
-- 许可证是**法律约束，不是技术措施**。它不阻止私人自用的抓取
-  （AGPL 不约束未分发、未对外提供网络服务的自用行为），
-  也不能替代礼貌访问。真正约束滥用强度的是引擎层的全局限速与单日上限。
-- 分发修改版、或将其作为网络服务对外提供，均须以 AGPL-3.0 开源完整对应源码；
-  **不提供商业授权例外**。
-- 已发布版本不可撤回授权：`v0.0.1` 及更早按 MIT 发布，该版本继续受 MIT 约束；
-  自本版起的新代码按 AGPL-3.0 授权。
-
-如果你的使用场景与上述义务不兼容（例如必须闭源分发），请勿使用本代码。

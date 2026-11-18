@@ -161,6 +161,14 @@ def check_db(db_path: Path, seed: pd.DataFrame, meta: dict) -> None:
         if dup:
             _fail(errors, f"{dup} duplicate nids")
 
+        # Title is unique on the platform; a duplicate here means a rename-window
+        # snapshot artifact (old book renamed/deleted, its name re-taken). Block
+        # the build and list the pairs so each case can be adjudicated manually.
+        for title, nids in conn.execute(
+                "SELECT title, GROUP_CONCAT(nid) FROM books"
+                " GROUP BY title HAVING COUNT(*) > 1"):
+            _fail(errors, f"duplicate title {title!r}: nids {nids}")
+
         print(
             f"validate: books={books} licensed={licensed} tags={tag_rows}/{tag_count}"
             f" universe={meta['universe_rows']} base={meta['base']}"

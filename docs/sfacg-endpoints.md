@@ -5,7 +5,7 @@
 > **全部结论来自 2026-11-16 的现网请求**，探针脚本 `fetchers/probe_sfacg_api.py`（搜索/详情/三接口）
 > 与 `fetchers/probe_novelbytype.py`（分类枚举），原始结果 `out/sfacg_api_probe.json`、`out/novelbytype_bounds.json`。
 > **不引用** `archive/search.md`（2026-11-15 旧稿）的数字——其「HTML 全量」判断已被本次实测否定（§2.3）。
-> **上游实现参照**：`temp/sfacg_tools/sfacglib/`（解析器与参数以它为准，本档只做核对与补测）。
+> **上游实现参照**：[sfacg_tools](https://github.com/light-nook-labs/sfacg_tools) `sfacglib/`（解析器与参数以它为准，本档只做核对与补测）。
 > **时点声明**：接口无契约、随时可能变。本档所有条数、体积、限流阈值都是当日单次观测，
 > 引用时必须带「实测于 2026-11-16」。
 >
@@ -620,7 +620,7 @@ GET https://pages.sfacg.com/ajax/act/MonthlyBoy.ashx?op=getRanks&date={YYYY-MM}&
 
 ## 10. 上游实现的问题清单
 
-`temp/sfacg_tools` 可直接复用，但以下四处在端上必须自行处理：
+[sfacg_tools](https://github.com/light-nook-labs/sfacg_tools) 可直接复用（本地镜像在 `temp/`，不入库），但以下四处在端上必须自行处理：
 
 | # | 位置 | 问题 | 后果 |
 | --- | --- | --- | --- |
@@ -641,7 +641,7 @@ GET https://pages.sfacg.com/ajax/act/MonthlyBoy.ashx?op=getRanks&date={YYYY-MM}&
 uv run --project analysis python analysis/fetchers/probe_sfacg_api.py
 # → analysis/out/sfacg_api_probe.json
 # 含 §9「无效 nid 返回 200」的三例对照，是 §4.4 的证据来源
-# 两个探针都只依赖 requests，不引用 temp/sfacg_tools（那份代码不在仓库内）
+# 两个探针都只依赖 requests，不引用 sfacg_tools 上游库
 
 # 分类枚举边界（约 6 分钟，九类二分；--verify 追加页间重叠校验）
 uv run --project analysis python analysis/fetchers/probe_novelbytype.py [--tid 29] [--verify]
