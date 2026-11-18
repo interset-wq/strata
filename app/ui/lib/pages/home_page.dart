@@ -46,8 +46,6 @@ class HomePage extends ConsumerWidget {
             const SizedBox(height: 8),
             _sectionTitle(context, '找书入口'),
             _entryGrid(context),
-            _sectionTitle(context, '分类找书'),
-            _genreChips(context),
             _sectionTitle(context, '完本推荐'),
             const _RecommendSection(kind: 'finish'),
             _sectionTitle(context, '热门书'),
@@ -140,23 +138,6 @@ class HomePage extends ConsumerWidget {
     );
   }
 
-  Widget _genreChips(BuildContext context) {
-    const genres = ['魔幻', '玄幻', '古风', '科幻', '校园', '都市', '悬疑'];
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          for (final g in genres)
-            ActionChip(
-              label: Text(g),
-              onPressed: () => context.go('/rankings'),
-            ),
-        ],
-      ),
-    );
-  }
 }
 
 /// 推荐流分区（novly 模式）：完结库/全库按平台累计值的行卡列表，
