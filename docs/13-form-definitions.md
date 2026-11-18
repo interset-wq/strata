@@ -253,7 +253,7 @@ def classify_form(row) -> str:
 - 引擎：榜单/发现流加 `form` 过滤；长篇榜排除 `dialogue`、短篇榜排除 `medium`；
   各形式给独立入口（对接契约 12 §6）。
 - 推荐层：优质短篇用 `fav_pctl` 同代判定（§6.1.2）；**长篇区的排序信号是 `lqs`**
-  （篇幅加权口碑分，见 `app/docs/16-length-weighted-quality.md`），二者都接入契约 12 §3.2 白名单；
+  （篇幅加权口碑分，见 [`16-length-weighted-quality.md`](./16-length-weighted-quality.md)），二者都接入契约 12 §3.2 白名单；
   绝对 favs 只在展示层作锚点，不回流打分。
 - 报告 22 三判据、报告 06 征文命名约定、09 附录 D 决策为上游依据，**本文不修改它们**。
 - 三判据的可执行实现在 `analysis/lib/dialogue_form.py`（报告 22 与 04/09/11/19 的

@@ -106,7 +106,7 @@ len = log(字数/15万) / log(100万/15万)，夹在 [0,1]
   压到 20 万字量级；`lqs` 把篇幅作为**有界先验**（最多 25%）加回去。
 - 与收藏量秩相关 −0.01、与 `pr` +0.62——是口碑榜不是热度榜。
 - **不是质量标签**：只在推荐层排序，展示层沿用 §2.3 的分位并列口径。
-- 权威口径、校准与边界：`app/docs/16-length-weighted-quality.md`；实现 `analysis/lib/lqs.py`。
+- **权威口径、校准与边界：[`16-length-weighted-quality.md`](./16-length-weighted-quality.md)**；实现 `analysis/lib/lqs.py`。
 
 ---
 
@@ -154,7 +154,7 @@ len = log(字数/15万) / log(100万/15万)，夹在 [0,1]
 后台推荐仍统一走量化信号。
 
 - **信号白名单**（可用）：`fav_pctl` / `click_pctl` / `praise_pctl` / `pr` / `pctl_pr`
-  等同代分位与口碑效率信号。
+  等同代分位与口碑效率信号，以及长篇区的 `lqs`（§2.4）。
 - **红线**（禁止回流打分）：平台累计 `clicks`/`favs` 原始值、书龄、`form` 外的运营位。
   目的是防马太效应后门（头部永久高曝光）。
 - 推荐为**口碑驱动、非协同过滤**（无用户行为日志）。
@@ -169,6 +169,7 @@ len = log(字数/15万) / log(100万/15万)，夹在 [0,1]
 | 官方字段的原始语义、端点参数 | [`sfacg-app-api.md`](./sfacg-app-api.md)、[`sfacg-endpoints.md`](./sfacg-endpoints.md) |
 | 指标的**物理存储**、列类型、索引、体积 | `app/docs/02-data-model.md` |
 | 小说形式 `form` 的五值判定与优先级 | [`13-form-definitions.md`](./13-form-definitions.md) |
+| `lqs` 的完整定义、校准、行为与边界 | [`16-length-weighted-quality.md`](./16-length-weighted-quality.md) |
 | 深榜 D2 的指标与深度 | `app/docs/10-deep-ranks.md`、报告 21 |
 | 双模式展示/推荐解耦 | `app/docs/12-dual-mode.md` |
 | 各指标的分析结论与图表 | `analysis/reports/` 对应报告（01–22） |

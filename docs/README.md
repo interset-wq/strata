@@ -14,6 +14,7 @@
 | [`sfacg-live-ranks.md`](./sfacg-live-ranks.md) | 接口事实 | 现网榜单端点（`MonthlyBoy.ashx` 任意月、月票/新书/热销口径） |
 | [`metrics-definitions.md`](./metrics-definitions.md) | **自定义指标** | 定年/universe/五分位/pr/覆盖率/断更/生命状态/推荐信号白名单的唯一权威定义 |
 | [`13-form-definitions.md`](./13-form-definitions.md) | **小说形式** | `form` 五值（short/medium/long/dialogue/ip_collab）判定优先级、边界、优质短篇判定 |
+| [`16-length-weighted-quality.md`](./16-length-weighted-quality.md) | **自定义指标** | 篇幅加权口碑分 `lqs`：长篇区排序信号，`pr` 的「世代 × 收藏档」分位 × 归一化篇幅系数（0.75–1.0）、校准与边界 |
 | [`api-field-mapping.md`](./api-field-mapping.md) | **字段对应** | App API 18 字段 ↔ CSV/books 列的实测对应、一致率、值映射、写回约束（`point`/`bgBanner` 误映射纠正） |
 
 ## 使用约定
@@ -22,7 +23,8 @@
   只剩一行项目根绝对路径（如 `/docs/sfacg-app-api.md`），指向本目录。
   交叉引用无需修改——顺着指针即可找到正文。
 - **路径是项目根绝对路径**：以 `/docs/...` 表示，不是操作系统绝对路径。
-- **权威性**：接口事实以本目录三份为准；指标口径以 `metrics-definitions.md` 为准；
+- **权威性**：接口事实以本目录三份为准；指标口径以 `metrics-definitions.md` 为准
+  （`lqs` 的完整定义在其 [`16-length-weighted-quality.md`](./16-length-weighted-quality.md)）；
   形式以 `13-form-definitions.md` 为准；API 字段与本地列的对应关系以 `api-field-mapping.md`
   为准。报告里的数字是结论，不是定义。
 
