@@ -52,7 +52,7 @@ App API 规则：
 | `status` | `.book_info div` | 取含「完结/连载」片段；当期态 |
 | `updated_at` | `.book_info3` | `YY-MM-DD` 固定补 `20` 前缀 |
 | 简介/封面 | `.book_bk_qs1` / `.book_info img[src]` | 协议相对 URL 补 `https:` |
-| 打赏（第 3 项） | — | 无数字，不解析；月票 v1 丢弃 |
+| 打赏（第 3 项） | — | 无数字，不解析；页内月票项不解析——月票走 GetTicketNum 端点（§6，精确值） |
 
 App API 无选择器解析，但三态判据不同：读 `status.httpCode`（200 存活 / 404 死亡 /
 **417 或 401 = 通路不可用，不是书死了**）；`markCount`/`charCount` 缺失或非法 = 僵尸。
@@ -101,6 +101,8 @@ ON CONFLICT(nid) DO UPDATE SET ...;
 
 - 移动版 HTML：书名、作者、分类、签约状态、封面、简介、收藏、赞、字数、状态、
   更新时间全部解析并写入 `book_meta`；无 clicks，不伪造。
+- 月票：存活态追加 `GetTicketNum.ashx`（1 B）写 `book_meta.tickets`；请求失败
+  月票置 NULL，不影响其余字段落库。
 - App API：`novelName/authorName/authorId/addTime/lastUpdateTime/markCount/
   viewTimes/charCount/point/isFinish/signStatus/typeId/categoryId/isSensitive/
   allowDown/novelCover/bgBanner` 全部写入；无 praises/简介，保留旧值。
@@ -149,6 +151,7 @@ ON CONFLICT(nid) DO UPDATE SET ...;
 | 维度 | 规则 |
 | --- | --- |
 | 评论 | `op=getcomment` 精确整数（须过滤 `CommentID=0` 置顶公告）；**仅 `watchlist` 书抓**，写 `observations` 两列；全库统计不可做，观测列表内时间序列可行 |
+| 月票 | `GetTicketNum.ashx?nid=` 裸整数（`docs/sfacg-endpoints.md` §7.3）：**存活态详情抓取追加 1 次**（1 B），失败置 NULL 不阻塞；写入 `book_meta.tickets`。**当月值每月 1 日清零，跨月不可比**——只存当期、UI 标「本月」，不做月票时序与月票榜 |
 | 标签 | 移动版无结构化标签、App API 不返回（仅 PC 版有）；`book_meta` 可挂 `tags` 列，待需求出现再抓，v1 不抓 |
 | 章节 | 移动版目录页 168 KB 不抓；**App API `chaps` 仅 `watchlist` 书抓**（一次性快照）：逐章 `addTime`（更新热力图数据源）、`charCount`（正文口径）、VIP/废章/待审标记；落 `novel_chapters` 独立表，失败即回落 |
 
@@ -157,7 +160,8 @@ ON CONFLICT(nid) DO UPDATE SET ...;
 全库后台批量（订阅式除外）；一般读者抓 PC 版；跨书点击变化榜；一般读者抓评论；
 抓标签；移动版目录页；写 `books`；死亡/僵尸写成 0 值观测；靠状态码判活；
 按体积判活；细究下架原因；上传抓取结果/日志；App API 取代移动版基线；取正文；
-`addTime` 整体替换定年模型；为抓取引入用户凭据。
+`addTime` 整体替换定年模型；为抓取引入用户凭据；月票时序/月票榜（当月值
+每月清零、时序断序，`book_meta.tickets` 只存当期）。
 
 ## 8. 待决
 

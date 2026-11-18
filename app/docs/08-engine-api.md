@@ -85,7 +85,8 @@ UI 启动轮询即打这个端点（200ms 间隔、15s 超时），`status=="ok"
 `source == "local"`。`cover` 优先取本地封面直链，种子 `cover_url` 大量为空
 或为相对路径，客户端须兼容相对路径并使用官方默认封面兜底。
 `POST /strata/books/:nid/refresh` 的 `detail` 同样返回本次请求解析到的全部字段：
-HTML 含书名/作者/分类/签约/封面/简介/收藏/赞/字数/状态/更新时间；App API 含
+HTML 含书名/作者/分类/签约/封面/简介/收藏/赞/字数/状态/更新时间，外加
+`tickets`（当月月票，`GetTicketNum.ashx` 追加请求，失败为 null）；App API 含
 `markCount/viewTimes/charCount/point/addTime/signStatus/typeId/categoryId/...`。
 
 ### GET /strata/rankings/favs?year=&genre=&limit=

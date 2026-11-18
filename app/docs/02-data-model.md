@@ -130,10 +130,12 @@ CREATE TABLE book_meta(
   price_type TEXT, status TEXT, cover_url TEXT, summary TEXT,
   words INTEGER, favs INTEGER, praises INTEGER, clicks INTEGER,
   updated_at TEXT, add_time TEXT, point REAL, bg_banner TEXT,
-  category_id INTEGER, is_sensitive INTEGER, allow_down INTEGER
+  category_id INTEGER, is_sensitive INTEGER, allow_down INTEGER,
+  tickets INTEGER   -- 当月月票（GetTicketNum.ashx，每月 1 日清零；NULL=未抓/失败）
 );
 -- HTML 有简介/赞、无 clicks；App API 有 clicks/addTime/point、无简介/赞。
--- UPSERT 时本次缺失字段保留旧值，两通路可互补。
+-- UPSERT 时本次缺失字段保留旧值，两通路可互补。UI 书目属性一律覆盖层优先、
+-- seed.books 兜底——这是「本地数据不落后」的机制保证。
 
 -- 封面直链缓存（兼容旧读路径，book_meta.cover_url 优先）
 CREATE TABLE covers(nid INTEGER PRIMARY KEY, cover TEXT NOT NULL,
@@ -181,25 +183,6 @@ CREATE TABLE novel_chapters(
   PRIMARY KEY(nid, chap_id)
 );
 CREATE INDEX idx_chap_added ON novel_chapters(nid, added_at);
-
--- 封面直链缓存：兼容旧读路径；UI 优先读 book_meta.cover_url
-CREATE TABLE covers(
-  nid INTEGER PRIMARY KEY, cover TEXT NOT NULL,
-  source TEXT NOT NULL DEFAULT 'app', fetched_at INTEGER NOT NULL
-);
-
--- 详情页成功抓取的书目覆盖层（本地数据保鲜的核心）：每次抓取把响应内
--- 所有可解析字段整体 UPSERT，本次未返回的字段 COALESCE 保留旧值
--- （HTML 无 clicks，App API 无 praises/简介）。字段可超种子列
--- （summary/add_time 等）。UI 书目属性一律覆盖层优先、seed.books 兜底。
-CREATE TABLE book_meta(
-  nid INTEGER PRIMARY KEY, source TEXT NOT NULL, fetched_at INTEGER NOT NULL,
-  title TEXT, author TEXT, author_id INTEGER, genre TEXT, type_id INTEGER,
-  price_type TEXT, status TEXT, cover_url TEXT, summary TEXT,
-  words INTEGER, favs INTEGER, praises INTEGER, clicks INTEGER,
-  updated_at TEXT, add_time TEXT, point REAL, bg_banner TEXT,
-  category_id INTEGER, is_sensitive INTEGER, allow_down INTEGER
-);
 
 -- 每 nid 记一次出站详情尝试：请求前打点（失败也计入冷却窗口），
 -- 事后回填三态供诊断；不参与 UI 展示

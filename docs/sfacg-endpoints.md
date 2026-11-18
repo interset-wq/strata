@@ -73,6 +73,8 @@
 | 13 | 当期五榜 | `GET m.sfacg.com/rank/{original,bm,new,jp,sale}.html` | 无 | 20 | 无 | 12.5 KB |
 | 14 | PC 榜单页 | `GET book.sfacg.com/Rank/` | 无 | 4 榜同页 | 无 | — |
 | 15 | 分类列表（PC） | `GET book.sfacg.com/List/?tid={n}` | 无 | 分页 | `PageIndex` | 34 KB |
+| 16 | 更新窗口列表 | `GET book.sfacg.com/List/?ud={days}&PageIndex={n}` | 无 | 20 | `PageIndex`（站方截断 ≈82 页） | 29 KB |
+| 17 | 单书月票 | `GET book.sfacg.com/ajax/ashx/GetTicketNum.ashx?nid={id}` | 无 | 1 本 | — | 1 B |
 
 **分类 tid 映射**（从 PC 分类页现抓，九个值，无遗漏）：
 
@@ -286,6 +288,18 @@ tid={tid}&pi={页码}
 **限流表现（与 HTML 搜索相反）**：连打 30 次、间隔 0.5 秒，**30/30 全部成功、零空响应**；
 0.3 秒间隔连扫 929 页（悬疑整类）同样零失败。单页 1.5 KB，42,568 页约 **62 MB 流量**，
 按 0.5 s/页约 **5.9 小时**（实测约 1.4 s/页，整类九类全扫实际需 16 小时以上）。
+
+### 3.5 更新窗口列表（`List/?ud={days}`）——最近 N 天被触碰的书（2026-11-18 实测）
+
+`GET book.sfacg.com/List/?ud={days}&PageIndex={n}`，PC HTML，20 本/页，按最近更新降序。
+页头「现在有`<span>N</span>`部小说」报窗口总数（ud=7 实测 1,943），但**站方在 ≈82 页
+（≈1,640 本）截断**——与月榜 top20 右截断同性质，报的数翻不到。列表行自带标题/作者
+（含 authorId）/评分/分类 tid/更新日期/字数，详情抓取失败仍有可用行。
+
+与 novelbytype（#4）的分工：枚举全库但**无增量能力**（§3 陷阱）；ud 列表是唯一
+「最近被更新」的高效增量发现源，ud=15/30 可扩窗（窗口上界未测）。
+端点与截断上限发现自第三方 `jiweiyaya/sfacg-rank`（github.com/jiuweiyaya/sfacg-rank），
+本项目实测复核：ud=7 PageIndex=1 → 28.7 KB / 20 条 / 总数 1,943。
 
 ### 5.1 目录容量、实际返回量与报告 10 的口径
 
@@ -553,6 +567,20 @@ GET https://pages.sfacg.com/ajax/act/MonthlyBoy.ashx?op=getRanks&date={YYYY-MM}&
 | `m.sfacg.com/rank/sale.html` | 热销 | 20 | 无数值 |
 
 全部 12.5 KB，nid 在相对链接 `/b/{nid}/` 里。**要数值只能走 PC 榜单页或月榜接口。**
+
+### 7.3 单书月票（`GetTicketNum.ashx`）——免认证裸整数（2026-11-18 实测）
+
+`GET book.sfacg.com/ajax/ashx/GetTicketNum.ashx?nid={id}` → 响应体就是裸整数（如 `3189`），
+无认证、无 JSON 包装。语义是**当月**票数（每月 1 日清零），与 `MonthlyBoy.ashx` 的
+`ticketNum` 同口径。注意：
+
+- **无效 nid 与真零月票同为 `'0'`**——不能判活，只对已判活的书取值；
+- 老书可能真实为 0（nid=48704 实测 0）；活跃书正常（nid=750700 → 3189，同页 PC 详情
+  「本月排名 999 名」「收藏 15877」交叉吻合）；
+- 单请求 1 B，限速下成本忽略不计；App 详情页可追加此请求获得精确月票
+  （v1 设计丢弃月票，见 05 §6，接入属产品决策）。
+
+来源：第三方 `jiuweiyaya/sfacg-rank`，本项目实测复核。
 
 ---
 
@@ -829,7 +857,7 @@ json.dump({k:df.loc[v,'id'].tolist() for k,v in drop_mask(df).items()},
 | 1 | `pi` 的深翻页在「新书插入」时是否会漂移（今天测的是单时刻稳定性） | 决定全库枚举能否增量续扫 |
 | 2 | 枚举首页是否等价于「最近更新」——若是，可用 1 页/类做增量 | 可把整类全扫降为秒级 |
 | 3 | 移动版详情页的标签在哪个 JS 变量里 | 若可解析，详情页只抓移动版即可（15 KB vs 73 KB） |
-| 4 | `api.sfacg.com/novels/{nid}?expand=ticket` 需 Basic 认证，未测 | 单书月票（周/月）只能走此端点 |
+| 4 | ~~`api.sfacg.com/novels/{nid}?expand=ticket`~~ **已解决（2026-11-18）**：单书当月月票走 `GetTicketNum.ashx?nid=`，免认证裸整数（§7.3）；App API expand=ticket 不再必要 | 详情页/watchlist 可低成本获得精确月票 |
 | 5 | HTML 搜索限流的准确恢复时间（>3 分钟，未测到上界） | 决定重试退避策略 |
 | 6 | 枚举 ≈221,354 与库内 245,779 的双向差额：库外以新书为主（165/187）、真遗漏仅 0.47%；库内 10.1% 未进分类目录 | 决定「官方目录」能否作为种子补全的权威源，也决定覆盖率该怎么算 |
 | 7 | ~~重写 `report_survival.py`~~ **已完成 2026-11-17**：三态判据 + 分母先扣 manifest 剔 2,451 本 + 按 nid 段分层加权；覆盖率 69.3%（旧 68.9% 量级未变，口径已改），§2.1 揭示在册密度 U 型 / 缺失槽位存活率倒 U 型 = 游标形状，§4.1 给补爬量约 1 千本 | 报告 10 正文与生成器均已更新；报告 05 偏倚评估的「库内断更率」读法仍待单独处理 |
