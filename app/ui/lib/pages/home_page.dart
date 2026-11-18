@@ -340,7 +340,7 @@ class _CoverCard extends StatelessWidget {
                       ? ClipRRect(
                           borderRadius: BorderRadius.circular(10),
                           child: Image.network(
-                            'https://rss.sfacg.com/web/novel/images/NovelCover/Big/$coverUrl',
+                            coverImageUrl(coverUrl)!,
                             fit: BoxFit.cover,
                             errorBuilder: (_, _, _) => _spine(context, item.nid),
                           ),

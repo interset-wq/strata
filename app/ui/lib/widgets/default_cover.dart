@@ -9,6 +9,17 @@ const _defaultCovers = [
 
 String defaultCoverUrl(int nid) => _defaultCovers[nid.abs() % 2];
 
+/// 封面 URL 归一化（与详情页口径一致）：
+/// - seed 静态值是相对路径（如 2025/12/xx.jpg）→ 拼 CDN 前缀；
+/// - 观测封面是完整 https URL 或 // 协议相对 → 原样/补协议；
+/// - 空值 → null（调用方回退默认封面）。
+String? coverImageUrl(String? raw) {
+  if (raw == null || raw.isEmpty) return null;
+  if (raw.startsWith('http')) return raw;
+  if (raw.startsWith('//')) return 'https:$raw';
+  return 'https://rss.sfacg.com/web/novel/images/NovelCover/Big/$raw';
+}
+
 /// 默认封面兜底图。radius>0 时裁圆角（与封面卡一致的 10）。
 Widget defaultCover(int nid, {BoxFit fit = BoxFit.cover, double radius = 0}) {
   final image = Image.network(defaultCoverUrl(nid), fit: fit);

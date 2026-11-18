@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../widgets/default_cover.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -226,7 +228,7 @@ class _BoardCard extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final cover = (item.coverUrl == null || item.coverUrl!.isEmpty)
         ? _defaultCover
-        : 'https://rss.sfacg.com/web/novel/images/NovelCover/Big/${item.coverUrl}';
+        : coverImageUrl(item.coverUrl)!;
     final top = item.rank <= 3;
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
@@ -365,7 +367,7 @@ class _ShortCard extends StatelessWidget {
                   child: Image.network(
                     (item.coverUrl == null || item.coverUrl!.isEmpty)
                         ? _defaultCover
-                        : 'https://rss.sfacg.com/web/novel/images/NovelCover/Big/${item.coverUrl}',
+                        : coverImageUrl(item.coverUrl)!,
                     fit: BoxFit.cover,
                     errorBuilder: (_, _, _) => ColoredBox(
                         color: scheme.primary.withValues(alpha: .15)),
