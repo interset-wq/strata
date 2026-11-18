@@ -96,6 +96,7 @@ func New(s *store.Store) *gin.Engine {
 	group.GET("/rankings/short", srv.rankingShort)
 	group.GET("/rankings/new", srv.rankingNew)
 	group.GET("/search", srv.search)
+	group.GET("/random", srv.random)
 	group.GET("/featured", srv.featured)
 	group.GET("/shelf", srv.shelfList)
 	group.PUT("/shelf", srv.shelfAdd)
@@ -304,6 +305,23 @@ func (s *Server) rankingNew(c *gin.Context) {
 // /rankings/favs (which reads the curated seed pool), the candidate universe
 // here is the 241,758-row statistical frame, so early generations really do
 // have a Top200 board. See app/docs/10-deep-ranks.md.
+// random samples the seed uniformly at random for the home shuffle grid.
+func (s *Server) random(c *gin.Context) {
+	limit, ok := parseLimit(c)
+	if !ok {
+		return
+	}
+	items, err := s.store.RandomBooks(c.Request.Context(), limit)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"meta":  gin.H{"pool": "seed", "ordering": "random"},
+		"items": items,
+	})
+}
+
 // rankingBoard is the Classic full-catalog board (docs/12 showcase column):
 // platform cumulative values, offset-paginated. Display-only pathway.
 func (s *Server) rankingBoard(c *gin.Context) {

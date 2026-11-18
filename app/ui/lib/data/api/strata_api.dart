@@ -137,6 +137,13 @@ class StrataApi {
     await _delete('/watchlist/$nid');
   }
 
+  Future<List<RankItem>> randomBooks({int limit = 8}) async {
+    final body = await _get('/random', {'limit': '$limit'});
+    return (body['items'] as List)
+        .map((e) => RankItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<List<ShelfItem>> shelfList() async {
     final body = await _get('/shelf');
     return (body['items'] as List)

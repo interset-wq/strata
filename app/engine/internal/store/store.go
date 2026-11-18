@@ -612,6 +612,41 @@ func (s *Store) WatchPollDone(ctx context.Context, nid, at int64) error {
 	return err
 }
 
+// RandomBooks samples n unlicensed seed books uniformly at random
+// (ORDER BY RANDOM), used by the home "shuffle" grid. Cover and stats
+// included so cards render identically to board items.
+func (s *Store) RandomBooks(ctx context.Context, limit int) ([]RankItem, error) {
+	rows, err := s.DB.QueryContext(ctx, `
+SELECT nid, title, author, genre, est_year, status, words, clicks, favs, cover_url
+FROM seed.books
+WHERE is_licensed = 0
+ORDER BY RANDOM() LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []RankItem{}
+	for rows.Next() {
+		var (
+			item                RankItem
+			gen, status, cover  sql.NullString
+			words, clicks, favs sql.NullInt64
+		)
+		if err := rows.Scan(&item.NID, &item.Title, &item.Author, &gen,
+			&item.EstYear, &status, &words, &clicks, &favs, &cover); err != nil {
+			return nil, err
+		}
+		item.Genre = strPtr(gen)
+		item.Status = strPtr(status)
+		item.Words = intPtr(words)
+		item.Clicks = intPtr(clicks)
+		item.Favs = intPtr(favs)
+		item.CoverURL = strPtr(cover)
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
 // Search is the L1 local search over the bundled seed (title/author LIKE).
 // Licensed books are included: they are searchable and detail-visible by
 // design, just excluded from percentile rankings.

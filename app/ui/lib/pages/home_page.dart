@@ -14,6 +14,13 @@ final boardProvider =
   return handle.api.rankingBoard(kind: kind, limit: 3);
 });
 
+/// 随机书架数据源：/random 均匀抽样，换一换即 invalidate。
+final randomProvider =
+    FutureProvider.autoDispose<List<RankItem>>((ref) async {
+  final handle = await ref.watch(bootProvider.future);
+  return handle.api.randomBooks(limit: 4);
+});
+
 /// 首页：编辑精选轮播 → 入口宫格 → 分类找书 → 继续浏览。
 /// 不暴露种子统计——定位是找书 App（用户反馈 2026-11-17）。
 class HomePage extends ConsumerWidget {
@@ -40,10 +47,14 @@ class HomePage extends ConsumerWidget {
               const SizedBox(height: 8),
               _sectionTitle(context, '找书入口'),
               _entryGrid(context),
-              _sectionTitle(context, '完本推荐'),
-              const _RecommendSection(kind: 'finish'),
-              _sectionTitle(context, '热门书'),
-              const _RecommendSection(kind: 'popular'),
+              _sectionTitle(context, '人气风向标'),
+              const _ShowcaseSection(kind: 'popular'),
+              _sectionTitle(context, '完结精选'),
+              const _BoardGrid(kind: 'finish'),
+              _sectionTitle(context, '今日精品更新'),
+              const _Spotlight(),
+              _sectionTitle(context, '随机书架'),
+              const _ShuffleGrid(),
               _sectionTitle(context, '继续浏览'),
               const _ContinueBrowsing(),
             ],
@@ -219,12 +230,11 @@ class HomePage extends ConsumerWidget {
 
 }
 
-/// 推荐流分区（novly 模式）：完结库/全库按平台累计值的行卡列表，
-/// 取前 3 本。锚点是平台点击数——展示层口径（docs/12 §1），不进推荐打分。
-class _RecommendSection extends ConsumerWidget {
+/// 人气风向标（官方式）：两列封面卡 + 榜单角标，platform clicks 展示层口径。
+class _ShowcaseSection extends ConsumerWidget {
   final String kind;
 
-  const _RecommendSection({required this.kind});
+  const _ShowcaseSection({required this.kind});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -239,97 +249,251 @@ class _RecommendSection extends ConsumerWidget {
         child: Text('加载失败：$e',
             style: TextStyle(fontSize: 12, color: Colors.grey)),
       ),
-      data: (list) => Column(
-        children: [
-          for (final it in list.take(3))
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-              child: _RecommendCard(item: it),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 行卡：封面/书脊 + 标题 + 作者·题材 + 点击数徽章（mockup 01 定稿）。
-class _RecommendCard extends StatelessWidget {
-  final RankItem item;
-
-  const _RecommendCard({required this.item});
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final coverUrl = item.coverUrl;
-    final hasCover = coverUrl != null && coverUrl.isNotEmpty;
-    return Card(
-      margin: EdgeInsets.zero,
-      child: InkWell(
-        onTap: () => context.push('/book/${item.nid}'),
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 44,
-                height: 60,
-                child: hasCover
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(6),
-                        child: Image.network(
-                          'https://rss.sfacg.com/web/novel/images/NovelCover/Big/$coverUrl',
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) =>
-                              _spine(context, item.title),
-                        ),
-                      )
-                    : _spine(context, item.title),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(item.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge
-                            ?.copyWith(fontSize: 13)),
-                    const SizedBox(height: 2),
-                    Text(
-                      item.genre != null
-                          ? '${item.author} · ${item.genre}'
-                          : item.author,
-                      style: TextStyle(
-                          fontSize: 11, color: scheme.onSurfaceVariant),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
-                decoration: BoxDecoration(
-                    border: Border.all(
-                        color: scheme.outline.withValues(alpha: .5)),
-                    borderRadius: BorderRadius.circular(999)),
-                child: Text('点击 ${_wan(item.clicks ?? 0)}',
-                    style: TextStyle(
-                        fontSize: 10, color: scheme.onSurfaceVariant)),
-              ),
+      data: (list) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (var i = 0; i < list.take(2).length; i++) ...[
+              if (i > 0) const SizedBox(width: 12),
+              Expanded(child: _CoverCard(item: list[i], rank: i + 1)),
             ],
-          ),
+          ],
         ),
       ),
     );
   }
 }
 
+/// 完结精选：4 列封面网格（board finish 前 4）。
+class _BoardGrid extends ConsumerWidget {
+  final String kind;
+
+  const _BoardGrid({required this.kind});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final items = ref.watch(boardProvider(kind));
+    return items.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.all(16),
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (e, _) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Text('加载失败：$e',
+            style: TextStyle(fontSize: 12, color: Colors.grey)),
+      ),
+      data: (list) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (var i = 0; i < list.take(4).length; i++) ...[
+              if (i > 0) const SizedBox(width: 10),
+              Expanded(child: _CoverCard(item: list[i], rank: null)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 封面卡：CDN 实图/书脊字占位 + 可选榜单角标。
+class _CoverCard extends StatelessWidget {
+  final RankItem item;
+  final int? rank;
+
+  const _CoverCard({required this.item, this.rank});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final coverUrl = item.coverUrl;
+    final hasCover = coverUrl != null && coverUrl.isNotEmpty;
+    return InkWell(
+      onTap: () => context.push('/book/${item.nid}'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AspectRatio(
+            aspectRatio: 3 / 4,
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: hasCover
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.network(
+                            'https://rss.sfacg.com/web/novel/images/NovelCover/Big/$coverUrl',
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, _, _) => _spine(context, item.title),
+                          ),
+                        )
+                      : _spine(context, item.title),
+                ),
+                if (rank != null)
+                  Positioned(
+                    top: 6,
+                    left: 6,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: scheme.primary,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text('人气榜 No.$rank',
+                          style: TextStyle(
+                              fontSize: 9, color: scheme.onPrimary)),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(item.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                  fontSize: 12, fontWeight: FontWeight.w600)),
+          Text(
+            '${item.genre ?? ''}${item.status != null ? ' · ${item.status}' : ''}',
+            style: TextStyle(
+                fontSize: 10, color: scheme.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 今日精品更新：编辑精选第一本，单本大图沉浸式（官方式）。
+class _Spotlight extends ConsumerWidget {
+  const _Spotlight();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final featured = ref.watch(featuredProvider);
+    return featured.when(
+      loading: () => const SizedBox.shrink(),
+      error: (e, _) => const SizedBox.shrink(),
+      data: (items) {
+        if (items.isEmpty) return const SizedBox.shrink();
+        final it = items.first;
+        final scheme = Theme.of(context).colorScheme;
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: InkWell(
+            onTap: () => context.push('/book/${it.nid}'),
+            borderRadius: BorderRadius.circular(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AspectRatio(
+                  aspectRatio: 2,
+                  child: ClipRRect(
+                    borderRadius:
+                        const BorderRadius.vertical(top: Radius.circular(16)),
+                    child: Image.network(
+                      'https://rs.sfacg.com/web/novel/images/images/beitouNew/${it.nid}.jpg',
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, _, _) =>
+                          ColoredBox(color: scheme.primary.withValues(alpha: .15)),
+                    ),
+                  ),
+                ),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: scheme.surface,
+                    borderRadius: const BorderRadius.vertical(
+                        bottom: Radius.circular(16)),
+                    border: Border.all(
+                        color: scheme.outline.withValues(alpha: .4)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(it.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.w700)),
+                      const SizedBox(height: 3),
+                      Text(it.author,
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: scheme.onSurfaceVariant)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// 随机书架：/random 均匀抽样 + 换一换（官方"次元新书"同款）。
+class _ShuffleGrid extends ConsumerStatefulWidget {
+  const _ShuffleGrid();
+
+  @override
+  ConsumerState<_ShuffleGrid> createState() => _ShuffleGridState();
+}
+
+class _ShuffleGridState extends ConsumerState<_ShuffleGrid> {
+  @override
+  Widget build(BuildContext context) {
+    final items = ref.watch(randomProvider);
+    return items.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.all(16),
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (e, _) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Text('加载失败：$e',
+            style: TextStyle(fontSize: 12, color: Colors.grey)),
+      ),
+      data: (list) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Column(
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (var i = 0; i < list.take(4).length; i++) ...[
+                  if (i > 0) const SizedBox(width: 10),
+                  Expanded(child: _CoverCard(item: list[i], rank: null)),
+                ],
+              ],
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () => ref.invalidate(randomProvider),
+                style: OutlinedButton.styleFrom(
+                    foregroundColor: Theme.of(context).colorScheme.primary,
+                    side: BorderSide(
+                        color: Theme.of(context).colorScheme.primary)),
+                child: const Text('换一换 ↻'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 书脊字占位（无封面书的诚实降级）。
 Widget _spine(BuildContext context, String title) {
   final scheme = Theme.of(context).colorScheme;
   return Container(
@@ -343,11 +507,6 @@ Widget _spine(BuildContext context, String title) {
         style: TextStyle(
             fontFamily: 'serif', fontSize: 18, color: scheme.onSurfaceVariant)),
   );
-}
-
-String _wan(int n) {
-  if (n >= 10000) return '${(n / 10000).toStringAsFixed(0)}万';
-  return '$n';
 }
 
 /// 继续浏览：书架里的书（本地足迹随使用增长）。

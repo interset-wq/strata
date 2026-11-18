@@ -132,6 +132,12 @@ App API 成功→精确元数据写观测 + cover 缓存；否则 HTML 兜底（
 仅 alive 写观测）。无论成败均盖章 `last_poll_at`，坏书不会卡死队列；
 失败不写观测行——数据页据实区分「暂无更新」与「数据缺口」。
 
+### GET /strata/random?limit=（**已实现**）
+
+首页"换一换"网格数据源：`is_licensed=0` 种子库内 `ORDER BY RANDOM()` 均匀抽样
+（默认 limit，上限 max_limit），items 为 RankItem（含 status/words/clicks/favs/
+cover_url）。诚实随机——官方"次元新书/专题推荐"的换一换同款模式。
+
 ### GET /strata/rankings/short?limit=
 
 200：同上结构，`meta.kind="short"`、`ordering="favs"`、`short_max_words=50000`，
