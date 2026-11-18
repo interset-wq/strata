@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../widgets/default_cover.dart';
+import '../widgets/metric_badge.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -350,7 +351,7 @@ class _BoardCard extends StatelessWidget {
                           _badge(context, item.contest!,
                               fg: scheme.primary, bg: scheme.primary.withValues(alpha: .12)),
                         _badge(context, '收藏 ${_wan(item.favs)}',
-                            fg: scheme.onSurfaceVariant),
+                            fg: scheme.onSurfaceVariant, icon: MetricIcons.favs),
                         _badge(context, '分位 ${item.favPctl.toStringAsFixed(1)}%',
                             fg: scheme.secondary),
                       ],
@@ -445,7 +446,7 @@ class _ShortCard extends StatelessWidget {
                           _badge(context, _wan(words),
                               fg: scheme.onSurfaceVariant),
                         _badge(context, '收藏 ${_wan(item.favs)}',
-                            fg: scheme.secondary),
+                            fg: scheme.secondary, icon: MetricIcons.favs),
                       ],
                     ),
                   ],
@@ -459,7 +460,7 @@ class _ShortCard extends StatelessWidget {
   }
 }
 
-Widget _badge(BuildContext context, String text, {Color? fg, Color? bg}) {
+Widget _badge(BuildContext context, String text, {Color? fg, Color? bg, IconData? icon}) {
   final scheme = Theme.of(context).colorScheme;
   return Container(
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
@@ -468,7 +469,16 @@ Widget _badge(BuildContext context, String text, {Color? fg, Color? bg}) {
       border: Border.all(color: scheme.outline.withValues(alpha: .5)),
       borderRadius: BorderRadius.circular(999),
     ),
-    child: Text(text, style: TextStyle(fontSize: 10, color: fg ?? scheme.onSurfaceVariant)),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (icon != null) ...[
+          Icon(icon, size: 11, color: fg ?? scheme.onSurfaceVariant),
+          const SizedBox(width: 2),
+        ],
+        Text(text, style: TextStyle(fontSize: 10, color: fg ?? scheme.onSurfaceVariant)),
+      ],
+    ),
   );
 }
 

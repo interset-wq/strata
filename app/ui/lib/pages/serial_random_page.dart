@@ -6,6 +6,7 @@ import '../core/providers.dart';
 import '../data/api/strata_api.dart';
 import '../widgets/back_to_top.dart';
 import '../widgets/default_cover.dart';
+import '../widgets/metric_badge.dart';
 
 /// 随机连载：从全库连载书中等概率抽取 100 本，供重度依赖随机性找书的读者。
 /// 每次"换一批"或下拉刷新都重掷一次（ORDER BY RANDOM，等概率）。
@@ -138,12 +139,13 @@ class _SerialTile extends StatelessWidget {
       tags.removeWhere((t) => !seen.add(t));
     }
 
-    // 指标行：字数 · 收藏 · 点击 · 点赞（非空才显示）
-    final metrics = <String>[
-      if (item.words != null) '${_wan(item.words)}字',
-      if (item.favs > 0) '${_wan(item.favs)}藏',
-      if (item.clicks != null) '${_wan(item.clicks)}阅',
-      if (item.praises != null && item.praises! > 0) '${_wan(item.praises)}赞',
+    // 指标行：字数 · 收藏 · 点击 · 点赞（非空才显示；icon 语义见 app/docs/15）
+    final metrics = <(IconData, String)>[
+      if (item.words != null) (MetricIcons.words, '${_wan(item.words)}字'),
+      if (item.favs > 0) (MetricIcons.favs, _wan(item.favs)),
+      if (item.clicks != null) (MetricIcons.clicks, '${_wan(item.clicks)}阅'),
+      if (item.praises != null && item.praises! > 0)
+        (MetricIcons.praises, _wan(item.praises)),
     ];
 
     return InkWell(
@@ -217,10 +219,15 @@ class _SerialTile extends StatelessWidget {
                   ],
                   if (metrics.isNotEmpty) ...[
                     const SizedBox(height: 6),
-                    Text(metrics.join('  '),
-                        style: TextStyle(
-                            fontSize: 10,
-                            color: scheme.onSurfaceVariant)),
+                    Row(
+                      children: [
+                        for (var i = 0; i < metrics.length; i++) ...[
+                          if (i > 0) const SizedBox(width: 10),
+                          MetricBadge(
+                              icon: metrics[i].$1, text: metrics[i].$2),
+                        ],
+                      ],
+                    ),
                   ],
                 ],
               ),

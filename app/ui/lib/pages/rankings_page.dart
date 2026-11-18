@@ -6,6 +6,7 @@ import '../widgets/default_cover.dart';
 
 import '../core/providers.dart';
 import '../data/api/strata_api.dart';
+import '../widgets/metric_badge.dart';
 
 /// Classic 六榜侧栏（官方式）：映射到平台累计值排序（docs/12 展示列）。
 const _boards = [
@@ -288,11 +289,10 @@ class _BoardCard extends StatelessWidget {
                     ),
                     const Spacer(),
                     if (item.words != null)
-                      Text('${_wan(item.words!)}+字',
-                          style: TextStyle(
-                              fontSize: 12,
-                              color: scheme.primary,
-                              fontWeight: FontWeight.w600)),
+                      MetricBadge(
+                          icon: MetricIcons.words,
+                          text: '${_wan(item.words!)}+字',
+                          color: scheme.primary),
                   ],
                 ),
               ),

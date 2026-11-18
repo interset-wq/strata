@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/providers.dart';
 import '../data/api/strata_api.dart';
+import '../widgets/metric_badge.dart';
 
 /// 单书数据页（Phase 5 作者工作台）：本机观测时序 + 更新历史。
 /// 红线（docs/12）：诚实区分「暂无更新」与「数据缺口」，
@@ -179,11 +180,14 @@ class _ObsRow extends StatelessWidget {
             spacing: 4,
             runSpacing: 4,
             children: [
-              if (o.favs != null) _chip(context, '收藏 ${_wan(o.favs!)}'),
-              if (o.praises != null) _chip(context, '推荐 ${_wan(o.praises!)}'),
+              if (o.favs != null)
+                _chip(context, '收藏 ${_wan(o.favs!)}', icon: MetricIcons.favs),
+              if (o.praises != null)
+                _chip(context, '推荐 ${_wan(o.praises!)}',
+                    icon: MetricIcons.praises),
               if (o.words != null)
                 _chip(context, '字数 ${_wan(o.words!)}',
-                    fg: scheme.primary),
+                    fg: scheme.primary, icon: MetricIcons.words),
             ],
           ),
           if (o.updatedAt != null)
@@ -198,7 +202,7 @@ class _ObsRow extends StatelessWidget {
     );
   }
 
-  Widget _chip(BuildContext context, String text, {Color? fg}) {
+  Widget _chip(BuildContext context, String text, {Color? fg, IconData? icon}) {
     final scheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -206,7 +210,17 @@ class _ObsRow extends StatelessWidget {
           color: scheme.surface,
           border: Border.all(color: scheme.outline.withValues(alpha: .4)),
           borderRadius: BorderRadius.circular(999)),
-      child: Text(text, style: TextStyle(fontSize: 10, color: fg ?? scheme.onSurfaceVariant)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 11, color: fg ?? scheme.onSurfaceVariant),
+            const SizedBox(width: 2),
+          ],
+          Text(text,
+              style: TextStyle(fontSize: 10, color: fg ?? scheme.onSurfaceVariant)),
+        ],
+      ),
     );
   }
 }

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../core/providers.dart';
 import '../widgets/default_cover.dart';
+import '../widgets/metric_badge.dart';
 import '../data/api/strata_api.dart';
 
 /// Classic 发现流（mockups 11 屏定稿，docs/12 §5）：有封面书按平台热度
@@ -217,7 +218,7 @@ class _DiscoverCard extends StatelessWidget {
                             fontSize: 11, color: scheme.onSurfaceVariant)),
                     const SizedBox(height: 5),
                     _badge(context, '点击 ${_wan(item.clicks ?? 0)}',
-                        fg: scheme.primary),
+                        fg: scheme.primary, icon: MetricIcons.clicks),
                   ],
                 ),
               ),
@@ -229,7 +230,7 @@ class _DiscoverCard extends StatelessWidget {
   }
 }
 
-Widget _badge(BuildContext context, String text, {Color? fg}) {
+Widget _badge(BuildContext context, String text, {Color? fg, IconData? icon}) {
   final scheme = Theme.of(context).colorScheme;
   return Container(
     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
@@ -237,8 +238,17 @@ Widget _badge(BuildContext context, String text, {Color? fg}) {
       border: Border.all(color: scheme.outline.withValues(alpha: .5)),
       borderRadius: BorderRadius.circular(999),
     ),
-    child: Text(text,
-        style: TextStyle(fontSize: 10, color: fg ?? scheme.onSurfaceVariant)),
+    child: Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (icon != null) ...[
+          Icon(icon, size: 11, color: fg ?? scheme.onSurfaceVariant),
+          const SizedBox(width: 2),
+        ],
+        Text(text,
+            style: TextStyle(fontSize: 10, color: fg ?? scheme.onSurfaceVariant)),
+      ],
+    ),
   );
 }
 

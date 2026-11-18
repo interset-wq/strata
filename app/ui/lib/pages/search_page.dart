@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/providers.dart';
+import '../widgets/metric_badge.dart';
 
 /// 本地搜索页（mockups 05 屏定稿）：L1 种子库内 title/author LIKE 匹配
 /// （授权书也可搜到），命中数说明行 + 卡片式结果。
@@ -156,12 +157,22 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                                                     borderRadius:
                                                         BorderRadius.circular(
                                                             999)),
-                                                child: Text(
-                                                    '收藏 ${_wan(it.favs ?? 0)}',
-                                                    style: TextStyle(
-                                                        fontSize: 10,
-                                                        color: scheme
-                                                            .onSurfaceVariant)),
+                                                child: Row(
+                                                    mainAxisSize:
+                                                        MainAxisSize.min,
+                                                    children: [
+                                                      Icon(MetricIcons.favs,
+                                                          size: 11,
+                                                          color: scheme
+                                                              .onSurfaceVariant),
+                                                      const SizedBox(width: 2),
+                                                      Text(
+                                                          '收藏 ${_wan(it.favs ?? 0)}',
+                                                          style: TextStyle(
+                                                              fontSize: 10,
+                                                              color: scheme
+                                                                  .onSurfaceVariant)),
+                                                    ]),
                                               ),
                                             ],
                                           ),

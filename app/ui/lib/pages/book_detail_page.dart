@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/providers.dart';
 import '../data/api/strata_api.dart';
+import '../widgets/metric_badge.dart';
 
 /// 书籍详情页：种子数据 + 最新观测的 effective 展示，
 /// 附三态刷新（docs/05）与观测历史。
@@ -307,8 +308,15 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                 title: Text(
                     '${DateTime.fromMillisecondsSinceEpoch(o.observedAt * 1000)}'
                     .replaceAll('.000', '')),
-                subtitle: Text(
-                    '收藏 ${o.favs ?? '-'} · 赞 ${o.praises ?? '-'} · 字数 ${o.words ?? '-'}'),
+                subtitle: Row(
+                  children: [
+                    MetricBadge(icon: MetricIcons.favs, text: '收藏 ${o.favs ?? '-'}'),
+                    const SizedBox(width: 10),
+                    MetricBadge(icon: MetricIcons.praises, text: '赞 ${o.praises ?? '-'}'),
+                    const SizedBox(width: 10),
+                    MetricBadge(icon: MetricIcons.words, text: '字数 ${o.words ?? '-'}'),
+                  ],
+                ),
               ),
           ],
         );
