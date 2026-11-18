@@ -8,22 +8,32 @@ import '../widgets/back_to_top.dart';
 import '../widgets/default_cover.dart';
 import '../widgets/metric_badge.dart';
 
-/// 随机连载：从全库连载书中等概率抽取 100 本，供重度依赖随机性找书的读者。
+/// 随机池：从指定状态池中等概率抽取 100 本（serial=连载长篇，
+/// finished=完结长篇，与首页默认"长篇"tab 口径一致）。
 /// 每次"换一批"或下拉刷新都重掷一次（ORDER BY RANDOM，等概率）。
-final randomSerialProvider =
-    FutureProvider.autoDispose<List<RankItem>>((ref) async {
+final randomPoolProvider =
+    FutureProvider.autoDispose.family<List<RankItem>, String>((ref, status)
+        async {
   final handle = await ref.watch(bootProvider.future);
-  return handle.api.randomBooks(limit: 100, status: 'serial');
+  return handle.api.randomBooks(limit: 100, status: status);
 });
 
-class SerialRandomPage extends ConsumerStatefulWidget {
-  const SerialRandomPage({super.key});
+/// 随机池 100 本二级页（连载/完结共用，由 status/title 区分）。
+class RandomPoolPage extends ConsumerStatefulWidget {
+  final String status; // 'serial' | 'finished'
+  final String title;
+
+  const RandomPoolPage({
+    super.key,
+    required this.status,
+    required this.title,
+  });
 
   @override
-  ConsumerState<SerialRandomPage> createState() => _SerialRandomPageState();
+  ConsumerState<RandomPoolPage> createState() => _RandomPoolPageState();
 }
 
-class _SerialRandomPageState extends ConsumerState<SerialRandomPage> {
+class _RandomPoolPageState extends ConsumerState<RandomPoolPage> {
   final _scroll = ScrollController();
   bool _showTop = false;
 
@@ -45,10 +55,10 @@ class _SerialRandomPageState extends ConsumerState<SerialRandomPage> {
 
   @override
   Widget build(BuildContext context) {
-    final items = ref.watch(randomSerialProvider);
+    final items = ref.watch(randomPoolProvider(widget.status));
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('随机连载 · 100 本')),
+      appBar: AppBar(title: Text(widget.title)),
       body: items.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(
@@ -56,8 +66,8 @@ class _SerialRandomPageState extends ConsumerState<SerialRandomPage> {
                 style: TextStyle(fontSize: 12, color: scheme.error))),
         data: (list) => RefreshIndicator(
           onRefresh: () async {
-            ref.invalidate(randomSerialProvider);
-            await ref.read(randomSerialProvider.future);
+            ref.invalidate(randomPoolProvider(widget.status));
+            await ref.read(randomPoolProvider(widget.status).future);
           },
           child: Stack(
             children: [
@@ -69,7 +79,7 @@ class _SerialRandomPageState extends ConsumerState<SerialRandomPage> {
                   if (i == list.length) {
                     return _rerollButton();
                   }
-                  return _SerialTile(item: list[i]);
+                  return _PoolTile(item: list[i]);
                 },
               ),
               if (_showTop)
@@ -95,7 +105,7 @@ class _SerialRandomPageState extends ConsumerState<SerialRandomPage> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16),
       child: OutlinedButton.icon(
-        onPressed: () => ref.invalidate(randomSerialProvider),
+        onPressed: () => ref.invalidate(randomPoolProvider(widget.status)),
         icon: const Icon(Icons.refresh, size: 18),
         label: const Text('换一批（再抽 100 本）'),
         style: OutlinedButton.styleFrom(
@@ -111,10 +121,10 @@ class _SerialRandomPageState extends ConsumerState<SerialRandomPage> {
   }
 }
 
-class _SerialTile extends StatelessWidget {
+class _PoolTile extends StatelessWidget {
   final RankItem item;
 
-  const _SerialTile({required this.item});
+  const _PoolTile({required this.item});
 
   static String _wan(int? n) {
     if (n == null) return '';

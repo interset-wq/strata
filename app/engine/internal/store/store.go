@@ -681,10 +681,23 @@ func (s *Store) WatchPollDone(ctx context.Context, nid, at int64) error {
 const longFormMinWords = 150000
 
 // RandomBooks samples n unlicensed seed books uniformly at random
-// (ORDER BY RANDOM is a uniform permutation). serialOnly restricts the
-// pool to ongoing long-form works (status='连载中' AND words >= 15万)
-// with the same uniformity.
-func (s *Store) RandomBooks(ctx context.Context, limit int, serialOnly bool) ([]RankItem, error) {
+// (ORDER BY RANDOM is a uniform permutation). status selects the pool:
+// "" draws from the whole seed, "serial" from ongoing long-form works
+// (status='连载中' AND words >= 15万), "finished" from completed long-form
+// works (status='已完结' AND words >= 15万) — both home showcase sections
+// mirror the default 长篇 tab. Any other value is rejected.
+func (s *Store) RandomBooks(ctx context.Context, limit int, status string) ([]RankItem, error) {
+	var pool string
+	switch status {
+	case "":
+		pool = ""
+	case "serial":
+		pool = " AND status = '连载中' AND words >= " + strconv.Itoa(longFormMinWords)
+	case "finished":
+		pool = " AND status = '已完结' AND words >= " + strconv.Itoa(longFormMinWords)
+	default:
+		return nil, fmt.Errorf("unsupported random status %q", status)
+	}
 	query := `
 SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
        seed.books.est_year, seed.books.status, seed.books.words, seed.books.clicks,
@@ -692,12 +705,8 @@ SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
        COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url
 FROM seed.books
 LEFT JOIN covers c ON c.nid = seed.books.nid
-WHERE is_licensed = 0`
-	if serialOnly {
-		query += " AND status = '连载中' AND words >= " +
-			strconv.Itoa(longFormMinWords)
-	}
-	query += " ORDER BY RANDOM() LIMIT ?"
+WHERE is_licensed = 0` + pool +
+		" ORDER BY RANDOM() LIMIT ?"
 	rows, err := s.DB.QueryContext(ctx, query, limit)
 	if err != nil {
 		return nil, err

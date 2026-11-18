@@ -32,6 +32,14 @@ final serialShowcaseProvider = FutureProvider.autoDispose<List<RankItem>>((
   return handle.api.randomBooks(limit: 8, status: 'serial');
 });
 
+/// 完结精选：形态照搬连载发现——从完结长篇中均匀抽样 8 本，
+/// 下拉刷新换一批，更多入口进 100 本二级页。
+final finishedShowcaseProvider =
+    FutureProvider.autoDispose<List<RankItem>>((ref) async {
+  final handle = await ref.watch(bootProvider.future);
+  return handle.api.randomBooks(limit: 8, status: 'finished');
+});
+
 /// 首页：编辑精选轮播 → 入口宫格 → 分类找书 → 继续浏览。
 /// 不暴露种子统计——定位是找书 App（用户反馈 2026-11-17）。
 class HomePage extends ConsumerStatefulWidget {
@@ -72,6 +80,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           ref.invalidate(boardProvider);
           ref.invalidate(randomProvider);
           ref.invalidate(serialShowcaseProvider);
+          ref.invalidate(finishedShowcaseProvider);
           await Future.wait([
             ref.read(featuredProvider.future),
             ref.read(bannerProvider.future),
@@ -98,9 +107,10 @@ class _HomePageState extends ConsumerState<HomePage> {
                 _entryGrid(context),
                 _sectionTitle(context, '连载发现',
                     onMore: () => context.push('/serial-random')),
-                const _ShowcaseSection(),
-                _sectionTitle(context, '完结精选'),
-                const _BoardGrid(kind: 'finish'),
+                _ShowcaseSection(provider: serialShowcaseProvider),
+                _sectionTitle(context, '完结精选',
+                    onMore: () => context.push('/finished-random')),
+                _ShowcaseSection(provider: finishedShowcaseProvider),
                 _sectionTitle(context, '今日精品更新'),
                 const _Spotlight(),
                 _sectionTitle(context, '随机书架'),
@@ -323,14 +333,16 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 }
 
-/// 连载发现：随机连载书 4×2 封面网格，无角标——内容即随机抽取的
-/// 全库连载书，等概率、每次下拉刷新换一批。
+/// 随机抽样展示区：4×2 封面网格，无角标——内容即随机抽取的池子
+/// （连载发现=连载长篇，完结精选=完结长篇），等概率、下拉刷新换一批。
 class _ShowcaseSection extends ConsumerWidget {
-  const _ShowcaseSection();
+  final FutureProvider<List<RankItem>> provider;
+
+  const _ShowcaseSection({required this.provider});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final items = ref.watch(serialShowcaseProvider);
+    final items = ref.watch(provider);
     return items.when(
       loading: () => const Padding(
         padding: EdgeInsets.all(16),
@@ -362,43 +374,6 @@ class _ShowcaseSection extends ConsumerWidget {
                   ],
                 ],
               ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// 完结精选：4 列封面网格（board finish 前 4）。
-class _BoardGrid extends ConsumerWidget {
-  final String kind;
-
-  const _BoardGrid({required this.kind});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final items = ref.watch(boardProvider(kind));
-    return items.when(
-      loading: () => const Padding(
-        padding: EdgeInsets.all(16),
-        child: Center(child: CircularProgressIndicator()),
-      ),
-      error: (e, _) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Text(
-          '加载失败：$e',
-          style: TextStyle(fontSize: 12, color: Colors.grey),
-        ),
-      ),
-      data: (list) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            for (var i = 0; i < list.take(4).length; i++) ...[
-              if (i > 0) const SizedBox(width: 10),
-              Expanded(child: _CoverCard(item: list[i], rank: null)),
             ],
           ],
         ),

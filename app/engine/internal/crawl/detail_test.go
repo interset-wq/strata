@@ -2,6 +2,7 @@ package crawl
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -10,7 +11,7 @@ import (
 // archived (docs/05 §10 #1), so those cases use minimal synthetic pages
 // until real fixtures land.
 func TestParseDetailAlive(t *testing.T) {
-	const fixture = "../../temp/_page_48704.html"
+	const fixture = "../../../../temp/_page_48704.html"
 	raw, err := os.ReadFile(fixture)
 	if err != nil {
 		t.Skipf("fixture %s not available on this machine: %v", fixture, err)
@@ -32,6 +33,21 @@ func TestParseDetailAlive(t *testing.T) {
 	}
 	if d.UpdatedAt != "2024-03-25 20:57:00" {
 		t.Fatalf("updated_at = %q", d.UpdatedAt)
+	}
+	if d.Title != "英雄再临(英雄？我早就不当了)" {
+		t.Fatalf("title = %q", d.Title)
+	}
+	if d.Author != "无聊看看天" {
+		t.Fatalf("author = %q", d.Author)
+	}
+	if d.Genre != "科幻" || d.PriceType != "VIP" {
+		t.Fatalf("genre/price = %q / %q", d.Genre, d.PriceType)
+	}
+	if d.CoverURL != "https://rs.sfacg.com/web/novel/images/NovelCover/Big/2019/11/3d2f9821-16b5-4240-8086-1ff6928e2990.jpg" {
+		t.Fatalf("cover_url = %q", d.CoverURL)
+	}
+	if !strings.Contains(d.Summary, "超级英雄") {
+		t.Fatalf("summary = %q", d.Summary)
 	}
 }
 

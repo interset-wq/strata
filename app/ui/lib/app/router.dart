@@ -10,7 +10,7 @@ import '../pages/history_page.dart';
 import '../pages/home_page.dart';
 import '../pages/rankings_page.dart';
 import '../pages/search_page.dart';
-import '../pages/serial_random_page.dart';
+import '../pages/random_pool_page.dart';
 import '../pages/watchlist_page.dart';
 import '../pages/settings_page.dart';
 import '../pages/shelf_page.dart';
@@ -95,7 +95,11 @@ final router = GoRouter(
     GoRoute(path: '/watchlist', builder: (_, _) => const WatchlistPage()),
     GoRoute(path: '/history', builder: (_, _) => const HistoryPage()),
     GoRoute(path: '/serial-random',
-        builder: (_, _) => const SerialRandomPage()),
+        builder: (_, _) => const RandomPoolPage(
+            status: 'serial', title: '随机连载 · 100 本')),
+    GoRoute(path: '/finished-random',
+        builder: (_, _) => const RandomPoolPage(
+            status: 'finished', title: '随机完结 · 100 本')),
     GoRoute(
       path: '/book/:nid/data',
       builder: (_, state) => BookDataPage(

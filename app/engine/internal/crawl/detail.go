@@ -3,6 +3,7 @@ package crawl
 import (
 	"context"
 	"fmt"
+	"html"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -32,7 +33,14 @@ func (s DetailState) String() string {
 }
 
 // Detail is the parsed mobile page (docs/05 §4.1). Only alive pages get one.
+// Every field the page exposes is parsed in the same request; none is wasted.
 type Detail struct {
+	Title     string `json:"title,omitempty"`
+	Author    string `json:"author,omitempty"`
+	Genre     string `json:"genre,omitempty"`
+	PriceType string `json:"price_type,omitempty"`
+	CoverURL  string `json:"cover_url,omitempty"`
+	Summary   string `json:"summary,omitempty"`
 	Favs      int64  `json:"favs"`
 	Praises   int64  `json:"praises"`
 	Words     int64  `json:"words"`
@@ -49,7 +57,22 @@ var (
 	reWords     = regexp.MustCompile(`book_info3">[^<]*?([\d,]+)字`)
 	reStatus    = regexp.MustCompile(`(已完结|连载中)`)
 	reUpdated   = regexp.MustCompile(`\b(\d{2})-(\d{2})-(\d{2}) (\d{2}):(\d{2})\b`)
+	reTitle     = regexp.MustCompile(`(?s)class="book_newtitle"[^>]*>(.*?)</span>`)
+	reInfo2     = regexp.MustCompile(`(?s)class="book_info2"[^>]*>(.*?)</div>`)
+	reInfo2Span = regexp.MustCompile(`(?s)<span[^>]*>(.*?)</span>`)
+	reInfo3     = regexp.MustCompile(`(?s)class="book_info3"[^>]*>(.*?)</span>`)
+	reInfo3AW   = regexp.MustCompile(`(?s)^\s*(.*?)\s*/\s*([\d,]+)\s*字`)
+	reInfoCover = regexp.MustCompile(`(?s)<ul[^>]*class="book_info"[^>]*>.*?<img[^>]+src=['"]([^'"]+)['"]`)
+	reProfile   = regexp.MustCompile(`(?s)<ul class="book_profile">(.*?)</ul>`)
+	reSummary   = regexp.MustCompile(`(?s)<li[^>]*class="book_bk_qs1"[^>]*>(.*?)</li>`)
+	reTag       = regexp.MustCompile(`(?s)<[^>]+>`)
 )
+
+// detailGenres is the nine-way genre vocabulary used by seed.books.
+var detailGenres = map[string]bool{
+	"魔幻": true, "玄幻": true, "古风": true, "科幻": true, "校园": true,
+	"都市": true, "游戏": true, "同人": true, "悬疑": true,
+}
 
 // ParseDetail is a pure function: HTML in, verdict out (docs/05 §4.4). It
 // must not touch the network, the database, or the clock. Verdict order
@@ -95,17 +118,59 @@ func ParseDetail(html string) (DetailState, *Detail) {
 
 	d := Detail{Favs: favs, Praises: praises}
 
-	if m := reWords.FindStringSubmatch(html); m != nil {
-		if w, err := parseNum(m[1]); err == nil && w > 0 {
-			d.Words = w
+	if m := reTitle.FindStringSubmatch(html); m != nil {
+		d.Title = cleanText(m[1])
+	}
+	if m := reInfo2.FindStringSubmatch(html); m != nil {
+		for _, sm := range reInfo2Span.FindAllStringSubmatch(m[1], -1) {
+			value := cleanText(sm[1])
+			switch {
+			case detailGenres[value] && d.Genre == "":
+				d.Genre = value
+			case (value == "已完结" || value == "连载中") && d.Status == "":
+				d.Status = value
+			case value != "" && d.PriceType == "":
+				d.PriceType = value
+			}
 		}
 	}
-	if m := reStatus.FindStringSubmatch(html); m != nil {
-		d.Status = m[1]
+	if m := reInfo3.FindStringSubmatch(html); m != nil {
+		info := cleanText(m[1])
+		if aw := reInfo3AW.FindStringSubmatch(info); aw != nil {
+			d.Author = cleanText(aw[1])
+			if w, err := parseNum(aw[2]); err == nil && w > 0 {
+				d.Words = w
+			}
+		}
+		// Two-digit year: always a 20xx date, stored as sortable TEXT (§4.2).
+		if u := reUpdated.FindStringSubmatch(info); u != nil {
+			d.UpdatedAt = "20" + u[1] + "-" + u[2] + "-" + u[3] + " " + u[4] + ":" + u[5] + ":00"
+		}
 	}
-	// Two-digit year: always a 20xx date, stored as sortable TEXT (§4.2).
-	if m := reUpdated.FindStringSubmatch(html); m != nil {
-		d.UpdatedAt = "20" + m[1] + "-" + m[2] + "-" + m[3] + " " + m[4] + ":" + m[5] + ":00"
+	if d.Words == 0 {
+		if m := reWords.FindStringSubmatch(html); m != nil {
+			if w, err := parseNum(m[1]); err == nil && w > 0 {
+				d.Words = w
+			}
+		}
+	}
+	if d.Status == "" {
+		if m := reStatus.FindStringSubmatch(html); m != nil {
+			d.Status = m[1]
+		}
+	}
+	if d.UpdatedAt == "" {
+		if m := reUpdated.FindStringSubmatch(html); m != nil {
+			d.UpdatedAt = "20" + m[1] + "-" + m[2] + "-" + m[3] + " " + m[4] + ":" + m[5] + ":00"
+		}
+	}
+	if m := reInfoCover.FindStringSubmatch(html); m != nil {
+		d.CoverURL = normalizeURL(m[1])
+	}
+	if m := reProfile.FindStringSubmatch(html); m != nil {
+		if sm := reSummary.FindStringSubmatch(m[1]); sm != nil {
+			d.Summary = cleanText(sm[1])
+		}
 	}
 
 	// Illegal numbers that survived the sign check: all-zero anomalies.
@@ -113,6 +178,27 @@ func ParseDetail(html string) (DetailState, *Detail) {
 		return DetailZombie, nil
 	}
 	return DetailAlive, &d
+}
+
+// cleanText turns a small HTML fragment into display text: tags become
+// spaces, entities are decoded, and runs of whitespace collapse.
+func cleanText(s string) string {
+	s = reTag.ReplaceAllString(s, " ")
+	s = html.UnescapeString(s)
+	return strings.Join(strings.Fields(s), " ")
+}
+
+// normalizeURL completes protocol-relative and root-relative page URLs.
+func normalizeURL(s string) string {
+	s = strings.TrimSpace(html.UnescapeString(s))
+	switch {
+	case strings.HasPrefix(s, "//"):
+		return "https:" + s
+	case strings.HasPrefix(s, "/"):
+		return "https://m.sfacg.com" + s
+	default:
+		return s
+	}
 }
 
 func parseNum(s string) (int64, error) {

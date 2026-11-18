@@ -58,6 +58,7 @@ func appAPIHeaders() (http.Header, error) {
 type AppNovel struct {
 	NovelID        int64   `json:"novelId"`
 	NovelName      string  `json:"novelName"`
+	AuthorID       int64   `json:"authorId"`
 	AuthorName     string  `json:"authorName"`
 	AddTime        string  `json:"addTime"`
 	LastUpdateTime string  `json:"lastUpdateTime"`
@@ -67,8 +68,40 @@ type AppNovel struct {
 	Point          float64 `json:"point"`
 	IsFinish       bool    `json:"isFinish"`
 	SignStatus     string  `json:"signStatus"`
+	TypeID         int64   `json:"typeId"`
+	CategoryID     int64   `json:"categoryId"`
+	IsSensitive    bool    `json:"isSensitive"`
+	AllowDown      bool    `json:"allowDown"`
 	NovelCover     string  `json:"novelCover"`
 	BgBanner       string  `json:"bgBanner"`
+	NID            int64   `json:"nid"`
+	TID            int64   `json:"tid"`
+}
+
+// AppGenre maps the App API typeId to the nine-way genre vocabulary.
+func AppGenre(typeID int64) string {
+	switch typeID {
+	case 21:
+		return "魔幻"
+	case 22:
+		return "玄幻"
+	case 23:
+		return "古风"
+	case 24:
+		return "科幻"
+	case 25:
+		return "校园"
+	case 26:
+		return "都市"
+	case 27:
+		return "游戏"
+	case 28:
+		return "同人"
+	case 29:
+		return "悬疑"
+	default:
+		return ""
+	}
 }
 
 // FetchAppNovel requests GET /novels/{nid} through the shared limiter.
