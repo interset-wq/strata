@@ -56,20 +56,29 @@ uv run python fetchers/cover_queue.py enqueue --dry-run   # 离线核算
 uv run python fetchers/cover_queue.py enqueue             # 入队
 uv run python fetchers/cover_queue.py status
 uv run python fetchers/cover_queue.py fetch --max-requests N --delay 0.6 [--shard i/n]
+uv run python fetchers/cover_queue.py fetch --nids-file LIST --results R.jsonl  # 清单模式：不读写 db
 uv run python fetchers/cover_queue.py dequeue --batch 100 --out batch.json  # CI 原子出队
 uv run python fetchers/cover_queue.py ack --result result.jsonl
 uv run python fetchers/cover_queue.py requeue-expired --lease 600
 uv run python fetchers/cover_queue.py export --snapshots PATH  # URL→out/cover_export.jsonl，快照另导
 ```
 
-## 5. CI 接入（未建 workflow）
+## 5. CI 接入（已建 `.github/workflows/cover-fetch.yml`）
 
-结果 jsonl 是唯一持久状态，job 间无需传队列 db：checkout → `enqueue`（自动续采）→
-`fetch --shard i/n`（按 `nid % n` 分片，无共享状态）→ 上传 artifact → 合并 `export` →
-`build_seed.py` 追加 `covers` 表。
+结果 jsonl 是唯一持久状态，CI 不接触队列 db：`workflow_dispatch` 传入 gzip+base64 的
+**nid 清单**（约 2,100 个约 7 KB，2,081 个实测 7,228 字符）→ `fetch --nids-file` 串行采 →
+上传 `cover-results` artifact → 本地 `ack --result` 合并回队列。
+
+- **并行不撞车**：本地与 CI 各取互为补集的分片（本地 `--shard 0/2`、CI 清单只放
+  `nid % 2 = 1`），nid 级互斥，无需共享状态或加锁。
+- **失败语义**：CI 结果只含成功记录，未采到的书在本地仍是 `pending`，下批自然重试；
+  CI 侧不累加 `attempts`，永久 404 只能由本地三轮重试判定。
+- **合规**：runner 与本地同样串行 `--delay 0.6`（脚本强制 ≥0.5），不并发请求同一端点。
+- 落地顺序仍是 `export --snapshots` → `build_seed.py` 追加 `covers` 表。
 
 ## 6. 采集进度与已知现象（2026-11-18）
 
-- 累计 API 采集 2,107 条，全部含快照；唯一失败 nid 73900 为 App 端已删书（soft-fail 404）。
+- 累计 API 采集 **10,464 / 10,519**（99.5%），全部含 15 字段快照、无 `point` 泄漏；
+  剩余 51 条待重试 + 4 条永久失败（App 端已删书，soft-fail 404）。
 - 74 本封面已被官方换为默认图 `defaultNew.jpg`（URL 合法，UI 兜底处理）。
-- 全量完成后剩余约 8,411 条待采（按 1/5/天节奏约 5 天）。
+- 已跑到全量的 99.5%，剩余量 1 批（约 1 分钟）即可清零。
