@@ -128,11 +128,11 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  // header form tab（docs/13 form 字段，已定稿）：小说/中篇/短篇/对话/IP。
+  // header form tab（docs/13 form 字段）：长篇（=小说，15万字以上）/中篇/短篇/对话/IP。
   // 无品牌行——移动端惯例，顶部即内容导航。刷新挂在行末。
   Widget _formTabs(BuildContext context, VoidCallback onRefresh) {
     final scheme = Theme.of(context).colorScheme;
-    const forms = ['小说', '中篇', '短篇', '对话', 'IP'];
+    const forms = ['长篇', '中篇', '短篇', '对话', 'IP'];
     return SizedBox(
       height: 42,
       child: Row(
