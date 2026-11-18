@@ -10,6 +10,7 @@ import '../pages/history_page.dart';
 import '../pages/home_page.dart';
 import '../pages/rankings_page.dart';
 import '../pages/search_page.dart';
+import '../pages/serial_random_page.dart';
 import '../pages/watchlist_page.dart';
 import '../pages/settings_page.dart';
 import '../pages/shelf_page.dart';
@@ -93,6 +94,8 @@ final router = GoRouter(
     GoRoute(path: '/discover', builder: (_, _) => const DiscoverPage()),
     GoRoute(path: '/watchlist', builder: (_, _) => const WatchlistPage()),
     GoRoute(path: '/history', builder: (_, _) => const HistoryPage()),
+    GoRoute(path: '/serial-random',
+        builder: (_, _) => const SerialRandomPage()),
     GoRoute(
       path: '/book/:nid/data',
       builder: (_, state) => BookDataPage(

@@ -69,7 +69,8 @@ class HomePage extends ConsumerWidget {
                 ),
                 const SizedBox(height: 8),
                 _entryGrid(context),
-                _sectionTitle(context, '连载发现'),
+                _sectionTitle(context, '连载发现',
+                    onMore: () => context.push('/serial-random')),
                 const _ShowcaseSection(),
                 _sectionTitle(context, '完结精选'),
                 const _BoardGrid(kind: 'finish'),
@@ -204,10 +205,41 @@ class HomePage extends ConsumerWidget {
     );
   }
 
-  Widget _sectionTitle(BuildContext context, String text) => Padding(
-    padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-    child: Text(text, style: Theme.of(context).textTheme.titleLarge),
-  );
+  Widget _sectionTitle(BuildContext context, String text,
+      {void Function()? onMore}) =>
+      Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(text,
+                  style: Theme.of(context).textTheme.titleLarge,
+                  overflow: TextOverflow.ellipsis),
+            ),
+            if (onMore != null)
+              InkWell(
+                onTap: onMore,
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text('更多',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: Theme.of(context).colorScheme.primary)),
+                      Icon(Icons.chevron_right,
+                          size: 16,
+                          color: Theme.of(context).colorScheme.primary),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      );
 
   // 二级页面分流宫格：底部 Tab 之外的目的地都从这里进。
   Widget _entryGrid(BuildContext context) {
@@ -395,7 +427,7 @@ class _CoverCard extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             item.title,
-            maxLines: 1,
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
           ),
@@ -464,7 +496,7 @@ class _Spotlight extends ConsumerWidget {
                     children: [
                       Text(
                         it.title,
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           fontSize: 14,
