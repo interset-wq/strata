@@ -299,8 +299,11 @@ type RankItem struct {
 
 func (s *Store) RankingFavs(ctx context.Context, year int, genre, status, contest string, limit int) ([]RankItem, error) {
 	query := `
-SELECT nid, title, author, genre, est_year, favs, fav_pctl, contest, cover_url
+SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
+       seed.books.est_year, seed.books.favs, seed.books.fav_pctl, seed.books.contest,
+       COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url
 FROM seed.books
+LEFT JOIN covers c ON c.nid = seed.books.nid
 WHERE est_year = ? AND is_licensed = 0 AND fav_pctl IS NOT NULL`
 	args := []any{year}
 	if genre != "" {
@@ -321,7 +324,7 @@ WHERE est_year = ? AND is_licensed = 0 AND fav_pctl IS NOT NULL`
 			args = append(args, contest)
 		}
 	}
-	query += " ORDER BY fav_pctl DESC, nid ASC LIMIT ?"
+	query += " ORDER BY fav_pctl DESC, seed.books.nid ASC LIMIT ?"
 	args = append(args, limit)
 
 	rows, err := s.DB.QueryContext(ctx, query, args...)
@@ -421,10 +424,13 @@ type ShortItem struct {
 
 func (s *Store) RankingShort(ctx context.Context, limit int) ([]ShortItem, error) {
 	const q = `
-SELECT nid, title, author, genre, est_year, favs, words, cover_url
+SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
+       seed.books.est_year, seed.books.favs, seed.books.words,
+       COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url
 FROM seed.books
+LEFT JOIN covers c ON c.nid = seed.books.nid
 WHERE words <= 50000 AND status = '已完结' AND is_licensed = 0
-ORDER BY favs DESC, nid ASC
+ORDER BY favs DESC, seed.books.nid ASC
 LIMIT ?`
 	rows, err := s.DB.QueryContext(ctx, q, limit)
 	if err != nil {
@@ -481,8 +487,12 @@ func (s *Store) BoardBooks(ctx context.Context, kind string, limit, offset int) 
 		return nil, nil
 	}
 	q := `
-SELECT nid, title, author, genre, est_year, status, words, clicks, favs, cover_url
+SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
+       seed.books.est_year, seed.books.status, seed.books.words, seed.books.clicks,
+       seed.books.favs,
+       COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url
 FROM seed.books
+LEFT JOIN covers c ON c.nid = seed.books.nid
 WHERE is_licensed = 0`
 	if kind == "finish" {
 		q += " AND status = '已完结'"
@@ -524,9 +534,13 @@ WHERE is_licensed = 0`
 // cursor "" starts at the top; otherwise "clicks:nid" of the last item.
 func (s *Store) Discover(ctx context.Context, cursor string, limit int) ([]RankItem, error) {
 	q := `
-SELECT nid, title, author, genre, est_year, status, words, clicks, favs, cover_url
+SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
+       seed.books.est_year, seed.books.status, seed.books.words, seed.books.clicks,
+       seed.books.favs,
+       COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url
 FROM seed.books
-WHERE is_licensed = 0 AND cover_url IS NOT NULL AND cover_url != ''`
+LEFT JOIN covers c ON c.nid = seed.books.nid
+WHERE is_licensed = 0 AND COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) IS NOT NULL`
 	args := []any{}
 	if cursor != "" {
 		var clicks int64
@@ -537,7 +551,7 @@ WHERE is_licensed = 0 AND cover_url IS NOT NULL AND cover_url != ''`
 		q += " AND (clicks < ? OR (clicks = ? AND nid > ?))"
 		args = append(args, clicks, clicks, nid)
 	}
-	q += " ORDER BY clicks DESC, nid ASC LIMIT ?"
+	q += " ORDER BY clicks DESC, seed.books.nid ASC LIMIT ?"
 	args = append(args, limit)
 
 	rows, err := s.DB.QueryContext(ctx, q, args...)
@@ -597,9 +611,11 @@ type WatchItem struct {
 // WatchList joins the watchlist with seed metadata, newest first.
 func (s *Store) WatchList(ctx context.Context) ([]WatchItem, error) {
 	rows, err := s.DB.QueryContext(ctx, `
-SELECT w.nid, b.title, b.author, b.genre, b.cover_url,
+SELECT w.nid, b.title, b.author, b.genre,
+       COALESCE(c.cover, NULLIF(b.cover_url, '')) AS cover_url,
        w.added_at, w.role, w.note
 FROM watchlist w JOIN seed.books b ON b.nid = w.nid
+LEFT JOIN covers c ON c.nid = w.nid
 ORDER BY w.added_at DESC`)
 	if err != nil {
 		return nil, err
@@ -658,8 +674,12 @@ func (s *Store) WatchPollDone(ctx context.Context, nid, at int64) error {
 // included so cards render identically to board items.
 func (s *Store) RandomBooks(ctx context.Context, limit int) ([]RankItem, error) {
 	rows, err := s.DB.QueryContext(ctx, `
-SELECT nid, title, author, genre, est_year, status, words, clicks, favs, cover_url
+SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
+       seed.books.est_year, seed.books.status, seed.books.words, seed.books.clicks,
+       seed.books.favs,
+       COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url
 FROM seed.books
+LEFT JOIN covers c ON c.nid = seed.books.nid
 WHERE is_licensed = 0
 ORDER BY RANDOM() LIMIT ?`, limit)
 	if err != nil {
@@ -698,7 +718,7 @@ func (s *Store) Search(ctx context.Context, q string, limit int) ([]SearchItem, 
 SELECT nid, title, author, genre, est_year, favs
 FROM seed.books
 WHERE (title LIKE ? ESCAPE '\' OR author LIKE ? ESCAPE '\')
-ORDER BY favs DESC, nid ASC
+ORDER BY favs DESC, seed.books.nid ASC
 LIMIT ?`, pattern, pattern, limit)
 	if err != nil {
 		return nil, err
@@ -730,7 +750,7 @@ func (s *Store) RankingNew(ctx context.Context, limit int) ([]RankItem, error) {
 SELECT nid, title, author, genre, est_year, favs, fav_pctl
 FROM seed.books
 WHERE est_year >= ? AND is_licensed = 0 AND fav_pctl IS NOT NULL
-ORDER BY fav_pctl DESC, est_date DESC, nid ASC
+ORDER BY fav_pctl DESC, est_date DESC, seed.books.nid ASC
 LIMIT ?`, s.Manifest.GenMax-1, limit)
 	if err != nil {
 		return nil, err
@@ -892,8 +912,11 @@ type FeaturedBook struct {
 // FeaturedBooks returns up to limit featured books for the home carousel.
 func (s *Store) FeaturedBooks(ctx context.Context, limit int) ([]FeaturedBook, error) {
 	rows, err := s.DB.QueryContext(ctx, `
-SELECT nid, title, author, cover_url, favs
-FROM seed.books WHERE featured = 1
+SELECT seed.books.nid, seed.books.title, seed.books.author,
+       COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url, seed.books.favs
+FROM seed.books
+LEFT JOIN covers c ON c.nid = seed.books.nid
+WHERE featured = 1
 ORDER BY favs DESC LIMIT ?`, limit)
 	if err != nil {
 		return nil, err
