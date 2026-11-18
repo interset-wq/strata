@@ -437,7 +437,7 @@ class _LargeImageSection extends ConsumerWidget {
   }
 }
 
-class _LargeImageCard extends ConsumerWidget {
+class _LargeImageCard extends ConsumerStatefulWidget {
   final FeaturedItem item;
   final int index;
   final List<FeaturedItem> items;
@@ -449,11 +449,21 @@ class _LargeImageCard extends ConsumerWidget {
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_LargeImageCard> createState() => _LargeImageCardState();
+}
+
+class _LargeImageCardState extends ConsumerState<_LargeImageCard> {
+  // banner 源图（beitouNew 超宽定制图）为主；个别书没有该图（404）
+  // 时回退书籍封面，无封面再默认封面。
+  bool _bannerFailed = false;
+
+  @override
+  Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final item = widget.item;
     final coverUrl = item.coverUrl;
     final hasCover = coverUrl != null && coverUrl.isNotEmpty;
-    final image = hasCover
+    final fallback = hasCover
         ? Image.network(
             coverImageUrl(coverUrl)!,
             fit: BoxFit.cover,
@@ -476,13 +486,43 @@ class _LargeImageCard extends ConsumerWidget {
             borderRadius:
                 const BorderRadius.vertical(top: Radius.circular(12)),
             child: AspectRatio(
-              aspectRatio: 3 / 4,
+              // 超宽 4.47:1 源图按核心带展示，与轮播同比例。
+              aspectRatio: 2.2,
               child: GestureDetector(
                 onTap: () {
-                  ref.read(imageViewerProvider.notifier).state = items;
-                  context.push('/image-viewer/$index');
+                  ref.read(imageViewerProvider.notifier).state = widget.items;
+                  context.push('/image-viewer/${widget.index}');
                 },
-                child: image,
+                child: _bannerFailed
+                    ? fallback
+                    : LayoutBuilder(
+                        builder: (context, box) {
+                          final w = box.maxWidth;
+                          return Stack(
+                            fit: StackFit.expand,
+                            children: [
+                              ColoredBox(color:
+                                  scheme.primary.withValues(alpha: .1)),
+                              // 与轮播同款偏移：1.45× 宽渲染 + 左移 0.45×
+                              Positioned(
+                                left: -w * 0.45,
+                                width: w * 1.45,
+                                top: 0,
+                                bottom: 0,
+                                child: Image.network(
+                                  bannerImageUrl(item.nid),
+                                  fit: BoxFit.cover,
+                                  loadingBuilder: coverLoadingBuilder,
+                                  errorBuilder: (_, _, _) {
+                                    setState(() => _bannerFailed = true);
+                                    return fallback;
+                                  },
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
               ),
             ),
           ),

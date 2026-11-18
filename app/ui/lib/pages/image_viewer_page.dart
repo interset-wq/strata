@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../core/providers.dart';
 import '../data/api/strata_api.dart';
+import '../widgets/banner_carousel.dart';
 import '../widgets/default_cover.dart';
 
 /// 图片全屏查看器：大图精选点图进入。黑底全屏，左右滑动切图，
@@ -50,9 +51,7 @@ class _ImageViewerPageState extends ConsumerState<ImageViewerPage> {
                 itemCount: items.length,
                 onPageChanged: (i) => setState(() => _index = i),
                 itemBuilder: (context, i) => _ZoomableImage(
-                  url: coverImageUrl(items[i].coverUrl) ??
-                      defaultCoverUrl(items[i].nid),
-                  nid: items[i].nid,
+                  item: items[i],
                   onTapClose: () => context.pop(),
                 ),
               ),
@@ -71,22 +70,37 @@ class _ImageViewerPageState extends ConsumerState<ImageViewerPage> {
   }
 }
 
+/// 单张大图：beitouNew 超宽源图完整展示（列表页裁核心带，
+/// 查看器看全图）；404 时回退书籍封面，再无则默认封面。
 class _ZoomableImage extends StatefulWidget {
-  final String url;
-  final int nid;
+  final FeaturedItem item;
   final VoidCallback onTapClose;
 
-  const _ZoomableImage({
-    required this.url,
-    required this.nid,
-    required this.onTapClose,
-  });
+  const _ZoomableImage({required this.item, required this.onTapClose});
 
   @override
   State<_ZoomableImage> createState() => _ZoomableImageState();
 }
 
 class _ZoomableImageState extends State<_ZoomableImage> {
+  Widget get _coverFallback {
+    final coverUrl = coverImageUrl(widget.item.coverUrl);
+    if (coverUrl == null || coverUrl.isEmpty) {
+      return defaultCover(widget.item.nid, fit: BoxFit.contain);
+    }
+    return Image.network(
+      coverUrl,
+      fit: BoxFit.contain,
+      loadingBuilder: (_, child, progress) {
+        if (progress == null) return child;
+        return const Center(child: CircularProgressIndicator(
+            strokeWidth: 2, color: Colors.white54));
+      },
+      errorBuilder: (_, _, _) =>
+          defaultCover(widget.item.nid, fit: BoxFit.contain),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -96,7 +110,7 @@ class _ZoomableImageState extends State<_ZoomableImage> {
         maxScale: 4,
         child: Center(
           child: Image.network(
-            widget.url,
+            bannerImageUrl(widget.item.nid),
             fit: BoxFit.contain,
             loadingBuilder: (_, child, progress) {
               if (progress == null) return child;
@@ -104,8 +118,7 @@ class _ZoomableImageState extends State<_ZoomableImage> {
                   child: CircularProgressIndicator(
                       strokeWidth: 2, color: Colors.white54));
             },
-            errorBuilder: (_, _, _) =>
-                defaultCover(widget.nid, fit: BoxFit.contain),
+            errorBuilder: (_, _, _) => _coverFallback,
           ),
         ),
       ),

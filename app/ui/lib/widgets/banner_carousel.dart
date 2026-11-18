@@ -4,6 +4,11 @@ import 'package:flutter/material.dart';
 
 import '../data/api/strata_api.dart';
 
+/// SFACG banner 源图 URL：4.47:1 超宽定制图（非书籍封面）。
+/// 轮播与首页大图精选共用。
+String bannerImageUrl(int nid) =>
+    'https://rs.sfacg.com/web/novel/images/images/beitouNew/$nid.jpg';
+
 /// 首页轮播：featured=1 编辑精选。
 ///
 /// SFACG banner 源图为 4.47:1 超宽图（rs.sfacg.com beitouNew/{nid}.jpg），
@@ -58,9 +63,6 @@ class _BannerCarouselState extends State<BannerCarousel> {
     super.dispose();
   }
 
-  static String _bannerUrl(int nid) =>
-      'https://rs.sfacg.com/web/novel/images/images/beitouNew/$nid.jpg';
-
   @override
   Widget build(BuildContext context) {
     if (widget.items.isEmpty) return const SizedBox.shrink();
@@ -91,7 +93,7 @@ class _BannerCarouselState extends State<BannerCarousel> {
                     nid: it.nid,
                     title: it.title,
                     author: it.author,
-                    url: _bannerUrl(it.nid),
+                    url: bannerImageUrl(it.nid),
                     fallbackColor: scheme.primary.withValues(alpha: .15),
                     onTap: () => widget.onTap?.call(it),
                   ),
