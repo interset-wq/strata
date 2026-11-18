@@ -206,6 +206,17 @@ class StrataApi {
         .toList();
   }
 
+  /// 大图精选 gallery：featured=1 全池分页，默认按收藏降序，
+  /// order='asc' 倒序；nid 作 tie-breaker，分页稳定。
+  Future<List<FeaturedItem>> featuredAll(
+      {int limit = 10, int offset = 0, String order = 'desc'}) async {
+    final body = await _get('/featured-all',
+        {'limit': '$limit', 'offset': '$offset', 'order': order});
+    return (body['items'] as List)
+        .map((e) => FeaturedItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<void> shelfAdd(int nid) async {
     await _postBody('/shelf', {'nid': nid});
   }

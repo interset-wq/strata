@@ -6,6 +6,7 @@ import '../pages/book_detail_page.dart';
 import '../pages/boot_page.dart';
 import '../pages/browse_page.dart';
 import '../pages/discover_page.dart';
+import '../pages/featured_gallery_page.dart';
 import '../pages/history_page.dart';
 import '../pages/home_page.dart';
 import '../pages/rankings_page.dart';
@@ -111,6 +112,8 @@ final router = GoRouter(
     GoRoute(path: '/moe-goddess',
         builder: (_, _) =>
             const PoolListPage(kind: 'moe-goddess', title: '萌神获奖')),
+    GoRoute(path: '/featured-gallery',
+        builder: (_, _) => const FeaturedGalleryPage()),
     GoRoute(path: '/image-viewer/:index',
         builder: (_, state) => ImageViewerPage(
             initialIndex:

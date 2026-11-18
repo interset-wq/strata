@@ -101,6 +101,7 @@ func New(s *store.Store) *gin.Engine {
 	group.GET("/history", srv.history)
 	group.POST("/history/:nid", srv.recordHistory)
 	group.GET("/featured", srv.featured)
+	group.GET("/featured-all", srv.featuredAll)
 	group.GET("/banner", srv.banner)
 	group.GET("/shelf", srv.shelfList)
 	group.PUT("/shelf", srv.shelfAdd)
@@ -967,6 +968,42 @@ func (s *Server) featured(c *gin.Context) {
 		return
 	}
 	items, err := s.store.FeaturedBooks(c.Request.Context(), limit)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"items": items})
+}
+
+// featuredAll pages through the whole featured=1 pool (编辑精选, licensed
+// included) for the 大图精选 "更多" gallery: favs DESC by default (most
+// curated first), order=asc inverts.
+func (s *Server) featuredAll(c *gin.Context) {
+	limit, ok := parseLimit(c)
+	if !ok {
+		return
+	}
+	offset := 0
+	if raw := c.Query("offset"); raw != "" {
+		o, err := strconv.Atoi(raw)
+		if err != nil || o < 0 {
+			fail(c, http.StatusBadRequest, "invalid_argument",
+				"offset must be a non-negative integer")
+			return
+		}
+		offset = o
+	}
+	order := "desc"
+	if raw := c.Query("order"); raw != "" {
+		if raw != "asc" && raw != "desc" {
+			fail(c, http.StatusBadRequest, "invalid_argument",
+				"order must be 'asc' or 'desc'")
+			return
+		}
+		order = raw
+	}
+	items, err := s.store.FeaturedAll(c.Request.Context(), limit, offset,
+		order)
 	if err != nil {
 		fail(c, http.StatusInternalServerError, "internal", err.Error())
 		return

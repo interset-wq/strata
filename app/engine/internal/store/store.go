@@ -1026,20 +1026,37 @@ type FeaturedBook struct {
 
 // FeaturedBooks returns up to limit featured books for the home carousel.
 func (s *Store) FeaturedBooks(ctx context.Context, limit int) ([]FeaturedBook, error) {
-	return s.featured(ctx, limit, "ORDER BY favs DESC LIMIT ?")
+	return s.featured(ctx, limit, 0,
+		"ORDER BY favs DESC, seed.books.nid ASC")
+}
+
+// FeaturedAll returns one page of the featured=1 pool (编辑精选, includes
+// licensed works) for the 大图精选 "更多" gallery. order "asc" inverts the
+// default favs DESC; nid is the tie-breaker so pages are stable. (nid must
+// be qualified: the covers table also has a nid column.)
+func (s *Store) FeaturedAll(ctx context.Context, limit, offset int,
+	order string) ([]FeaturedBook, error) {
+	dir := "DESC"
+	if order == "asc" {
+		dir = "ASC"
+	}
+	return s.featured(ctx, limit, offset,
+		"ORDER BY favs "+dir+", seed.books.nid ASC")
 }
 
 // featured is the shared query for the featured=1 pool (编辑精选,
 // includes licensed works): static favs order or random reroll.
-func (s *Store) featured(ctx context.Context, limit int, orderBy string) ([]FeaturedBook, error) {
+func (s *Store) featured(ctx context.Context, limit, offset int,
+	orderBy string) ([]FeaturedBook, error) {
 	query := `
 SELECT seed.books.nid, seed.books.title, seed.books.author,
        COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url, seed.books.favs
 FROM seed.books
 LEFT JOIN covers c ON c.nid = seed.books.nid
 WHERE featured = 1
-` + orderBy
-	rows, err := s.DB.QueryContext(ctx, query, limit)
+` + orderBy + `
+LIMIT ? OFFSET ?`
+	rows, err := s.DB.QueryContext(ctx, query, limit, offset)
 	if err != nil {
 		return nil, err
 	}

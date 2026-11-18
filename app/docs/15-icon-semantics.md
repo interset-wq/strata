@@ -48,6 +48,12 @@
 | --- | --- | --- |
 | 图片不可用 | `Icons.image_not_supported_outlined` | 大图精选卡片 / 全屏查看器：banner cut 图 404 时的占位容器（不做封面兜底——3:4 封面塞 16:9 容器会被裁成一条） |
 
+## 动作
+
+| 语义 | icon | 使用处 |
+| --- | --- | --- |
+| 切换排序方向 | `Icons.swap_vert` | 大图精选 gallery AppBar：收藏降序/升序切换（tooltip 显示目标方向） |
+
 ## 使用规范
 
 1. 指标展示统一走 `MetricBadge` 组件（`lib/widgets/metric_badge.dart`）：

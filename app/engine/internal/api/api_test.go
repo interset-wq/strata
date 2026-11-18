@@ -120,6 +120,49 @@ func TestBannerSegmented(t *testing.T) {
 		http.StatusBadRequest)
 }
 
+func TestFeaturedAll(t *testing.T) {
+	srv, _ := newTestServer(t)
+	// testseed featured pool: 1003 (favs 900) then 1001 (favs 500).
+	// Default order: favs DESC.
+	all := getJSON(t, srv.URL+"/strata/featured-all?limit=10", http.StatusOK)
+	items := all["items"].([]any)
+	if len(items) != 2 {
+		t.Fatalf("items = %d, want 2", len(items))
+	}
+	if items[0].(map[string]any)["nid"] != 1003.0 ||
+		items[1].(map[string]any)["nid"] != 1001.0 {
+		t.Fatalf("desc order = %v, %v",
+			items[0].(map[string]any)["nid"], items[1].(map[string]any)["nid"])
+	}
+	// order=asc inverts.
+	asc := getJSON(t, srv.URL+"/strata/featured-all?limit=10&order=asc",
+		http.StatusOK)
+	a := asc["items"].([]any)
+	if a[0].(map[string]any)["nid"] != 1001.0 ||
+		a[1].(map[string]any)["nid"] != 1003.0 {
+		t.Fatalf("asc order = %v, %v",
+			a[0].(map[string]any)["nid"], a[1].(map[string]any)["nid"])
+	}
+	// Pagination: limit=1 offset=1 skips the first row.
+	page := getJSON(t, srv.URL+"/strata/featured-all?limit=1&offset=1",
+		http.StatusOK)
+	p := page["items"].([]any)
+	if len(p) != 1 || p[0].(map[string]any)["nid"] != 1001.0 {
+		t.Fatalf("page = %v, want [1001]", p)
+	}
+	// Past the end: empty, not an error.
+	empty := getJSON(t, srv.URL+"/strata/featured-all?limit=10&offset=5",
+		http.StatusOK)
+	if len(empty["items"].([]any)) != 0 {
+		t.Fatalf("past-end = %v, want empty", empty["items"])
+	}
+	// Invalid inputs rejected.
+	getJSON(t, srv.URL+"/strata/featured-all?order=sideways",
+		http.StatusBadRequest)
+	getJSON(t, srv.URL+"/strata/featured-all?offset=-1",
+		http.StatusBadRequest)
+}
+
 func TestLicensedPool(t *testing.T) {
 	srv, _ := newTestServer(t)
 	body := getJSON(t, srv.URL+"/strata/licensed", http.StatusOK)
