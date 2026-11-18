@@ -17,12 +17,6 @@ final boardProvider = FutureProvider.autoDispose.family<List<RankItem>, String>(
   },
 );
 
-/// 随机书架数据源：/random 均匀抽样，换一换即 invalidate。
-final randomProvider = FutureProvider.autoDispose<List<RankItem>>((ref) async {
-  final handle = await ref.watch(bootProvider.future);
-  return handle.api.randomBooks(limit: 4);
-});
-
 /// 连载发现：从全库连载书中均匀抽样（ORDER BY RANDOM，等概率），
 /// 每次下拉刷新重掷一批。
 final serialShowcaseProvider = FutureProvider.autoDispose<List<RankItem>>((
@@ -78,38 +72,36 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final featured = ref.watch(featuredProvider);
     final banners = ref.watch(bannerProvider);
     return Scaffold(
       body: RefreshIndicator(
         onRefresh: () async {
-          ref.invalidate(featuredProvider);
           ref.invalidate(bannerProvider);
           ref.invalidate(boardProvider);
-          ref.invalidate(randomProvider);
           ref.invalidate(serialShowcaseProvider);
           ref.invalidate(finishedShowcaseProvider);
           ref.invalidate(browseShowcaseProvider);
-          await Future.wait([
-            ref.read(featuredProvider.future),
-            ref.read(bannerProvider.future),
-          ]);
+          await ref.read(bannerProvider.future);
         },
         child: SafeArea(
           bottom: false,
-          child: featured.when(
+          child: banners.when(
             loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Center(child: Text('精选加载失败：$e')),
+            error: (e, _) => Center(child: Text('加载失败：$e')),
             data: (items) => Stack(
               children: [
                 ListView(
                   controller: _scroll,
                   padding: const EdgeInsets.symmetric(vertical: 8),
               children: [
-                _formTabs(context, () => ref.invalidate(featuredProvider)),
+                _formTabs(context, () {
+                  ref.invalidate(serialShowcaseProvider);
+                  ref.invalidate(finishedShowcaseProvider);
+                  ref.invalidate(browseShowcaseProvider);
+                }),
                 _searchRow(context),
                 BannerCarousel(
-                  items: banners.asData?.value ?? items,
+                  items: items,
                   onTap: (it) => context.push('/book/${it.nid}'),
                 ),
                 const SizedBox(height: 8),
@@ -123,12 +115,6 @@ class _HomePageState extends ConsumerState<HomePage> {
                 _sectionTitle(context, '随便看看',
                     onMore: () => context.push('/browse-random')),
                 _ShowcaseSection(provider: browseShowcaseProvider),
-                _sectionTitle(context, '今日精品更新'),
-                const _Spotlight(),
-                _sectionTitle(context, '随机书架'),
-                const _ShuffleGrid(),
-                _sectionTitle(context, '继续浏览'),
-                const _ContinueBrowsing(),
               ],
                 ),
                 if (_showTop)
@@ -468,221 +454,8 @@ class _CoverCard extends StatelessWidget {
   }
 }
 
-/// 今日精品更新：编辑精选第一本，单本大图沉浸式（官方式）。
-class _Spotlight extends ConsumerWidget {
-  const _Spotlight();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final featured = ref.watch(featuredProvider);
-    return featured.when(
-      loading: () => const SizedBox.shrink(),
-      error: (e, _) => const SizedBox.shrink(),
-      data: (items) {
-        if (items.isEmpty) return const SizedBox.shrink();
-        final it = items.first;
-        final scheme = Theme.of(context).colorScheme;
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: InkWell(
-            onTap: () => context.push('/book/${it.nid}'),
-            borderRadius: BorderRadius.circular(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                AspectRatio(
-                  aspectRatio: 2,
-                  child: ClipRRect(
-                    borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(16),
-                    ),
-                    child: Image.network(
-                      'https://rs.sfacg.com/web/novel/images/images/beitouNew/${it.nid}.jpg',
-                      fit: BoxFit.cover,
-                      loadingBuilder: coverLoadingBuilder,
-                      errorBuilder: (_, _, _) => ColoredBox(
-                        color: scheme.primary.withValues(alpha: .15),
-                      ),
-                    ),
-                  ),
-                ),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: scheme.surface,
-                    borderRadius: const BorderRadius.vertical(
-                      bottom: Radius.circular(16),
-                    ),
-                    border: Border.all(
-                      color: scheme.outline.withValues(alpha: .4),
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        it.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        it.author,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: scheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-/// 随机书架：/random 均匀抽样 + 换一换（官方"次元新书"同款）。
-class _ShuffleGrid extends ConsumerStatefulWidget {
-  const _ShuffleGrid();
-
-  @override
-  ConsumerState<_ShuffleGrid> createState() => _ShuffleGridState();
-}
-
-class _ShuffleGridState extends ConsumerState<_ShuffleGrid> {
-  @override
-  Widget build(BuildContext context) {
-    final items = ref.watch(randomProvider);
-    return items.when(
-      loading: () => const Padding(
-        padding: EdgeInsets.all(16),
-        child: Center(child: CircularProgressIndicator()),
-      ),
-      error: (e, _) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Text(
-          '加载失败：$e',
-          style: TextStyle(fontSize: 12, color: Colors.grey),
-        ),
-      ),
-      data: (list) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Column(
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                for (var i = 0; i < list.take(4).length; i++) ...[
-                  if (i > 0) const SizedBox(width: 10),
-                  Expanded(child: _CoverCard(item: list[i], rank: null)),
-                ],
-              ],
-            ),
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton(
-                onPressed: () => ref.invalidate(randomProvider),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: Theme.of(context).colorScheme.primary,
-                  side: BorderSide(
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                ),
-                child: const Text('换一换 ↻'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 /// 默认封面兜底（用户拍板）：cover_url 为空用官方 default/defaultNew
 /// 两张图按 nid 取余绑定，不用书脊占位。
 Widget _spine(BuildContext context, int nid) {
   return defaultCover(nid, radius: 10);
-}
-
-/// 继续浏览：书架里的书（本地足迹随使用增长）。
-class _ContinueBrowsing extends ConsumerWidget {
-  const _ContinueBrowsing();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final shelf = ref.watch(shelfProvider);
-    return shelf.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) =>
-          Padding(padding: const EdgeInsets.all(16), child: Text('加载失败：$e')),
-      data: (items) {
-        if (items.isEmpty) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Text(
-              '书架还是空的——逛逛榜单，把感兴趣的书收进来',
-              style: TextStyle(color: Colors.grey),
-            ),
-          );
-        }
-        return SizedBox(
-          height: 176,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: items.length,
-            itemBuilder: (context, i) {
-              final it = items[i];
-              return Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: InkWell(
-                  onTap: () => context.push('/book/${it.nid}'),
-                  borderRadius: BorderRadius.circular(10),
-                  child: SizedBox(
-                    width: 96,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 96,
-                          height: 132,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(10),
-                            color: Theme.of(context).colorScheme.primary
-                                .withValues(alpha: .15),
-                          ),
-                          child: const Icon(Icons.menu_book, size: 28),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          it.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            height: 1.3,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        );
-      },
-    );
-  }
 }

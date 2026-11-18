@@ -59,12 +59,6 @@ final metaProvider = FutureProvider<Meta>((ref) async {
   return handle.api.meta();
 });
 
-/// 编辑精选轮播（featured=1，构建期人工选定）。
-final featuredProvider = FutureProvider<List<FeaturedItem>>((ref) async {
-  final handle = await ref.watch(bootProvider.future);
-  return handle.api.featured();
-});
-
 /// 每日 banner：以当天日期为随机种子，对整个 banner 池（含 is_licensed）
 /// 等概率抽取——同一天稳定、隔天必变、池内每个 banner 都可能被抽中。
 final bannerProvider = FutureProvider<List<FeaturedItem>>((ref) async {
