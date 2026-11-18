@@ -512,6 +512,36 @@ def _fetch_one(session: requests.Session, nid: int, timeout: float) -> dict:
     return rec
 
 
+def _fetch_chunk(session: requests.Session, nids: list[int],
+                delay: float, timeout: float, dry_run: bool) -> list[dict]:
+    results = []
+    for nid in nids:
+        if dry_run:
+            results.append({"nid": nid, "cover_url": "", "http": 0, "error": "dry-run"})
+            continue
+        results.append(_fetch_one(session, nid, timeout))
+        time.sleep(delay)
+    return results
+
+
+def _load_nids_file(path: Path, shard: tuple[int, int] | None, limit: int) -> list[int]:
+    """读取待抓 nid 清单（每行或空白分隔），去重、按分片过滤、截断。"""
+    seen: set[int] = set()
+    nids: list[int] = []
+    for token in Path(path).read_text(encoding="utf-8").split():
+        try:
+            nid = int(token)
+        except ValueError:
+            continue
+        if nid in seen:
+            continue
+        seen.add(nid)
+        nids.append(nid)
+    if shard:
+        nids = [n for n in nids if n % shard[1] == shard[0]]
+    return nids[:limit]
+
+
 def cmd_fetch(args: argparse.Namespace) -> None:
     delay = max(args.delay, MIN_DELAY)
     if args.delay < MIN_DELAY:
@@ -519,84 +549,101 @@ def cmd_fetch(args: argparse.Namespace) -> None:
     shard = None
     if args.shard:
         i, n = (int(x) for x in args.shard.split("/"))
+        if not (0 <= i < n):
+            raise SystemExit(f"非法分片 {args.shard}：需 0<=i<n")
         shard = (i, n)
     session = requests.Session()
     session.headers.update(F.make_headers())
+    # 清单模式：不发 db、不认领，结果只追加 results（跨 CI job 合并回本地队列）
+    list_nids = None
+    if args.nids_file:
+        list_nids = _load_nids_file(Path(args.nids_file), shard, args.max_requests)
+        print(f"清单模式：{len(list_nids):,d} 条待请求，不读写队列 db", flush=True)
     total = 0
     while total < args.max_requests:
         batch = min(args.batch, args.max_requests - total)
-        con = connect(Path(args.db))
-        now = time.time()
-        cutoff = now - args.lease
-        con.execute("BEGIN IMMEDIATE")
-        try:
-            sql = (
-                "SELECT nid FROM jobs WHERE (status='pending' OR (status='running' AND claimed_at<?)) "
-                "AND attempts<?"
-            )
-            params: list = [cutoff, args.max_attempts]
-            if shard:
-                sql += " AND nid % ? = ?"
-                params += [shard[1], shard[0]]
-            sql += " ORDER BY nid LIMIT ?"
-            params.append(batch)
-            nids = [r[0] for r in con.execute(sql, params).fetchall()]
-            con.executemany(
-                "UPDATE jobs SET status='running', claimed_by=?, claimed_at=?, updated_at=? WHERE nid=?",
-                [(args.worker, now, now, nid) for nid in nids],
-            )
-            con.commit()
-        except Exception:
-            con.rollback()
-            raise
-        finally:
-            con.close()
-        if not nids:
-            print("队列已空（无 pending），结束")
-            break
-        results = []
-        for nid in nids:
-            if args.dry_run:
-                rec = {"nid": nid, "cover_url": "", "http": 0, "error": "dry-run"}
-            else:
-                rec = _fetch_one(session, nid, args.timeout)
-                time.sleep(delay)
-            results.append(rec)
-        con = connect(Path(args.db))
-        now = time.time()
-        successes: list[dict] = []
-        con.execute("BEGIN IMMEDIATE")
-        try:
-            for rec in results:
-                nid = int(rec["nid"])
-                cover = (rec.get("cover_url") or "").strip()
-                if cover:
-                    con.execute(
-                        "UPDATE jobs SET status='done', cover_url=?, http=?, error='', "
-                        "claimed_by=NULL, claimed_at=NULL, updated_at=? WHERE nid=?",
-                        (cover, int(rec.get("http") or 0), now, nid),
-                    )
-                    successes.append({"nid": nid, "cover_url": cover,
-                                      "http": int(rec.get("http") or 0),
-                                      "snapshot": rec.get("snapshot") or {}})
-                else:
-                    row = con.execute("SELECT attempts FROM jobs WHERE nid=?", (nid,)).fetchone()
-                    attempts = (row["attempts"] + 1) if row else 1
-                    status = "pending" if args.dry_run else (
-                        "failed" if attempts >= args.max_attempts else "pending")
-                    con.execute(
-                        "UPDATE jobs SET status=?, attempts=?, http=?, error=?, "
-                        "claimed_by=NULL, claimed_at=NULL, updated_at=? WHERE nid=?",
-                        (status, attempts, int(rec.get("http") or 0), (rec.get("error") or "")[:300], now, nid),
-                    )
-            con.commit()
-        except Exception:
-            con.rollback()
-            raise
-        finally:
-            con.close()
-        if successes and not args.dry_run:
-            append_results(Path(args.results), successes)
+        if list_nids is not None:
+            nids = list_nids[total:total + batch]
+            if not nids:
+                print("清单已跑完，结束")
+                break
+            results = _fetch_chunk(session, nids, delay, args.timeout, args.dry_run)
+            if not args.dry_run:
+                successes = [{"nid": r["nid"], "cover_url": r["cover_url"],
+                              "http": int(r.get("http") or 0),
+                              "snapshot": r.get("snapshot") or {}}
+                             for r in results if (r.get("cover_url") or "").strip()]
+                append_results(Path(args.results), successes)
+                for r in results:
+                    if not (r.get("cover_url") or "").strip():
+                        print(f"  失败 nid={r['nid']} http={r.get('http')} "
+                              f"{r.get('error')}", flush=True)
+        else:
+            con = connect(Path(args.db))
+            now = time.time()
+            cutoff = now - args.lease
+            con.execute("BEGIN IMMEDIATE")
+            try:
+                sql = (
+                    "SELECT nid FROM jobs WHERE (status='pending' OR (status='running' AND claimed_at<?)) "
+                    "AND attempts<?"
+                )
+                params: list = [cutoff, args.max_attempts]
+                if shard:
+                    sql += " AND nid % ? = ?"
+                    params += [shard[1], shard[0]]
+                sql += " ORDER BY nid LIMIT ?"
+                params.append(batch)
+                nids = [r[0] for r in con.execute(sql, params).fetchall()]
+                con.executemany(
+                    "UPDATE jobs SET status='running', claimed_by=?, claimed_at=?, updated_at=? WHERE nid=?",
+                    [(args.worker, now, now, nid) for nid in nids],
+                )
+                con.commit()
+            except Exception:
+                con.rollback()
+                raise
+            finally:
+                con.close()
+            if not nids:
+                print("队列已空（无 pending），结束")
+                break
+            results = _fetch_chunk(session, nids, delay, args.timeout, args.dry_run)
+            con = connect(Path(args.db))
+            now = time.time()
+            successes: list[dict] = []
+            con.execute("BEGIN IMMEDIATE")
+            try:
+                for rec in results:
+                    nid = int(rec["nid"])
+                    cover = (rec.get("cover_url") or "").strip()
+                    if cover:
+                        con.execute(
+                            "UPDATE jobs SET status='done', cover_url=?, http=?, error='', "
+                            "claimed_by=NULL, claimed_at=NULL, updated_at=? WHERE nid=?",
+                            (cover, int(rec.get("http") or 0), now, nid),
+                        )
+                        successes.append({"nid": nid, "cover_url": cover,
+                                          "http": int(rec.get("http") or 0),
+                                          "snapshot": rec.get("snapshot") or {}})
+                    else:
+                        row = con.execute("SELECT attempts FROM jobs WHERE nid=?", (nid,)).fetchone()
+                        attempts = (row["attempts"] + 1) if row else 1
+                        status = "pending" if args.dry_run else (
+                            "failed" if attempts >= args.max_attempts else "pending")
+                        con.execute(
+                            "UPDATE jobs SET status=?, attempts=?, http=?, error=?, "
+                            "claimed_by=NULL, claimed_at=NULL, updated_at=? WHERE nid=?",
+                            (status, attempts, int(rec.get("http") or 0), (rec.get("error") or "")[:300], now, nid),
+                        )
+                con.commit()
+            except Exception:
+                con.rollback()
+                raise
+            finally:
+                con.close()
+            if successes and not args.dry_run:
+                append_results(Path(args.results), successes)
         total += len(nids)
         ok = sum(1 for r in results if r.get("cover_url"))
         print(f"[{total}/{args.max_requests}] 本批 {len(nids)} 条，成功 {ok}，失败 {len(nids)-ok}",
@@ -660,6 +707,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--worker", default="cli")
     p.add_argument("--lease", type=float, default=600)
     p.add_argument("--max-attempts", type=int, default=3)
+    p.add_argument("--nids-file", help="清单模式：只抓文件里的 nid，不读写队列 db（CI 用）")
     p.add_argument("--dry-run", action="store_true", help="出队但不发请求、不计失败")
     p.set_defaults(func=cmd_fetch)
     return ap

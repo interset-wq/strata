@@ -1,0 +1,78 @@
+name: cover-fetch
+
+# 手动触发的封面采集批次。只接一份 nid 清单，不读写本地队列 db：
+# 结果作为 artifact 上传，本地用 `cover_queue.py ack --result <file>` 合并回队列。
+# 分片约定见 `analysis/fetchers/cover_queue.py --shard i/n`：本地与 CI 取互为补集的分片，
+# 并行跑不会重复请求同一本。
+
+on:
+  workflow_dispatch:
+    inputs:
+      nids_b64:
+        description: "gzip+base64 编码的待抓 nid 清单（空白分隔）"
+        required: true
+      max_requests:
+        description: "本批最多请求数"
+        required: false
+        default: "2100"
+      delay:
+        description: "单请求间隔秒，低于 0.5 会被脚本强制抬到合规下限"
+        required: false
+        default: "0.6"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cover-fetch
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install deps
+        run: pip install --disable-pip-version-check requests
+
+      - name: Decode nid list
+        env:
+          NIDS_B64: ${{ inputs.nids_b64 }}
+        run: |
+          python - <<'PY'
+          import base64, gzip, os, pathlib
+          raw = gzip.decompress(base64.b64decode(os.environ["NIDS_B64"]))
+          pathlib.Path("out").mkdir(exist_ok=True)
+          pathlib.Path("out/cover_nids.txt").write_bytes(raw)
+          print("nids:", len(raw.split()))
+          PY
+
+      - name: Fetch covers
+        run: |
+          python analysis/fetchers/cover_queue.py fetch \
+            --nids-file out/cover_nids.txt \
+            --results out/ci_results.jsonl \
+            --batch 50 \
+            --max-requests "${{ inputs.max_requests }}" \
+            --delay "${{ inputs.delay }}" \
+            --timeout 25
+
+      - name: Summary
+        if: always()
+        run: |
+          rows=$(wc -l < out/ci_results.jsonl 2>/dev/null || echo 0)
+          echo "cover-fetch: ${rows} rows" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cover-results
+          path: out/ci_results.jsonl
+          if-no-files-found: warn
+          retention-days: 7
