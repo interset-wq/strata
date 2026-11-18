@@ -379,6 +379,8 @@ class RankItem {
   final String? status;
   final int? words;
   final int? clicks;
+  final int? praises;
+  final List<String> tags;
 
   RankItem.fromJson(Map<String, dynamic> m)
       : rank = m['rank'] as int,
@@ -393,7 +395,11 @@ class RankItem {
         coverUrl = m['cover_url'] as String?,
         status = m['status'] as String?,
         words = m['words'] as int?,
-        clicks = m['clicks'] as int?;
+        clicks = m['clicks'] as int?,
+        praises = (m['praises'] as num?)?.toInt(),
+        tags = ((m['tags'] as List?) ?? const [])
+            .map((e) => e.toString())
+            .toList();
 }
 
 class WatchItem {

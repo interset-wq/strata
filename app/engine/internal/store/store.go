@@ -282,19 +282,21 @@ LIMIT 1`
 }
 
 type RankItem struct {
-	Rank     int     `json:"rank"`
-	NID      int64   `json:"nid"`
-	Title    string  `json:"title"`
-	Author   string  `json:"author"`
-	Genre    *string `json:"genre"`
-	EstYear  int     `json:"est_year"`
-	Favs     *int64  `json:"favs"`
-	FavPctl  float64 `json:"fav_pctl"`
-	Contest  *string `json:"contest"`
-	CoverURL *string `json:"cover_url"`
-	Status   *string `json:"status"`
-	Words    *int64  `json:"words"`
-	Clicks   *int64  `json:"clicks"`
+	Rank     int      `json:"rank"`
+	NID      int64    `json:"nid"`
+	Title    string   `json:"title"`
+	Author   string   `json:"author"`
+	Genre    *string  `json:"genre"`
+	EstYear  int      `json:"est_year"`
+	Favs     *int64   `json:"favs"`
+	FavPctl  float64  `json:"fav_pctl"`
+	Contest  *string  `json:"contest"`
+	CoverURL *string  `json:"cover_url"`
+	Status   *string  `json:"status"`
+	Words    *int64   `json:"words"`
+	Clicks   *int64   `json:"clicks"`
+	Praises  *int64   `json:"praises"`
+	Tags     []string `json:"tags"`
 }
 
 func (s *Store) RankingFavs(ctx context.Context, year int, genre, status, contest string, limit int) ([]RankItem, error) {
@@ -679,7 +681,7 @@ func (s *Store) RandomBooks(ctx context.Context, limit int, serialOnly bool) ([]
 	query := `
 SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
        seed.books.est_year, seed.books.status, seed.books.words, seed.books.clicks,
-       seed.books.favs,
+       seed.books.favs, seed.books.praises,
        COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url
 FROM seed.books
 LEFT JOIN covers c ON c.nid = seed.books.nid
@@ -696,12 +698,13 @@ WHERE is_licensed = 0`
 	items := []RankItem{}
 	for rows.Next() {
 		var (
-			item                RankItem
-			gen, status, cover  sql.NullString
-			words, clicks, favs sql.NullInt64
+			item               RankItem
+			gen, status, cover sql.NullString
+			words, clicks, favs,
+			praises sql.NullInt64
 		)
 		if err := rows.Scan(&item.NID, &item.Title, &item.Author, &gen,
-			&item.EstYear, &status, &words, &clicks, &favs, &cover); err != nil {
+			&item.EstYear, &status, &words, &clicks, &favs, &praises, &cover); err != nil {
 			return nil, err
 		}
 		item.Genre = strPtr(gen)
@@ -709,10 +712,51 @@ WHERE is_licensed = 0`
 		item.Words = intPtr(words)
 		item.Clicks = intPtr(clicks)
 		item.Favs = intPtr(favs)
+		item.Praises = intPtr(praises)
 		item.CoverURL = strPtr(cover)
 		items = append(items, item)
 	}
-	return items, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	s.attachTags(ctx, items)
+	return items, nil
+}
+
+// attachTags fills item.Tags from seed.book_tags with a single batched
+// query (avoids N+1 for the random-serial page's 100 rows).
+func (s *Store) attachTags(ctx context.Context, items []RankItem) {
+	if len(items) == 0 {
+		return
+	}
+	placeholders := make([]string, len(items))
+	args := make([]any, len(items))
+	for i, it := range items {
+		placeholders[i] = "?"
+		args[i] = it.NID
+	}
+	query := fmt.Sprintf(`
+SELECT nid, tag FROM seed.book_tags WHERE nid IN (%s) ORDER BY tag`,
+		strings.Join(placeholders, ","))
+	rows, err := s.DB.QueryContext(ctx, query, args...)
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var (
+			nid int64
+			tag string
+		)
+		if err := rows.Scan(&nid, &tag); err != nil {
+			return
+		}
+		for i := range items {
+			if items[i].NID == nid {
+				items[i].Tags = append(items[i].Tags, tag)
+			}
+		}
+	}
 }
 
 // Search is the L1 local search over the bundled seed (title/author LIKE).

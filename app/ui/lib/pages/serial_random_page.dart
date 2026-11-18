@@ -115,16 +115,49 @@ class _SerialTile extends StatelessWidget {
 
   const _SerialTile({required this.item});
 
+  static String _wan(int? n) {
+    if (n == null) return '';
+    if (n >= 10000) return '${(n / 10000).toStringAsFixed(1)}万';
+    return '$n';
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final coverUrl = item.coverUrl;
     final hasCover = coverUrl != null && coverUrl.isNotEmpty;
+
+    // 标签：题材 + book_tags（最多 3 个）
+    final tags = <String>[
+      if (item.genre != null && item.genre!.isNotEmpty) item.genre!,
+      ...item.tags,
+    ];
+    if (tags.toSet().length != tags.length) {
+      // 去重且保持顺序
+      final seen = <String>{};
+      tags.removeWhere((t) => !seen.add(t));
+    }
+
+    // 指标行：字数 · 收藏 · 点击 · 点赞（非空才显示）
+    final metrics = <String>[
+      if (item.words != null) '${_wan(item.words)}字',
+      if (item.favs > 0) '${_wan(item.favs)}藏',
+      if (item.clicks != null) '${_wan(item.clicks)}阅',
+      if (item.praises != null && item.praises! > 0) '${_wan(item.praises)}赞',
+    ];
+
     return InkWell(
       onTap: () => context.push('/book/${item.nid}'),
       borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 5),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: scheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+              color: scheme.outline.withValues(alpha: .25)),
+        ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -153,22 +186,42 @@ class _SerialTile extends StatelessWidget {
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                          fontSize: 14, fontWeight: FontWeight.w600)),
+                          fontSize: 13, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 3),
                   Text(item.author,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style:
                           TextStyle(fontSize: 11, color: scheme.secondary)),
-                  const SizedBox(height: 3),
-                  Text(
-                    [
-                      if (item.genre != null) item.genre!,
-                      if (item.status != null) item.status!,
-                    ].join(' · '),
-                    style: TextStyle(
-                        fontSize: 10, color: scheme.onSurfaceVariant),
-                  ),
+                  if (tags.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 4,
+                      runSpacing: 4,
+                      children: [
+                        for (final t in tags.take(3))
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: scheme.primary.withValues(alpha: .08),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(t,
+                                style: TextStyle(
+                                    fontSize: 10,
+                                    color: scheme.primary)),
+                          ),
+                      ],
+                    ),
+                  ],
+                  if (metrics.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(metrics.join('  '),
+                        style: TextStyle(
+                            fontSize: 10,
+                            color: scheme.onSurfaceVariant)),
+                  ],
                 ],
               ),
             ),
