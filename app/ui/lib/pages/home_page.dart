@@ -461,16 +461,15 @@ class _LargeImageCardState extends ConsumerState<_LargeImageCard> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final item = widget.item;
-    final coverUrl = item.coverUrl;
-    final hasCover = coverUrl != null && coverUrl.isNotEmpty;
-    final fallback = hasCover
-        ? Image.network(
-            coverImageUrl(coverUrl)!,
-            fit: BoxFit.cover,
-            loadingBuilder: coverLoadingBuilder,
-            errorBuilder: (_, _, _) => defaultCover(item.nid),
-          )
-        : defaultCover(item.nid);
+    // 书籍封面是 3:4 竖图，塞进 16:9 容器会被裁成一条——
+    // banner 源图 404 时只给占位容器，不做封面兜底。
+    final placeholder = ColoredBox(
+      color: scheme.primary.withValues(alpha: .06),
+      child: Center(
+        child: Icon(Icons.image_not_supported_outlined,
+            size: 36, color: scheme.outline),
+      ),
+    );
 
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 6, 16, 6),
@@ -494,7 +493,7 @@ class _LargeImageCardState extends ConsumerState<_LargeImageCard> {
                   context.push('/image-viewer/${widget.index}');
                 },
                 child: _bannerFailed
-                    ? fallback
+                    ? placeholder
                     : ColoredBox(
                         color: scheme.primary.withValues(alpha: .1),
                         child: Image.network(
@@ -503,7 +502,7 @@ class _LargeImageCardState extends ConsumerState<_LargeImageCard> {
                           loadingBuilder: coverLoadingBuilder,
                           errorBuilder: (_, _, _) {
                             setState(() => _bannerFailed = true);
-                            return fallback;
+                            return placeholder;
                           },
                         ),
                       ),

@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import '../core/providers.dart';
 import '../data/api/strata_api.dart';
 import '../widgets/banner_carousel.dart';
-import '../widgets/default_cover.dart';
 
 /// 图片全屏查看器：大图精选点图进入。黑底全屏，左右滑动切图，
 /// 单指点按关闭，双击 2× 缩放，双指捏合 1–4×。
@@ -83,24 +82,6 @@ class _ZoomableImage extends StatefulWidget {
 }
 
 class _ZoomableImageState extends State<_ZoomableImage> {
-  Widget get _coverFallback {
-    final coverUrl = coverImageUrl(widget.item.coverUrl);
-    if (coverUrl == null || coverUrl.isEmpty) {
-      return defaultCover(widget.item.nid, fit: BoxFit.contain);
-    }
-    return Image.network(
-      coverUrl,
-      fit: BoxFit.contain,
-      loadingBuilder: (_, child, progress) {
-        if (progress == null) return child;
-        return const Center(child: CircularProgressIndicator(
-            strokeWidth: 2, color: Colors.white54));
-      },
-      errorBuilder: (_, _, _) =>
-          defaultCover(widget.item.nid, fit: BoxFit.contain),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -118,7 +99,10 @@ class _ZoomableImageState extends State<_ZoomableImage> {
                   child: CircularProgressIndicator(
                       strokeWidth: 2, color: Colors.white54));
             },
-            errorBuilder: (_, _, _) => _coverFallback,
+            // 与列表一致：404 只给占位，不做封面兜底。
+            errorBuilder: (_, _, _) => const Center(
+                child: Icon(Icons.image_not_supported_outlined,
+                    size: 48, color: Colors.white38)),
           ),
         ),
       ),

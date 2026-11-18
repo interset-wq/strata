@@ -42,6 +42,12 @@
 | 授权作品（licensed） | `Icons.lock` | 首页宽卡入口（可点击用实心，与规则 4 一致） |
 | 萌神获奖 | `Icons.emoji_events` | 首页宽卡入口（与宫格"征文比赛"同"获奖"语义，复用） |
 
+## 状态占位
+
+| 语义 | icon | 使用处 |
+| --- | --- | --- |
+| 图片不可用 | `Icons.image_not_supported_outlined` | 大图精选卡片 / 全屏查看器：banner cut 图 404 时的占位容器（不做封面兜底——3:4 封面塞 16:9 容器会被裁成一条） |
+
 ## 使用规范
 
 1. 指标展示统一走 `MetricBadge` 组件（`lib/widgets/metric_badge.dart`）：
