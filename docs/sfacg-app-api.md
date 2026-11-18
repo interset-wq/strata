@@ -215,14 +215,15 @@ App 详情页的「看漫画 / 听有声」按钮数据源。实测 2026-11-18�
 **推论**：改编不适合作全库维度或推荐信号——样本量不足（<200 本）、且被 `featured` 覆盖。
 只在展示层按需单本查询（详情页"看漫画/听有声"按钮）。
 
-**Web 入口 URL**（2026-11-18 实测）：
+**Web 入口 URL**（2026-11-18 实测 + 用户浏览器核实）：
 
-| 类型 | 模板 | 结果 |
+| 类型 | 模板 | 状态 |
 | --- | --- | --- |
-| 漫画 | `http://manhua.sfacg.com/mh/{folderName}/`（`folderName` 来自 `GET /comics/{comicId}`） | 官方 `sfacg.com/catalog?tid=10` 分类页仍用此格式，但逐条实测（含官方页上的 `XJYQS`、`ZCMGT`）返回「糟糕,页面找不到了」；`mh.sfacg.com` 返回 403。**漫画 Web 端疑似下线或限区域** |
-| 有声 | 无 | 仅有 `albumId`，`book.sfacg.com/Album/{id}/`、`m.sfacg.com/a\|album\|audio/{id}/`、`sfacg.com/album\|audio/{id}/` 全部 404 / 「出错啦」 |
+| 漫画 | `http://manhua.sfacg.com/mh/{folderName}/`（`folderName` 来自 `GET /comics/{comicId}`） | **不可用**。官方会**定期关闭漫画站**：当前仅首页能加载，**所有详情页 404**（官方 catalog 页自身链接的 `XJYQS`、`ZCMGT` 同样 404；`mh.sfacg.com` 403、`mm.sfacg.com/b/{folder}` 「出错啦」）。用户浏览器复核结果一致 |
+| 有声 | 无 | 仅有 `albumId`，无 folderName；`book.sfacg.com/Album/{id}/`、`m.sfacg.com/a\|album\|audio/{id}/`、`sfacg.com/album\|audio/{id}/` 全部 404 / 「出错啦」 |
 
-端上按漫画模板拼装、失败由浏览器兜底；有声目前不给链接，只标「有改编」。
+**结论：两类都不生成外链**——模板虽在，站点常态性不可用，拼出来就是死链。
+`comic_folder` 仍在库（官方恢复后可直接复用），但端上只标「有改编漫画 / 有有声」。
 
 **陷阱（与 `GetTicketNum` 同型）**：无效 nid、已死亡的书、无衍生作品的书，三者响应的
 `status` 都是 200 且 `comicId/albumId` 全 0——**不能用来判活，也不能区分「查无此书」

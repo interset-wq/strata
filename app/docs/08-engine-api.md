@@ -89,16 +89,16 @@ HTML 含书名/作者/分类/签约/封面/简介/收藏/赞/字数/状态/更�
 `tickets`（当月月票，`GetTicketNum.ashx` 追加请求，失败为 null）；App API 含
 `markCount/viewTimes/charCount/point/addTime/signStatus/typeId/categoryId/...`。
 
-详情响应另含衍生作品入口（05 §6、§6.1），字段只在已抓到时出现：
+详情响应另含衍生作品标注（05 §6、§6.1），字段只在已抓到时出现：
 
 ```json
-{ "comic_id": 2937, "album_id": 97, "comic_folder": "XJYQS",
-  "comic_url": "http://manhua.sfacg.com/mh/XJYQS/" }
+{ "comic_id": 2937, "album_id": 97, "comic_folder": "XJYQS" }
 ```
 
-`comic_url` 由本地按模板拼装，零请求；`album_id>0` 时**不给链接**（无官方 Web
-模板），UI 只标「有有声改编」。`comic_id`/`album_id` 为 `null`（未抓/失败）与
-`0`（确认无改编）都表示不显示入口。
+**不返回任何外链字段**：漫画站被官方定期关闭（当前详情页全 404），有声无 Web 模板，
+拼出的 URL 即死链。UI 只按 `>0` 显示「有改编漫画 / 有有声」的静态标注；
+`comic_folder` 仅为官方恢复后复用的留档。`null`（未抓/失败）与 `0`（确认无改编）
+都不显示标注。
 
 ### GET /strata/rankings/favs?year=&genre=&limit=
 
