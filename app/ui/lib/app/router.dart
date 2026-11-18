@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../pages/book_data_page.dart';
 import '../pages/book_detail_page.dart';
 import '../pages/boot_page.dart';
 import '../pages/browse_page.dart';
@@ -8,6 +9,7 @@ import '../pages/discover_page.dart';
 import '../pages/home_page.dart';
 import '../pages/rankings_page.dart';
 import '../pages/search_page.dart';
+import '../pages/watchlist_page.dart';
 import '../pages/settings_page.dart';
 import '../pages/shelf_page.dart';
 
@@ -88,5 +90,12 @@ final router = GoRouter(
       ),
     ),
     GoRoute(path: '/discover', builder: (_, _) => const DiscoverPage()),
+    GoRoute(path: '/watchlist', builder: (_, _) => const WatchlistPage()),
+    GoRoute(
+      path: '/book/:nid/data',
+      builder: (_, state) => BookDataPage(
+        nid: int.parse(state.pathParameters['nid']!),
+      ),
+    ),
   ],
 );

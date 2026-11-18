@@ -39,7 +39,15 @@ class _ShelfPageState extends ConsumerState<ShelfPage> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('书架')),
+      appBar: AppBar(
+        title: const Text('书架'),
+        actions: [
+          IconButton(
+              icon: const Icon(Icons.visibility_outlined),
+              tooltip: '追踪管理',
+              onPressed: () => context.push('/watchlist')),
+        ],
+      ),
       body: FutureBuilder<List<ShelfItem>>(
         future: _shelf,
         builder: (context, snap) {

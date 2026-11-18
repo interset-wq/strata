@@ -527,6 +527,62 @@ WHERE is_licensed = 0 AND cover_url IS NOT NULL AND cover_url != ''`
 	return items, rows.Err()
 }
 
+// WatchAdd puts a book on the author's watchlist (Phase 5 tracking).
+func (s *Store) WatchAdd(ctx context.Context, nid int64, addedAt int64) error {
+	_, err := s.DB.ExecContext(ctx, `
+INSERT OR IGNORE INTO watchlist(nid, role, added_at) VALUES (?, 'self', ?)`,
+		nid, addedAt)
+	return err
+}
+
+// WatchRemove drops a book from the watchlist.
+func (s *Store) WatchRemove(ctx context.Context, nid int64) error {
+	_, err := s.DB.ExecContext(ctx, `DELETE FROM watchlist WHERE nid = ?`, nid)
+	return err
+}
+
+// WatchItem is a watchlist row joined with seed metadata.
+type WatchItem struct {
+	NID      int64   `json:"nid"`
+	Title    string  `json:"title"`
+	Author   string  `json:"author"`
+	Genre    *string `json:"genre"`
+	CoverURL *string `json:"cover_url"`
+	AddedAt  int64   `json:"added_at"`
+	Role     string  `json:"role"`
+	Note     *string `json:"note"`
+}
+
+// WatchList joins the watchlist with seed metadata, newest first.
+func (s *Store) WatchList(ctx context.Context) ([]WatchItem, error) {
+	rows, err := s.DB.QueryContext(ctx, `
+SELECT w.nid, b.title, b.author, b.genre, b.cover_url,
+       w.added_at, w.role, w.note
+FROM watchlist w JOIN seed.books b ON b.nid = w.nid
+ORDER BY w.added_at DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []WatchItem{}
+	for rows.Next() {
+		var (
+			it         WatchItem
+			gen, cover sql.NullString
+			note       sql.NullString
+		)
+		if err := rows.Scan(&it.NID, &it.Title, &it.Author, &gen,
+			&cover, &it.AddedAt, &it.Role, &note); err != nil {
+			return nil, err
+		}
+		it.Genre = strPtr(gen)
+		it.CoverURL = strPtr(cover)
+		it.Note = strPtr(note)
+		items = append(items, it)
+	}
+	return items, rows.Err()
+}
+
 // Search is the L1 local search over the bundled seed (title/author LIKE).
 // Licensed books are included: they are searchable and detail-visible by
 // design, just excluded from percentile rankings.

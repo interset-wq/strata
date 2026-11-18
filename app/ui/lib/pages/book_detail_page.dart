@@ -35,6 +35,19 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
         centerTitle: true,
         actions: [
           IconButton(
+            icon: const Icon(Icons.visibility_outlined),
+            tooltip: '加入追踪',
+            onPressed: () async {
+              final handle =
+                  await ref.read(bootProvider.future);
+              await handle.api.watchAdd(widget.nid);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('已加入追踪')));
+              }
+            },
+          ),
+          IconButton(
             icon: onShelf
                 ? const Icon(Icons.favorite)
                 : const Icon(Icons.favorite_border),

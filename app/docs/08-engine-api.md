@@ -117,6 +117,14 @@ Classic 发现流（docs/12 §5）：候选池 = `is_licensed=0` 且**有封面*
 `clicks:nid`，缺省从顶部开始），每批默认 20，stateless。响应含 `next_cursor`
 （批末返回，为空表示到底）。
 
+### GET/POST/DELETE /strata/watchlist（**已实现**）
+
+作者工作台追踪列表（Phase 5，docs/12 §3.4 反馈回路隔离：观测数据只存 user.db）。
+GET 返回 `{items:[{nid,title,author,genre,cover_url,added_at,role,note}]}`（JOIN seed.books，
+按加入时间倒序）；POST/DELETE `/watchlist/:nid` 幂等增删。观测时序见
+`GET /books/:nid/observations`（按 observed_at 倒序，来源 source 标注），
+保留期由 PruneObservations 管理。
+
 ### GET /strata/rankings/short?limit=
 
 200：同上结构，`meta.kind="short"`、`ordering="favs"`、`short_max_words=50000`，

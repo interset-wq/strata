@@ -83,6 +83,9 @@ func New(s *store.Store) *gin.Engine {
 	group.GET("/books/:nid", srv.book)
 	group.POST("/books/:nid/refresh", srv.bookRefresh)
 	group.GET("/books/:nid/observations", srv.observations)
+	group.GET("/watchlist", srv.watchList)
+	group.POST("/watchlist/:nid", srv.watchAdd)
+	group.DELETE("/watchlist/:nid", srv.watchRemove)
 	group.GET("/rankings/favs", srv.rankingFavs)
 	group.GET("/rankings/board", srv.rankingBoard)
 	group.GET("/discover", srv.discover)
@@ -358,6 +361,44 @@ func (s *Server) discover(c *gin.Context) {
 		"items":       items,
 		"next_cursor": nextCursor,
 	})
+}
+
+// watchList returns the author's tracked books joined with seed metadata.
+func (s *Server) watchList(c *gin.Context) {
+	items, err := s.store.WatchList(c.Request.Context())
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"meta": gin.H{"pool": "user"}, "items": items})
+}
+
+// watchAdd tracks a book. Idempotent (INSERT OR IGNORE).
+func (s *Server) watchAdd(c *gin.Context) {
+	nid, err := strconv.ParseInt(c.Param("nid"), 10, 64)
+	if err != nil || nid <= 0 {
+		fail(c, http.StatusBadRequest, "invalid_argument", "nid must be a positive integer")
+		return
+	}
+	if err := s.store.WatchAdd(c.Request.Context(), nid, time.Now().Unix()); err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"meta": gin.H{"nid": nid, "added": true}})
+}
+
+// watchRemove drops a book from the watchlist.
+func (s *Server) watchRemove(c *gin.Context) {
+	nid, err := strconv.ParseInt(c.Param("nid"), 10, 64)
+	if err != nil || nid <= 0 {
+		fail(c, http.StatusBadRequest, "invalid_argument", "nid must be a positive integer")
+		return
+	}
+	if err := s.store.WatchRemove(c.Request.Context(), nid); err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"meta": gin.H{"nid": nid, "removed": true}})
 }
 
 func (s *Server) rankingDeep(c *gin.Context) {

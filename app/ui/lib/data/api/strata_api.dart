@@ -122,6 +122,21 @@ class StrataApi {
         .toList();
   }
 
+  Future<List<WatchItem>> watchList() async {
+    final body = await _get('/watchlist');
+    return (body['items'] as List)
+        .map((e) => WatchItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> watchAdd(int nid) async {
+    await _post('/watchlist/$nid');
+  }
+
+  Future<void> watchRemove(int nid) async {
+    await _delete('/watchlist/$nid');
+  }
+
   Future<List<ShelfItem>> shelfList() async {
     final body = await _get('/shelf');
     return (body['items'] as List)
@@ -281,6 +296,27 @@ class RankItem {
         status = m['status'] as String?,
         words = m['words'] as int?,
         clicks = m['clicks'] as int?;
+}
+
+class WatchItem {
+  final int nid;
+  final String title;
+  final String author;
+  final String? genre;
+  final String? coverUrl;
+  final int addedAt;
+  final String role;
+  final String? note;
+
+  WatchItem.fromJson(Map<String, dynamic> m)
+      : nid = m['nid'] as int,
+        title = m['title'] as String,
+        author = m['author'] as String,
+        genre = m['genre'] as String?,
+        coverUrl = m['cover_url'] as String?,
+        addedAt = m['added_at'] as int,
+        role = m['role'] as String? ?? 'self',
+        note = m['note'] as String?;
 }
 
 class DiscoverPage {
