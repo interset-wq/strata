@@ -941,7 +941,17 @@ func (s *Server) banner(c *gin.Context) {
 	for _, ch := range seed {
 		day = day*10 + int64(ch-'0')
 	}
-	items, err := s.store.BannerPick(c.Request.Context(), day, limit)
+	offset := 0
+	if raw := c.Query("offset"); raw != "" {
+		o, err := strconv.Atoi(raw)
+		if err != nil || o < 0 {
+			fail(c, http.StatusBadRequest, "invalid_argument",
+				"offset must be a non-negative integer")
+			return
+		}
+		offset = o
+	}
+	items, err := s.store.BannerPick(c.Request.Context(), day, offset, limit)
 	if err != nil {
 		fail(c, http.StatusInternalServerError, "internal", err.Error())
 		return

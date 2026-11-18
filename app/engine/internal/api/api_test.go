@@ -97,6 +97,29 @@ func TestLicensedBookDetail(t *testing.T) {
 	}
 }
 
+func TestBannerSegmented(t *testing.T) {
+	srv, _ := newTestServer(t)
+	// Same seed: offset 0 and offset 1 must not overlap.
+	a := getJSON(t, srv.URL+"/strata/banner?seed=20261118&limit=1&offset=0", http.StatusOK)
+	b := getJSON(t, srv.URL+"/strata/banner?seed=20261118&limit=1&offset=1", http.StatusOK)
+	ia := a["items"].([]any)
+	ib := b["items"].([]any)
+	if len(ia) != 1 || len(ib) != 1 {
+		t.Fatalf("segments = %d, %d, want 1, 1", len(ia), len(ib))
+	}
+	if ia[0].(map[string]any)["nid"] == ib[0].(map[string]any)["nid"] {
+		t.Fatalf("segments overlap: %v", ia[0].(map[string]any)["nid"])
+	}
+	// Different seed, same offset: deterministic (same result twice).
+	c := getJSON(t, srv.URL+"/strata/banner?seed=20261118&limit=1&offset=0", http.StatusOK)
+	if ia[0].(map[string]any)["nid"] != c["items"].([]any)[0].(map[string]any)["nid"] {
+		t.Fatal("seeded pick is not deterministic")
+	}
+	// Negative offset rejected.
+	getJSON(t, srv.URL+"/strata/banner?seed=20261118&limit=1&offset=-1",
+		http.StatusBadRequest)
+}
+
 func TestLicensedPool(t *testing.T) {
 	srv, _ := newTestServer(t)
 	body := getJSON(t, srv.URL+"/strata/licensed", http.StatusOK)

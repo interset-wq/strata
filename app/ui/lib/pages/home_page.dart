@@ -116,6 +116,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                 _sectionTitle(context, '随便看看',
                     onMore: () => context.push('/browse-random')),
                 _ShowcaseSection(provider: browseShowcaseProvider),
+                _sectionTitle(context, '大图精选'),
+                const _LargeImageSection(),
               ],
                 ),
                 if (_showTop)
@@ -406,6 +408,114 @@ class _HomePageState extends ConsumerState<HomePage> {
 
 /// 随机抽样展示区：4×2 封面网格，无角标——内容即随机抽取的池子
 /// （连载发现=连载长篇，完结精选=完结长篇），等概率、下拉刷新换一批。
+// 大图精选：每日 banner 池的后段（与轮播同种子、offset 跳段不重复）。
+// 与轮播不同：文字在图下方，点图进全屏查看器，点文字进详情页。
+class _LargeImageSection extends ConsumerWidget {
+  const _LargeImageSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final items = ref.watch(largeImageProvider);
+    return items.when(
+      loading: () => const SizedBox(
+          height: 120,
+          child: Center(child: CircularProgressIndicator(strokeWidth: 2))),
+      error: (e, _) => Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child:
+              Text('加载失败：$e', style: const TextStyle(fontSize: 12))),
+      data: (list) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Column(
+          children: [
+            for (var i = 0; i < list.length; i++)
+              _LargeImageCard(item: list[i], index: i, items: list),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LargeImageCard extends ConsumerWidget {
+  final FeaturedItem item;
+  final int index;
+  final List<FeaturedItem> items;
+
+  const _LargeImageCard({
+    required this.item,
+    required this.index,
+    required this.items,
+  });
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
+    final coverUrl = item.coverUrl;
+    final hasCover = coverUrl != null && coverUrl.isNotEmpty;
+    final image = hasCover
+        ? Image.network(
+            coverImageUrl(coverUrl)!,
+            fit: BoxFit.cover,
+            loadingBuilder: coverLoadingBuilder,
+            errorBuilder: (_, _, _) => defaultCover(item.nid),
+          )
+        : defaultCover(item.nid);
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: scheme.outline.withValues(alpha: .25)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(12)),
+            child: AspectRatio(
+              aspectRatio: 3 / 4,
+              child: GestureDetector(
+                onTap: () {
+                  ref.read(imageViewerProvider.notifier).state = items;
+                  context.push('/image-viewer/$index');
+                },
+                child: image,
+              ),
+            ),
+          ),
+          InkWell(
+            onTap: () => context.push('/book/${item.nid}'),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(item.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: scheme.onSurface)),
+                  const SizedBox(height: 3),
+                  Text(item.author,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style:
+                          TextStyle(fontSize: 11, color: scheme.secondary)),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ShowcaseSection extends ConsumerWidget {
   final FutureProvider<List<RankItem>> provider;
 

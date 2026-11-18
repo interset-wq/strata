@@ -195,9 +195,12 @@ class StrataApi {
   }
 
   /// 每日 banner：日期种子对整个 banner 池（含 is_licensed）等概率抽取。
-  Future<List<FeaturedItem>> banners({required int seed, int limit = 6}) async {
-    final body =
-        await _get('/banner', {'seed': '$seed', 'limit': '$limit'});
+  Future<List<FeaturedItem>> banners(
+      {required int seed,
+      int limit = 6,
+      int offset = 0}) async {
+    final body = await _get('/banner',
+        {'seed': '$seed', 'limit': '$limit', 'offset': '$offset'});
     return (body['items'] as List)
         .map((e) => FeaturedItem.fromJson(e as Map<String, dynamic>))
         .toList();

@@ -1026,13 +1026,20 @@ type FeaturedBook struct {
 
 // FeaturedBooks returns up to limit featured books for the home carousel.
 func (s *Store) FeaturedBooks(ctx context.Context, limit int) ([]FeaturedBook, error) {
-	rows, err := s.DB.QueryContext(ctx, `
+	return s.featured(ctx, limit, "ORDER BY favs DESC LIMIT ?")
+}
+
+// featured is the shared query for the featured=1 pool (编辑精选,
+// includes licensed works): static favs order or random reroll.
+func (s *Store) featured(ctx context.Context, limit int, orderBy string) ([]FeaturedBook, error) {
+	query := `
 SELECT seed.books.nid, seed.books.title, seed.books.author,
        COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url, seed.books.favs
 FROM seed.books
 LEFT JOIN covers c ON c.nid = seed.books.nid
 WHERE featured = 1
-ORDER BY favs DESC LIMIT ?`, limit)
+` + orderBy
+	rows, err := s.DB.QueryContext(ctx, query, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -1260,7 +1267,13 @@ ORDER BY h.viewed_at DESC LIMIT ?`, limit)
 // licensed works included — banners are display-layer) with the date as the
 // random seed. Same seed → same set, every day a different draw, and every
 // banner stays reachable because the shuffle is a uniform reorder.
-func (s *Store) BannerPick(ctx context.Context, seed int64, limit int) ([]FeaturedBook, error) {
+// BannerPick returns a seeded deterministic segment of the featured=1
+// pool: the whole pool is shuffled by (nid, seed), then rows [offset,
+// offset+limit) are taken. Sharing one seed across calls with different
+// offsets segments the pool without overlap — the daily banner carousel
+// and the 大图精选 section use the same day seed, offset 0 and N.
+func (s *Store) BannerPick(ctx context.Context, seed int64, offset int,
+	limit int) ([]FeaturedBook, error) {
 	rows, err := s.DB.QueryContext(ctx, `
 SELECT seed.books.nid, seed.books.title, seed.books.author,
        COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url, seed.books.favs
@@ -1268,7 +1281,7 @@ FROM seed.books
 LEFT JOIN covers c ON c.nid = seed.books.nid
 WHERE featured = 1
 ORDER BY (seed.books.nid*2654435761 + ?) % 1000003, seed.books.nid
-LIMIT ?`, seed, limit)
+LIMIT ? OFFSET ?`, seed, limit, offset)
 	if err != nil {
 		return nil, err
 	}

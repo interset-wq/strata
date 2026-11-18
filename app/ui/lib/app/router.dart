@@ -10,6 +10,7 @@ import '../pages/history_page.dart';
 import '../pages/home_page.dart';
 import '../pages/rankings_page.dart';
 import '../pages/search_page.dart';
+import '../pages/image_viewer_page.dart';
 import '../pages/random_pool_page.dart';
 import '../pages/pool_list_page.dart';
 import '../pages/watchlist_page.dart';
@@ -110,6 +111,10 @@ final router = GoRouter(
     GoRoute(path: '/moe-goddess',
         builder: (_, _) =>
             const PoolListPage(kind: 'moe-goddess', title: '萌神获奖')),
+    GoRoute(path: '/image-viewer/:index',
+        builder: (_, state) => ImageViewerPage(
+            initialIndex:
+                int.tryParse(state.pathParameters['index'] ?? '0') ?? 0)),
     GoRoute(
       path: '/book/:nid/data',
       builder: (_, state) => BookDataPage(

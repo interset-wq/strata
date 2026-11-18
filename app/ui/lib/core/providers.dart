@@ -65,8 +65,27 @@ final bannerProvider = FutureProvider<List<FeaturedItem>>((ref) async {
   final handle = await ref.watch(bootProvider.future);
   final now = DateTime.now();
   final seed = now.year * 10000 + now.month * 100 + now.day;
-  return handle.api.banners(seed: seed);
+  return handle.api.banners(seed: seed, limit: bannerCarouselCount);
 });
+
+/// 轮播与大图精选共用的每日种子：同一天对 featured 全池做一次
+/// 确定性洗牌，轮播取前 [bannerCarouselCount] 张（offset 0），
+/// 大图精选紧随其后取 6 张（offset = bannerCarouselCount），
+/// 两段天然不重复，同日稳定、隔天都变。
+const bannerCarouselCount = 6;
+const largeImageCount = 6;
+
+/// 大图精选：与每日轮播同种子的后段（文字在图下方，点图全屏查看）。
+final largeImageProvider = FutureProvider<List<FeaturedItem>>((ref) async {
+  final handle = await ref.watch(bootProvider.future);
+  final now = DateTime.now();
+  final seed = now.year * 10000 + now.month * 100 + now.day;
+  return handle.api.banners(
+      seed: seed, limit: largeImageCount, offset: bannerCarouselCount);
+});
+
+/// 图片全屏查看器的当前图集（首页大图精选打开查看器前写入）。
+final imageViewerProvider = StateProvider<List<FeaturedItem>>((ref) => const []);
 
 /// 书架（“想读”，首页“继续浏览”数据源）。
 final shelfProvider = FutureProvider<List<ShelfItem>>((ref) async {
