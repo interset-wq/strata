@@ -115,14 +115,20 @@ class BookRowTile extends StatelessWidget {
                   ],
                   if (metrics.isNotEmpty) ...[
                     const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        for (var i = 0; i < metrics.length; i++) ...[
-                          if (i > 0) const SizedBox(width: 10),
-                          MetricBadge(
-                              icon: metrics[i].$1, text: metrics[i].$2),
+                    // 大书四指标全显时会超宽（实测 2.6px），scaleDown
+                    // 仅在溢出时等比缩小，不丢内容。
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          for (var i = 0; i < metrics.length; i++) ...[
+                            if (i > 0) const SizedBox(width: 10),
+                            MetricBadge(
+                                icon: metrics[i].$1, text: metrics[i].$2),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                   ],
                 ],
