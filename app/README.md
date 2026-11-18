@@ -22,9 +22,9 @@
 | 10 | [`深榜契约`](./docs/10-deep-ranks.md) | 已实施：`deep_ranks` 只读表（schema 2）/世代内 Top200 端点/`pool=universe`+`in_seed` |
 | 11 | [`封面补全`](./docs/11-cover-refresh-proposal.md) | 已定案、采集中（存 URL 队列 + 15 字段快照；2026-11-18 达 2,107/10,519）；写回 covers 表待种子重建 |
 | 12 | [`双模式契约`](./docs/12-dual-mode.md) | 设计契约：novly 展示 / 量化发现双模式、展示层与推荐层解耦、信号白名单、无限滚动 vs 有限榜单 |
-| 13 | [`小说形式 form 权威定义`](./docs/13-form-definitions.md) | 开发口径（未实施）：`short/medium/long/dialogue/ip_collab` 五值判定优先级、边界、伪代码、现算分布；09 附录 D 的可执行细化 |
+| 13 | [`小说形式 form 权威定义`](../docs/form-definitions.md)（全局文档） | 开发口径（未实施）：`short/medium/long/dialogue/ip_collab` 五值判定优先级、边界、伪代码、现算分布；09 附录 D 的可执行细化 |
 | 14 | [`发现流增强视图`](./docs/14-discovery-views.md) | 设计定案（未实施）：发书日历（P1，est_date 聚合零请求）+ 增长榜多窗口（P2，observations 时序）+ 时序桶分层（P3 悬置）；源自竞品 sf.iluyf.com 借鉴评估 |
-| 16 | [`篇幅加权口碑分 lqs`](./docs/16-length-weighted-quality.md) | 口径定案（未实施）：长篇区专用排序信号，`pr` 世代×收藏档分位 × 归一化篇幅系数（0.75–1.0）；校准对齐收藏加权中位篇幅 102 万字，与收藏量秩相关 −0.01 |
+| 16 | [`篇幅加权口碑分 lqs`](../docs/length-weighted-quality.md)（全局文档） | 口径定案（未实施）：长篇区专用排序信号，`pr` 世代×收藏档分位 × 归一化篇幅系数（0.75–1.0）；校准对齐收藏加权中位篇幅 102 万字，与收藏量秩相关 −0.01 |
 
 ## 引擎（`engine/`）
 

@@ -1,1 +1,1 @@
-/docs/16-length-weighted-quality.md
+/docs/length-weighted-quality.md

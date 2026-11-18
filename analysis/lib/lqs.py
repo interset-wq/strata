@@ -1,4 +1,4 @@
-"""篇幅加权口碑分 `lqs`（2026-11-18 定案，权威口径 `docs/16-length-weighted-quality.md`）。
+"""篇幅加权口碑分 `lqs`（2026-11-18 定案，权威口径 `docs/length-weighted-quality.md`）。
 
 为什么需要它：`pr`（praises/favs）在长篇区与篇幅强负相关——中位 pr 从 15–30 万字的
 0.52 掉到 100 万字以上的 0.22；`pr` 前 1% 的 177 本里 77% 是 15–30 万字、0 本超过

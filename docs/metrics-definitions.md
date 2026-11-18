@@ -4,7 +4,7 @@
 > 凡报告、App、推荐层用到下列指标，口径以本文为准。
 > 原始官方字段的语义见 [`sfacg-app-api.md`](./sfacg-app-api.md) §3 与
 > [`sfacg-endpoints.md`](./sfacg-endpoints.md)；物理存储见 `app/docs/02-data-model.md`；
-> 小说形式 `form` 的定义见 [`13-form-definitions.md`](./13-form-definitions.md)。
+> 小说形式 `form` 的定义见 [`form-definitions.md`](./form-definitions.md)。
 >
 > **数字口径**：本文引用的规模数字随数据集版本变化，实现与写作时以生成器现算为准，
 > 不硬编码。当前数据内容上界 **2026-05-03**（`eras.snapshot_bounds()` 现算）。
@@ -106,7 +106,7 @@ len = log(字数/15万) / log(100万/15万)，夹在 [0,1]
   压到 20 万字量级；`lqs` 把篇幅作为**有界先验**（最多 25%）加回去。
 - 与收藏量秩相关 −0.01、与 `pr` +0.62——是口碑榜不是热度榜。
 - **不是质量标签**：只在推荐层排序，展示层沿用 §2.3 的分位并列口径。
-- **权威口径、校准与边界：[`16-length-weighted-quality.md`](./16-length-weighted-quality.md)**；实现 `analysis/lib/lqs.py`。
+- **权威口径、校准与边界：[`length-weighted-quality.md`](./length-weighted-quality.md)**；实现 `analysis/lib/lqs.py`。
 
 ---
 
@@ -168,8 +168,8 @@ len = log(字数/15万) / log(100万/15万)，夹在 [0,1]
 | --- | --- |
 | 官方字段的原始语义、端点参数 | [`sfacg-app-api.md`](./sfacg-app-api.md)、[`sfacg-endpoints.md`](./sfacg-endpoints.md) |
 | 指标的**物理存储**、列类型、索引、体积 | `app/docs/02-data-model.md` |
-| 小说形式 `form` 的五值判定与优先级 | [`13-form-definitions.md`](./13-form-definitions.md) |
-| `lqs` 的完整定义、校准、行为与边界 | [`16-length-weighted-quality.md`](./16-length-weighted-quality.md) |
+| 小说形式 `form` 的五值判定与优先级 | [`form-definitions.md`](./form-definitions.md) |
+| `lqs` 的完整定义、校准、行为与边界 | [`length-weighted-quality.md`](./length-weighted-quality.md) |
 | 深榜 D2 的指标与深度 | `app/docs/10-deep-ranks.md`、报告 21 |
 | 双模式展示/推荐解耦 | `app/docs/12-dual-mode.md` |
 | 各指标的分析结论与图表 | `analysis/reports/` 对应报告（01–22） |

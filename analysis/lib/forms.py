@@ -1,10 +1,10 @@
-"""`form` 形式分类（`docs/13-form-definitions.md` §4 伪代码的可执行版）。
+"""`form` 形式分类（`docs/form-definitions.md` §4 伪代码的可执行版）。
 
 五值互斥：`short / medium / long / dialogue / ip_collab`，逐级覆盖：
 字数兜底 → 篇幅征文命名 → 对话形态 → 对话征文 → IP 合作。
 
 本模块只回答「是不是短篇/长篇」，不回答「好不好」——质量判定见 `lqs.py` 与
-`docs/13-form-definitions.md` §6.1。
+`docs/form-definitions.md` §6.1。
 
 已知缺口（与上游文档一致）：§3.3 提到「X 征」默认长篇，但 §4 的权威伪代码未实现该规则，
 此处同样不实现；它只影响字数落在中篇区间的四季征文，随 `form` 列正式落地时一并定。

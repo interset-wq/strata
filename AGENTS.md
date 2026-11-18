@@ -6,7 +6,7 @@ Windows + PowerShell environment.
 
 ## Read first (do not scan the whole repo)
 
-- `docs/README.md` — **global definitions**: SFACG endpoint facts (`sfacg-endpoints.md` PC, `sfacg-app-api.md` App, `sfacg-live-ranks.md`), custom metric definitions (`metrics-definitions.md`), and novel `form` definitions (`13-form-definitions.md`). Authoritative for interfaces and our own metrics/definitions. Old paths in `analysis/references/` and `app/docs/` are one-line absolute-path pointers to `/docs/...`.
+- `docs/README.md` — **global definitions**: SFACG endpoint facts (`sfacg-endpoints.md` PC, `sfacg-app-api.md` App, `sfacg-live-ranks.md`), custom metric definitions (`metrics-definitions.md`), and novel `form` definitions (`form-definitions.md`). Authoritative for interfaces and our own metrics/definitions. Old paths in `analysis/references/` and `app/docs/` are one-line absolute-path pointers to `/docs/...`.
 - `analysis/README.md` — data pipeline, 22 reports (19 baseline + 3 supplements), and the 12 caliber constraints. Authoritative for any number.
 - `app/README.md` + `app/docs/01-12` — product design (Chinese). `01-tech-stack.md` and `02-data-model.md` are the binding ones.
 - `archive/` is intentionally stale (old dataset, old `quarry/` pipeline). Never cite its numbers or APIs.

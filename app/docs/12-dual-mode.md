@@ -41,7 +41,7 @@
 ### 3.2 信号白名单（红线）
 
 推荐打分只能用：`fav_pctl` / `click_pctl` / `praise_pctl` / `pr` / `pctl_pr` /
-`deep_ranks` / `books.form`（附录 D 实施后）/ `lqs`（篇幅加权口碑分，见 `16-length-weighted-quality.md`）。
+`deep_ranks` / `books.form`（附录 D 实施后）/ `lqs`（篇幅加权口碑分，见 `docs/length-weighted-quality.md`）。
 
 `lqs` 只由 `pr` 的「世代 × 收藏档」分位与归一化篇幅构成，不含任何原始累计值；
 收藏量只用于分档归一（与分位分母同性质），不作打分项。
@@ -89,7 +89,7 @@
 ## 6. 形式维度（附录 D 实施后）
 
 官方 genre 只按主题分 9 类、无形式轴。`books` 主表加互斥单值 `form`
-（short/medium/long/dialogue/ip_collab），**权威判定口径见 `docs/13-form-definitions.md`**：
+（short/medium/long/dialogue/ip_collab），**权威判定口径见 `docs/form-definitions.md`**：
 
 - 核心收益是过滤噪声：长篇榜排除 `dialogue`（对话可长至 88 万字）；短篇榜排除
   `medium`（中篇并入会让 Top200 里 197/200 是中篇）；保留中篇档；互动并入 dialogue；

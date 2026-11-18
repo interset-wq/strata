@@ -12,7 +12,7 @@
 570712 为 88 万字对话小说），故判据②的字数上界只用于群体占比。
 互动小说是对话小说的子集，本地无法单独识别，并入合并口径。
 
-口径权威说明见 `docs/13-form-definitions.md`、`analysis/references/moebattle-tags.md`
+口径权威说明见 `docs/form-definitions.md`、`analysis/references/moebattle-tags.md`
 与报告 22。
 """
 
