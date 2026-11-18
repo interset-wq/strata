@@ -716,6 +716,13 @@ LEFT JOIN covers c ON c.nid = seed.books.nid
 WHERE is_licensed = 0` + pool +
 		" ORDER BY RANDOM() LIMIT ?"
 	rows, err := s.DB.QueryContext(ctx, query, limit)
+	return s.scanRankItems(ctx, rows, err)
+}
+
+// scanRankItems reads one result set of the shared seed-book query
+// (RandomBooks / curated pools) and fills batched tags.
+func (s *Store) scanRankItems(ctx context.Context, rows *sql.Rows,
+	err error) ([]RankItem, error) {
 	if err != nil {
 		return nil, err
 	}
@@ -746,6 +753,38 @@ WHERE is_licensed = 0` + pool +
 	}
 	s.attachTags(ctx, items)
 	return items, nil
+}
+
+// curated is the shared scan for the deterministic home pools: the same
+// seed-book SELECT as RandomBooks, with a pool-specific WHERE clause and
+// favs ordering (no randomness — these are small fixed lists).
+func (s *Store) curated(ctx context.Context, limit int, extra string) ([]RankItem, error) {
+	query := `
+SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
+       seed.books.est_year, seed.books.status, seed.books.words, seed.books.clicks,
+       seed.books.favs, seed.books.praises,
+       COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url
+FROM seed.books
+LEFT JOIN covers c ON c.nid = seed.books.nid
+WHERE 1=1` + extra +
+		` ORDER BY seed.books.favs DESC, seed.books.nid ASC LIMIT ?`
+	rows, err := s.DB.QueryContext(ctx, query, limit)
+	return s.scanRankItems(ctx, rows, err)
+}
+
+// LicensedBooks lists the licensed Japanese light novels (is_licensed=1,
+// 47 in the canonical seed): searchable and detail-visible, but excluded
+// from every percentile pool.
+func (s *Store) LicensedBooks(ctx context.Context, limit int) ([]RankItem, error) {
+	return s.curated(ctx, limit, " AND seed.books.is_licensed = 1")
+}
+
+// MoeGoddessBooks lists books carrying a yearly 萌神 award tag
+// (2018萌神 … 2024萌神, 2 per year in the canonical seed).
+func (s *Store) MoeGoddessBooks(ctx context.Context, limit int) ([]RankItem, error) {
+	return s.curated(ctx, limit,
+		" AND seed.books.nid IN (SELECT nid FROM seed.book_tags "+
+			"WHERE tag LIKE '____萌神')")
 }
 
 // attachTags fills item.Tags from seed.book_tags with a single batched

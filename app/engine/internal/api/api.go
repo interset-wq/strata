@@ -96,6 +96,8 @@ func New(s *store.Store) *gin.Engine {
 	group.GET("/rankings/new", srv.rankingNew)
 	group.GET("/search", srv.search)
 	group.GET("/random", srv.random)
+	group.GET("/licensed", srv.licensed)
+	group.GET("/moe-goddess", srv.moeGoddess)
 	group.GET("/history", srv.history)
 	group.POST("/history/:nid", srv.recordHistory)
 	group.GET("/featured", srv.featured)
@@ -472,6 +474,42 @@ func (s *Server) random(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"meta":  gin.H{"pool": "seed", "ordering": "random"},
+		"items": items,
+	})
+}
+
+// licensed lists the small fixed pool of licensed Japanese light novels
+// (is_licensed=1), favs order. Home entry card 授权作品.
+func (s *Server) licensed(c *gin.Context) {
+	limit, ok := parseLimit(c)
+	if !ok {
+		return
+	}
+	items, err := s.store.LicensedBooks(c.Request.Context(), limit)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"meta":  gin.H{"pool": "licensed", "ordering": "favs"},
+		"items": items,
+	})
+}
+
+// moeGoddess lists books carrying a yearly 萌神 award tag (2018–2024),
+// favs order. Home entry card 萌神获奖.
+func (s *Server) moeGoddess(c *gin.Context) {
+	limit, ok := parseLimit(c)
+	if !ok {
+		return
+	}
+	items, err := s.store.MoeGoddessBooks(c.Request.Context(), limit)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"meta":  gin.H{"pool": "moe-goddess", "ordering": "favs"},
 		"items": items,
 	})
 }

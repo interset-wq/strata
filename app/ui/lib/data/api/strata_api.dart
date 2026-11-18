@@ -163,6 +163,22 @@ class StrataApi {
         .toList();
   }
 
+  /// 授权作品：licensed 日本轻小说全量列表（收藏排序，无随机）。
+  Future<List<RankItem>> licensedBooks({int limit = 100}) async {
+    final body = await _get('/licensed', {'limit': '$limit'});
+    return (body['items'] as List)
+        .map((e) => RankItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// 萌神获奖：2018–2024 各年度萌神 tag 书籍全量列表（收藏排序）。
+  Future<List<RankItem>> moeGoddessBooks({int limit = 100}) async {
+    final body = await _get('/moe-goddess', {'limit': '$limit'});
+    return (body['items'] as List)
+        .map((e) => RankItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<List<ShelfItem>> shelfList() async {
     final body = await _get('/shelf');
     return (body['items'] as List)

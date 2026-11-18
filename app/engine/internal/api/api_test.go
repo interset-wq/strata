@@ -97,6 +97,39 @@ func TestLicensedBookDetail(t *testing.T) {
 	}
 }
 
+func TestLicensedPool(t *testing.T) {
+	srv, _ := newTestServer(t)
+	body := getJSON(t, srv.URL+"/strata/licensed", http.StatusOK)
+	meta := body["meta"].(map[string]any)
+	if meta["pool"] != "licensed" || meta["ordering"] != "favs" {
+		t.Fatalf("meta = %v", meta)
+	}
+	items := body["items"].([]any)
+	if len(items) != 1 {
+		t.Fatalf("items = %d, want 1", len(items))
+	}
+	if items[0].(map[string]any)["nid"].(float64) != 2001 {
+		t.Fatalf("first = %v", items[0])
+	}
+}
+
+func TestMoeGoddessPool(t *testing.T) {
+	srv, _ := newTestServer(t)
+	body := getJSON(t, srv.URL+"/strata/moe-goddess", http.StatusOK)
+	items := body["items"].([]any)
+	if len(items) != 1 {
+		t.Fatalf("items = %d, want 1", len(items))
+	}
+	first := items[0].(map[string]any)
+	if first["nid"].(float64) != 1003 {
+		t.Fatalf("first = %v", first)
+	}
+	tags, _ := first["tags"].([]any)
+	if len(tags) != 1 || tags[0] != "2020萌神" {
+		t.Fatalf("tags = %v", tags)
+	}
+}
+
 func TestRankingFavs(t *testing.T) {
 	srv, _ := newTestServer(t)
 	body := getJSON(t, srv.URL+"/strata/rankings/favs?year=2010&limit=2", http.StatusOK)

@@ -1,15 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../core/providers.dart';
 import '../data/api/strata_api.dart';
 import '../widgets/back_to_top.dart';
-import '../widgets/default_cover.dart';
-import '../widgets/metric_badge.dart';
+import '../widgets/book_row_tile.dart';
 
 /// 随机池：从指定状态池中等概率抽取 100 本（serial=连载长篇，
-/// finished=完结长篇，与首页默认"长篇"tab 口径一致）。
+/// finished=完结长篇，browse=60万字大书，与首页三个随机区一一对应）。
 /// 每次"换一批"或下拉刷新都重掷一次（ORDER BY RANDOM，等概率）。
 final randomPoolProvider =
     FutureProvider.autoDispose.family<List<RankItem>, String>((ref, status)
@@ -18,9 +16,9 @@ final randomPoolProvider =
   return handle.api.randomBooks(limit: 100, status: status);
 });
 
-/// 随机池 100 本二级页（连载/完结共用，由 status/title 区分）。
+/// 随机池 100 本二级页（连载/完结/随便看看共用，由 status/title 区分）。
 class RandomPoolPage extends ConsumerStatefulWidget {
-  final String status; // 'serial' | 'finished'
+  final String status; // 'serial' | 'finished' | 'browse'
   final String title;
 
   const RandomPoolPage({
@@ -79,7 +77,7 @@ class _RandomPoolPageState extends ConsumerState<RandomPoolPage> {
                   if (i == list.length) {
                     return _rerollButton();
                   }
-                  return _PoolTile(item: list[i]);
+                  return BookRowTile(item: list[i]);
                 },
               ),
               if (_showTop)
@@ -115,134 +113,6 @@ class _RandomPoolPageState extends ConsumerState<RandomPoolPage> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(22),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PoolTile extends StatelessWidget {
-  final RankItem item;
-
-  const _PoolTile({required this.item});
-
-  static String _wan(int? n) {
-    if (n == null) return '';
-    if (n >= 10000) return '${(n / 10000).toStringAsFixed(1)}万';
-    return '$n';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final coverUrl = item.coverUrl;
-    final hasCover = coverUrl != null && coverUrl.isNotEmpty;
-
-    // 标签：题材 + book_tags（最多 3 个）
-    final tags = <String>[
-      if (item.genre != null && item.genre!.isNotEmpty) item.genre!,
-      ...item.tags,
-    ];
-    if (tags.toSet().length != tags.length) {
-      // 去重且保持顺序
-      final seen = <String>{};
-      tags.removeWhere((t) => !seen.add(t));
-    }
-
-    // 指标行：字数 · 点击 · 收藏 · 赞（非空才显示；顺序对齐官方 app 排版）
-    final metrics = <(IconData, String)>[
-      if (item.words != null) (MetricIcons.words, '${_wan(item.words)}字'),
-      if (item.clicks != null) (MetricIcons.clicks, _wan(item.clicks)),
-      if (item.favs > 0) (MetricIcons.favs, _wan(item.favs)),
-      if (item.praises != null && item.praises! > 0)
-        (MetricIcons.praises, _wan(item.praises)),
-    ];
-
-    return InkWell(
-      onTap: () => context.push('/book/${item.nid}'),
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 5),
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: scheme.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-              color: scheme.outline.withValues(alpha: .25)),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: 48,
-              height: 64,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: hasCover
-                    ? Image.network(
-                        coverImageUrl(coverUrl)!,
-                        fit: BoxFit.cover,
-                        loadingBuilder: coverLoadingBuilder,
-                        errorBuilder: (_, _, _) =>
-                            defaultCover(item.nid),
-                      )
-                    : defaultCover(item.nid),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(item.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 3),
-                  Text(item.author,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style:
-                          TextStyle(fontSize: 11, color: scheme.secondary)),
-                  if (tags.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 4,
-                      runSpacing: 4,
-                      children: [
-                        for (final t in tags.take(3))
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: scheme.primary.withValues(alpha: .08),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(t,
-                                style: TextStyle(
-                                    fontSize: 10,
-                                    color: scheme.primary)),
-                          ),
-                      ],
-                    ),
-                  ],
-                  if (metrics.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        for (var i = 0; i < metrics.length; i++) ...[
-                          if (i > 0) const SizedBox(width: 10),
-                          MetricBadge(
-                              icon: metrics[i].$1, text: metrics[i].$2),
-                        ],
-                      ],
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ],
         ),
       ),
     );

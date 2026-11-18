@@ -112,6 +112,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                 _sectionTitle(context, '完结精选',
                     onMore: () => context.push('/finished-random')),
                 _ShowcaseSection(provider: finishedShowcaseProvider),
+                _entryCards(context),
                 _sectionTitle(context, '随便看看',
                     onMore: () => context.push('/browse-random')),
                 _ShowcaseSection(provider: browseShowcaseProvider),
@@ -249,6 +250,78 @@ class _HomePageState extends ConsumerState<HomePage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  // 宽卡入口：授权作品 / 萌神获奖——打断连续 4×2 网格的节奏，
+  // 同时给两个 curated 池补上首页入口（icon 语义见 app/docs/15）。
+  Widget _entryCards(BuildContext context) {
+    return Column(
+      children: [
+        _wideEntryCard(context,
+            icon: Icons.lock,
+            title: '授权作品',
+            subtitle: '官方授权日本轻小说',
+            route: '/licensed'),
+        const SizedBox(height: 10),
+        _wideEntryCard(context,
+            icon: Icons.emoji_events,
+            title: '萌神获奖',
+            subtitle: '官方萌神奖 2018–2024',
+            route: '/moe-goddess'),
+      ],
+    );
+  }
+
+  Widget _wideEntryCard(BuildContext context,
+      {required IconData icon,
+      required String title,
+      required String subtitle,
+      required String route}) {
+    final scheme = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: () => context.push(route),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: scheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: scheme.outline.withValues(alpha: .25)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: scheme.primary.withValues(alpha: .08),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, size: 20, color: scheme.primary),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: scheme.onSurface)),
+                  const SizedBox(height: 2),
+                  Text(subtitle,
+                      style: TextStyle(
+                          fontSize: 11, color: scheme.onSurfaceVariant)),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, size: 20, color: scheme.outline),
+          ],
+        ),
       ),
     );
   }

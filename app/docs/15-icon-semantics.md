@@ -35,6 +35,13 @@
 | 征文比赛 | `Icons.emoji_events` | 首页宫格 |
 | 短篇榜 | `Icons.article` | 首页宫格 |
 
+## 分类入口（首页 curated 宽卡）
+
+| 语义 | icon | 使用处 |
+| --- | --- | --- |
+| 授权作品（licensed） | `Icons.lock` | 首页宽卡入口（可点击用实心，与规则 4 一致） |
+| 萌神获奖 | `Icons.emoji_events` | 首页宽卡入口（与宫格"征文比赛"同"获奖"语义，复用） |
+
 ## 使用规范
 
 1. 指标展示统一走 `MetricBadge` 组件（`lib/widgets/metric_badge.dart`）：

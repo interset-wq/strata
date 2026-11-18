@@ -11,6 +11,7 @@ import '../pages/home_page.dart';
 import '../pages/rankings_page.dart';
 import '../pages/search_page.dart';
 import '../pages/random_pool_page.dart';
+import '../pages/pool_list_page.dart';
 import '../pages/watchlist_page.dart';
 import '../pages/settings_page.dart';
 import '../pages/shelf_page.dart';
@@ -103,6 +104,12 @@ final router = GoRouter(
     GoRoute(path: '/browse-random',
         builder: (_, _) => const RandomPoolPage(
             status: 'browse', title: '随便看看 · 100 本')),
+    GoRoute(path: '/licensed',
+        builder: (_, _) =>
+            const PoolListPage(kind: 'licensed', title: '授权作品')),
+    GoRoute(path: '/moe-goddess',
+        builder: (_, _) =>
+            const PoolListPage(kind: 'moe-goddess', title: '萌神获奖')),
     GoRoute(
       path: '/book/:nid/data',
       builder: (_, state) => BookDataPage(
