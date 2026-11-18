@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../core/providers.dart';
 import '../data/api/strata_api.dart';
 import '../widgets/banner_carousel.dart';
+import '../widgets/back_to_top.dart';
 import '../widgets/default_cover.dart';
 import 'browse_page.dart';
 
@@ -33,11 +34,34 @@ final serialShowcaseProvider = FutureProvider.autoDispose<List<RankItem>>((
 
 /// 首页：编辑精选轮播 → 入口宫格 → 分类找书 → 继续浏览。
 /// 不暴露种子统计——定位是找书 App（用户反馈 2026-11-17）。
-class HomePage extends ConsumerWidget {
+class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends ConsumerState<HomePage> {
+  final _scroll = ScrollController();
+  bool _showTop = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(() {
+      final show = _scroll.hasClients && _scroll.offset > 500;
+      if (show != _showTop) setState(() => _showTop = show);
+    });
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final featured = ref.watch(featuredProvider);
     final banners = ref.watch(bannerProvider);
     return Scaffold(
@@ -58,8 +82,11 @@ class HomePage extends ConsumerWidget {
           child: featured.when(
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Center(child: Text('精选加载失败：$e')),
-            data: (items) => ListView(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+            data: (items) => Stack(
+              children: [
+                ListView(
+                  controller: _scroll,
+                  padding: const EdgeInsets.symmetric(vertical: 8),
               children: [
                 _formTabs(context, () => ref.invalidate(featuredProvider)),
                 _searchRow(context),
@@ -80,6 +107,19 @@ class HomePage extends ConsumerWidget {
                 const _ShuffleGrid(),
                 _sectionTitle(context, '继续浏览'),
                 const _ContinueBrowsing(),
+              ],
+                ),
+                if (_showTop)
+                  Positioned(
+                    right: 16,
+                    bottom: 24,
+                    child: BackToTop(
+                      onTap: () => _scroll.animateTo(
+                          0,
+                          duration: const Duration(milliseconds: 400),
+                          curve: Curves.easeOut),
+                    ),
+                  ),
               ],
             ),
           ),

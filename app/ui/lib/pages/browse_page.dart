@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../core/providers.dart';
 import '../data/api/strata_api.dart';
+import '../widgets/back_to_top.dart';
 
 /// 二级浏览页模式：宫格四入口共用，数据维度不同。
 enum BrowseMode { category, status, contest, short }
@@ -27,6 +28,23 @@ class BrowsePage extends ConsumerStatefulWidget {
 class _BrowsePageState extends ConsumerState<BrowsePage> {
   String? _filter; // 分类页=题材名；状态页=状态文案
   String _contest = ''; // 比赛页：'' = 全部参赛作品；否则具体届次名
+  final _scroll = ScrollController();
+  bool _showTop = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(() {
+      final show = _scroll.hasClients && _scroll.offset > 500;
+      if (show != _showTop) setState(() => _showTop = show);
+    });
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
 
   String get _title => switch (widget.mode) {
         BrowseMode.category => '分类找书',
@@ -49,7 +67,16 @@ class _BrowsePageState extends ConsumerState<BrowsePage> {
       ),
       body: year == null
           ? const Center(child: CircularProgressIndicator())
-          : _Body(mode: widget.mode, year: year, filter: _filter, contest: _contest, onFilter: (f) => setState(() => _filter = f), onContest: (c) => setState(() => _contest = c)),
+          : _Body(
+              mode: widget.mode,
+              year: year,
+              filter: _filter,
+              contest: _contest,
+              scroll: _scroll,
+              showTop: _showTop,
+              onFilter: (f) => setState(() => _filter = f),
+              onContest: (c) => setState(() => _contest = c),
+            ),
     );
   }
 }
@@ -59,14 +86,18 @@ class _Body extends ConsumerWidget {
   final int year;
   final String? filter;
   final String contest;
-  final void Function(String?) onFilter;
-  final void Function(String) onContest;
+  final ScrollController scroll;
+  final bool showTop;
+  final ValueChanged<String?> onFilter;
+  final ValueChanged<String> onContest;
 
   const _Body({
     required this.mode,
     required this.year,
     required this.filter,
     required this.contest,
+    required this.scroll,
+    required this.showTop,
     required this.onFilter,
     required this.onContest,
   });
@@ -75,8 +106,11 @@ class _Body extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
     final mode = this.mode;
-    return ListView(
-      padding: const EdgeInsets.all(16),
+    return Stack(
+      children: [
+        ListView(
+          controller: scroll,
+          padding: const EdgeInsets.all(16),
       children: [
         Text(_caliberNote(mode),
             style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant)),
@@ -116,6 +150,19 @@ class _Body extends ConsumerWidget {
         if (mode != BrowseMode.short)
           ..._rankItems(context, ref).map(
             (it) => _BoardCard(item: it),
+          ),
+        ],
+        ),
+        if (showTop)
+          Positioned(
+            right: 16,
+            bottom: 24,
+            child: BackToTop(
+              onTap: () => scroll.animateTo(
+                  0,
+                  duration: const Duration(milliseconds: 400),
+                  curve: Curves.easeOut),
+            ),
           ),
       ],
     );

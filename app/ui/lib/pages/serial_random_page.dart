@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../core/providers.dart';
 import '../data/api/strata_api.dart';
+import '../widgets/back_to_top.dart';
 import '../widgets/default_cover.dart';
 
 /// 随机连载：从全库连载书中等概率抽取 100 本，供重度依赖随机性找书的读者。
@@ -14,11 +15,35 @@ final randomSerialProvider =
   return handle.api.randomBooks(limit: 100, status: 'serial');
 });
 
-class SerialRandomPage extends ConsumerWidget {
+class SerialRandomPage extends ConsumerStatefulWidget {
   const SerialRandomPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SerialRandomPage> createState() => _SerialRandomPageState();
+}
+
+class _SerialRandomPageState extends ConsumerState<SerialRandomPage> {
+  final _scroll = ScrollController();
+  bool _showTop = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(() {
+      final show = _scroll.offset > 500;
+      if (show != _showTop) setState(() => _showTop = show);
+    });
+  }
+
+  @override
+  void dispose() {
+    _scroll.removeListener(() {});
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final items = ref.watch(randomSerialProvider);
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
@@ -33,22 +58,38 @@ class SerialRandomPage extends ConsumerWidget {
             ref.invalidate(randomSerialProvider);
             await ref.read(randomSerialProvider.future);
           },
-          child: ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
-            itemCount: list.length + 1,
-            itemBuilder: (context, i) {
-              if (i == list.length) {
-                return _rerollButton(context, ref);
-              }
-              return _SerialTile(item: list[i]);
-            },
+          child: Stack(
+            children: [
+              ListView.builder(
+                controller: _scroll,
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
+                itemCount: list.length + 1,
+                itemBuilder: (context, i) {
+                  if (i == list.length) {
+                    return _rerollButton();
+                  }
+                  return _SerialTile(item: list[i]);
+                },
+              ),
+              if (_showTop)
+                Positioned(
+                  right: 16,
+                  bottom: 24,
+                  child: BackToTop(
+                    onTap: () => _scroll.animateTo(
+                        0,
+                        duration: const Duration(milliseconds: 400),
+                        curve: Curves.easeOut),
+                  ),
+                ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _rerollButton(BuildContext context, WidgetRef ref) {
+  Widget _rerollButton() {
     final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 16),

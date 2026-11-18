@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../core/providers.dart';
 import '../data/api/strata_api.dart';
+import '../widgets/back_to_top.dart';
 import '../widgets/default_cover.dart';
 
 /// 阅读记录：本地 user.db 的浏览足迹，按最近打开排序。
@@ -12,11 +13,34 @@ final historyProvider = FutureProvider.autoDispose<HistoryData>((ref) async {
   return handle.api.history(limit: 50);
 });
 
-class HistoryPage extends ConsumerWidget {
+class HistoryPage extends ConsumerStatefulWidget {
   const HistoryPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HistoryPage> createState() => _HistoryPageState();
+}
+
+class _HistoryPageState extends ConsumerState<HistoryPage> {
+  final _scroll = ScrollController();
+  bool _showTop = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(() {
+      final show = _scroll.hasClients && _scroll.offset > 500;
+      if (show != _showTop) setState(() => _showTop = show);
+    });
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final items = ref.watch(historyProvider);
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
@@ -35,13 +59,29 @@ class HistoryPage extends ConsumerWidget {
                   style: TextStyle(fontSize: 13)),
             );
           }
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: list.length,
-            itemBuilder: (context, i) {
-              final it = list[i];
-              return _HistoryTile(entry: it);
-            },
+          return Stack(
+            children: [
+              ListView.builder(
+                controller: _scroll,
+                padding: const EdgeInsets.all(16),
+                itemCount: list.length,
+                itemBuilder: (context, i) {
+                  final it = list[i];
+                  return _HistoryTile(entry: it);
+                },
+              ),
+              if (_showTop)
+                Positioned(
+                  right: 16,
+                  bottom: 24,
+                  child: BackToTop(
+                    onTap: () => _scroll.animateTo(
+                        0,
+                        duration: const Duration(milliseconds: 400),
+                        curve: Curves.easeOut),
+                  ),
+                ),
+            ],
           );
         },
       ),

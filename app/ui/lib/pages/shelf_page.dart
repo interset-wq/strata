@@ -6,6 +6,7 @@ import '../widgets/default_cover.dart';
 
 import '../core/providers.dart';
 import '../data/api/strata_api.dart';
+import '../widgets/back_to_top.dart';
 
 /// 书架页（mockups 04 屏定稿）：官方式筛选 chips 行、封面卡条目、
 /// 空态引导。数据 = 本地收藏（user.db.shelf JOIN seed.books）。
@@ -19,11 +20,23 @@ class ShelfPage extends ConsumerStatefulWidget {
 class _ShelfPageState extends ConsumerState<ShelfPage> {
   late Future<List<ShelfItem>> _shelf;
   String? _genreFilter; // null = 全部
+  final _scroll = ScrollController();
+  bool _showTop = false;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _scroll.addListener(() {
+      final show = _scroll.hasClients && _scroll.offset > 500;
+      if (show != _showTop) setState(() => _showTop = show);
+    });
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
   }
 
   void _load() {
@@ -69,8 +82,10 @@ class _ShelfPageState extends ConsumerState<ShelfPage> {
           final filtered = _genreFilter == null
               ? items
               : items.where((e) => e.genre == _genreFilter).toList();
-          return Column(
+          return Stack(
             children: [
+              Column(
+                children: [
               SizedBox(
                 height: 44,
                 child: ListView(
@@ -105,6 +120,7 @@ class _ShelfPageState extends ConsumerState<ShelfPage> {
                     : RefreshIndicator(
                         onRefresh: () async => _load(),
                         child: ListView.builder(
+                          controller: _scroll,
                           padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                           itemCount: filtered.length,
                           itemBuilder: (context, i) =>
@@ -115,6 +131,19 @@ class _ShelfPageState extends ConsumerState<ShelfPage> {
                         ),
                       ),
               ),
+            ],
+              ),
+              if (_showTop)
+                Positioned(
+                  right: 16,
+                  bottom: 24,
+                  child: BackToTop(
+                    onTap: () => _scroll.animateTo(
+                        0,
+                        duration: const Duration(milliseconds: 400),
+                        curve: Curves.easeOut),
+                  ),
+                ),
             ],
           );
         },

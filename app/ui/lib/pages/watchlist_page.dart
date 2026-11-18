@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../widgets/default_cover.dart';
+import '../widgets/back_to_top.dart';
 
 import '../core/providers.dart';
 import '../data/api/strata_api.dart';
@@ -18,11 +19,23 @@ class WatchlistPage extends ConsumerStatefulWidget {
 
 class _WatchlistPageState extends ConsumerState<WatchlistPage> {
   late Future<List<WatchItem>> _watch;
+  final _scroll = ScrollController();
+  bool _showTop = false;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _scroll.addListener(() {
+      final show = _scroll.hasClients && _scroll.offset > 500;
+      if (show != _showTop) setState(() => _showTop = show);
+    });
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
   }
 
   void _load() {
@@ -75,13 +88,29 @@ class _WatchlistPageState extends ConsumerState<WatchlistPage> {
           }
           return RefreshIndicator(
             onRefresh: () async => _load(),
-            child: ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-              itemCount: items.length,
-              itemBuilder: (context, i) => _WatchCard(
-                item: items[i],
-                onRemove: () => _remove(items[i]),
-              ),
+            child: Stack(
+              children: [
+                ListView.builder(
+                  controller: _scroll,
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                  itemCount: items.length,
+                  itemBuilder: (context, i) => _WatchCard(
+                    item: items[i],
+                    onRemove: () => _remove(items[i]),
+                  ),
+                ),
+                if (_showTop)
+                  Positioned(
+                    right: 16,
+                    bottom: 24,
+                    child: BackToTop(
+                      onTap: () => _scroll.animateTo(
+                          0,
+                          duration: const Duration(milliseconds: 400),
+                          curve: Curves.easeOut),
+                    ),
+                  ),
+              ],
             ),
           );
         },
