@@ -9,15 +9,15 @@ import '../widgets/default_cover.dart';
 import 'browse_page.dart';
 
 /// Classic 排行行卡数据（board 端点），kind: finish / popular。
-final boardProvider =
-    FutureProvider.autoDispose.family<List<RankItem>, String>((ref, kind) async {
-  final handle = await ref.watch(bootProvider.future);
-  return handle.api.rankingBoard(kind: kind, limit: 8);
-});
+final boardProvider = FutureProvider.autoDispose.family<List<RankItem>, String>(
+  (ref, kind) async {
+    final handle = await ref.watch(bootProvider.future);
+    return handle.api.rankingBoard(kind: kind, limit: 8);
+  },
+);
 
 /// 随机书架数据源：/random 均匀抽样，换一换即 invalidate。
-final randomProvider =
-    FutureProvider.autoDispose<List<RankItem>>((ref) async {
+final randomProvider = FutureProvider.autoDispose<List<RankItem>>((ref) async {
   final handle = await ref.watch(bootProvider.future);
   return handle.api.randomBooks(limit: 4);
 });
@@ -79,20 +79,21 @@ class HomePage extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
               decoration: BoxDecoration(
-                  border: Border(
-                      bottom: BorderSide(
-                          width: 2,
-                          color: i == 0
-                              ? scheme.primary
-                              : Colors.transparent))),
-              child: Text(forms[i],
-                  style: TextStyle(
-                      fontSize: 14,
-                      fontWeight:
-                          i == 0 ? FontWeight.w700 : FontWeight.w400,
-                      color: i == 0
-                          ? scheme.primary
-                          : scheme.onSurfaceVariant)),
+                border: Border(
+                  bottom: BorderSide(
+                    width: 2,
+                    color: i == 0 ? scheme.primary : Colors.transparent,
+                  ),
+                ),
+              ),
+              child: Text(
+                forms[i],
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: i == 0 ? FontWeight.w700 : FontWeight.w400,
+                  color: i == 0 ? scheme.primary : scheme.onSurfaceVariant,
+                ),
+              ),
             ),
           ],
           const Spacer(),
@@ -118,22 +119,32 @@ class HomePage extends ConsumerWidget {
               onTap: () => context.push('/search'),
               borderRadius: BorderRadius.circular(999),
               child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 9,
+                ),
                 decoration: BoxDecoration(
                   color: scheme.surface,
-                  border:
-                      Border.all(color: scheme.outline.withValues(alpha: .4)),
+                  border: Border.all(
+                    color: scheme.outline.withValues(alpha: .4),
+                  ),
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.search,
-                        size: 16, color: scheme.onSurfaceVariant),
+                    Icon(
+                      Icons.search,
+                      size: 16,
+                      color: scheme.onSurfaceVariant,
+                    ),
                     const SizedBox(width: 8),
-                    Text('搜索书名 / 作者',
-                        style: TextStyle(
-                            fontSize: 12, color: scheme.onSurfaceVariant)),
+                    Text(
+                      '搜索书名 / 作者',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -144,22 +155,23 @@ class HomePage extends ConsumerWidget {
             onTap: () => context.push('/history'),
             borderRadius: BorderRadius.circular(999),
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
               decoration: BoxDecoration(
-                border:
-                    Border.all(color: scheme.outline.withValues(alpha: .4)),
+                border: Border.all(color: scheme.outline.withValues(alpha: .4)),
                 borderRadius: BorderRadius.circular(999),
               ),
               child: Row(
                 children: [
                   Icon(Icons.history, size: 14, color: scheme.primary),
                   const SizedBox(width: 5),
-                  Text('阅读记录',
-                      style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: scheme.primary)),
+                  Text(
+                    '阅读记录',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: scheme.primary,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -170,9 +182,9 @@ class HomePage extends ConsumerWidget {
   }
 
   Widget _sectionTitle(BuildContext context, String text) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-        child: Text(text, style: Theme.of(context).textTheme.titleLarge),
-      );
+    padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+    child: Text(text, style: Theme.of(context).textTheme.titleLarge),
+  );
 
   // 二级页面分流宫格：底部 Tab 之外的目的地都从这里进。
   Widget _entryGrid(BuildContext context) {
@@ -185,41 +197,35 @@ class HomePage extends ConsumerWidget {
     ];
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          child: Row(
-            children: [
-              for (final (icon, label, mode) in entries)
-                Expanded(
-                  child: InkWell(
-                    onTap: () => context.push('/browse?mode=${mode.name}'),
-                    borderRadius: BorderRadius.circular(12),
-                    child: Column(
-                      children: [
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: scheme.primary.withValues(alpha: .12),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          alignment: Alignment.center,
-                          child: Icon(icon, size: 22, color: scheme.primary),
-                        ),
-                        const SizedBox(height: 5),
-                        Text(label, style: const TextStyle(fontSize: 11)),
-                      ],
+      child: Row(
+        children: [
+          for (final (icon, label, mode) in entries)
+            Expanded(
+              child: InkWell(
+                onTap: () => context.push('/browse?mode=${mode.name}'),
+                borderRadius: BorderRadius.circular(12),
+                child: Column(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: scheme.primary.withValues(alpha: .12),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      alignment: Alignment.center,
+                      child: Icon(icon, size: 22, color: scheme.primary),
                     ),
-                  ),
+                    const SizedBox(height: 5),
+                    Text(label, style: const TextStyle(fontSize: 11)),
+                  ],
                 ),
-            ],
-          ),
-        ),
+              ),
+            ),
+        ],
       ),
     );
   }
-
 }
 
 /// 人气风向标（官方式 4×2）：两行四列封面网格 + 排名角标。
@@ -240,8 +246,10 @@ class _ShowcaseSection extends ConsumerWidget {
       ),
       error: (e, _) => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Text('加载失败：$e',
-            style: TextStyle(fontSize: 12, color: Colors.grey)),
+        child: Text(
+          '加载失败：$e',
+          style: TextStyle(fontSize: 12, color: Colors.grey),
+        ),
       ),
       data: (list) => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -257,7 +265,9 @@ class _ShowcaseSection extends ConsumerWidget {
                     Expanded(
                       child: (row * 4 + c) < list.length
                           ? _CoverCard(
-                              item: list[row * 4 + c], rank: row * 4 + c + 1)
+                              item: list[row * 4 + c],
+                              rank: row * 4 + c + 1,
+                            )
                           : const SizedBox(),
                     ),
                   ],
@@ -287,8 +297,10 @@ class _BoardGrid extends ConsumerWidget {
       ),
       error: (e, _) => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Text('加载失败：$e',
-            style: TextStyle(fontSize: 12, color: Colors.grey)),
+        child: Text(
+          '加载失败：$e',
+          style: TextStyle(fontSize: 12, color: Colors.grey),
+        ),
       ),
       data: (list) => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -334,7 +346,8 @@ class _CoverCard extends StatelessWidget {
                           child: Image.network(
                             coverImageUrl(coverUrl)!,
                             fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) => _spine(context, item.nid),
+                            errorBuilder: (_, _, _) =>
+                                _spine(context, item.nid),
                           ),
                         )
                       : _spine(context, item.nid),
@@ -345,29 +358,32 @@ class _CoverCard extends StatelessWidget {
                     left: 6,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 1),
+                        horizontal: 6,
+                        vertical: 1,
+                      ),
                       decoration: BoxDecoration(
                         color: scheme.primary,
                         borderRadius: BorderRadius.circular(4),
                       ),
-                      child: Text('人气 No.$rank',
-                          style: TextStyle(
-                              fontSize: 9, color: scheme.onPrimary)),
+                      child: Text(
+                        '人气 No.$rank',
+                        style: TextStyle(fontSize: 9, color: scheme.onPrimary),
+                      ),
                     ),
                   ),
               ],
             ),
           ),
           const SizedBox(height: 6),
-          Text(item.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                  fontSize: 12, fontWeight: FontWeight.w600)),
+          Text(
+            item.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          ),
           Text(
             '${item.genre ?? ''}${item.status != null ? ' · ${item.status}' : ''}',
-            style: TextStyle(
-                fontSize: 10, color: scheme.onSurfaceVariant),
+            style: TextStyle(fontSize: 10, color: scheme.onSurfaceVariant),
           ),
         ],
       ),
@@ -400,13 +416,15 @@ class _Spotlight extends ConsumerWidget {
                 AspectRatio(
                   aspectRatio: 2,
                   child: ClipRRect(
-                    borderRadius:
-                        const BorderRadius.vertical(top: Radius.circular(16)),
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(16),
+                    ),
                     child: Image.network(
                       'https://rs.sfacg.com/web/novel/images/images/beitouNew/${it.nid}.jpg',
                       fit: BoxFit.cover,
-                      errorBuilder: (_, _, _) =>
-                          ColoredBox(color: scheme.primary.withValues(alpha: .15)),
+                      errorBuilder: (_, _, _) => ColoredBox(
+                        color: scheme.primary.withValues(alpha: .15),
+                      ),
                     ),
                   ),
                 ),
@@ -416,23 +434,32 @@ class _Spotlight extends ConsumerWidget {
                   decoration: BoxDecoration(
                     color: scheme.surface,
                     borderRadius: const BorderRadius.vertical(
-                        bottom: Radius.circular(16)),
+                      bottom: Radius.circular(16),
+                    ),
                     border: Border.all(
-                        color: scheme.outline.withValues(alpha: .4)),
+                      color: scheme.outline.withValues(alpha: .4),
+                    ),
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(it.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              fontSize: 14, fontWeight: FontWeight.w700)),
+                      Text(
+                        it.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                       const SizedBox(height: 3),
-                      Text(it.author,
-                          style: TextStyle(
-                              fontSize: 11,
-                              color: scheme.onSurfaceVariant)),
+                      Text(
+                        it.author,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -464,8 +491,10 @@ class _ShuffleGridState extends ConsumerState<_ShuffleGrid> {
       ),
       error: (e, _) => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Text('加载失败：$e',
-            style: TextStyle(fontSize: 12, color: Colors.grey)),
+        child: Text(
+          '加载失败：$e',
+          style: TextStyle(fontSize: 12, color: Colors.grey),
+        ),
       ),
       data: (list) => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -486,9 +515,11 @@ class _ShuffleGridState extends ConsumerState<_ShuffleGrid> {
               child: OutlinedButton(
                 onPressed: () => ref.invalidate(randomProvider),
                 style: OutlinedButton.styleFrom(
-                    foregroundColor: Theme.of(context).colorScheme.primary,
-                    side: BorderSide(
-                        color: Theme.of(context).colorScheme.primary)),
+                  foregroundColor: Theme.of(context).colorScheme.primary,
+                  side: BorderSide(
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
                 child: const Text('换一换 ↻'),
               ),
             ),
@@ -514,10 +545,8 @@ class _ContinueBrowsing extends ConsumerWidget {
     final shelf = ref.watch(shelfProvider);
     return shelf.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Padding(
-        padding: const EdgeInsets.all(16),
-        child: Text('加载失败：$e'),
-      ),
+      error: (e, _) =>
+          Padding(padding: const EdgeInsets.all(16), child: Text('加载失败：$e')),
       data: (items) {
         if (items.isEmpty) {
           return const Padding(
@@ -551,9 +580,7 @@ class _ContinueBrowsing extends ConsumerWidget {
                           height: 132,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(10),
-                            color: Theme.of(context)
-                                .colorScheme
-                                .primary
+                            color: Theme.of(context).colorScheme.primary
                                 .withValues(alpha: .15),
                           ),
                           child: const Icon(Icons.menu_book, size: 28),
