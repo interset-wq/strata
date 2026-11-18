@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 )
 
-const userSchemaVersion = 2
+const userSchemaVersion = 4
 
 const userSchema = `
 CREATE TABLE IF NOT EXISTS observations(
@@ -102,6 +102,44 @@ CREATE TABLE IF NOT EXISTS covers(
   cover       TEXT NOT NULL,
   source      TEXT NOT NULL DEFAULT 'app',
   fetched_at  INTEGER NOT NULL
+);
+
+-- Latest book metadata from one successful detail fetch. This is the
+-- writable overlay for seed.books: every field returned by the request is
+-- kept here, including fields the seed has no column for (summary/add_time).
+CREATE TABLE IF NOT EXISTS book_meta(
+  nid          INTEGER PRIMARY KEY,
+  source       TEXT NOT NULL,
+  fetched_at   INTEGER NOT NULL,
+  title        TEXT,
+  author       TEXT,
+  author_id    INTEGER,
+  genre        TEXT,
+  type_id      INTEGER,
+  price_type   TEXT,
+  status       TEXT,
+  cover_url    TEXT,
+  summary      TEXT,
+  words        INTEGER,
+  favs         INTEGER,
+  praises      INTEGER,
+  clicks       INTEGER,
+  updated_at   TEXT,
+  add_time     TEXT,
+  point        REAL,
+  bg_banner    TEXT,
+  category_id  INTEGER,
+  is_sensitive INTEGER,
+  allow_down   INTEGER
+);
+
+-- One row per nid records the last outbound detail-fetch attempt. An attempt
+-- is stamped BEFORE the request so failures still count against the 24h
+-- cooldown; state is updated afterwards for diagnostics.
+CREATE TABLE IF NOT EXISTS refresh_attempts(
+  nid          INTEGER PRIMARY KEY,
+  attempted_at INTEGER NOT NULL,
+  state        TEXT NOT NULL DEFAULT 'pending'
 );
 `
 

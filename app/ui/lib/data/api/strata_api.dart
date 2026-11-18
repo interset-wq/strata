@@ -42,6 +42,13 @@ class StrataApi {
 
   Future<Meta> meta() async => Meta.fromJson(await _get('/meta') as Map<String, dynamic>);
 
+  Future<EngineSettings> settings() async =>
+      EngineSettings.fromJson(await _get('/settings') as Map<String, dynamic>);
+
+  Future<EngineSettings> setDetailRateLimitEnabled(bool enabled) async =>
+      EngineSettings.fromJson(await _putBody(
+          '/settings', {'detail_rate_limit_enabled': enabled}) as Map<String, dynamic>);
+
   Future<BookDetail> book(int nid) async =>
       BookDetail.fromJson(await _get('/books/$nid') as Map<String, dynamic>);
 
@@ -191,6 +198,19 @@ class StrataApi {
     return jsonDecode(text);
   }
 
+  Future<dynamic> _putBody(String path, Map<String, dynamic> body) async {
+    final req = await _client.openUrl('PUT', _uri(path));
+    req.headers.contentType = ContentType.json;
+    req.write(jsonEncode(body));
+    final resp = await req.close();
+    final text = await resp.transform(utf8.decoder).join();
+    if (resp.statusCode != 200) {
+      throw StrataApiException(
+          status: resp.statusCode, code: 'internal', message: text);
+    }
+    return jsonDecode(text);
+  }
+
   Future<void> _delete(String path) async {
     final req = await _client.openUrl('DELETE', _uri(path));
     final resp = await req.close();
@@ -202,6 +222,19 @@ class StrataApi {
   }
 
   Future<void> close() async => _client.close();
+}
+
+/// 引擎侧用户可调的抓取限制（详情刷新 24h 冷却开关）。
+class EngineSettings {
+  final bool detailRateLimitEnabled;
+  final int windowSeconds;
+
+  EngineSettings({required this.detailRateLimitEnabled, required this.windowSeconds});
+
+  factory EngineSettings.fromJson(Map<String, dynamic> j) => EngineSettings(
+        detailRateLimitEnabled: j['detail_rate_limit_enabled'] as bool? ?? true,
+        windowSeconds: j['detail_refresh_window_seconds'] as int? ?? 86400,
+      );
 }
 
 class StrataApiException implements Exception {

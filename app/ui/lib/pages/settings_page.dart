@@ -2,6 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/providers.dart';
+import '../data/api/strata_api.dart';
+
+/// 详情刷新限流开关的数据源：引擎 /settings。
+final detailRateLimitProvider =
+    FutureProvider.autoDispose<EngineSettings>((ref) async {
+  final handle = await ref.watch(bootProvider.future);
+  return handle.api.settings();
+});
 
 /// 设置页：外观、数据状态、口径说明、关于。
 class SettingsPage extends ConsumerWidget {
@@ -69,6 +77,38 @@ class SettingsPage extends ConsumerWidget {
                 ),
               ),
             ),
+          ),
+          const SizedBox(height: 16),
+          Text('抓取', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 8),
+          Card(
+            child: ref.watch(detailRateLimitProvider).when(
+                  loading: () => const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Center(child: CircularProgressIndicator()),
+                  ),
+                  error: (e, _) => Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text('引擎未就绪：$e',
+                        style: TextStyle(color: scheme.error, fontSize: 12)),
+                  ),
+                  data: (st) => SwitchListTile(
+                    title: const Text('详情刷新限流（24 小时一次）'),
+                    subtitle: Text(
+                      st.detailRateLimitEnabled
+                          ? '同一本书每天最多向官方发起一次刷新请求'
+                          : '已关闭——可随时手动刷新（请节制）',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    value: st.detailRateLimitEnabled,
+                    onChanged: (v) async {
+                      await ref
+                          .read(bootProvider.future)
+                          .then((h) => h.api.setDetailRateLimitEnabled(v));
+                      ref.invalidate(detailRateLimitProvider);
+                    },
+                  ),
+                ),
           ),
           const SizedBox(height: 16),
           Text('口径说明', style: Theme.of(context).textTheme.titleLarge),

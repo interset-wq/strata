@@ -73,15 +73,8 @@ func (s *Server) pollOne(ctx context.Context, nid int64) {
 	// silently degrades to the mobile HTML baseline.
 	if s.appAPI {
 		if app, aerr := crawl.FetchAppNovel(pctx, s.client, s.limiter, nid, false); aerr == nil {
-			clicks, favs, words := app.ViewTimes, app.MarkCount, app.CharCount
-			status := map[bool]string{true: "已完结", false: "连载中"}[app.IsFinish]
-			updatedAt := app.LastUpdateTime
 			observedAt := time.Now().Unix()
-			_ = s.store.InsertObservation(pctx, nid, observedAt,
-				&clicks, &favs, nil, &words, &status, &updatedAt)
-			if app.NovelCover != "" {
-				_ = s.store.UpsertCover(pctx, nid, app.NovelCover, observedAt)
-			}
+			_ = s.writeApp(pctx, nid, app, observedAt)
 			_ = s.store.WatchPollDone(pctx, nid, observedAt)
 			return
 		}
@@ -95,10 +88,7 @@ func (s *Server) pollOne(ctx context.Context, nid int64) {
 		return
 	}
 	if state == crawl.DetailAlive && d != nil {
-		favs, praises, words := d.Favs, d.Praises, d.Words
-		status, updatedAt := d.Status, d.UpdatedAt
-		_ = s.store.InsertObservation(pctx, nid, observedAt,
-			nil, &favs, &praises, &words, &status, &updatedAt)
+		_ = s.writeHTML(pctx, nid, d, observedAt)
 	}
 	_ = s.store.WatchPollDone(pctx, nid, time.Now().Unix())
 }

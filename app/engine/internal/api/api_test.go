@@ -1,12 +1,14 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"strata/engine/internal/appshell"
+	"strata/engine/internal/crawl"
 	"strata/engine/internal/store"
 	"strata/engine/internal/testseed"
 )
@@ -234,5 +236,85 @@ func TestBookNotFound(t *testing.T) {
 	body := getJSON(t, srv.URL+"/strata/books/999999", http.StatusNotFound)
 	if body["error"].(map[string]any)["code"] != "not_found" {
 		t.Fatalf("body = %v", body)
+	}
+}
+
+func TestWriteHTMLPersistsEveryField(t *testing.T) {
+	srv, st := newTestServer(t)
+	s := &Server{store: st}
+	d := &crawl.Detail{
+		Title: "Local Title", Author: "Local Author",
+		Genre: "\u79d1\u5e7b", PriceType: "VIP",
+		CoverURL: "https://example.test/cover.jpg", Summary: "Local summary",
+		Favs: 1000, Praises: 200, Words: 12345,
+		Status: "\u8fde\u8f7d\u4e2d", UpdatedAt: "2026-11-18 12:00:00",
+	}
+	if err := s.writeHTML(context.Background(), 1001, d, 1800000000); err != nil {
+		t.Fatal(err)
+	}
+
+	detail, err := st.Book(context.Background(), 1001)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if detail.Book.Title != "Long A" {
+		t.Fatalf("seed title must stay read-only: %q", detail.Book.Title)
+	}
+	if detail.Meta == nil || detail.Meta.Summary == nil || *detail.Meta.Summary != "Local summary" {
+		t.Fatalf("meta = %+v", detail.Meta)
+	}
+
+	body := getJSON(t, srv.URL+"/strata/books/1001", http.StatusOK)
+	if body["cover"] != "https://example.test/cover.jpg" {
+		t.Fatalf("cover = %v", body["cover"])
+	}
+	eff := body["effective"].(map[string]any)
+	checks := map[string]any{
+		"title": "Local Title", "author": "Local Author", "genre": "\u79d1\u5e7b",
+		"price_type": "VIP", "summary": "Local summary", "status": "\u8fde\u8f7d\u4e2d",
+		"cover_url": "https://example.test/cover.jpg", "words": float64(12345),
+		"favs": float64(1000), "praises": float64(200),
+	}
+	for key, want := range checks {
+		if got := eff[key]; got != want {
+			t.Fatalf("effective[%s] = %v, want %v", key, got, want)
+		}
+	}
+}
+
+func TestWriteAppPersistsEveryField(t *testing.T) {
+	srv, st := newTestServer(t)
+	s := &Server{store: st}
+	app := &crawl.AppNovel{
+		NovelID: 1001, NovelName: "App Title", AuthorID: 42, AuthorName: "App Author",
+		AddTime: "2020-01-01T00:00:00", LastUpdateTime: "2026-11-18T12:00:00",
+		MarkCount: 8888, ViewTimes: 99999, CharCount: 77777, Point: 7.5,
+		IsFinish: true, SignStatus: "VIP", TypeID: 21, CategoryID: 1,
+		IsSensitive: true, AllowDown: false,
+		NovelCover: "https://example.test/app.jpg", BgBanner: "https://example.test/bg.jpg",
+	}
+	if err := s.writeApp(context.Background(), 1001, app, 1800000001); err != nil {
+		t.Fatal(err)
+	}
+
+	body := getJSON(t, srv.URL+"/strata/books/1001", http.StatusOK)
+	eff := body["effective"].(map[string]any)
+	checks := map[string]any{
+		"title": "App Title", "author": "App Author", "author_id": float64(42),
+		"genre": "\u9b54\u5e7b", "type_id": float64(21),
+		"price_type": "VIP", "status": "\u5df2\u5b8c\u7ed3",
+		"clicks": float64(99999), "favs": float64(8888), "words": float64(77777),
+		"updated_at": "2026-11-18T12:00:00", "add_time": "2020-01-01T00:00:00",
+		"point": 7.5, "category_id": float64(1),
+		"is_sensitive": true, "allow_down": false,
+		"cover_url": "https://example.test/app.jpg",
+	}
+	for key, want := range checks {
+		if got := eff[key]; got != want {
+			t.Fatalf("effective[%s] = %v, want %v", key, got, want)
+		}
+	}
+	if body["cover"] != "https://example.test/app.jpg" {
+		t.Fatalf("cover = %v", body["cover"])
 	}
 }

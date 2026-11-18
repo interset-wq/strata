@@ -69,10 +69,14 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
           final scheme = Theme.of(context).colorScheme;
           // 种子 cover_url 存相对路径（无前缀，上游爬虫缺前缀为已知问题）：
           // 有值拼 CDN 前缀；空值用官方默认封面兜底（用户拍板 2026-11-17）。
-          final raw = s(b['cover_url']);
+          final raw = s(eff['cover_url'] ?? b['cover_url']);
           final cover = (raw == null || raw.isEmpty)
               ? _defaultCover
-              : 'https://rss.sfacg.com/web/novel/images/NovelCover/Big/$raw';
+              : raw.startsWith('http')
+                  ? raw
+                  : raw.startsWith('//')
+                      ? 'https:$raw'
+                      : 'https://rss.sfacg.com/web/novel/images/NovelCover/Big/$raw';
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -114,18 +118,23 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(s(b['title']) ?? '',
+                        Text(s(eff['title'] ?? b['title']) ?? '',
                             style: Theme.of(context).textTheme.headlineSmall),
                         const SizedBox(height: 6),
-                        Text(s(b['author']) ?? '',
+                        Text(s(eff['author'] ?? b['author']) ?? '',
                             style: TextStyle(
                                 fontSize: 12, color: scheme.onSurfaceVariant)),
                         const SizedBox(height: 8),
                         Wrap(
                           spacing: 6,
                           children: [
-                            if (s(b['status']) != null)
-                              _badge(context, s(b['status'])!, filled: true),
+                            if (s(eff['status'] ?? b['status']) != null)
+                              _badge(context,
+                                  s(eff['status'] ?? b['status'])!,
+                                  filled: true),
+                            if (s(eff['genre'] ?? b['genre']) != null)
+                              _badge(context,
+                                  s(eff['genre'] ?? b['genre'])!),
                             if (s(b['est_year']) != null)
                               _badge(context, '${s(b['est_year'])} 代'),
                           ],
@@ -142,6 +151,15 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                   for (final tag in d.tags) Chip(label: Text(tag)),
                 ],
               ),
+              if (s(eff['summary']) != null) ...[
+                const SizedBox(height: 12),
+                Text('\u4f5c\u54c1\u7b80\u4ecb',
+                    style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: 4),
+                Text(s(eff['summary'])!,
+                    style: TextStyle(
+                        fontSize: 12, color: scheme.onSurfaceVariant)),
+              ],
               const SizedBox(height: 12),
               if (licensed)
                 const Padding(
@@ -204,16 +222,23 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
     try {
       final handle = await ref.read(bootProvider.future);
       final r = await handle.api.refresh(widget.nid);
+      final rd = r.detail ?? const <String, dynamic>{};
       setState(() {
         switch (r.state) {
           case 'alive':
-            refreshMessage = '观测已写入（favs=${r.detail?['favs']}）';
+            refreshMessage = '观测已写入（favs=${rd['favs'] ?? rd['markCount']}）';
             refreshColor = Colors.green;
           case 'dead':
             refreshMessage = '官方页面不存在（未写观测）';
             refreshColor = Colors.deepOrange;
           case 'zombie':
             refreshMessage = '该书当前不可阅读（未写观测）';
+            refreshColor = Colors.deepOrange;
+          case 'rate_limited':
+            final retry = rd['retry_after_seconds'] as int? ?? 0;
+            final hours = (retry / 3600).ceil();
+            refreshMessage =
+                '24 小时内已刷新过（约 $hours 小时后可再试，设置中可关闭限流）';
             refreshColor = Colors.deepOrange;
           default:
             refreshMessage = '未知状态：${r.state}';
@@ -459,10 +484,14 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
             row('状态', eff['status']?.toString() ?? s(b['status'])),
             row('上架日期', s(b['est_date'])),
             row('收录置信度', s(b['est_conf'])),
-            row('价格类型', s(b['price_type'])),
+            row('价格类型', s(eff['price_type'] ?? b['price_type'])),
             row('比赛', s(b['contest'])),
             row('featured', b['featured'] == true ? '是（编辑精选）' : null),
-            row('官方更新时间', s(b['updated_at'])),
+            row('官方更新时间', s(eff['updated_at'] ?? b['updated_at'])),
+            row('官方上架时间', s(eff['add_time'])),
+            row('官方评分', s(eff['point'])),
+            row('同人', eff['category_id'] == 1 ? '是' : null),
+            row('敏感标记', eff['is_sensitive'] == true ? '是' : null),
             row('数据来源', d.source == 'local' ? '本地观测' : '种子'),
             row('数据截止', d.dataEnd),
           ],

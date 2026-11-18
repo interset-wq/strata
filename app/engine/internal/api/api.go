@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -40,21 +41,18 @@ type Server struct {
 	// default, any failure silently degrades to the mobile HTML baseline.
 	appAPI bool
 
-	// Refresh debounce: same nid within the window returns the last
-	// verdict without touching the limiter (docs/08).
-	refreshMu   sync.Mutex
-	refreshLast map[int64]refreshEntry
+	// Serializes the per-nid cooldown check and attempt stamp so two
+	// concurrent taps cannot both consume the same 24h window.
+	refreshMu sync.Mutex
 
 	// Background watchlist poll worker (Phase 5): started once in New.
 	watcherStarted bool
 }
 
-const refreshDebounce = time.Minute
-
-type refreshEntry struct {
-	verdict gin.H
-	at      time.Time
-}
+const (
+	detailRefreshWindow = 24 * time.Hour
+	detailRateLimitPref = "detail_rate_limit_enabled"
+)
 
 func New(s *store.Store) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
@@ -74,15 +72,16 @@ func New(s *store.Store) *gin.Engine {
 		},
 	}
 	srv := &Server{
-		store:       s,
-		limiter:     crawl.NewLimiter(crawl.DefaultInterval),
-		client:      client,
-		refreshLast: map[int64]refreshEntry{},
-		appAPI:      os.Getenv("STRATA_APP_API") == "1",
+		store:   s,
+		limiter: crawl.NewLimiter(crawl.DefaultInterval),
+		client:  client,
+		appAPI:  os.Getenv("STRATA_APP_API") == "1",
 	}
 	group := r.Group("/strata")
 	group.GET("/healthz", srv.healthz)
 	group.GET("/meta", srv.meta)
+	group.GET("/settings", srv.settings)
+	group.PUT("/settings", srv.updateSettings)
 	group.GET("/books/:nid", srv.book)
 	group.POST("/books/:nid/refresh", srv.bookRefresh)
 	group.GET("/books/:nid/observations", srv.observations)
@@ -131,6 +130,79 @@ func (s *Server) meta(c *gin.Context) {
 	})
 }
 
+// settings reports the user-adjustable fetch limits. The detail cooldown is
+// on by default; users can disable it when they intentionally want several
+// manual refreshes in a day.
+func (s *Server) settings(c *gin.Context) {
+	enabled, err := s.detailRateLimitEnabled(c.Request.Context())
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"detail_rate_limit_enabled":     enabled,
+		"detail_refresh_window_seconds": int64(detailRefreshWindow / time.Second),
+	})
+}
+
+func (s *Server) updateSettings(c *gin.Context) {
+	var body struct {
+		DetailRateLimitEnabled *bool `json:"detail_rate_limit_enabled"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil || body.DetailRateLimitEnabled == nil {
+		fail(c, http.StatusBadRequest, "invalid_argument",
+			"detail_rate_limit_enabled is required")
+		return
+	}
+	value := "0"
+	if *body.DetailRateLimitEnabled {
+		value = "1"
+	}
+	if err := s.store.SetPref(c.Request.Context(), detailRateLimitPref, value); err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	s.settings(c)
+}
+
+// detailRateLimitEnabled returns the persisted preference; missing means on.
+func (s *Server) detailRateLimitEnabled(ctx context.Context) (bool, error) {
+	v, ok, err := s.store.Pref(ctx, detailRateLimitPref)
+	if err != nil {
+		return false, err
+	}
+	if !ok {
+		return true, nil
+	}
+	return v != "0" && v != "false", nil
+}
+
+// detailRefreshInfo describes the cooldown for one book on GET /books/:nid so
+// the UI can disable the button before a useless request is made.
+func (s *Server) detailRefreshInfo(ctx context.Context, nid int64, now time.Time) (gin.H, error) {
+	enabled, err := s.detailRateLimitEnabled(ctx)
+	if err != nil {
+		return nil, err
+	}
+	attempt, err := s.store.RefreshAttempt(ctx, nid)
+	if err != nil {
+		return nil, err
+	}
+	out := gin.H{
+		"rate_limit_enabled": enabled,
+		"window_seconds":     int64(detailRefreshWindow / time.Second),
+	}
+	if attempt != nil {
+		out["last_attempt_at"] = attempt.AttemptedAt
+		out["last_state"] = attempt.State
+		next := attempt.AttemptedAt + int64(detailRefreshWindow/time.Second)
+		if enabled && next > now.Unix() {
+			out["next_allowed_at"] = next
+		}
+	}
+	return out, nil
+}
+
 func (s *Server) book(c *gin.Context) {
 	nid, err := strconv.ParseInt(c.Param("nid"), 10, 64)
 	if err != nil || nid <= 0 {
@@ -148,32 +220,69 @@ func (s *Server) book(c *gin.Context) {
 	}
 
 	source := "seed"
-	if detail.Local != nil {
+	if detail.Local != nil || detail.Meta != nil {
 		source = "local"
 	}
-	// Locally fetched cover (App API novelCover) takes priority over the
-	// seed column, which is empty for many books (upstream crawler bug).
+	// Locally fetched cover takes priority over the seed column, which is
+	// empty or relative for many books (upstream crawler bug).
 	cover, _ := s.store.Cover(c.Request.Context(), nid)
+	if cover == "" && detail.Meta != nil && detail.Meta.CoverURL != nil {
+		cover = *detail.Meta.CoverURL
+	}
+	refresh, err := s.detailRefreshInfo(c.Request.Context(), nid, time.Now())
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"source":    source,
 		"data_end":  s.store.Manifest.ContentEnd,
 		"book":      detail.Book,
 		"tags":      detail.Tags,
 		"local":     detail.Local,
+		"meta":      detail.Meta,
 		"effective": effective(detail),
 		"cover":     cover,
+		"refresh":   refresh,
 	})
 }
 
 func effective(d *store.BookDetail) gin.H {
-	b, o := d.Book, d.Local
+	b, o, m := d.Book, d.Local, d.Meta
 	out := gin.H{
+		"title":      b.Title,
+		"author":     b.Author,
+		"genre":      b.Genre,
+		"price_type": b.PriceType,
 		"clicks":     b.Clicks,
 		"favs":       b.Favs,
 		"praises":    b.Praises,
 		"words":      b.Words,
 		"status":     b.Status,
+		"cover_url":  b.CoverURL,
 		"updated_at": b.UpdatedAt,
+	}
+	if m != nil {
+		overlayStr(out, "title", m.Title)
+		overlayStr(out, "author", m.Author)
+		overlayInt(out, "author_id", m.AuthorID)
+		overlayStr(out, "genre", m.Genre)
+		overlayInt(out, "type_id", m.TypeID)
+		overlayStr(out, "price_type", m.PriceType)
+		overlayStr(out, "status", m.Status)
+		overlayStr(out, "cover_url", m.CoverURL)
+		overlayStr(out, "summary", m.Summary)
+		overlayInt(out, "words", m.Words)
+		overlayInt(out, "favs", m.Favs)
+		overlayInt(out, "praises", m.Praises)
+		overlayInt(out, "clicks", m.Clicks)
+		overlayStr(out, "updated_at", m.UpdatedAt)
+		overlayStr(out, "add_time", m.AddTime)
+		overlayFloat(out, "point", m.Point)
+		overlayStr(out, "bg_banner", m.BgBanner)
+		overlayInt(out, "category_id", m.CategoryID)
+		overlayBool(out, "is_sensitive", m.IsSensitive)
+		overlayBool(out, "allow_down", m.AllowDown)
 	}
 	if o == nil {
 		return out
@@ -197,6 +306,42 @@ func effective(d *store.BookDetail) gin.H {
 		out["updated_at"] = o.UpdatedAt
 	}
 	return out
+}
+
+func overlayStr(out gin.H, key string, v *string) {
+	if v != nil {
+		out[key] = *v
+	}
+}
+
+func overlayInt(out gin.H, key string, v *int64) {
+	if v != nil {
+		out[key] = *v
+	}
+}
+
+func overlayFloat(out gin.H, key string, v *float64) {
+	if v != nil {
+		out[key] = *v
+	}
+}
+
+func overlayBool(out gin.H, key string, v *bool) {
+	if v != nil {
+		out[key] = *v
+	}
+}
+
+func metaStr(v string) *string {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return nil
+	}
+	return &v
+}
+
+func metaInt(v int64) *int64 {
+	return &v
 }
 
 func (s *Server) rankingFavs(c *gin.Context) {
@@ -495,57 +640,46 @@ func (s *Server) search(c *gin.Context) {
 // appended to user.db; dead/zombie pages are reported and never written.
 // The call is synchronous: the global limiter already serializes requests,
 // and a user-triggered refresh takes exactly one foreground slot.
+//
+// By default each book is limited to one outbound detail request per 24h.
+// The attempt is stamped BEFORE the request, so dead/zombie/network failures
+// also consume the window. The Settings switch can disable this limit.
 func (s *Server) bookRefresh(c *gin.Context) {
 	nid, err := strconv.ParseInt(c.Param("nid"), 10, 64)
 	if err != nil || nid <= 0 {
 		fail(c, http.StatusBadRequest, "invalid_argument", "nid must be a positive integer")
 		return
 	}
-	// Debounce: an identical nid within the window replays the last verdict
-	// without a fetch or a limiter slot.
-	s.refreshMu.Lock()
-	if e, ok := s.refreshLast[nid]; ok && time.Since(e.at) < refreshDebounce {
-		resp := cloneVerdict(e.verdict)
-		resp["cached"] = true
-		s.refreshMu.Unlock()
-		c.JSON(http.StatusOK, resp)
+	now := time.Now()
+	blocked, allowed, err := s.reserveDetailRefresh(c.Request.Context(), nid, now)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
-	s.refreshMu.Unlock()
+	if !allowed {
+		c.JSON(http.StatusOK, blocked)
+		return
+	}
 
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
 	defer cancel()
 
 	// App API enhancement (docs/05 §3.5): opt-in via STRATA_APP_API=1.
-	// On success the precise metadata replaces the HTML-parsed values and
-	// the cover is cached; ANY failure silently falls through to the
-	// mobile HTML baseline — no retry, no user-visible error.
+	// On success every field the response carries is persisted; ANY failure
+	// silently falls through to the mobile HTML baseline — no retry, no
+	// user-visible error.
 	if s.appAPI {
 		if app, aerr := crawl.FetchAppNovel(ctx, s.client, s.limiter, nid, true); aerr == nil {
-			clicks, favs, words := app.ViewTimes, app.MarkCount, app.CharCount
-			status := map[bool]string{true: "已完结", false: "连载中"}[app.IsFinish]
-			updatedAt := app.LastUpdateTime
 			observedAt := time.Now().Unix()
-			if err := s.store.InsertObservation(ctx, nid, observedAt,
-				&clicks, &favs, nil, &words, &status, &updatedAt); err == nil {
-				if app.NovelCover != "" {
-					_ = s.store.UpsertCover(ctx, nid, app.NovelCover, observedAt)
-				}
-				resp := gin.H{
+			if err := s.writeApp(ctx, nid, app, observedAt); err == nil {
+				s.finishDetailRefresh(nid, now.Unix(), "app")
+				c.JSON(http.StatusOK, gin.H{
 					"state":    "alive",
 					"written":  true,
 					"source":   "app",
 					"add_time": app.AddTime,
-					"detail": gin.H{
-						"clicks": clicks, "favs": favs, "words": words,
-						"status": status, "updated_at": updatedAt,
-						"cover": app.NovelCover, "point": app.Point,
-					},
-				}
-				s.refreshMu.Lock()
-				s.refreshLast[nid] = refreshEntry{verdict: resp, at: time.Now()}
-				s.refreshMu.Unlock()
-				c.JSON(http.StatusOK, resp)
+					"detail":   app,
+				})
 				return
 			}
 		}
@@ -554,6 +688,7 @@ func (s *Server) bookRefresh(c *gin.Context) {
 
 	state, d, observedAt, err := crawl.FetchDetail(ctx, s.client, s.limiter, nid, true)
 	if err != nil {
+		s.finishDetailRefresh(nid, now.Unix(), "error")
 		fail(c, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
@@ -562,29 +697,140 @@ func (s *Server) bookRefresh(c *gin.Context) {
 		resp["detail"] = d
 	}
 	if state == crawl.DetailAlive {
-		favs, praises, words := d.Favs, d.Praises, d.Words
-		status, updatedAt := d.Status, d.UpdatedAt
-		if err := s.store.InsertObservation(ctx, nid, observedAt,
-			nil, &favs, &praises, &words, &status, &updatedAt); err != nil {
+		if err := s.writeHTML(ctx, nid, d, observedAt); err != nil {
+			s.finishDetailRefresh(nid, now.Unix(), "error")
 			fail(c, http.StatusInternalServerError, "internal", err.Error())
 			return
 		}
 		resp["written"] = true
 	}
-	s.refreshMu.Lock()
-	s.refreshLast[nid] = refreshEntry{verdict: resp, at: time.Now()}
-	s.refreshMu.Unlock()
+	s.finishDetailRefresh(nid, now.Unix(), state.String())
 	c.JSON(http.StatusOK, resp)
 }
 
-// cloneVerdict shallow-copies a cached verdict so callers cannot mutate the
-// cache entry.
-func cloneVerdict(v gin.H) gin.H {
-	out := make(gin.H, len(v)+1)
-	for k, val := range v {
-		out[k] = val
+// reserveDetailRefresh atomically checks the per-nid cooldown and, when
+// allowed, stamps the attempt before any network I/O. It returns a ready-made
+// rate_limited response when the window is still closed.
+func (s *Server) reserveDetailRefresh(ctx context.Context, nid int64, now time.Time) (gin.H, bool, error) {
+	s.refreshMu.Lock()
+	defer s.refreshMu.Unlock()
+
+	enabled, err := s.detailRateLimitEnabled(ctx)
+	if err != nil {
+		return nil, false, err
 	}
-	return out
+	attempt, err := s.store.RefreshAttempt(ctx, nid)
+	if err != nil {
+		return nil, false, err
+	}
+	window := int64(detailRefreshWindow / time.Second)
+	if enabled && attempt != nil && now.Unix() < attempt.AttemptedAt+window {
+		next := attempt.AttemptedAt + window
+		return gin.H{
+			"state":               "rate_limited",
+			"written":             false,
+			"rate_limit_enabled":  true,
+			"last_attempt_at":     attempt.AttemptedAt,
+			"next_allowed_at":     next,
+			"retry_after_seconds": next - now.Unix(),
+		}, false, nil
+	}
+	if err := s.store.RecordRefreshAttempt(ctx, nid, now.Unix(), "pending"); err != nil {
+		return nil, false, err
+	}
+	return nil, true, nil
+}
+
+// finishDetailRefresh updates the stamped attempt's diagnostic state without
+// clobbering a newer attempt that may have started after this one.
+func (s *Server) finishDetailRefresh(nid, attemptedAt int64, state string) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_ = s.store.FinishRefreshAttempt(ctx, nid, attemptedAt, state)
+}
+
+// writeHTML persists every field parsed from the mobile detail page: the
+// observation row keeps the metric time series, book_meta keeps the latest
+// book attributes (title/author/genre/cover/summary/...), and covers keeps
+// the legacy App cover cache in sync.
+func (s *Server) writeHTML(ctx context.Context, nid int64, d *crawl.Detail, observedAt int64) error {
+	favs, praises, words := d.Favs, d.Praises, d.Words
+	var wordsPtr *int64
+	if words > 0 {
+		wordsPtr = &words
+	}
+	if err := s.store.InsertObservation(ctx, nid, observedAt,
+		nil, &favs, &praises, wordsPtr, metaStr(d.Status), metaStr(d.UpdatedAt)); err != nil {
+		return err
+	}
+	m := &store.BookMeta{
+		NID:       nid,
+		Source:    "html",
+		FetchedAt: observedAt,
+		Title:     metaStr(d.Title),
+		Author:    metaStr(d.Author),
+		Genre:     metaStr(d.Genre),
+		PriceType: metaStr(d.PriceType),
+		Status:    metaStr(d.Status),
+		CoverURL:  metaStr(d.CoverURL),
+		Summary:   metaStr(d.Summary),
+		Favs:      &favs,
+		Praises:   &praises,
+		Words:     wordsPtr,
+		UpdatedAt: metaStr(d.UpdatedAt),
+	}
+	if err := s.store.UpsertBookMeta(ctx, m); err != nil {
+		return err
+	}
+	if d.CoverURL != "" {
+		_ = s.store.UpsertCover(ctx, nid, d.CoverURL, observedAt)
+	}
+	return nil
+}
+
+// writeApp persists every field returned by GET /novels/{id}. The App API
+// has no praises/summary, so those stay nil and the previous local values
+// are preserved.
+func (s *Server) writeApp(ctx context.Context, nid int64, app *crawl.AppNovel, observedAt int64) error {
+	clicks, favs, words := app.ViewTimes, app.MarkCount, app.CharCount
+	status := "已完结"
+	if !app.IsFinish {
+		status = "连载中"
+	}
+	if err := s.store.InsertObservation(ctx, nid, observedAt,
+		&clicks, &favs, nil, &words, &status, metaStr(app.LastUpdateTime)); err != nil {
+		return err
+	}
+	m := &store.BookMeta{
+		NID:         nid,
+		Source:      "app",
+		FetchedAt:   observedAt,
+		Title:       metaStr(app.NovelName),
+		Author:      metaStr(app.AuthorName),
+		AuthorID:    metaInt(app.AuthorID),
+		Genre:       metaStr(crawl.AppGenre(app.TypeID)),
+		TypeID:      metaInt(app.TypeID),
+		PriceType:   metaStr(app.SignStatus),
+		Status:      metaStr(status),
+		CoverURL:    metaStr(app.NovelCover),
+		Words:       &words,
+		Favs:        &favs,
+		Clicks:      &clicks,
+		UpdatedAt:   metaStr(app.LastUpdateTime),
+		AddTime:     metaStr(app.AddTime),
+		Point:       &app.Point,
+		BgBanner:    metaStr(app.BgBanner),
+		CategoryID:  metaInt(app.CategoryID),
+		IsSensitive: &app.IsSensitive,
+		AllowDown:   &app.AllowDown,
+	}
+	if err := s.store.UpsertBookMeta(ctx, m); err != nil {
+		return err
+	}
+	if app.NovelCover != "" {
+		_ = s.store.UpsertCover(ctx, nid, app.NovelCover, observedAt)
+	}
+	return nil
 }
 
 // observations returns a nid's observation history, newest first.

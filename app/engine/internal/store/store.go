@@ -62,10 +62,47 @@ type Observation struct {
 	Source        string  `json:"source"`
 }
 
+// BookMeta is the latest metadata returned by one successful detail fetch.
+// It is an overlay on the read-only seed; nil means "not returned, keep the
+// previous value" (HTML and App API expose different subsets).
+type BookMeta struct {
+	NID         int64    `json:"nid"`
+	Source      string   `json:"source"`
+	FetchedAt   int64    `json:"fetched_at"`
+	Title       *string  `json:"title"`
+	Author      *string  `json:"author"`
+	AuthorID    *int64   `json:"author_id"`
+	Genre       *string  `json:"genre"`
+	TypeID      *int64   `json:"type_id"`
+	PriceType   *string  `json:"price_type"`
+	Status      *string  `json:"status"`
+	CoverURL    *string  `json:"cover_url"`
+	Summary     *string  `json:"summary"`
+	Words       *int64   `json:"words"`
+	Favs        *int64   `json:"favs"`
+	Praises     *int64   `json:"praises"`
+	Clicks      *int64   `json:"clicks"`
+	UpdatedAt   *string  `json:"updated_at"`
+	AddTime     *string  `json:"add_time"`
+	Point       *float64 `json:"point"`
+	BgBanner    *string  `json:"bg_banner"`
+	CategoryID  *int64   `json:"category_id"`
+	IsSensitive *bool    `json:"is_sensitive"`
+	AllowDown   *bool    `json:"allow_down"`
+}
+
 type BookDetail struct {
 	Book  *Book        `json:"book"`
 	Tags  []string     `json:"tags"`
 	Local *Observation `json:"local"`
+	Meta  *BookMeta    `json:"meta,omitempty"`
+}
+
+// RefreshAttempt is the last user-triggered detail fetch for one nid.
+type RefreshAttempt struct {
+	NID         int64  `json:"nid"`
+	AttemptedAt int64  `json:"attempted_at"`
+	State       string `json:"state"`
 }
 
 // Open attaches the read-only seed DB to the writable user DB. SQLite ATTACH
@@ -185,7 +222,11 @@ FROM seed.books WHERE nid = ?`
 	if err != nil {
 		return nil, err
 	}
-	return &BookDetail{Book: &b, Tags: tagList, Local: local}, nil
+	meta, err := s.BookMeta(ctx, nid)
+	if err != nil {
+		return nil, err
+	}
+	return &BookDetail{Book: &b, Tags: tagList, Local: local, Meta: meta}, nil
 }
 
 func (s *Store) bookTags(ctx context.Context, nid int64) ([]string, error) {
@@ -875,6 +916,152 @@ ORDER BY favs DESC LIMIT ?`, limit)
 	return items, rows.Err()
 }
 
+// UpsertBookMeta persists every field returned by one detail fetch. Nil
+// fields (not returned by that pathway) never overwrite an older value, so
+// the mobile HTML baseline and the App API enhancement can coexist.
+func (s *Store) UpsertBookMeta(ctx context.Context, m *BookMeta) error {
+	_, err := s.DB.ExecContext(ctx, `
+INSERT INTO book_meta(nid, source, fetched_at, title, author, author_id,
+ genre, type_id, price_type, status, cover_url, summary, words, favs, praises,
+ clicks, updated_at, add_time, point, bg_banner, category_id, is_sensitive,
+ allow_down)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(nid) DO UPDATE SET
+ source=excluded.source, fetched_at=excluded.fetched_at,
+ title=COALESCE(excluded.title, book_meta.title),
+ author=COALESCE(excluded.author, book_meta.author),
+ author_id=COALESCE(excluded.author_id, book_meta.author_id),
+ genre=COALESCE(excluded.genre, book_meta.genre),
+ type_id=COALESCE(excluded.type_id, book_meta.type_id),
+ price_type=COALESCE(excluded.price_type, book_meta.price_type),
+ status=COALESCE(excluded.status, book_meta.status),
+ cover_url=COALESCE(excluded.cover_url, book_meta.cover_url),
+ summary=COALESCE(excluded.summary, book_meta.summary),
+ words=COALESCE(excluded.words, book_meta.words),
+ favs=COALESCE(excluded.favs, book_meta.favs),
+ praises=COALESCE(excluded.praises, book_meta.praises),
+ clicks=COALESCE(excluded.clicks, book_meta.clicks),
+ updated_at=COALESCE(excluded.updated_at, book_meta.updated_at),
+ add_time=COALESCE(excluded.add_time, book_meta.add_time),
+ point=COALESCE(excluded.point, book_meta.point),
+ bg_banner=COALESCE(excluded.bg_banner, book_meta.bg_banner),
+ category_id=COALESCE(excluded.category_id, book_meta.category_id),
+ is_sensitive=COALESCE(excluded.is_sensitive, book_meta.is_sensitive),
+ allow_down=COALESCE(excluded.allow_down, book_meta.allow_down)`,
+		m.NID, m.Source, m.FetchedAt, m.Title, m.Author, m.AuthorID,
+		m.Genre, m.TypeID, m.PriceType, m.Status, m.CoverURL, m.Summary,
+		m.Words, m.Favs, m.Praises, m.Clicks, m.UpdatedAt, m.AddTime,
+		m.Point, m.BgBanner, m.CategoryID, m.IsSensitive, m.AllowDown)
+	return err
+}
+
+// BookMeta reads the local metadata overlay for a nid, if any.
+func (s *Store) BookMeta(ctx context.Context, nid int64) (*BookMeta, error) {
+	const q = `
+SELECT nid, source, fetched_at, title, author, author_id, genre, type_id,
+ price_type, status, cover_url, summary, words, favs, praises, clicks,
+ updated_at, add_time, point, bg_banner, category_id, is_sensitive, allow_down
+FROM book_meta WHERE nid = ?`
+	var (
+		m                                              BookMeta
+		title, author, genre, priceType, status, cover sql.NullString
+		summary, updatedAt, addTime, bgBanner          sql.NullString
+		authorID, typeID, words, favs, praises, clicks sql.NullInt64
+		categoryID, isSensitive, allowDown             sql.NullInt64
+		point                                          sql.NullFloat64
+	)
+	err := s.DB.QueryRowContext(ctx, q, nid).Scan(
+		&m.NID, &m.Source, &m.FetchedAt, &title, &author, &authorID, &genre,
+		&typeID, &priceType, &status, &cover, &summary, &words, &favs,
+		&praises, &clicks, &updatedAt, &addTime, &point, &bgBanner,
+		&categoryID, &isSensitive, &allowDown,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	m.Title = strPtr(title)
+	m.Author = strPtr(author)
+	m.AuthorID = intPtr(authorID)
+	m.Genre = strPtr(genre)
+	m.TypeID = intPtr(typeID)
+	m.PriceType = strPtr(priceType)
+	m.Status = strPtr(status)
+	m.CoverURL = strPtr(cover)
+	m.Summary = strPtr(summary)
+	m.Words = intPtr(words)
+	m.Favs = intPtr(favs)
+	m.Praises = intPtr(praises)
+	m.Clicks = intPtr(clicks)
+	m.UpdatedAt = strPtr(updatedAt)
+	m.AddTime = strPtr(addTime)
+	m.Point = floatPtr(point)
+	m.BgBanner = strPtr(bgBanner)
+	m.CategoryID = intPtr(categoryID)
+	m.IsSensitive = boolPtr(isSensitive)
+	m.AllowDown = boolPtr(allowDown)
+	return &m, nil
+}
+
+// RefreshAttempt reads the last user-triggered detail fetch for a nid.
+// A nil result means the book has never been refreshed on this device.
+func (s *Store) RefreshAttempt(ctx context.Context, nid int64) (*RefreshAttempt, error) {
+	var a RefreshAttempt
+	err := s.DB.QueryRowContext(ctx, `
+SELECT nid, attempted_at, state FROM refresh_attempts WHERE nid = ?`, nid).
+		Scan(&a.NID, &a.AttemptedAt, &a.State)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &a, nil
+}
+
+// RecordRefreshAttempt stamps an outbound detail request. It is written
+// before the request so a failure still consumes the cooldown window.
+func (s *Store) RecordRefreshAttempt(ctx context.Context, nid, attemptedAt int64, state string) error {
+	_, err := s.DB.ExecContext(ctx, `
+INSERT INTO refresh_attempts(nid, attempted_at, state) VALUES (?, ?, ?)
+ON CONFLICT(nid) DO UPDATE SET
+  attempted_at=excluded.attempted_at, state=excluded.state`,
+		nid, attemptedAt, state)
+	return err
+}
+
+// FinishRefreshAttempt updates the state of the attempt that is still current.
+// If a newer attempt has already been stamped, the update is a no-op.
+func (s *Store) FinishRefreshAttempt(ctx context.Context, nid, attemptedAt int64, state string) error {
+	_, err := s.DB.ExecContext(ctx, `
+UPDATE refresh_attempts SET state = ? WHERE nid = ? AND attempted_at = ?`,
+		state, nid, attemptedAt)
+	return err
+}
+
+// Pref reads a user preference. ok=false means the key is absent.
+func (s *Store) Pref(ctx context.Context, key string) (value string, ok bool, err error) {
+	err = s.DB.QueryRowContext(ctx, `SELECT value FROM prefs WHERE key = ?`, key).
+		Scan(&value)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	return value, true, nil
+}
+
+// SetPref writes a user preference.
+func (s *Store) SetPref(ctx context.Context, key, value string) error {
+	_, err := s.DB.ExecContext(ctx, `
+INSERT INTO prefs(key, value) VALUES (?, ?)
+ON CONFLICT(key) DO UPDATE SET value=excluded.value`, key, value)
+	return err
+}
+
 // UpsertCover stores an App API novelCover under the nid. Covers are
 // book attributes (not observations) and live only in user.db.
 func (s *Store) UpsertCover(ctx context.Context, nid int64, cover string, fetchedAt int64) error {
@@ -922,4 +1109,12 @@ func floatPtr(v sql.NullFloat64) *float64 {
 	}
 	f := v.Float64
 	return &f
+}
+
+func boolPtr(v sql.NullInt64) *bool {
+	if !v.Valid {
+		return nil
+	}
+	b := v.Int64 != 0
+	return &b
 }
