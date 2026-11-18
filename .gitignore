@@ -25,6 +25,9 @@ quarry/datasets/
 *.parquet
 *.feather
 
+# ── dataset：构建产物不入库（104 MB），源 jsonl 由 build.py 重建 ──
+dataset/out/
+
 # ── analysis：源库与产出都不入库，由 prepare / build 重建 ──────
 analysis/data/
 analysis/out/
