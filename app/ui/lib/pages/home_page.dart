@@ -22,6 +22,15 @@ final randomProvider = FutureProvider.autoDispose<List<RankItem>>((ref) async {
   return handle.api.randomBooks(limit: 4);
 });
 
+/// 连载发现：从全库连载书中均匀抽样（ORDER BY RANDOM，等概率），
+/// 每次下拉刷新重掷一批。
+final serialShowcaseProvider = FutureProvider.autoDispose<List<RankItem>>((
+  ref,
+) async {
+  final handle = await ref.watch(bootProvider.future);
+  return handle.api.randomBooks(limit: 8, status: 'serial');
+});
+
 /// 首页：编辑精选轮播 → 入口宫格 → 分类找书 → 继续浏览。
 /// 不暴露种子统计——定位是找书 App（用户反馈 2026-11-17）。
 class HomePage extends ConsumerWidget {
@@ -38,6 +47,7 @@ class HomePage extends ConsumerWidget {
           ref.invalidate(bannerProvider);
           ref.invalidate(boardProvider);
           ref.invalidate(randomProvider);
+          ref.invalidate(serialShowcaseProvider);
           await Future.wait([
             ref.read(featuredProvider.future),
             ref.read(bannerProvider.future),
@@ -59,8 +69,8 @@ class HomePage extends ConsumerWidget {
                 ),
                 const SizedBox(height: 8),
                 _entryGrid(context),
-                _sectionTitle(context, '人气风向标'),
-                const _ShowcaseSection(kind: 'popular'),
+                _sectionTitle(context, '连载发现'),
+                const _ShowcaseSection(),
                 _sectionTitle(context, '完结精选'),
                 const _BoardGrid(kind: 'finish'),
                 _sectionTitle(context, '今日精品更新'),
@@ -241,17 +251,14 @@ class HomePage extends ConsumerWidget {
   }
 }
 
-/// 人气风向标（官方式 4×2）：两行四列封面网格 + 排名角标。
-/// 角标用我们自己的排名口径（board popular 的名次即全库点击排名事实），
-/// 不照抄官方文案；platform clicks 仅展示层（docs/12 §1）。
+/// 连载发现：随机连载书 4×2 封面网格，无角标——内容即随机抽取的
+/// 全库连载书，等概率、每次下拉刷新换一批。
 class _ShowcaseSection extends ConsumerWidget {
-  final String kind;
-
-  const _ShowcaseSection({required this.kind});
+  const _ShowcaseSection();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final items = ref.watch(boardProvider(kind));
+    final items = ref.watch(serialShowcaseProvider);
     return items.when(
       loading: () => const Padding(
         padding: EdgeInsets.all(16),
@@ -277,10 +284,7 @@ class _ShowcaseSection extends ConsumerWidget {
                     if (c > 0) const SizedBox(width: 10),
                     Expanded(
                       child: (row * 4 + c) < list.length
-                          ? _CoverCard(
-                              item: list[row * 4 + c],
-                              rank: row * 4 + c + 1,
-                            )
+                          ? _CoverCard(item: list[row * 4 + c], rank: null)
                           : const SizedBox(),
                     ),
                   ],

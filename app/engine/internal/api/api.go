@@ -459,7 +459,8 @@ func (s *Server) random(c *gin.Context) {
 	if !ok {
 		return
 	}
-	items, err := s.store.RandomBooks(c.Request.Context(), limit)
+	items, err := s.store.RandomBooks(c.Request.Context(), limit,
+		c.Query("status") == "serial")
 	if err != nil {
 		fail(c, http.StatusInternalServerError, "internal", err.Error())
 		return

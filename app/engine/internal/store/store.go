@@ -672,16 +672,23 @@ func (s *Store) WatchPollDone(ctx context.Context, nid, at int64) error {
 // RandomBooks samples n unlicensed seed books uniformly at random
 // (ORDER BY RANDOM), used by the home "shuffle" grid. Cover and stats
 // included so cards render identically to board items.
-func (s *Store) RandomBooks(ctx context.Context, limit int) ([]RankItem, error) {
-	rows, err := s.DB.QueryContext(ctx, `
+// RandomBooks samples n unlicensed seed books uniformly at random
+// (ORDER BY RANDOM is a uniform permutation). serialOnly restricts the
+// pool to ongoing works (status='连载中') with the same uniformity.
+func (s *Store) RandomBooks(ctx context.Context, limit int, serialOnly bool) ([]RankItem, error) {
+	query := `
 SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
        seed.books.est_year, seed.books.status, seed.books.words, seed.books.clicks,
        seed.books.favs,
        COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url
 FROM seed.books
 LEFT JOIN covers c ON c.nid = seed.books.nid
-WHERE is_licensed = 0
-ORDER BY RANDOM() LIMIT ?`, limit)
+WHERE is_licensed = 0`
+	if serialOnly {
+		query += " AND status = '连载中'"
+	}
+	query += " ORDER BY RANDOM() LIMIT ?"
+	rows, err := s.DB.QueryContext(ctx, query, limit)
 	if err != nil {
 		return nil, err
 	}
