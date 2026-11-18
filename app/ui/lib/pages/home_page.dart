@@ -30,34 +30,47 @@ class HomePage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final featured = ref.watch(featuredProvider);
+    final banners = ref.watch(bannerProvider);
     return Scaffold(
-      body: SafeArea(
-        bottom: false,
-        child: featured.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text('精选加载失败：$e')),
-          data: (items) => ListView(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            children: [
-              _formTabs(context, () => ref.invalidate(featuredProvider)),
-              _searchRow(context),
-              BannerCarousel(
-                items: items,
-                onTap: (it) => context.push('/book/${it.nid}'),
-              ),
-              const SizedBox(height: 8),
-              _entryGrid(context),
-              _sectionTitle(context, '人气风向标'),
-              const _ShowcaseSection(kind: 'popular'),
-              _sectionTitle(context, '完结精选'),
-              const _BoardGrid(kind: 'finish'),
-              _sectionTitle(context, '今日精品更新'),
-              const _Spotlight(),
-              _sectionTitle(context, '随机书架'),
-              const _ShuffleGrid(),
-              _sectionTitle(context, '继续浏览'),
-              const _ContinueBrowsing(),
-            ],
+      body: RefreshIndicator(
+        onRefresh: () async {
+          ref.invalidate(featuredProvider);
+          ref.invalidate(bannerProvider);
+          ref.invalidate(boardProvider);
+          ref.invalidate(randomProvider);
+          await Future.wait([
+            ref.read(featuredProvider.future),
+            ref.read(bannerProvider.future),
+          ]);
+        },
+        child: SafeArea(
+          bottom: false,
+          child: featured.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(child: Text('精选加载失败：$e')),
+            data: (items) => ListView(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              children: [
+                _formTabs(context, () => ref.invalidate(featuredProvider)),
+                _searchRow(context),
+                BannerCarousel(
+                  items: banners.asData?.value ?? items,
+                  onTap: (it) => context.push('/book/${it.nid}'),
+                ),
+                const SizedBox(height: 8),
+                _entryGrid(context),
+                _sectionTitle(context, '人气风向标'),
+                const _ShowcaseSection(kind: 'popular'),
+                _sectionTitle(context, '完结精选'),
+                const _BoardGrid(kind: 'finish'),
+                _sectionTitle(context, '今日精品更新'),
+                const _Spotlight(),
+                _sectionTitle(context, '随机书架'),
+                const _ShuffleGrid(),
+                _sectionTitle(context, '继续浏览'),
+                const _ContinueBrowsing(),
+              ],
+            ),
           ),
         ),
       ),

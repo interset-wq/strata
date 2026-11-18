@@ -65,6 +65,15 @@ final featuredProvider = FutureProvider<List<FeaturedItem>>((ref) async {
   return handle.api.featured();
 });
 
+/// 每日 banner：以当天日期为随机种子，对整个 banner 池（含 is_licensed）
+/// 等概率抽取——同一天稳定、隔天必变、池内每个 banner 都可能被抽中。
+final bannerProvider = FutureProvider<List<FeaturedItem>>((ref) async {
+  final handle = await ref.watch(bootProvider.future);
+  final now = DateTime.now();
+  final seed = now.year * 10000 + now.month * 100 + now.day;
+  return handle.api.banners(seed: seed);
+});
+
 /// 书架（“想读”，首页“继续浏览”数据源）。
 final shelfProvider = FutureProvider<List<ShelfItem>>((ref) async {
   final handle = await ref.watch(bootProvider.future);

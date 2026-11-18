@@ -99,6 +99,7 @@ func New(s *store.Store) *gin.Engine {
 	group.GET("/history", srv.history)
 	group.POST("/history/:nid", srv.recordHistory)
 	group.GET("/featured", srv.featured)
+	group.GET("/banner", srv.banner)
 	group.GET("/shelf", srv.shelfList)
 	group.PUT("/shelf", srv.shelfAdd)
 	group.DELETE("/shelf/:nid", srv.shelfRemove)
@@ -873,6 +874,30 @@ func (s *Server) observations(c *gin.Context) {
 		return
 	}
 	items, err := s.store.Observations(c.Request.Context(), nid)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"items": items})
+}
+
+// banner picks the daily banner set: a uniform deterministic shuffle of the
+// whole banner pool (seed featured=1, licensed included) keyed by a date
+// seed so every day draws a different, cacheable set.
+func (s *Server) banner(c *gin.Context) {
+	limit, ok := parseLimit(c)
+	if !ok {
+		return
+	}
+	seed := time.Now().Format("20060102")
+	if raw := c.Query("seed"); raw != "" {
+		seed = raw
+	}
+	var day int64
+	for _, ch := range seed {
+		day = day*10 + int64(ch-'0')
+	}
+	items, err := s.store.BannerPick(c.Request.Context(), day, limit)
 	if err != nil {
 		fail(c, http.StatusInternalServerError, "internal", err.Error())
 		return

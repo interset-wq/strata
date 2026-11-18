@@ -1141,6 +1141,40 @@ ORDER BY h.viewed_at DESC LIMIT ?`, limit)
 	return items, rows.Err()
 }
 
+// BannerPick deterministically shuffles the banner pool (seed featured=1,
+// licensed works included — banners are display-layer) with the date as the
+// random seed. Same seed → same set, every day a different draw, and every
+// banner stays reachable because the shuffle is a uniform reorder.
+func (s *Store) BannerPick(ctx context.Context, seed int64, limit int) ([]FeaturedBook, error) {
+	rows, err := s.DB.QueryContext(ctx, `
+SELECT seed.books.nid, seed.books.title, seed.books.author,
+       COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url, seed.books.favs
+FROM seed.books
+LEFT JOIN covers c ON c.nid = seed.books.nid
+WHERE featured = 1
+ORDER BY (seed.books.nid*2654435761 + ?) % 1000003, seed.books.nid
+LIMIT ?`, seed, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []FeaturedBook{}
+	for rows.Next() {
+		var (
+			it    FeaturedBook
+			cover sql.NullString
+			favs  sql.NullInt64
+		)
+		if err := rows.Scan(&it.NID, &it.Title, &it.Author, &cover, &favs); err != nil {
+			return nil, err
+		}
+		it.CoverURL = strPtr(cover)
+		it.Favs = intPtr(favs)
+		items = append(items, it)
+	}
+	return items, rows.Err()
+}
+
 // Cover returns the locally fetched cover path for a nid, if any.
 func (s *Store) Cover(ctx context.Context, nid int64) (string, error) {
 	var cover string
