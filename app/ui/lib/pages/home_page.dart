@@ -11,7 +11,7 @@ import 'browse_page.dart';
 final boardProvider =
     FutureProvider.autoDispose.family<List<RankItem>, String>((ref, kind) async {
   final handle = await ref.watch(bootProvider.future);
-  return handle.api.rankingBoard(kind: kind, limit: 3);
+  return handle.api.rankingBoard(kind: kind, limit: 8);
 });
 
 /// 随机书架数据源：/random 均匀抽样，换一换即 invalidate。
@@ -230,7 +230,9 @@ class HomePage extends ConsumerWidget {
 
 }
 
-/// 人气风向标（官方式）：两列封面卡 + 榜单角标，platform clicks 展示层口径。
+/// 人气风向标（官方式 4×2）：两行四列封面网格 + 排名角标。
+/// 角标用我们自己的排名口径（board popular 的名次即全库点击排名事实），
+/// 不照抄官方文案；platform clicks 仅展示层（docs/12 §1）。
 class _ShowcaseSection extends ConsumerWidget {
   final String kind;
 
@@ -251,12 +253,24 @@ class _ShowcaseSection extends ConsumerWidget {
       ),
       data: (list) => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Column(
           children: [
-            for (var i = 0; i < list.take(2).length; i++) ...[
-              if (i > 0) const SizedBox(width: 12),
-              Expanded(child: _CoverCard(item: list[i], rank: i + 1)),
+            for (var row = 0; row < 2; row++) ...[
+              if (row > 0) const SizedBox(height: 12),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (var c = 0; c < 4; c++) ...[
+                    if (c > 0) const SizedBox(width: 10),
+                    Expanded(
+                      child: (row * 4 + c) < list.length
+                          ? _CoverCard(
+                              item: list[row * 4 + c], rank: row * 4 + c + 1)
+                          : const SizedBox(),
+                    ),
+                  ],
+                ],
+              ),
             ],
           ],
         ),
@@ -344,7 +358,7 @@ class _CoverCard extends StatelessWidget {
                         color: scheme.primary,
                         borderRadius: BorderRadius.circular(4),
                       ),
-                      child: Text('人气榜 No.$rank',
+                      child: Text('人气 No.$rank',
                           style: TextStyle(
                               fontSize: 9, color: scheme.onPrimary)),
                     ),
