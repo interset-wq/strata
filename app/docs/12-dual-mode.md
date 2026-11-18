@@ -41,7 +41,10 @@
 ### 3.2 信号白名单（红线）
 
 推荐打分只能用：`fav_pctl` / `click_pctl` / `praise_pctl` / `pr` / `pctl_pr` /
-`deep_ranks` / `books.form`（附录 D 实施后）。
+`deep_ranks` / `books.form`（附录 D 实施后）/ `lqs`（篇幅加权口碑分，见 `16-length-weighted-quality.md`）。
+
+`lqs` 只由 `pr` 的「世代 × 收藏档」分位与归一化篇幅构成，不含任何原始累计值；
+收藏量只用于分档归一（与分位分母同性质），不作打分项。
 
 **严禁** `clicks` / `favs` / `praises` 原始累计值进入推荐打分——否则马太效应从后门渗入。
 原始值只用于展示层锚点。
