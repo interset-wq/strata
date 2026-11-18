@@ -104,6 +104,19 @@ UI 启动轮询即打这个端点（200ms 间隔、15s 超时），`status=="ok"
 与 `genre` 可组合，均在分位榜口径内过滤。`contest` 取值在端上从 `contest=1` 结果
 聚合（items 的 `contest` 字段），不单独提供枚举端点。
 
+### GET /strata/rankings/board?kind=&limit=&offset=（**已实现**）
+
+Classic 全库榜（docs/12 展示列）：平台累计值排序，不涉及分位。`kind` 枚举：
+`recommend`(praises) / `popular`(clicks) / `favs` / `new`(est_date) / `finish`(已完结按 favs) /
+`words`。`offset` 分页（默认 0）。items 为 RankItem（含 `status`/`words`/`clicks`/`cover_url`）。
+
+### GET /strata/discover?cursor=&limit=（**已实现**）
+
+Classic 发现流（docs/12 §5）：候选池 = `is_licensed=0` 且**有封面**（封面硬门槛，
+12,107 本），按平台 `clicks` 降序，**keyset 游标分页**（cursor = 上一批末条
+`clicks:nid`，缺省从顶部开始），每批默认 20，stateless。响应含 `next_cursor`
+（批末返回，为空表示到底）。
+
 ### GET /strata/rankings/short?limit=
 
 200：同上结构，`meta.kind="short"`、`ordering="favs"`、`short_max_words=50000`，

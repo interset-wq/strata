@@ -251,6 +251,9 @@ type RankItem struct {
 	FavPctl  float64 `json:"fav_pctl"`
 	Contest  *string `json:"contest"`
 	CoverURL *string `json:"cover_url"`
+	Status   *string `json:"status"`
+	Words    *int64  `json:"words"`
+	Clicks   *int64  `json:"clicks"`
 }
 
 func (s *Store) RankingFavs(ctx context.Context, year int, genre, status, contest string, limit int) ([]RankItem, error) {
@@ -403,6 +406,122 @@ LIMIT ?`
 		item.Genre = strPtr(gen)
 		item.Favs = intPtr(favs)
 		item.Words = intPtr(words)
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
+// boardKind maps the Classic board selector to its ordering column.
+// All are platform cumulative values (docs/12 §1 novly showcase column).
+func boardKindCol(kind string) (string, bool) {
+	switch kind {
+	case "recommend":
+		return "praises DESC", true
+	case "popular":
+		return "clicks DESC", true
+	case "favs":
+		return "favs DESC", true
+	case "new":
+		return "est_date DESC", true
+	case "finish":
+		return "favs DESC", true // filtered to finished, still by favs
+	case "words":
+		return "words DESC", true
+	}
+	return "", false
+}
+
+// BoardBooks is the Classic full-catalog board (docs/12 showcase): platform
+// cumulative values, no percentile math. Isolated from the recommendation
+// signal whitelist — display only.
+func (s *Store) BoardBooks(ctx context.Context, kind string, limit, offset int) ([]RankItem, error) {
+	col, ok := boardKindCol(kind)
+	if !ok {
+		return nil, nil
+	}
+	q := `
+SELECT nid, title, author, genre, est_year, status, words, clicks, favs, cover_url
+FROM seed.books
+WHERE is_licensed = 0`
+	if kind == "finish" {
+		q += " AND status = '已完结'"
+	}
+	q += fmt.Sprintf(" ORDER BY %s LIMIT ? OFFSET ?", col)
+	args := []any{limit, offset}
+
+	rows, err := s.DB.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := make([]RankItem, 0, limit)
+	for rows.Next() {
+		var (
+			item                RankItem
+			gen, status, cover  sql.NullString
+			words, clicks, favs sql.NullInt64
+		)
+		if err := rows.Scan(&item.NID, &item.Title, &item.Author, &gen,
+			&item.EstYear, &status, &words, &clicks, &favs, &cover); err != nil {
+			return nil, err
+		}
+		item.Rank = len(items) + offset + 1
+		item.Genre = strPtr(gen)
+		item.Status = strPtr(status)
+		item.Words = intPtr(words)
+		item.Clicks = intPtr(clicks)
+		item.Favs = intPtr(favs)
+		item.CoverURL = strPtr(cover)
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
+// Discover is the classic discovery stream: cover-bearing unlicensed books
+// ordered by platform clicks (docs/12 §5: cover is a hard gate), keyset
+// paginated by (clicks, nid) for stable, overlap-free infinite scrolling.
+// cursor "" starts at the top; otherwise "clicks:nid" of the last item.
+func (s *Store) Discover(ctx context.Context, cursor string, limit int) ([]RankItem, error) {
+	q := `
+SELECT nid, title, author, genre, est_year, status, words, clicks, favs, cover_url
+FROM seed.books
+WHERE is_licensed = 0 AND cover_url IS NOT NULL AND cover_url != ''`
+	args := []any{}
+	if cursor != "" {
+		var clicks int64
+		var nid int64
+		if _, err := fmt.Sscanf(cursor, "%d:%d", &clicks, &nid); err != nil {
+			return nil, err
+		}
+		q += " AND (clicks < ? OR (clicks = ? AND nid > ?))"
+		args = append(args, clicks, clicks, nid)
+	}
+	q += " ORDER BY clicks DESC, nid ASC LIMIT ?"
+	args = append(args, limit)
+
+	rows, err := s.DB.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := make([]RankItem, 0, limit)
+	for rows.Next() {
+		var (
+			item                RankItem
+			gen, status, cover  sql.NullString
+			words, clicks, favs sql.NullInt64
+		)
+		if err := rows.Scan(&item.NID, &item.Title, &item.Author, &gen,
+			&item.EstYear, &status, &words, &clicks, &favs, &cover); err != nil {
+			return nil, err
+		}
+		item.Rank = len(items) + 1
+		item.Genre = strPtr(gen)
+		item.Status = strPtr(status)
+		item.Words = intPtr(words)
+		item.Clicks = intPtr(clicks)
+		item.Favs = intPtr(favs)
+		item.CoverURL = strPtr(cover)
 		items = append(items, item)
 	}
 	return items, rows.Err()

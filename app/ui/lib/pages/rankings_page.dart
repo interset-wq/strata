@@ -5,182 +5,363 @@ import 'package:go_router/go_router.dart';
 import '../core/providers.dart';
 import '../data/api/strata_api.dart';
 
-/// 题材枚举与引擎 api.go 保持一致（契约 08）。
-const genres = [
-  '魔幻', '玄幻', '古风', '科幻', '校园', '都市', '游戏', '同人', '悬疑',
+/// Classic 六榜侧栏（官方式）：映射到平台累计值排序（docs/12 展示列）。
+const _boards = [
+  ('recommend', '推荐榜'),
+  ('popular', '人气榜'),
+  ('favs', '收藏榜'),
+  ('new', '新书榜'),
+  ('finish', '完结榜'),
+  ('words', '字数榜'),
 ];
 
-/// 榜单页：分位榜 / 题材榜 / 短篇榜 / 新书榜。
-class RankingsPage extends ConsumerWidget {
+final _boardProvider = FutureProvider.autoDispose
+    .family<List<RankItem>, (String, int)>((ref, arg) async {
+  final handle = await ref.watch(bootProvider.future);
+  return handle.api.rankingBoard(kind: arg.$1, limit: 50, offset: arg.$2);
+});
+
+/// 榜单页（mockups 10 屏定稿）：header tab（Classic 主线 + 量化预留）、
+/// 官方式左侧榜单侧栏、右侧大封面卡列表、back-to-top。
+class RankingsPage extends ConsumerStatefulWidget {
   const RankingsPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final meta = ref.watch(metaProvider);
-    final genMax = meta.value?.manifest.genMax ?? 2025;
-    final genMin = meta.value?.manifest.genMin ?? 2007;
+  ConsumerState<RankingsPage> createState() => _RankingsPageState();
+}
 
-    return DefaultTabController(
-      length: 4,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('榜单'),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.search),
-              tooltip: '搜索',
-              onPressed: () => context.go('/search'),
-            ),
-          ],
-          bottom: const TabBar(
-            isScrollable: true,
-            tabs: [
-              Tab(text: '分位榜'),
-              Tab(text: '题材榜'),
-              Tab(text: '短篇榜'),
-              Tab(text: '新书榜'),
-            ],
-          ),
-        ),
-        body: TabBarView(
-          children: [
-            _FavsTab(genMin: genMin, genMax: genMax, genre: null),
-            _FavsTab(genMin: genMin, genMax: genMax, genre: '魔幻'),
-            _ShortTab(),
-            _NewTab(),
-          ],
-        ),
-      ),
-    );
+class _RankingsPageState extends ConsumerState<RankingsPage> {
+  String _kind = 'recommend';
+  final _scroll = ScrollController();
+  bool _showTop = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(() {
+      final show = _scroll.offset > 500;
+      if (show != _showTop) setState(() => _showTop = show);
+    });
   }
-}
-
-class _FavsTab extends ConsumerStatefulWidget {
-  final int genMin, genMax;
-  final String? genre;
-  const _FavsTab({required this.genMin, required this.genMax, this.genre});
 
   @override
-  ConsumerState<_FavsTab> createState() => _FavsTabState();
-}
-
-class _FavsTabState extends ConsumerState<_FavsTab> {
-  late int year = widget.genMax;
-  late String? genre = widget.genre;
-
-  @override
-  void didUpdateWidget(_FavsTab old) {
-    super.didUpdateWidget(old);
-    if (old.genre != widget.genre) genre = widget.genre;
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final arg = (year: year, genre: genre);
-    final items = ref.watch(favsRankingProvider(arg));
-    final selectors = <Widget>[
-      DropdownButton<int>(
-        value: year,
-        items: [
-          for (int y = widget.genMax; y >= widget.genMin; y--)
-            DropdownMenuItem(value: y, child: Text('$y')),
+    final scheme = Theme.of(context).colorScheme;
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('榜单'),
+        actions: [
+          IconButton(
+              icon: const Icon(Icons.swap_vert),
+              onPressed: () => context.push('/discover')),
         ],
-        onChanged: (v) => setState(() => year = v!),
       ),
-    ];
-    if (widget.genre != null) {
-      selectors.add(
-        DropdownButton<String>(
-          value: genre,
-          items: [
-            const DropdownMenuItem(value: null, child: Text('全部')),
-            for (final g in genres)
-              DropdownMenuItem(value: g, child: Text(g)),
-          ],
-          onChanged: (v) => setState(() => genre = v),
-        ),
-      );
-    }
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(children: [...selectors, const Spacer()]),
-        ),
-        Expanded(child: items.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(child: Text('加载失败：$e')),
-          data: (list) => list.isEmpty
-              ? const Center(child: Text('该年份/题材下无种子书目'))
-              : ListView.builder(
-                  itemCount: list.length,
-                  itemBuilder: (_, i) => _RankTile(item: list[i]),
+      body: Column(
+        children: [
+          // header tab：Classic 主线，量化模式预留（数据分析中）
+          Container(
+            height: 42,
+            decoration: BoxDecoration(
+                border: Border(
+                    bottom: BorderSide(color: scheme.outline.withValues(alpha: .3)))),
+            child: Row(
+              children: [
+                const SizedBox(width: 16),
+                _modeTab(context, 'Classic', true, null),
+                const SizedBox(width: 22),
+                _modeTab(context, '量化', false, '数据分析中'),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 左侧榜单侧栏：朱砂胶囊选中
+                SizedBox(
+                  width: 92,
+                  child: ListView(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    children: [
+                      for (final (kind, label) in _boards)
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+                          child: GestureDetector(
+                            onTap: () => setState(() => _kind = kind),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 9),
+                              alignment: Alignment.center,
+                              decoration: BoxDecoration(
+                                color: _kind == kind
+                                    ? scheme.primary
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(label,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: _kind == kind
+                                        ? FontWeight.w700
+                                        : FontWeight.w400,
+                                    color: _kind == kind
+                                        ? scheme.onPrimary
+                                        : scheme.onSurfaceVariant,
+                                  )),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-        )),
-      ],
+                Expanded(
+                  child: Stack(
+                    children: [
+                      _BoardList(key: ValueKey(_kind), kind: _kind, scroll: _scroll),
+                      if (_showTop)
+                        Positioned(
+                          right: 10,
+                          bottom: 10,
+                          child: _BackToTop(onTap: () => _scroll.animateTo(0,
+                              duration: const Duration(milliseconds: 400),
+                              curve: Curves.easeOut)),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _modeTab(BuildContext context, String label, bool active, String? note) {
+    final scheme = Theme.of(context).colorScheme;
+    return GestureDetector(
+      onTap: active ? null : null,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
+        decoration: BoxDecoration(
+            border: Border(
+                bottom: BorderSide(
+                    width: 2,
+                    color: active
+                        ? scheme.primary
+                        : Colors.transparent))),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(label,
+                style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: active ? FontWeight.w700 : FontWeight.w400,
+                    color: active ? scheme.primary : scheme.onSurfaceVariant)),
+            if (note != null) ...[
+              const SizedBox(width: 4),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(
+                    border: Border.all(color: scheme.outline.withValues(alpha: .4)),
+                    borderRadius: BorderRadius.circular(999)),
+                child: Text(note,
+                    style: TextStyle(
+                        fontSize: 9, color: scheme.onSurfaceVariant)),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }
 
-class _ShortTab extends ConsumerWidget {
+class _BoardList extends ConsumerWidget {
+  final String kind;
+  final ScrollController scroll;
+
+  const _BoardList({super.key, required this.kind, required this.scroll});
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final items = ref.watch(shortRankingProvider);
+    final items = ref.watch(_boardProvider((kind, 0)));
     return items.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('加载失败：$e')),
-      data: (list) => list.isEmpty
-          ? const Center(child: Text('无数据'))
-          : ListView.builder(
-              itemCount: list.length,
-              itemBuilder: (_, i) {
-                final it = list[i];
-                return ListTile(
-                  leading: Text('${it.rank}'),
-                  title: Text(it.title),
-                  subtitle: Text('${it.author} · ${it.estYear}'),
-                  trailing: Text('${it.favs} 收藏'),
-                  onTap: () => context.push('/book/${it.nid}'),
-                );
-              },
-            ),
+      error: (e, _) => Padding(
+          padding: const EdgeInsets.all(16), child: Text('加载失败：$e')),
+      data: (list) => ListView.builder(
+        controller: scroll,
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 60),
+        itemCount: list.length + 1,
+        itemBuilder: (context, i) {
+          if (i == list.length) {
+            return Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text('上滑加载更多 · 平台累计值，老书占优',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      fontSize: 11, color: schemeOf(context).onSurfaceVariant)),
+            );
+          }
+          return _BoardCard(item: list[i]);
+        },
+      ),
     );
   }
 }
 
-class _NewTab extends ConsumerWidget {
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final items = ref.watch(newRankingProvider);
-    return items.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('加载失败：$e')),
-      data: (list) => list.isEmpty
-          ? const Center(child: Text('无数据'))
-          : ListView.builder(
-              itemCount: list.length,
-              itemBuilder: (_, i) => _RankTile(item: list[i]),
-            ),
-    );
-  }
-}
+ColorScheme schemeOf(BuildContext context) => Theme.of(context).colorScheme;
 
-class _RankTile extends StatelessWidget {
+class _BoardCard extends StatelessWidget {
   final RankItem item;
-  const _RankTile({required this.item});
+
+  const _BoardCard({required this.item});
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      leading: Text('${item.rank}'),
-      title: Text(item.title),
-      subtitle: Text('${item.author} · ${item.estYear}'
-          '${item.genre != null ? ' · ${item.genre}' : ''}'),
-      trailing: Text(
-        'pctl ${item.favPctl.toStringAsFixed(1)}',
-        style: Theme.of(context).textTheme.bodySmall,
+    final scheme = schemeOf(context);
+    final coverUrl = item.coverUrl;
+    final hasCover = coverUrl != null && coverUrl.isNotEmpty;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: InkWell(
+        onTap: () => context.push('/book/${item.nid}'),
+        borderRadius: BorderRadius.circular(10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 大封面：有封面拼 CDN 前缀；无封面书脊字占位（官方式降级）
+            SizedBox(
+              width: 104,
+              height: 140,
+              child: hasCover
+                  ? ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.network(
+                        'https://rss.sfacg.com/web/novel/images/NovelCover/Big/$coverUrl',
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, _, _) => _SpineTile(ch: item.title.isEmpty ? '书' : item.title.characters.first),
+                      ),
+                    )
+                  : _SpineTile(ch: item.title.isEmpty ? '书' : item.title.characters.first),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: SizedBox(
+                height: 140,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(item.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w600, height: 1.4)),
+                    const SizedBox(height: 6),
+                    Text(item.author,
+                        style: TextStyle(
+                            fontSize: 11.5, color: scheme.onSurfaceVariant)),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        if (item.genre != null)
+                          _solidBadge(context, item.genre!, scheme.primary),
+                        if (item.status != null) ...[
+                          const SizedBox(width: 4),
+                          _solidBadge(
+                              context,
+                              item.status!,
+                              item.status == '已完结'
+                                  ? scheme.secondary
+                                  : scheme.tertiary),
+                        ],
+                      ],
+                    ),
+                    const Spacer(),
+                    if (item.words != null)
+                      Text('${_wan(item.words!)}+字',
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: scheme.primary,
+                              fontWeight: FontWeight.w600)),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
-      onTap: () => context.push('/book/${item.nid}'),
     );
   }
+}
+
+class _SpineTile extends StatelessWidget {
+  final String ch;
+
+  const _SpineTile({required this.ch});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = schemeOf(context);
+    return Container(
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        border: Border.all(color: scheme.outline.withValues(alpha: .4)),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      alignment: Alignment.center,
+      child: Text(ch,
+          style: TextStyle(
+              fontFamily: 'serif',
+              fontSize: 30,
+              color: scheme.onSurfaceVariant)),
+    );
+  }
+}
+
+Widget _solidBadge(BuildContext context, String text, Color bg) {
+  return Container(
+    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+    decoration: BoxDecoration(
+        color: bg, borderRadius: BorderRadius.circular(4)),
+    child: Text(text,
+        style: TextStyle(
+            fontSize: 10, color: Theme.of(context).colorScheme.onPrimary)),
+  );
+}
+
+class _BackToTop extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _BackToTop({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = schemeOf(context);
+    return Material(
+      color: scheme.surface,
+      borderRadius: BorderRadius.circular(20),
+      elevation: 3,
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: SizedBox(
+          width: 40,
+          height: 40,
+          child: Icon(Icons.arrow_upward, size: 20, color: scheme.primary),
+        ),
+      ),
+    );
+  }
+}
+
+String _wan(int n) {
+  if (n >= 10000) return '${(n / 10000).toStringAsFixed(0)}万';
+  return '$n';
 }

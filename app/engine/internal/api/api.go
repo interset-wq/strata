@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"strconv"
@@ -83,6 +84,8 @@ func New(s *store.Store) *gin.Engine {
 	group.POST("/books/:nid/refresh", srv.bookRefresh)
 	group.GET("/books/:nid/observations", srv.observations)
 	group.GET("/rankings/favs", srv.rankingFavs)
+	group.GET("/rankings/board", srv.rankingBoard)
+	group.GET("/discover", srv.discover)
 	group.GET("/rankings/deep", srv.rankingDeep)
 	group.GET("/rankings/short", srv.rankingShort)
 	group.GET("/rankings/new", srv.rankingNew)
@@ -294,6 +297,69 @@ func (s *Server) rankingNew(c *gin.Context) {
 // /rankings/favs (which reads the curated seed pool), the candidate universe
 // here is the 241,758-row statistical frame, so early generations really do
 // have a Top200 board. See app/docs/10-deep-ranks.md.
+// rankingBoard is the Classic full-catalog board (docs/12 showcase column):
+// platform cumulative values, offset-paginated. Display-only pathway.
+func (s *Server) rankingBoard(c *gin.Context) {
+	kind := c.Query("kind")
+	if _, ok := map[string]bool{
+		"recommend": true, "popular": true, "favs": true,
+		"new": true, "finish": true, "words": true,
+	}[kind]; !ok {
+		fail(c, http.StatusBadRequest, "invalid_argument",
+			"kind must be recommend|popular|favs|new|finish|words")
+		return
+	}
+	limit, ok := parseLimit(c)
+	if !ok {
+		return
+	}
+	offset := 0
+	if raw := c.Query("offset"); raw != "" {
+		var err error
+		if offset, err = strconv.Atoi(raw); err != nil || offset < 0 {
+			fail(c, http.StatusBadRequest, "invalid_argument", "offset must be a non-negative integer")
+			return
+		}
+	}
+	items, err := s.store.BoardBooks(c.Request.Context(), kind, limit, offset)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"meta": gin.H{"kind": kind, "pool": "seed", "ordering": "cumulative",
+			"licensed_excluded": true},
+		"items": items,
+	})
+}
+
+// discover is the classic discovery stream (docs/12 §5): cover-bearing
+// books by platform clicks, keyset pagination via cursor "clicks:nid",
+// 20 per batch, stateless.
+func (s *Server) discover(c *gin.Context) {
+	limit, ok := parseLimit(c)
+	if !ok {
+		return
+	}
+	items, err := s.store.Discover(c.Request.Context(), c.Query("cursor"), limit)
+	if err != nil {
+		fail(c, http.StatusBadRequest, "invalid_argument", err.Error())
+		return
+	}
+	var nextCursor string
+	if len(items) == limit {
+		last := items[len(items)-1]
+		if last.Clicks != nil {
+			nextCursor = fmt.Sprintf("%d:%d", *last.Clicks, last.NID)
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"meta":        gin.H{"pool": "seed", "ordering": "clicks", "cover_required": true},
+		"items":       items,
+		"next_cursor": nextCursor,
+	})
+}
+
 func (s *Server) rankingDeep(c *gin.Context) {
 	rawYear := c.Query("year")
 	year, err := strconv.Atoi(rawYear)

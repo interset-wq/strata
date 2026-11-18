@@ -64,6 +64,26 @@ class StrataApi {
         .toList();
   }
 
+  Future<List<RankItem>> rankingBoard(
+      {required String kind, int limit = 50, int offset = 0}) async {
+    final body = await _get('/rankings/board', {
+      'kind': kind,
+      'limit': '$limit',
+      if (offset > 0) 'offset': '$offset',
+    });
+    return (body['items'] as List)
+        .map((e) => RankItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<DiscoverPage> discover({String? cursor, int limit = 20}) async {
+    final body = await _get('/discover', {
+      'limit': '$limit',
+      if (cursor != null && cursor.isNotEmpty) 'cursor': cursor,
+    });
+    return DiscoverPage.fromJson(body as Map<String, dynamic>);
+  }
+
   Future<List<ShortItem>> rankingShort({int limit = 50}) async {
     final body = await _get('/rankings/short', {'limit': '$limit'});
     return (body['items'] as List)
@@ -243,6 +263,9 @@ class RankItem {
   final double favPctl;
   final String? contest;
   final String? coverUrl;
+  final String? status;
+  final int? words;
+  final int? clicks;
 
   RankItem.fromJson(Map<String, dynamic> m)
       : rank = m['rank'] as int,
@@ -254,7 +277,23 @@ class RankItem {
         favs = m['favs'] as int,
         favPctl = (m['fav_pctl'] as num?)?.toDouble() ?? 0,
         contest = m['contest'] as String?,
-        coverUrl = m['cover_url'] as String?;
+        coverUrl = m['cover_url'] as String?,
+        status = m['status'] as String?,
+        words = m['words'] as int?,
+        clicks = m['clicks'] as int?;
+}
+
+class DiscoverPage {
+  final List<RankItem> items;
+  final String? nextCursor;
+
+  DiscoverPage.fromJson(Map<String, dynamic> m)
+      : items = (m['items'] as List)
+            .map((e) => RankItem.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        nextCursor = m['next_cursor'] as String?;
+
+  bool get hasMore => nextCursor != null && nextCursor!.isNotEmpty;
 }
 
 class ShortItem {
