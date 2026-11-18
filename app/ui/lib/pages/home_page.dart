@@ -486,8 +486,8 @@ class _LargeImageCardState extends ConsumerState<_LargeImageCard> {
             borderRadius:
                 const BorderRadius.vertical(top: Radius.circular(12)),
             child: AspectRatio(
-              // 超宽 4.47:1 源图按核心带展示，与轮播同比例。
-              aspectRatio: 2.2,
+              // cut 成品图（CDN 居中裁切 750×430），按原生比例零裁切。
+              aspectRatio: bannerCutAspect,
               child: GestureDetector(
                 onTap: () {
                   ref.read(imageViewerProvider.notifier).state = widget.items;
@@ -495,33 +495,17 @@ class _LargeImageCardState extends ConsumerState<_LargeImageCard> {
                 },
                 child: _bannerFailed
                     ? fallback
-                    : LayoutBuilder(
-                        builder: (context, box) {
-                          final w = box.maxWidth;
-                          return Stack(
-                            fit: StackFit.expand,
-                            children: [
-                              ColoredBox(color:
-                                  scheme.primary.withValues(alpha: .1)),
-                              // 与轮播同款偏移：1.45× 宽渲染 + 左移 0.45×
-                              Positioned(
-                                left: -w * 0.45,
-                                width: w * 1.45,
-                                top: 0,
-                                bottom: 0,
-                                child: Image.network(
-                                  bannerImageUrl(item.nid),
-                                  fit: BoxFit.cover,
-                                  loadingBuilder: coverLoadingBuilder,
-                                  errorBuilder: (_, _, _) {
-                                    setState(() => _bannerFailed = true);
-                                    return fallback;
-                                  },
-                                ),
-                              ),
-                            ],
-                          );
-                        },
+                    : ColoredBox(
+                        color: scheme.primary.withValues(alpha: .1),
+                        child: Image.network(
+                          bannerCutUrl(item.nid),
+                          fit: BoxFit.cover,
+                          loadingBuilder: coverLoadingBuilder,
+                          errorBuilder: (_, _, _) {
+                            setState(() => _bannerFailed = true);
+                            return fallback;
+                          },
+                        ),
                       ),
               ),
             ),

@@ -9,6 +9,14 @@ import '../data/api/strata_api.dart';
 String bannerImageUrl(int nid) =>
     'https://rs.sfacg.com/web/novel/images/images/beitouNew/$nid.jpg';
 
+/// banner cut 版：CDN 居中裁切成品图 750×430（1.744:1 ≈ 16:9），
+/// 无需端上手动裁核心带。首页大图精选直接用。
+String bannerCutUrl(int nid) =>
+    'https://rs.sfacg.com/web/novel/images/images/beitouNew/cut/$nid.jpg';
+
+/// cut 版成品图的宽高比（750×430），容器按此比例展示零裁切。
+const double bannerCutAspect = 750 / 430;
+
 /// 首页轮播：featured=1 编辑精选。
 ///
 /// SFACG banner 源图为 4.47:1 超宽图（rs.sfacg.com beitouNew/{nid}.jpg），
