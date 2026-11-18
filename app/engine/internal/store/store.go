@@ -583,6 +583,35 @@ ORDER BY w.added_at DESC`)
 	return items, rows.Err()
 }
 
+// WatchDue returns nids whose poll schedule is due: poll enabled and
+// (never polled or past poll_interval). Ordered oldest-last-poll first.
+func (s *Store) WatchDue(ctx context.Context, now int64, limit int) ([]int64, error) {
+	rows, err := s.DB.QueryContext(ctx, `
+SELECT nid FROM watchlist
+WHERE poll_enabled = 1 AND (last_poll_at IS NULL OR ? - last_poll_at >= poll_interval)
+ORDER BY last_poll_at ASC LIMIT ?`, now, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	nids := []int64{}
+	for rows.Next() {
+		var nid int64
+		if err := rows.Scan(&nid); err != nil {
+			return nil, err
+		}
+		nids = append(nids, nid)
+	}
+	return nids, rows.Err()
+}
+
+// WatchPollDone stamps the completion time of a scheduled poll.
+func (s *Store) WatchPollDone(ctx context.Context, nid, at int64) error {
+	_, err := s.DB.ExecContext(ctx,
+		`UPDATE watchlist SET last_poll_at = ? WHERE nid = ?`, at, nid)
+	return err
+}
+
 // Search is the L1 local search over the bundled seed (title/author LIKE).
 // Licensed books are included: they are searchable and detail-visible by
 // design, just excluded from percentile rankings.

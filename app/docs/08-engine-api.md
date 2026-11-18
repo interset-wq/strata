@@ -125,6 +125,13 @@ GET 返回 `{items:[{nid,title,author,genre,cover_url,added_at,role,note}]}`（J
 `GET /books/:nid/observations`（按 observed_at 倒序，来源 source 标注），
 保留期由 PruneObservations 管理。
 
+**订阅式后台抓取（Phase 5，已实现）**：引擎启动时挂后台 worker，每分钟 tick，
+每次最多取 5 本到期书（`poll_enabled=1` 且 `now - last_poll_at >= poll_interval`，
+默认 86400s），经**后台 lane** 限速槽逐本串行抓取（前台请求永远优先）。
+App API 成功→精确元数据写观测 + cover 缓存；否则 HTML 兜底（三态判据，
+仅 alive 写观测）。无论成败均盖章 `last_poll_at`，坏书不会卡死队列；
+失败不写观测行——数据页据实区分「暂无更新」与「数据缺口」。
+
 ### GET /strata/rankings/short?limit=
 
 200：同上结构，`meta.kind="short"`、`ordering="favs"`、`short_max_words=50000`，

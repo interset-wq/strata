@@ -44,6 +44,9 @@ type Server struct {
 	// verdict without touching the limiter (docs/08).
 	refreshMu   sync.Mutex
 	refreshLast map[int64]refreshEntry
+
+	// Background watchlist poll worker (Phase 5): started once in New.
+	watcherStarted bool
 }
 
 const refreshDebounce = time.Minute
@@ -97,6 +100,7 @@ func New(s *store.Store) *gin.Engine {
 	group.GET("/shelf", srv.shelfList)
 	group.PUT("/shelf", srv.shelfAdd)
 	group.DELETE("/shelf/:nid", srv.shelfRemove)
+	srv.startWatcher(context.Background())
 	return r
 }
 

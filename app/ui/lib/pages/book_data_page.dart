@@ -91,6 +91,15 @@ class _BookDataPageState extends ConsumerState<BookDataPage> {
                 ),
               ),
               const SizedBox(height: 14),
+              // 观测折线：观测点 ≥3 才启用（docs/12 红线——不足不硬画）
+              if (items.length >= 3)
+                _TrendChart(
+                  points: (items.reversed.toList())
+                      .where((o) => o.favs != null)
+                      .map((o) => o.favs!.toDouble())
+                      .toList(),
+                ),
+              if (items.length >= 3) const SizedBox(height: 14),
               Text('观测时序（新 → 旧）',
                   style: TextStyle(
                       fontSize: 12, color: scheme.onSurfaceVariant)),
@@ -200,6 +209,103 @@ class _ObsRow extends StatelessWidget {
       child: Text(text, style: TextStyle(fontSize: 10, color: fg ?? scheme.onSurfaceVariant)),
     );
   }
+}
+
+/// 观测折线（favs 时序）：朱砂细线 + 端点数值。观测点 ≥3 才画。
+class _TrendChart extends StatelessWidget {
+  final List<double> points;
+
+  const _TrendChart({required this.points});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final isRising = points.last >= points.first;
+    final color = isRising ? scheme.primary : scheme.tertiary;
+    final minV = points.reduce((a, b) => a < b ? a : b);
+    final maxV = points.reduce((a, b) => a > b ? a : b);
+    final span = (maxV - minV).abs().clamp(1.0, double.infinity);
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        border: Border.all(color: scheme.outline.withValues(alpha: .4)),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('收藏时序',
+                  style: TextStyle(
+                      fontSize: 11, color: scheme.onSurfaceVariant)),
+              Text('${_wan(points.first.toInt())} → ${_wan(points.last.toInt())}',
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: color)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 72,
+            width: double.infinity,
+            child: CustomPaint(
+              painter: _SparklinePainter(
+                  points: points, minV: minV, span: span, color: color),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SparklinePainter extends CustomPainter {
+  final List<double> points;
+  final double minV;
+  final double span;
+  final Color color;
+
+  _SparklinePainter({
+    required this.points,
+    required this.minV,
+    required this.span,
+    required this.color,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (points.length < 2) return;
+    final step = size.width / (points.length - 1);
+    final path = Path();
+    for (var i = 0; i < points.length; i++) {
+      final x = i * step;
+      final y = size.height - (points[i] - minV) / span * size.height;
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
+    }
+    canvas.drawPath(
+        path,
+        Paint()
+          ..color = color
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.6
+          ..strokeJoin = StrokeJoin.round);
+    // 端点小圆
+    canvas.drawCircle(
+        Offset(size.width, size.height - (points.last - minV) / span * size.height),
+        2.5,
+        Paint()..color = color);
+  }
+
+  @override
+  bool shouldRepaint(covariant _SparklinePainter old) =>
+      old.points.length != points.length;
 }
 
 String _wan(int n) {
