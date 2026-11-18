@@ -31,7 +31,18 @@ jobs:
           GOPROXY: https://goproxy.cn,direct
         run: |
           flutter pub get
-          flutter build apk --release --target-platform android-arm64
+          set -o pipefail
+          flutter build apk --release --target-platform android-arm64 2>&1 | tee build_log.txt
+          status=$?
+          if [ $status -ne 0 ]; then
+            {
+              echo "### build log tail"
+              echo '```'
+              tail -120 build_log.txt
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit $status
+          fi
 
       - name: Create pre-release
         env:
