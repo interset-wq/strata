@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../core/providers.dart';
 import '../data/api/strata_api.dart';
 import '../widgets/banner_carousel.dart';
+import '../widgets/default_cover.dart';
 import 'browse_page.dart';
 
 /// Classic 排行行卡数据（board 端点），kind: finish / popular。
@@ -342,10 +343,10 @@ class _CoverCard extends StatelessWidget {
                           child: Image.network(
                             'https://rss.sfacg.com/web/novel/images/NovelCover/Big/$coverUrl',
                             fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) => _spine(context, item.title),
+                            errorBuilder: (_, _, _) => _spine(context, item.nid),
                           ),
                         )
-                      : _spine(context, item.title),
+                      : _spine(context, item.nid),
                 ),
                 if (rank != null)
                   Positioned(
@@ -507,20 +508,10 @@ class _ShuffleGridState extends ConsumerState<_ShuffleGrid> {
   }
 }
 
-/// 书脊字占位（无封面书的诚实降级）。
-Widget _spine(BuildContext context, String title) {
-  final scheme = Theme.of(context).colorScheme;
-  return Container(
-    decoration: BoxDecoration(
-      color: scheme.surface,
-      border: Border.all(color: scheme.outline.withValues(alpha: .4)),
-      borderRadius: BorderRadius.circular(6),
-    ),
-    alignment: Alignment.center,
-    child: Text(title.isEmpty ? '书' : title.characters.first,
-        style: TextStyle(
-            fontFamily: 'serif', fontSize: 18, color: scheme.onSurfaceVariant)),
-  );
+/// 默认封面兜底（用户拍板）：cover_url 为空用官方 default/defaultNew
+/// 两张图按 nid 取余绑定，不用书脊占位。
+Widget _spine(BuildContext context, int nid) {
+  return defaultCover(nid, radius: 10);
 }
 
 /// 继续浏览：书架里的书（本地足迹随使用增长）。

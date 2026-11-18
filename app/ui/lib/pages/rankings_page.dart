@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../widgets/default_cover.dart';
+
 import '../core/providers.dart';
 import '../data/api/strata_api.dart';
 
@@ -246,10 +248,10 @@ class _BoardCard extends StatelessWidget {
                       child: Image.network(
                         'https://rss.sfacg.com/web/novel/images/NovelCover/Big/$coverUrl',
                         fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => _SpineTile(ch: item.title.isEmpty ? '书' : item.title.characters.first),
+                        errorBuilder: (_, _, _) => defaultCover(item.nid, radius: 10),
                       ),
                     )
-                  : _SpineTile(ch: item.title.isEmpty ? '书' : item.title.characters.first),
+                  : defaultCover(item.nid, radius: 10),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -297,30 +299,6 @@ class _BoardCard extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _SpineTile extends StatelessWidget {
-  final String ch;
-
-  const _SpineTile({required this.ch});
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = schemeOf(context);
-    return Container(
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        border: Border.all(color: scheme.outline.withValues(alpha: .4)),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      alignment: Alignment.center,
-      child: Text(ch,
-          style: TextStyle(
-              fontFamily: 'serif',
-              fontSize: 30,
-              color: scheme.onSurfaceVariant)),
     );
   }
 }

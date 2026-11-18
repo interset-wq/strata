@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/providers.dart';
+import '../widgets/default_cover.dart';
 import '../data/api/strata_api.dart';
 
 /// Classic 发现流（mockups 11 屏定稿，docs/12 §5）：有封面书按平台热度
@@ -192,11 +193,10 @@ class _DiscoverCard extends StatelessWidget {
                         child: Image.network(
                           'https://rss.sfacg.com/web/novel/images/NovelCover/Big/$coverUrl',
                           fit: BoxFit.cover,
-                          errorBuilder: (_, _, _) =>
-                              _Spine(ch: item.title, scheme: scheme),
+                          errorBuilder: (_, _, _) => defaultCover(item.nid, radius: 10),
                         ),
                       )
-                    : _Spine(ch: item.title, scheme: scheme),
+                    : defaultCover(item.nid, radius: 10),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -239,27 +239,6 @@ Widget _badge(BuildContext context, String text, {Color? fg}) {
     child: Text(text,
         style: TextStyle(fontSize: 10, color: fg ?? scheme.onSurfaceVariant)),
   );
-}
-
-class _Spine extends StatelessWidget {
-  final String ch;
-  final ColorScheme scheme;
-
-  const _Spine({required this.ch, required this.scheme});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        border: Border.all(color: scheme.outline.withValues(alpha: .4)),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      alignment: Alignment.center,
-      child: Text(ch.isEmpty ? '书' : ch.characters.first,
-          style: TextStyle(fontFamily: 'serif', fontSize: 30, color: scheme.onSurfaceVariant)),
-    );
-  }
 }
 
 String _wan(int n) {

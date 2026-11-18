@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../widgets/default_cover.dart';
+
 import '../core/providers.dart';
 import '../data/api/strata_api.dart';
 
@@ -153,13 +155,7 @@ class _ShelfCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 alignment: Alignment.center,
-                child: Text(
-                  item.title.isEmpty ? '书' : item.title.characters.first,
-                  style: TextStyle(
-                      fontFamily: 'serif',
-                      fontSize: 24,
-                      color: scheme.onSurfaceVariant),
-                ),
+                child: defaultCover(item.nid, radius: 6),
               ),
               const SizedBox(width: 12),
               Expanded(
