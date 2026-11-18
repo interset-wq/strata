@@ -44,6 +44,16 @@ jobs:
             exit $status
           fi
 
+      - name: Dump failure log into the repo
+        if: failure()
+        run: |
+          git config user.name "ci-bot"
+          git config user.email "noreply@users.noreply.github.com"
+          tail -200 app/ui/build_log.txt > ci-failure.log || true
+          git add ci-failure.log
+          git commit -m "ci: failure log [skip ci]" || true
+          git push || true
+
       - name: Create pre-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
