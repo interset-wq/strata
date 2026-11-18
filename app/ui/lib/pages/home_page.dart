@@ -23,60 +23,139 @@ class HomePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final featured = ref.watch(featuredProvider);
     return Scaffold(
-      appBar: AppBar(
-        title: _brandTitle(context),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: '刷新',
-            onPressed: () => ref.invalidate(featuredProvider),
+      body: SafeArea(
+        bottom: false,
+        child: featured.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Center(child: Text('精选加载失败：$e')),
+          data: (items) => ListView(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            children: [
+              _formTabs(context, () => ref.invalidate(featuredProvider)),
+              _searchRow(context),
+              BannerCarousel(
+                items: items,
+                onTap: (it) => context.push('/book/${it.nid}'),
+              ),
+              const SizedBox(height: 8),
+              _sectionTitle(context, '找书入口'),
+              _entryGrid(context),
+              _sectionTitle(context, '完本推荐'),
+              const _RecommendSection(kind: 'finish'),
+              _sectionTitle(context, '热门书'),
+              const _RecommendSection(kind: 'popular'),
+              _sectionTitle(context, '继续浏览'),
+              const _ContinueBrowsing(),
+            ],
           ),
-        ],
-      ),
-      body: featured.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('精选加载失败：$e')),
-        data: (items) => ListView(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          children: [
-            BannerCarousel(
-              items: items,
-              onTap: (it) => context.push('/book/${it.nid}'),
-            ),
-            const SizedBox(height: 8),
-            _sectionTitle(context, '找书入口'),
-            _entryGrid(context),
-            _sectionTitle(context, '完本推荐'),
-            const _RecommendSection(kind: 'finish'),
-            _sectionTitle(context, '热门书'),
-            const _RecommendSection(kind: 'popular'),
-            _sectionTitle(context, '继续浏览'),
-            const _ContinueBrowsing(),
-          ],
         ),
       ),
     );
   }
 
-  Widget _brandTitle(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text('书层',
-            style: Theme.of(context)
-                .appBarTheme
-                .titleTextStyle
-                ?.copyWith(color: Theme.of(context).colorScheme.onSurface)),
-        Text(' · ', style: TextStyle(color: primary)),
-        Text('Strata',
-            style: TextStyle(
-              fontFamily: 'serif',
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: primary,
-            )),
-      ],
+  // header form tab（docs/13 form 字段，已定稿）：小说/中篇/短篇/对话/IP。
+  // 无品牌行——移动端惯例，顶部即内容导航。刷新挂在行末。
+  Widget _formTabs(BuildContext context, VoidCallback onRefresh) {
+    final scheme = Theme.of(context).colorScheme;
+    const forms = ['小说', '中篇', '短篇', '对话', 'IP'];
+    return SizedBox(
+      height: 42,
+      child: Row(
+        children: [
+          const SizedBox(width: 16),
+          for (var i = 0; i < forms.length; i++) ...[
+            if (i > 0) const SizedBox(width: 20),
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
+              decoration: BoxDecoration(
+                  border: Border(
+                      bottom: BorderSide(
+                          width: 2,
+                          color: i == 0
+                              ? scheme.primary
+                              : Colors.transparent))),
+              child: Text(forms[i],
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight:
+                          i == 0 ? FontWeight.w700 : FontWeight.w400,
+                      color: i == 0
+                          ? scheme.primary
+                          : scheme.onSurfaceVariant)),
+            ),
+          ],
+          const Spacer(),
+          IconButton(
+            icon: const Icon(Icons.refresh, size: 20),
+            tooltip: '刷新',
+            onPressed: onRefresh,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 搜索框 + 阅读记录行（官方式）：搜索胶囊进本地搜索，阅读记录暂占位。
+  Widget _searchRow(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: InkWell(
+              onTap: () => context.push('/search'),
+              borderRadius: BorderRadius.circular(999),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                decoration: BoxDecoration(
+                  color: scheme.surface,
+                  border:
+                      Border.all(color: scheme.outline.withValues(alpha: .4)),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.search,
+                        size: 16, color: scheme.onSurfaceVariant),
+                    const SizedBox(width: 8),
+                    Text('搜索书名 / 作者',
+                        style: TextStyle(
+                            fontSize: 12, color: scheme.onSurfaceVariant)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          InkWell(
+            onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('阅读记录整理中'))),
+            borderRadius: BorderRadius.circular(999),
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 13, vertical: 9),
+              decoration: BoxDecoration(
+                border:
+                    Border.all(color: scheme.outline.withValues(alpha: .4)),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.history, size: 14, color: scheme.primary),
+                  const SizedBox(width: 5),
+                  Text('阅读记录',
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: scheme.primary)),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
