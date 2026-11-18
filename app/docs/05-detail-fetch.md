@@ -155,6 +155,7 @@ ON CONFLICT(nid) DO UPDATE SET ...;
 | 月票 | `GetTicketNum.ashx?nid=` 裸整数（`docs/sfacg-endpoints.md` §7.3）：**存活态详情抓取追加 1 次**（1 B），失败置 NULL 不阻塞；写入 `book_meta.tickets`。**当月值每月 1 日清零，跨月不可比**——只存当期、UI 标「本月」，不做月票时序与月票榜 |
 | 标签 | 移动版无结构化标签、App API 不返回（仅 PC 版有）；`book_meta` 可挂 `tags` 列，待需求出现再抓，v1 不抓 |
 | 章节 | 移动版目录页 168 KB 不抓；**App API `chaps` 仅 `watchlist` 书抓**（一次性快照）：逐章 `addTime`（更新热力图数据源）、`charCount`（正文口径）、VIP/废章/待审标记；落 `novel_chapters` 独立表，失败即回落 |
+| 衍生作品 | `GET /adpworks/novelId/{id}`（`docs/sfacg-app-api.md` §3.4）一次 0.2 KB 得 `comicId`/`albumId`（`0`=无），是 App「看漫画/听有声」按钮的数据源。改编集中在头部（收藏 Top20 中 13 有漫画、18 有声；随机 30 本零命中），**v1 不抓**——UI 需要该入口时再开，写入 `book_meta` 两列 |
 
 ## 7. 不做
 

@@ -94,6 +94,8 @@ ENDPOINTS: list[tuple[str, str, bool]] = [
     ("月票排名 周/月/总", "/novels/730611/ticket/rank?numMax=20&dateRange=1", False),
     ("打赏排名 月度", "/novels/730611/bonus/rank?numMax=20&dateRange=1", False),
     ("书内活动推送", "/novels/730611/actpushes?filter=android&pageType=0", False),
+    ("衍生作品（小说→漫画/有声）", "/adpworks/novelId/155640", False),
+    ("衍生作品（漫画→原著）", "/adpworks/comicId/2937", False),
     ("章节正文（无权限，应 401）", "/Chaps/8436696?expand=content", True),
     ("当前用户（需登录，应 401）", "/user", True),
 ]

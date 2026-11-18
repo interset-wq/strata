@@ -19,6 +19,7 @@
 | 4 | **`GET /novels/{id}/chaps` 返回逐章 `addTime` + `charCount`**                      | 更新热力图与全勤看板有了**精确数据源**，不必靠观测差值推断 |
 | 5 | `GET /specialpush` 返回 **77 个推送位**（42 个非空）                                   | App 首页/榜位的完整位代码表                                      |
 | 6 | **App API 不提供历史时序**（`history`/`trend`/`statistics` 全空）                  | 时序仍须自建，但每次抓取只要 0.7 KB（PC 版 15.7 KB，降 22 倍）   |
+| 7 | **`GET /adpworks/novelId/{id}` 一次请求给出改编漫画/有声的 id**（`0`=无）          | App「看漫画/听有声」按钮的数据源；衍生作品可作 IP 改编维度       |
 
 > **正文不取**：`GET /Chaps/{id}?expand=content` 实测 **401 / errorCode 507「没有访问接口的权限」**，
 > 无需也无法绕过。本档案只覆盖书目元数据。
@@ -106,6 +107,8 @@ resp = requests.get("https://api.sfacg.com/novels/730611",
 | `GET /novels/{id}/ticket/rank?numMax=&dateRange=`     | 200           | 月票排名，`dateRange`：0 周 / 1 月 / 2 总                       |
 | `GET /novels/{id}/bonus/rank?numMax=&dateRange=`      | 200           | 打赏排名，`dateRange=1` 月度                                    |
 | `GET /novels/{id}/actpushes?filter=android&pageType=` | 200           | 书内活动推送，实测 `pageType=0` 为空                            |
+| `GET /adpworks/novelId/{id}`                          | 200           | **衍生作品**：`{novelId, albumId, comicId, *LastUpdateDate}`，`0`=无 |
+| `GET /adpworks/comicId/{comic-id}`                    | 200           | 漫画 → 原著小说（同上结构，反向）                                |
 | `GET /novels/{id}/reviews`                            | **404** | `zymelaii/ubook-rs/doc/api.md` 记的路径无效（书评端点另在别处） |
 | `GET /Chaps/{id}?expand=content`                      | **401** | errorCode 507「没有访问接口的权限」——**正文不可取**       |
 | `GET /user`                                           | **401** | 「需要登录才能访问该资源」                                        |
@@ -177,6 +180,34 @@ resp = requests.get("https://api.sfacg.com/novels/730611",
 `ticketNum`、`isStick`、`accountId`、`displayName`、`roleName`、`vipLevel`、`diyaMember`。
 
 `GET /novels/{id}/fans`：`accountId`、`nickName`、`userName`、`fansPoint`、`levelName`、`vipLevel`。
+
+### 3.4 衍生作品字段（`/adpworks`）
+
+App 详情页的「看漫画 / 听有声」按钮数据源。实测 2026-11-18：
+
+| 字段 | 类型 | 说明 |
+| --- | --- | --- |
+| `novelId` | int | 原著小说（原样回显，**不校验是否存在**） |
+| `comicId` | int | 改编漫画 id，`0` = 无漫画 |
+| `albumId` | int | 有声/广播剧 id，`0` = 无有声 |
+| `comicLastUpdateDate` | str/null | 漫画最近更新时间；无漫画时 null |
+| `albumLastUpdateDate` | str/null | 有声最近更新时间；无有声时 null |
+
+实测样本：155640《血姬与骑士》→ comic 2937 + album 97；48704《英雄再临》→ comic 1920；
+730611 → album 149、无漫画（与站内一致）。
+
+**改编集中在头部**（2026-11-18 抽样，串行 0.55 s）：随机 30 本（seed 20261118）**零命中**；
+收藏 Top20 中 **13 本有漫画、18 本有有声**（血姬与骑士、英雄再临、闭嘴恶龙等）。
+故全库普查收益低、代价高（每本 1 次请求），按需查询即可。
+
+**陷阱（与 `GetTicketNum` 同型）**：无效 nid、已死亡的书、无衍生作品的书，三者响应的
+`status` 都是 200 且 `comicId/albumId` 全 0——**不能用来判活，也不能区分「查无此书」
+与「无改编」**。只对已判活的书取值。
+
+**同一 IP 的其他实体**：`/search/any/result`（或 `/search/novels/result`）返回
+`{novels, comics, albums}` 三数组，`albums` 条目带 `novelId`（可反查原著），
+`comics` 条目只有 `comicId` 无 `novelId`——漫画侧关联只能走 `/adpworks`。
+`GET /comics?novelId=` **不支持按小说过滤**（忽略参数、返回热榜 6 条），勿误用。
 
 ---
 
@@ -377,3 +408,5 @@ PC 版人气显示到 `0.1 万`（步长 1,000、±500），本项目据此**取
 - 外部日期交叉校验：`analysis/fetchers/probe_external_dates.py`
 - PC 端档案：[`sfacg-endpoints.md`](./sfacg-endpoints.md)
 - 月度榜档案：[`sfacg-live-ranks.md`](./sfacg-live-ranks.md)
+- 上游端点清单（第三方，含 `adpworks` 与各 `expand` 枚举）：
+  https://github.com/zymelaii/ubook-rs/blob/master/doc/api.md
