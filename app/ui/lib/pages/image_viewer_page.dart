@@ -70,8 +70,8 @@ class _ImageViewerPageState extends ConsumerState<ImageViewerPage> {
   }
 }
 
-/// 单张大图：beitouNew 超宽源图完整展示（列表页裁核心带，
-/// 查看器看全图）；404 时回退书籍封面，再无则默认封面。
+/// 单张大图：与列表一致的 cut 成品图（750×430 居中裁切）；
+/// 404 时回退书籍封面，再无则默认封面。
 class _ZoomableImage extends StatefulWidget {
   final FeaturedItem item;
   final VoidCallback onTapClose;
@@ -110,7 +110,7 @@ class _ZoomableImageState extends State<_ZoomableImage> {
         maxScale: 4,
         child: Center(
           child: Image.network(
-            bannerImageUrl(widget.item.nid),
+            bannerCutUrl(widget.item.nid),
             fit: BoxFit.contain,
             loadingBuilder: (_, child, progress) {
               if (progress == null) return child;
