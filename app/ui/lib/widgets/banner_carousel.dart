@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../data/api/strata_api.dart';
@@ -18,11 +20,40 @@ class BannerCarousel extends StatefulWidget {
 }
 
 class _BannerCarouselState extends State<BannerCarousel> {
-  final _controller = PageController(viewportFraction: 1);
+  // 无限副本：1000 份轮次、从中间副本起步，自动播放永远 +1 向前，
+  // 末张→首张不会反向掉头（回绕靠副本边界无感衔接）。
+  static const _loops = 1000;
+
+  late final _controller = PageController(
+      viewportFraction: 1, initialPage: _loops ~/ 2);
   int _page = 0;
+  Timer? _auto;
+
+  static const _autoInterval = Duration(seconds: 4);
+
+  @override
+  void initState() {
+    super.initState();
+    _restartAuto();
+  }
+
+  // 自动轮播：4s 翻下一页（副本序号恒 +1，始终同向）；用户手势翻页后重新计时。
+  void _restartAuto() {
+    _auto?.cancel();
+    _auto = Timer.periodic(_autoInterval, (_) {
+      if (!mounted || !_controller.hasClients || widget.items.length < 2) {
+        return;
+      }
+      final next = _controller.page!.round() + 1;
+      _controller.animateToPage(next,
+          duration: const Duration(milliseconds: 400),
+          curve: Curves.easeOut);
+    });
+  }
 
   @override
   void dispose() {
+    _auto?.cancel();
     _controller.dispose();
     super.dispose();
   }
@@ -38,24 +69,35 @@ class _BannerCarouselState extends State<BannerCarousel> {
       children: [
         AspectRatio(
           aspectRatio: 2.2, // ~0.45 高宽比；图片本体 4.47:1，经偏移裁剪取核心带
-          child: PageView.builder(
-            controller: _controller,
-            itemCount: widget.items.length,
-            onPageChanged: (i) => setState(() => _page = i),
-            itemBuilder: (context, i) {
-              final it = widget.items[i];
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: _Slide(
-                  nid: it.nid,
-                  title: it.title,
-                  author: it.author,
-                  url: _bannerUrl(it.nid),
-                  fallbackColor: scheme.primary.withValues(alpha: .15),
-                  onTap: () => widget.onTap?.call(it),
-                ),
-              );
+          child: NotificationListener<ScrollNotification>(
+            onNotification: (n) {
+              // 用户手势翻页：重启计时，避免自动翻页与手势打架
+              if (n is ScrollStartNotification ||
+                  n is ScrollEndNotification) {
+                _restartAuto();
+              }
+              return false;
             },
+            child: PageView.builder(
+              controller: _controller,
+              itemCount: widget.items.length * _loops,
+              onPageChanged: (i) =>
+                  setState(() => _page = i % widget.items.length),
+              itemBuilder: (context, i) {
+                final it = widget.items[i % widget.items.length];
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: _Slide(
+                    nid: it.nid,
+                    title: it.title,
+                    author: it.author,
+                    url: _bannerUrl(it.nid),
+                    fallbackColor: scheme.primary.withValues(alpha: .15),
+                    onTap: () => widget.onTap?.call(it),
+                  ),
+                );
+              },
+            ),
           ),
         ),
         const SizedBox(height: 6),
