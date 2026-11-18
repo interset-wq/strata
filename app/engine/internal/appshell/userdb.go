@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 )
 
-const userSchemaVersion = 4
+const userSchemaVersion = 5
 
 const userSchema = `
 CREATE TABLE IF NOT EXISTS observations(
@@ -141,6 +141,14 @@ CREATE TABLE IF NOT EXISTS refresh_attempts(
   attempted_at INTEGER NOT NULL,
   state        TEXT NOT NULL DEFAULT 'pending'
 );
+
+-- Local browsing footprints: one row per nid, viewed_at bumped on every
+-- detail-page open. Pure local data, never uploaded.
+CREATE TABLE IF NOT EXISTS browsing_history(
+  nid       INTEGER PRIMARY KEY,
+  viewed_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_history_viewed ON browsing_history(viewed_at DESC);
 `
 
 func UserDBPath(dataDir string) string {

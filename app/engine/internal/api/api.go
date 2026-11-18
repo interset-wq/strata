@@ -96,6 +96,8 @@ func New(s *store.Store) *gin.Engine {
 	group.GET("/rankings/new", srv.rankingNew)
 	group.GET("/search", srv.search)
 	group.GET("/random", srv.random)
+	group.GET("/history", srv.history)
+	group.POST("/history/:nid", srv.recordHistory)
 	group.GET("/featured", srv.featured)
 	group.GET("/shelf", srv.shelfList)
 	group.PUT("/shelf", srv.shelfAdd)
@@ -465,6 +467,36 @@ func (s *Server) random(c *gin.Context) {
 		"meta":  gin.H{"pool": "seed", "ordering": "random"},
 		"items": items,
 	})
+}
+
+// recordHistory bumps the local browsing footprint for one nid. The detail
+// page calls it fire-and-forget on every open.
+func (s *Server) recordHistory(c *gin.Context) {
+	nid, err := strconv.ParseInt(c.Param("nid"), 10, 64)
+	if err != nil || nid <= 0 {
+		fail(c, http.StatusBadRequest, "invalid_argument", "bad nid")
+		return
+	}
+	if err := s.store.RecordBrowsing(c.Request.Context(), nid, time.Now().Unix()); err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"recorded": true})
+}
+
+// history returns the most recently opened books for the home reading
+// history entry. Pure local data.
+func (s *Server) history(c *gin.Context) {
+	limit, ok := parseLimit(c)
+	if !ok {
+		return
+	}
+	items, err := s.store.RecentHistory(c.Request.Context(), limit)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"items": items})
 }
 
 // rankingBoard is the Classic full-catalog board (docs/12 showcase column):

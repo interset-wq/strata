@@ -142,8 +142,7 @@ class HomePage extends ConsumerWidget {
           ),
           const SizedBox(width: 10),
           InkWell(
-            onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('阅读记录整理中'))),
+            onTap: () => context.push('/history'),
             borderRadius: BorderRadius.circular(999),
             child: Container(
               padding:

@@ -1096,6 +1096,51 @@ ON CONFLICT(nid) DO UPDATE SET cover=excluded.cover,
 	return err
 }
 
+// RecordBrowsing bumps the browsing footprint for a nid (upsert: the latest
+// open wins). Pure local data in user.db.
+func (s *Store) RecordBrowsing(ctx context.Context, nid, viewedAt int64) error {
+	_, err := s.DB.ExecContext(ctx, `
+INSERT INTO browsing_history(nid, viewed_at) VALUES (?, ?)
+ON CONFLICT(nid) DO UPDATE SET viewed_at=excluded.viewed_at`,
+		nid, viewedAt)
+	return err
+}
+
+// HistoryItem is one browsing footprint row joined with seed metadata.
+type HistoryItem struct {
+	NID      int64   `json:"nid"`
+	Title    string  `json:"title"`
+	Author   string  `json:"author"`
+	Genre    *string `json:"genre"`
+	ViewedAt int64   `json:"viewed_at"`
+}
+
+// RecentHistory returns the most recently opened books, newest first.
+func (s *Store) RecentHistory(ctx context.Context, limit int) ([]HistoryItem, error) {
+	rows, err := s.DB.QueryContext(ctx, `
+SELECT h.nid, COALESCE(b.title, ''), COALESCE(b.author, ''), b.genre, h.viewed_at
+FROM browsing_history h
+LEFT JOIN seed.books b ON b.nid = h.nid
+ORDER BY h.viewed_at DESC LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []HistoryItem{}
+	for rows.Next() {
+		var (
+			it    HistoryItem
+			genre sql.NullString
+		)
+		if err := rows.Scan(&it.NID, &it.Title, &it.Author, &genre, &it.ViewedAt); err != nil {
+			return nil, err
+		}
+		it.Genre = strPtr(genre)
+		items = append(items, it)
+	}
+	return items, rows.Err()
+}
+
 // Cover returns the locally fetched cover path for a nid, if any.
 func (s *Store) Cover(ctx context.Context, nid int64) (string, error) {
 	var cover string

@@ -91,6 +91,15 @@ class StrataApi {
     return DiscoverPage.fromJson(body as Map<String, dynamic>);
   }
 
+  Future<HistoryData> history({int limit = 50}) async {
+    final body = await _get('/history', {'limit': '$limit'});
+    return HistoryData.fromJson(body as Map<String, dynamic>);
+  }
+
+  Future<void> recordHistory(int nid) async {
+    await _post('/history/$nid');
+  }
+
   Future<List<ShortItem>> rankingShort({int limit = 50}) async {
     final body = await _get('/rankings/short', {'limit': '$limit'});
     return (body['items'] as List)
@@ -234,6 +243,43 @@ class EngineSettings {
   factory EngineSettings.fromJson(Map<String, dynamic> j) => EngineSettings(
         detailRateLimitEnabled: j['detail_rate_limit_enabled'] as bool? ?? true,
         windowSeconds: j['detail_refresh_window_seconds'] as int? ?? 86400,
+      );
+}
+
+/// 浏览足迹：纯本地 user.db 数据。
+class HistoryData {
+  final List<HistoryEntry> items;
+
+  HistoryData({required this.items});
+
+  factory HistoryData.fromJson(Map<String, dynamic> j) => HistoryData(
+        items: (j['items'] as List)
+            .map((e) => HistoryEntry.fromJson(e as Map<String, dynamic>))
+            .toList(),
+      );
+}
+
+class HistoryEntry {
+  final int nid;
+  final String title;
+  final String author;
+  final String? genre;
+  final int viewedAt;
+
+  HistoryEntry({
+    required this.nid,
+    required this.title,
+    required this.author,
+    this.genre,
+    required this.viewedAt,
+  });
+
+  factory HistoryEntry.fromJson(Map<String, dynamic> j) => HistoryEntry(
+        nid: j['nid'] as int,
+        title: j['title'] as String? ?? '',
+        author: j['author'] as String? ?? '',
+        genre: j['genre'] as String?,
+        viewedAt: j['viewed_at'] as int? ?? 0,
       );
 }
 

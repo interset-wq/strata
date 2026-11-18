@@ -20,6 +20,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
       'https://rs.sfacg.com/web/novel/images/NovelCover/Big/default.jpg';
 
   bool refreshing = false;
+  bool _footprintLogged = false;
   String? refreshMessage;
   Color? refreshColor;
   bool onShelf = false;
@@ -60,6 +61,12 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('加载失败：$e')),
         data: (d) {
+          // 打开即记一次浏览足迹（fire-and-forget，纯本地 user.db）。
+          if (!_footprintLogged) {
+            _footprintLogged = true;
+            ref.read(bootProvider.future).then((h) => h.api.recordHistory(widget.nid),
+                onError: (_) {});
+          }
           final b = d.book;
           // effective = 种子值被最新本地观测覆盖后的展示值（契约 08）。
           final eff = (d.effective ?? const {}).cast<String, dynamic>();
