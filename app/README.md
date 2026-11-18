@@ -18,6 +18,11 @@
 | 06 | [`更新机制`](./docs/06-update-mechanism.md) | 已完成 v1.0：五类"更新"分界、不叠全库调度（U5 订阅爬取除外）、种子换包原子替换 + 用户库事务迁移、三类保留期各自独立 |
 | 07 | [`作者工作台与观测列表`](./docs/07-author-workbench.md) | 已完成 v1.1：**更新热力图（首屏，锚官方全勤阈值 3,000 字/500 元）+ 全勤达标看板**、**更新量以章节时间戳为主方案**（App API `chaps`，"数据缺口"消失）、`watchlist.role` 分本人/同期对照、六指标折线 + 复合指标（端上现算）、订阅式后台爬取——对标官方只给收藏变化的结构性缺口 |
 | 08 | [`引擎 HTTP 契约`](./docs/08-engine-api.md) | v1.0：现有 5 个端点的响应模型/错误码/分页，search / detail 刷新 / observations / watchlist 草案；Go↔Dart 双方以此为准 |
+| 09 | [`种子完善提案`](./docs/09-seed-refresh-proposal.md) | 提案（未实施）：App API 补新书 → 战略转向深榜（D2 已实施）；附录 C 征文 top3 保底、附录 D 形式维度规则 |
+| 10 | [`深榜契约`](./docs/10-deep-ranks.md) | 已实施：`deep_ranks` 只读表（schema 2）/世代内 Top200 端点/`pool=universe`+`in_seed` |
+| 11 | [`封面刷新提案`](./docs/11-cover-refresh-proposal.md) | 提案（未实施）：封面 URL 队列、CI 分片；release 用优化种子，当前不阻塞 |
+| 12 | [`双模式契约`](./docs/12-dual-mode.md) | 设计契约：novly 展示 / 量化发现双模式、展示层与推荐层解耦、信号白名单、无限滚动 vs 有限榜单 |
+| 13 | [`小说形式 form 权威定义`](./docs/13-form-definitions.md) | 开发口径（未实施）：`short/medium/long/dialogue/ip_collab` 五值判定优先级、边界、伪代码、现算分布；09 附录 D 的可执行细化 |
 
 ## 引擎（`engine/`）
 

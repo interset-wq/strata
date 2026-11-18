@@ -15,7 +15,7 @@
 
 | 层 | 目录 | 状态 |
 | --- | --- | --- |
-| 研究 | [`analysis/`](./analysis/) | **已完成**：19 份基准报告 + 2 份补充报告、86 张图，数据管线可重建 |
+| 研究 | [`analysis/`](./analysis/) | **已完成**：19 份基准报告 + 3 份补充报告、88 张图，数据管线可重建 |
 | 产品 | [`app/`](./app/) | **设计中**：Flutter UI + 内嵌 Go 服务，见 [APP 设计文档 01](./app/docs/01-tech-stack.md) |
 | 接口档案 | [`analysis/references/sfacg-endpoints.md`](./analysis/references/sfacg-endpoints.md)（PC 端）+ [`sfacg-app-api.md`](./analysis/references/sfacg-app-api.md)（官方 App API） | **SFACG 接口唯一权威事实档案**：端点/参数/字段/状态码/限流；动手前必读，不要猜 API |
 | 归档 | [`archive/`](./archive/) | **历史实测档案，不是设计文档**：4 份实测细节仅供参考，数字口径已过时，见 [归档索引](./archive/README.md) |
@@ -65,7 +65,7 @@
 | 数据内容上界 | **2026-05-03**（原始 jsonl 的 `max(last_update)`，即扫描起点，非统一读取时刻） |
 | 上架年定年 | `analysis/lib/eras.py`，104 锚点、log(nid) 分段线性，留一法 P99 = 50 天 |
 | 在架覆盖率 | 约 69.3%（报告 10 已重写：三态判据 + 按 nid 段分层加权；旧 68.9% 量级未变、口径已改） |
-| 产出 | 19 份基准报告 + 2 份补充报告、86 张图，均由生成器产出 |
+| 产出 | 19 份基准报告 + 3 份补充报告、88 张图，均由生成器产出 |
 
 抓取方式决定了数据的边界：原始 jsonl 是 Scrapy 按天切分、追加写入的产物，
 列表页按 `last_update` 降序、每天从上一天断点续爬。全量是一次约三周、
@@ -109,10 +109,10 @@ uv sync
 uv run --extra archive python pipeline/prepare.py   # 首次：校验归档哈希并解压（已存在则跳过）
 uv run python pipeline/build_csv.py                 # 从 jsonl 重建 CSV / schema / manifest
 uv run python generators/report_timeline.py         # 生成报告 16（单份）
-for f in generators/report_*.py; do uv run python "$f"; done   # 全部 21 份（19 基准 + 2 补充）
+for f in generators/report_*.py; do uv run python "$f"; done   # 全部 22 份（19 基准 + 3 补充）
 ```
 
-完整管线、目录说明、21 份报告清单（19 基准 + 2 补充）和 12 条口径约束见 [`analysis/README.md`](./analysis/README.md)。
+完整管线、目录说明、22 份报告清单（19 基准 + 3 补充）和 12 条口径约束见 [`analysis/README.md`](./analysis/README.md)。
 `analysis/out/` 不入库，均可重建；榜单与存活探测需联网重新抓取。
 
 ---
@@ -149,7 +149,7 @@ for f in generators/report_*.py; do uv run python "$f"; done   # 全部 21 份�
 | 文档 | 用途 | 状态 |
 | --- | --- | --- |
 | [`analysis/README.md`](./analysis/README.md) | 数据管线、报告清单、口径约束 | **当前口径，先读** |
-| [`analysis/reports/`](./analysis/reports/) | 19 份基准报告 + 2 份补充报告正文与 86 张图 | **当前结论** |
+| [`analysis/reports/`](./analysis/reports/) | 19 份基准报告 + 3 份补充报告正文与 88 张图 | **当前结论** |
 | [`archive/README.md`](./archive/README.md) | 早期实测档案索引与失效清单 | 历史稿，4 份实测细节可参考 |
 | [`archive/data-findings.md`](./archive/data-findings.md) | 早期全量实测（字段陷阱、榜单机制、banner、标签） | 实测细节可参考，数字过时 |
 | [`archive/search.md`](./archive/search.md) | 三个官方接口实测边界与搜索方案 | 接口事实可参考，方案已重设为 `app/docs/04-search.md` |
