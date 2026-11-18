@@ -46,7 +46,6 @@ class HomePage extends ConsumerWidget {
                 onTap: (it) => context.push('/book/${it.nid}'),
               ),
               const SizedBox(height: 8),
-              _sectionTitle(context, '找书入口'),
               _entryGrid(context),
               _sectionTitle(context, '人气风向标'),
               const _ShowcaseSection(kind: 'popular'),
@@ -179,10 +178,10 @@ class HomePage extends ConsumerWidget {
   Widget _entryGrid(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final entries = [
-      ('类', '分类', BrowseMode.category),
-      ('态', '状态', BrowseMode.status),
-      ('赛', '比赛', BrowseMode.contest),
-      ('篇', '短篇', BrowseMode.short),
+      (Icons.category, '分类', BrowseMode.category),
+      (Icons.update, '状态', BrowseMode.status),
+      (Icons.emoji_events, '比赛', BrowseMode.contest),
+      (Icons.article, '短篇', BrowseMode.short),
     ];
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -191,7 +190,7 @@ class HomePage extends ConsumerWidget {
           padding: const EdgeInsets.symmetric(vertical: 12),
           child: Row(
             children: [
-              for (final (glyph, label, mode) in entries)
+              for (final (icon, label, mode) in entries)
                 Expanded(
                   child: InkWell(
                     onTap: () => context.push('/browse?mode=${mode.name}'),
@@ -206,14 +205,7 @@ class HomePage extends ConsumerWidget {
                             borderRadius: BorderRadius.circular(12),
                           ),
                           alignment: Alignment.center,
-                          child: Text(
-                            glyph,
-                            style: TextStyle(
-                              fontFamily: 'serif',
-                              fontSize: 16,
-                              color: scheme.primary,
-                            ),
-                          ),
+                          child: Icon(icon, size: 22, color: scheme.primary),
                         ),
                         const SizedBox(height: 5),
                         Text(label, style: const TextStyle(fontSize: 11)),
