@@ -680,12 +680,18 @@ func (s *Store) WatchPollDone(ctx context.Context, nid, at int64) error {
 // at or above this size.
 const longFormMinWords = 150000
 
+// megaBookMinWords: the home "随便看看" browse pool — big books only,
+// regardless of whether they are ongoing or finished.
+const megaBookMinWords = 600000
+
 // RandomBooks samples n unlicensed seed books uniformly at random
 // (ORDER BY RANDOM is a uniform permutation). status selects the pool:
 // "" draws from the whole seed, "serial" from ongoing long-form works
 // (status='连载中' AND words >= 15万), "finished" from completed long-form
 // works (status='已完结' AND words >= 15万) — both home showcase sections
-// mirror the default 长篇 tab. Any other value is rejected.
+// mirror the default 长篇 tab. "browse" (the home 随便看看 section) draws
+// from big books only (words >= 60万), ongoing or finished. Any other
+// value is rejected.
 func (s *Store) RandomBooks(ctx context.Context, limit int, status string) ([]RankItem, error) {
 	var pool string
 	switch status {
@@ -695,6 +701,8 @@ func (s *Store) RandomBooks(ctx context.Context, limit int, status string) ([]Ra
 		pool = " AND status = '连载中' AND words >= " + strconv.Itoa(longFormMinWords)
 	case "finished":
 		pool = " AND status = '已完结' AND words >= " + strconv.Itoa(longFormMinWords)
+	case "browse":
+		pool = " AND words >= " + strconv.Itoa(megaBookMinWords)
 	default:
 		return nil, fmt.Errorf("unsupported random status %q", status)
 	}

@@ -100,6 +100,9 @@ final router = GoRouter(
     GoRoute(path: '/finished-random',
         builder: (_, _) => const RandomPoolPage(
             status: 'finished', title: '随机完结 · 100 本')),
+    GoRoute(path: '/browse-random',
+        builder: (_, _) => const RandomPoolPage(
+            status: 'browse', title: '随便看看 · 100 本')),
     GoRoute(
       path: '/book/:nid/data',
       builder: (_, state) => BookDataPage(

@@ -40,6 +40,14 @@ final finishedShowcaseProvider =
   return handle.api.randomBooks(limit: 8, status: 'finished');
 });
 
+/// 随便看看：形态照搬连载发现——从 60 万字以上的大书中均匀抽样 8 本
+///（不限连载/完结），下拉刷新换一批，更多入口进 100 本二级页。
+final browseShowcaseProvider =
+    FutureProvider.autoDispose<List<RankItem>>((ref) async {
+  final handle = await ref.watch(bootProvider.future);
+  return handle.api.randomBooks(limit: 8, status: 'browse');
+});
+
 /// 首页：编辑精选轮播 → 入口宫格 → 分类找书 → 继续浏览。
 /// 不暴露种子统计——定位是找书 App（用户反馈 2026-11-17）。
 class HomePage extends ConsumerStatefulWidget {
@@ -81,6 +89,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           ref.invalidate(randomProvider);
           ref.invalidate(serialShowcaseProvider);
           ref.invalidate(finishedShowcaseProvider);
+          ref.invalidate(browseShowcaseProvider);
           await Future.wait([
             ref.read(featuredProvider.future),
             ref.read(bannerProvider.future),
@@ -111,6 +120,9 @@ class _HomePageState extends ConsumerState<HomePage> {
                 _sectionTitle(context, '完结精选',
                     onMore: () => context.push('/finished-random')),
                 _ShowcaseSection(provider: finishedShowcaseProvider),
+                _sectionTitle(context, '随便看看',
+                    onMore: () => context.push('/browse-random')),
+                _ShowcaseSection(provider: browseShowcaseProvider),
                 _sectionTitle(context, '今日精品更新'),
                 const _Spotlight(),
                 _sectionTitle(context, '随机书架'),

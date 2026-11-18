@@ -460,9 +460,9 @@ func (s *Server) random(c *gin.Context) {
 		return
 	}
 	status := c.Query("status")
-	if status != "" && status != "serial" && status != "finished" {
+	if status != "" && status != "serial" && status != "finished" && status != "browse" {
 		fail(c, http.StatusBadRequest, "invalid_status",
-			"status must be empty, \"serial\" or \"finished\"")
+			"status must be empty, \"serial\", \"finished\" or \"browse\"")
 		return
 	}
 	items, err := s.store.RandomBooks(c.Request.Context(), limit, status)
