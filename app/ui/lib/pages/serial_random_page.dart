@@ -139,11 +139,11 @@ class _SerialTile extends StatelessWidget {
       tags.removeWhere((t) => !seen.add(t));
     }
 
-    // 指标行：字数 · 收藏 · 点击 · 点赞（非空才显示；icon 语义见 app/docs/15）
+    // 指标行：字数 · 点击 · 收藏 · 赞（非空才显示；顺序对齐官方 app 排版）
     final metrics = <(IconData, String)>[
       if (item.words != null) (MetricIcons.words, '${_wan(item.words)}字'),
+      if (item.clicks != null) (MetricIcons.clicks, _wan(item.clicks)),
       if (item.favs > 0) (MetricIcons.favs, _wan(item.favs)),
-      if (item.clicks != null) (MetricIcons.clicks, '${_wan(item.clicks)}阅'),
       if (item.praises != null && item.praises! > 0)
         (MetricIcons.praises, _wan(item.praises)),
     ];
