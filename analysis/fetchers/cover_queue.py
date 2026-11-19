@@ -92,6 +92,11 @@ QUEUE_DB = paths.OUT_DIR / "cover_queue.db"
 RESULTS = paths.OUT_DIR / "cover_urls.jsonl"
 MIN_DELAY = 0.5  # 合规下限（秒），fetch 强制 clamp
 
+
+def is_default_cover(url: str | None) -> bool:
+    """站方占位封面；不能当作「已采到封面」。"""
+    return bool(url) and url.rsplit("/", 1)[-1].lower().startswith("default")
+
 # 一次请求里除 novelCover 外要落盘的当期快照字段（docs/api-field-mapping.md §2）。
 # point 官方废弃（App 不展示、96.8% 恒 6.0 无区分度）——直接丢弃。
 SNAPSHOT_FIELDS = (
@@ -143,7 +148,7 @@ def _empty_cover_nids(seed_db: Path) -> set[int]:
 
 
 def _default_cover_nids(nids: set[int]) -> set[int]:
-    """原始 jsonl 里封面文件名以 default 开头 → 源头无封面。"""
+    """原始 jsonl / App API 样本里是 default 图 → 源头无封面，不请求。"""
     out: set[int] = set()
     for fp in sorted(glob.glob(str(paths.JSONL_DIR / "meta*.jsonl"))):
         with open(fp, encoding="utf-8") as fh:
@@ -156,6 +161,14 @@ def _default_cover_nids(nids: set[int]) -> set[int]:
                     cov = (rec.get("cover") or "").rsplit("/", 1)[-1].lower()
                     if cov.startswith("default"):
                         out.add(int(nid))
+    if paths.APP_API_NOVELS.exists():
+        for line in paths.APP_API_NOVELS.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            rec = json.loads(line)
+            nid = rec.get("nid")
+            if nid in nids and is_default_cover(rec.get("novelCover")):
+                out.add(int(nid))
     return out
 
 
@@ -168,7 +181,7 @@ def _local_sample_covers(nids: set[int]) -> dict[int, str]:
         rec = json.loads(line)
         nid = rec.get("nid")
         cover = rec.get("novelCover")
-        if nid in nids and cover:
+        if nid in nids and cover and not is_default_cover(cover):
             out[int(nid)] = cover
     return out
 
@@ -185,7 +198,7 @@ def load_results(path: Path) -> dict[int, dict]:
         if not line.strip():
             continue
         rec = json.loads(line)
-        if rec.get("cover_url"):
+        if rec.get("cover_url") and not is_default_cover(rec["cover_url"]):
             out[int(rec["nid"])] = rec
     return out
 
@@ -203,7 +216,8 @@ def append_results(path: Path, records: list[dict]) -> int:
 
     results 是跨 CI job 的唯一持久进度；队列 db 可随时由 enqueue 重建。
     """
-    fresh = [r for r in records if r.get("cover_url")]
+    fresh = [r for r in records
+             if r.get("cover_url") and not is_default_cover(r["cover_url"])]
     if not fresh:
         return 0
     known: set[int] = set()
@@ -402,7 +416,8 @@ def cmd_ack(args: argparse.Namespace) -> None:
     try:
         for rec in records:
             nid = int(rec["nid"])
-            cover = (rec.get("cover_url") or "").strip()
+            raw_cover = (rec.get("cover_url") or "").strip()
+            cover = "" if is_default_cover(raw_cover) else raw_cover
             http = int(rec.get("http") or 0)
             err = (rec.get("error") or "")[:300]
             if cover:
@@ -417,6 +432,12 @@ def cmd_ack(args: argparse.Namespace) -> None:
             else:
                 row = con.execute("SELECT attempts FROM jobs WHERE nid=?", (nid,)).fetchone()
                 if row is None:
+                    continue
+                if "default cover" in err or is_default_cover(raw_cover):
+                    # 现场确认为官方占位图：不是网络失败，不要重试。
+                    con.execute(
+                        "UPDATE jobs SET status='skip_default', error=?, claimed_by=NULL, "
+                        "claimed_at=NULL, updated_at=? WHERE nid=?", (err, now, nid))
                     continue
                 attempts = row["attempts"] + 1
                 status = "failed" if attempts >= args.max_attempts else "pending"
@@ -503,7 +524,11 @@ def _fetch_one(session: requests.Session, nid: int, timeout: float) -> dict:
             rec["error"] = f"soft-fail httpCode={biz} {msg}".strip()[:300]
             return rec
         data = body.get("data") or {}
-        rec["cover_url"] = data.get("novelCover") or ""
+        cover = data.get("novelCover") or ""
+        if is_default_cover(cover):
+            rec["error"] = "default cover"
+            return rec
+        rec["cover_url"] = cover
         rec["snapshot"] = {k: data[k] for k in SNAPSHOT_FIELDS if k in data}
         if not rec["cover_url"]:
             rec["error"] = "no novelCover"
@@ -572,7 +597,9 @@ def cmd_fetch(args: argparse.Namespace) -> None:
                 successes = [{"nid": r["nid"], "cover_url": r["cover_url"],
                               "http": int(r.get("http") or 0),
                               "snapshot": r.get("snapshot") or {}}
-                             for r in results if (r.get("cover_url") or "").strip()]
+                             for r in results
+                             if (r.get("cover_url") or "").strip()
+                             and not is_default_cover(r["cover_url"])]
                 append_results(Path(args.results), successes)
                 for r in results:
                     if not (r.get("cover_url") or "").strip():
@@ -628,13 +655,20 @@ def cmd_fetch(args: argparse.Namespace) -> None:
                                           "snapshot": rec.get("snapshot") or {}})
                     else:
                         row = con.execute("SELECT attempts FROM jobs WHERE nid=?", (nid,)).fetchone()
+                        err = (rec.get("error") or "")[:300]
+                        if "default cover" in err:
+                            con.execute(
+                                "UPDATE jobs SET status='skip_default', error=?, "
+                                "claimed_by=NULL, claimed_at=NULL, updated_at=? WHERE nid=?",
+                                (err, now, nid))
+                            continue
                         attempts = (row["attempts"] + 1) if row else 1
                         status = "pending" if args.dry_run else (
                             "failed" if attempts >= args.max_attempts else "pending")
                         con.execute(
                             "UPDATE jobs SET status=?, attempts=?, http=?, error=?, "
                             "claimed_by=NULL, claimed_at=NULL, updated_at=? WHERE nid=?",
-                            (status, attempts, int(rec.get("http") or 0), (rec.get("error") or "")[:300], now, nid),
+                            (status, attempts, int(rec.get("http") or 0), err, now, nid),
                         )
                 con.commit()
             except Exception:

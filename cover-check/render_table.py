@@ -24,8 +24,9 @@ def main() -> None:
         "2026-11-17 串行采集（0.5s 间隔，仅取书目元数据、不取正文、不登录）。\n",
         f"> 结果：**{len(rows)}/{len(rows)} 本取到真实封面 URL**，"
         "全部 `https://rss.sfacg.com/` 直链、`image/jpeg` 可渲染。\n",
-        "> 这 47 本在种子 `books` 中 `cover_url` 全为空（授权剔除），"
-        "本表用于目验「按 nid 重取能否拿到正确封面」。\n\n",
+        "> 这 47 本已通过 `dataset/build.py` 写入数据集，"
+        "并由 `build_seed.py` 写入种子 `books.cover_url`；"
+        "本表保留了按 nid 重取时的目验结果。\n\n",
         COLS,
         SEP,
     ]

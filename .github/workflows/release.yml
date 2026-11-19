@@ -1,7 +1,7 @@
 name: release
 
-# Tag-triggered Android pre-release: build the arm64 release APK from the
-# committed engine blob (jniLibs) and attach it to a GitHub pre-release.
+# Tag-triggered Android pre-release: build libstrata.so with the NDK, build
+# the arm64 release APK, and attach it to a GitHub pre-release.
 on:
   push:
     tags: ["v*"]
@@ -25,10 +25,62 @@ jobs:
           flutter-version: 3.47.4
           cache: true
 
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.5"
+          cache-dependency-path: app/engine/go.sum
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK
+        run: |
+          yes | sdkmanager --licenses >/dev/null
+          sdkmanager "ndk;28.2.13676358" >/dev/null
+          echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/28.2.13676358" >> "$GITHUB_ENV"
+
+      - name: Build libstrata.so (arm64)
+        working-directory: app/engine
+        env:
+          GOPROXY: https://proxy.golang.org,direct
+        run: |
+          mkdir -p ../ui/android/app/src/main/jniLibs/arm64-v8a
+          CC="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android24-clang"
+          GOOS=android GOARCH=arm64 CGO_ENABLED=1 CC="$CC" \
+            go build -buildmode=c-shared -trimpath -ldflags="-s -w" \
+            -o ../ui/android/app/src/main/jniLibs/arm64-v8a/libstrata.so ./cmd/ffi
+          "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" \
+            -h ../ui/android/app/src/main/jniLibs/arm64-v8a/libstrata.so | grep AArch64
+          "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm" \
+            -D ../ui/android/app/src/main/jniLibs/arm64-v8a/libstrata.so | grep strata_start
+
+      - name: Verify bundled seed assets
+        run: |
+          test -s app/ui/assets/manifest.json
+          test -s app/ui/assets/seed.db.gz
+          python3 - <<'PY'
+          import gzip, hashlib, json, sqlite3, tempfile
+          from pathlib import Path
+
+          manifest = json.loads(Path("app/ui/assets/manifest.json").read_text(encoding="utf-8"))
+          assert manifest["schema_version"] >= 2, manifest["schema_version"]
+          gz = Path("app/ui/assets/seed.db.gz").read_bytes()
+          db = gzip.decompress(gz)
+          assert len(db) == manifest["files"]["db"]["bytes"], "seed.db size mismatch"
+          assert hashlib.sha256(db).hexdigest() == manifest["files"]["db"]["sha256"], "seed.db hash mismatch"
+          with tempfile.NamedTemporaryFile(suffix=".db") as fh:
+              fh.write(db)
+              fh.flush()
+              conn = sqlite3.connect(fh.name)
+              rows = conn.execute("SELECT COUNT(*) FROM deep_ranks").fetchone()[0]
+              meta = dict(conn.execute("SELECT key, value FROM seed_meta"))
+              conn.close()
+          assert rows == 14626, rows
+          assert meta["seed_version"] == manifest["seed_version"], meta["seed_version"]
+          print(f"seed {meta['seed_version']}: books={meta['book_count']} deep_ranks={rows}")
+          PY
+
       - name: Build release APK (arm64)
         working-directory: app/ui
-        env:
-          GOPROXY: https://goproxy.cn,direct
         run: |
           flutter pub get
           set -o pipefail
@@ -43,6 +95,13 @@ jobs:
             } >> "$GITHUB_STEP_SUMMARY"
             exit $status
           fi
+
+      - name: Verify release APK
+        run: |
+          APK=app/ui/build/app/outputs/flutter-apk/app-release.apk
+          unzip -l "$APK" | grep 'lib/arm64-v8a/libstrata.so'
+          AAPT=$(find "$ANDROID_SDK_ROOT/build-tools" -name aapt | sort -V | tail -1)
+          "$AAPT" dump permissions "$APK" | grep 'android.permission.INTERNET'
 
       - name: Dump failure log into the repo
         if: failure()

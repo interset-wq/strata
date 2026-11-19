@@ -1,7 +1,7 @@
 # 授权 47 本封面采集试跑 · 目验表
 > 数据源：官方 App API `GET /novels/{nid}` 的 `novelCover` 字段，2026-11-17 串行采集（0.5s 间隔，仅取书目元数据、不取正文、不登录）。
 > 结果：**47/47 本取到真实封面 URL**，全部 `https://rss.sfacg.com/` 直链、`image/jpeg` 可渲染。
-> 这 47 本在种子 `books` 中 `cover_url` 全为空（授权剔除），本表用于目验「按 nid 重取能否拿到正确封面」。
+> 这 47 本已通过 `dataset/build.py` 写入数据集，并由 `build_seed.py` 写入种子 `books.cover_url`；本表保留了按 nid 重取时的目验结果。
 
 | 序号 | nid | 书名 | 作者 | 封面（点击看原图） |
 |---:|---:|---|---|---|
