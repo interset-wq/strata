@@ -92,7 +92,9 @@ jobs:
               rows = conn.execute("SELECT COUNT(*) FROM deep_ranks").fetchone()[0]
               meta = dict(conn.execute("SELECT key, value FROM seed_meta"))
               conn.close()
-          assert rows == 14626, rows
+          # No count assertions: seed contents (book/deep-rank counts) change
+          # every release. Only self-consistency between seed.db.gz and
+          # manifest.json is checked (they are built together).
           assert meta["seed_version"] == manifest["seed_version"], meta["seed_version"]
           print(f"seed {meta['seed_version']}: books={meta['book_count']} deep_ranks={rows}")
           PY
@@ -138,5 +140,5 @@ jobs:
           gh release create "$GITHUB_REF_NAME" \
             app/ui/build/app/outputs/flutter-apk/app-release.apk \
             --title "$GITHUB_REF_NAME (Android pre-release)" \
-            --notes "Embedded Go engine + Flutter shell. Seed: 18,105 books (V3, 47 licensed included). Install the arm64 APK on Android 8+." \
+            --notes "Embedded Go engine + Flutter shell (arm64, Android 8+). Bundled seed: see app/ui/assets/manifest.json for the exact version and book count." \
             --prerelease
