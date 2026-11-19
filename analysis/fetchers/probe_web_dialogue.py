@@ -38,6 +38,7 @@ import json
 import re
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import pandas as pd
@@ -101,6 +102,8 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--csv", required=True)
     ap.add_argument("--tag", required=True)
+    ap.add_argument("--workers", type=int, default=1,
+                    help="并发数（默认 1；建议 ≤6，每请求约 1.3s）")
     args = ap.parse_args()
 
     csv_path = Path(args.csv)
@@ -115,18 +118,27 @@ def main() -> None:
                 rec = json.loads(line)
                 done[int(rec["nid"])] = rec
     todo = [r for r in df.to_dict("records") if int(r["nid"]) not in done]
-    print(f"{len(df)} 行，已抓 {len(done)}，待抓 {len(todo)}")
+    print(f"{len(df)} 行，已抓 {len(done)}，待抓 {len(todo)}，并发 {args.workers}")
+    if not todo:
+        return
 
-    with out.open("a", encoding="utf-8") as fh:
-        for i, r in enumerate(todo, 1):
-            nid = int(r["nid"])
-            rec = {**probe(nid), "title": str(r.get("title", ""))}
+    titles = {int(r["nid"]): str(r.get("title", "")) for r in todo}
+    n_done = 0
+    with out.open("a", encoding="utf-8") as fh, ThreadPoolExecutor(max_workers=args.workers) as ex:
+        # 限速由 worker 数决定（每请求约 1.3s），提交侧不再 sleep——否则提交循环
+        # 会比完成循环长一个数量级，首个结果要等几分钟才落盘，中途失败全丢。
+        futs = {ex.submit(probe, int(r["nid"])): int(r["nid"]) for r in todo}
+        for fut in as_completed(futs):
+            nid = futs[fut]
+            rec = {**fut.result(), "title": titles[nid]}
             fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
             fh.flush()
+            n_done += 1
             tag = {"dialogue": "对话", "prose": "散文", "unknown": "无正文",
                    "dead": "死亡", "error": "失败"}[rec["verdict"]]
-            print(f"[{i}/{len(todo)}] {nid:7} {tag:4} {rec['title'][:22]:24} | {rec.get('info', '')[:36]}")
-            time.sleep(DELAY)
+            if n_done % 20 == 0 or rec["verdict"] in ("error", "dead"):
+                print(f"[{n_done}/{len(todo)}] {nid:7} {tag:4} {rec['title'][:22]:24} "
+                      f"| {rec.get('info', '')[:36]}", flush=True)
 
     recs = [json.loads(x) for x in out.read_text(encoding="utf-8").splitlines() if x.strip()]
     import collections
