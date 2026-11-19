@@ -59,23 +59,28 @@ final metaProvider = FutureProvider<Meta>((ref) async {
   return handle.api.meta();
 });
 
-/// 每日 banner：以当天日期为随机种子，对整个 banner 池（含 is_licensed）
-/// 等概率抽取——同一天稳定、隔天必变、池内每个 banner 都可能被抽中。
-final bannerProvider = FutureProvider<List<FeaturedItem>>((ref) async {
+/// 首页轮播：中篇/IP 的 featured 池很小（含授权书也常不足 6 本），固定按
+/// 收藏展示、不做每日随机；短篇自身没有 featured，沿用 IP 的固定轮播。
+/// 长篇/对话仍用日期种子在各自形态内洗牌。
+final bannerProvider = FutureProvider.autoDispose
+    .family<List<FeaturedItem>, String>((ref, form) async {
   final handle = await ref.watch(bootProvider.future);
+  final carouselForm = form == 'short' ? 'ip_collab' : form;
+  if (carouselForm == 'medium' || carouselForm == 'ip_collab') {
+    return handle.api
+        .featured(limit: bannerCarouselCount, form: carouselForm);
+  }
   final now = DateTime.now();
   final seed = now.year * 10000 + now.month * 100 + now.day;
-  return handle.api.banners(seed: seed, limit: bannerCarouselCount);
+  return handle.api.banners(
+      seed: seed, limit: bannerCarouselCount, form: carouselForm);
 });
 
-/// 轮播与大图精选共用的每日种子：同一天对 featured 全池做一次
-/// 确定性洗牌，轮播取前 [bannerCarouselCount] 张（offset 0），
-/// 大图精选紧随其后取 6 张（offset = bannerCarouselCount），
-/// 两段天然不重复，同日稳定、隔天都变。
 const bannerCarouselCount = 6;
 const largeImageCount = 6;
 
-/// 大图精选：与每日轮播同种子的后段（文字在图下方，点图全屏查看）。
+/// 大图精选：全形态 featured 池的每日后段（文字在图下方，点图全屏查看）。
+/// 不受首页形态 tab 影响，也不与形态轮播共用池子。
 final largeImageProvider = FutureProvider<List<FeaturedItem>>((ref) async {
   final handle = await ref.watch(bootProvider.future);
   final now = DateTime.now();

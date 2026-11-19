@@ -47,6 +47,7 @@ type Book struct {
 	PraisePctl *float64 `json:"praise_pctl"`
 	PR         *float64 `json:"pr"`
 	PctlPR     *float64 `json:"pctl_pr"`
+	Form       string   `json:"form"`
 	IsLicensed bool     `json:"is_licensed"`
 }
 
@@ -173,7 +174,8 @@ func (s *Store) Book(ctx context.Context, nid int64) (*BookDetail, error) {
 	const q = `
 SELECT nid, title, author, genre, price_type, status, contest, words, clicks,
        favs, praises, featured, cover_url, updated_at, est_year, est_date,
-       est_conf, tags, fav_pctl, click_pctl, praise_pctl, pr, pctl_pr, is_licensed
+       est_conf, tags, fav_pctl, click_pctl, praise_pctl, pr, pctl_pr, form,
+       is_licensed
 FROM seed.books WHERE nid = ?`
 
 	var (
@@ -182,13 +184,14 @@ FROM seed.books WHERE nid = ?`
 		words, clicks, favs, praises, featured     sql.NullInt64
 		updatedAt, tags                            sql.NullString
 		favPctl, clickPctl, praisePctl, pr, pctlPR sql.NullFloat64
+		form                                       string
 		isLicensed                                 sql.NullInt64
 	)
 	err := s.DB.QueryRowContext(ctx, q, nid).Scan(
 		&b.NID, &b.Title, &b.Author, &genre, &priceType, &status, &contest,
 		&words, &clicks, &favs, &praises, &featured, &cover, &updatedAt,
 		&b.EstYear, &b.EstDate, &b.EstConf, &tags,
-		&favPctl, &clickPctl, &praisePctl, &pr, &pctlPR, &isLicensed,
+		&favPctl, &clickPctl, &praisePctl, &pr, &pctlPR, &form, &isLicensed,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
@@ -213,6 +216,7 @@ FROM seed.books WHERE nid = ?`
 	b.PraisePctl = floatPtr(praisePctl)
 	b.PR = floatPtr(pr)
 	b.PctlPR = floatPtr(pctlPR)
+	b.Form = form
 	b.IsLicensed = isLicensed.Valid && isLicensed.Int64 != 0
 
 	tagList, err := s.bookTags(ctx, nid)
@@ -297,6 +301,7 @@ type RankItem struct {
 	Words    *int64   `json:"words"`
 	Clicks   *int64   `json:"clicks"`
 	Praises  *int64   `json:"praises"`
+	Form     string   `json:"form"`
 	Tags     []string `json:"tags"`
 }
 
@@ -304,6 +309,7 @@ func (s *Store) RankingFavs(ctx context.Context, year int, genre, status, contes
 	query := `
 SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
        seed.books.est_year, seed.books.favs, seed.books.fav_pctl, seed.books.contest,
+       seed.books.form,
        COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url
 FROM seed.books
 LEFT JOIN covers c ON c.nid = seed.books.nid
@@ -345,7 +351,7 @@ WHERE est_year = ? AND is_licensed = 0 AND fav_pctl IS NOT NULL`
 			contest sql.NullString
 		)
 		if err := rows.Scan(&item.NID, &item.Title, &item.Author, &gen,
-			&item.EstYear, &favs, &pctl, &contest, &item.CoverURL); err != nil {
+			&item.EstYear, &favs, &pctl, &contest, &item.Form, &item.CoverURL); err != nil {
 			return nil, err
 		}
 		item.Rank = len(items) + 1
@@ -353,6 +359,75 @@ WHERE est_year = ? AND is_licensed = 0 AND fav_pctl IS NOT NULL`
 		item.Favs = intPtr(favs)
 		item.FavPctl = pctl
 		item.Contest = strPtr(contest)
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
+// ClassicBooks is the data-only browse list used by the Classic category,
+// status and contest pages. It intentionally sorts by absolute favs, not by
+// same-generation percentiles: Classic mode mirrors novly's cumulative view
+// and has no quantitative layer.
+func (s *Store) ClassicBooks(ctx context.Context, genre, status, contest, form string,
+	limit, offset int) ([]RankItem, error) {
+	query := `
+SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
+       seed.books.est_year, seed.books.status, seed.books.words, seed.books.clicks,
+       seed.books.favs, seed.books.praises, seed.books.contest, seed.books.form,
+       COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url
+FROM seed.books
+LEFT JOIN covers c ON c.nid = seed.books.nid
+WHERE seed.books.is_licensed = 0`
+	args := []any{}
+	if genre != "" {
+		query += " AND seed.books.genre = ?"
+		args = append(args, genre)
+	}
+	if status != "" {
+		query += " AND seed.books.status = ?"
+		args = append(args, status)
+	}
+	if contest != "" {
+		if contest == "1" {
+			query += " AND seed.books.contest != ''"
+		} else {
+			query += " AND seed.books.contest = ?"
+			args = append(args, contest)
+		}
+	}
+	if form != "" {
+		query += " AND seed.books.form = ?"
+		args = append(args, form)
+	}
+	query += " ORDER BY seed.books.favs DESC, seed.books.nid ASC LIMIT ? OFFSET ?"
+	args = append(args, limit, offset)
+
+	rows, err := s.DB.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := make([]RankItem, 0, limit)
+	for rows.Next() {
+		var (
+			item                         RankItem
+			gen, status, contest, cover  sql.NullString
+			words, clicks, favs, praises sql.NullInt64
+		)
+		if err := rows.Scan(&item.NID, &item.Title, &item.Author, &gen,
+			&item.EstYear, &status, &words, &clicks, &favs, &praises,
+			&contest, &item.Form, &cover); err != nil {
+			return nil, err
+		}
+		item.Rank = len(items) + offset + 1
+		item.Genre = strPtr(gen)
+		item.Status = strPtr(status)
+		item.Words = intPtr(words)
+		item.Clicks = intPtr(clicks)
+		item.Favs = intPtr(favs)
+		item.Praises = intPtr(praises)
+		item.Contest = strPtr(contest)
+		item.CoverURL = strPtr(cover)
 		items = append(items, item)
 	}
 	return items, rows.Err()
@@ -484,7 +559,7 @@ func boardKindCol(kind string) (string, bool) {
 // BoardBooks is the Classic full-catalog board (docs/12 showcase): platform
 // cumulative values, no percentile math. Isolated from the recommendation
 // signal whitelist — display only.
-func (s *Store) BoardBooks(ctx context.Context, kind string, limit, offset int) ([]RankItem, error) {
+func (s *Store) BoardBooks(ctx context.Context, kind, form string, limit, offset int) ([]RankItem, error) {
 	col, ok := boardKindCol(kind)
 	if !ok {
 		return nil, nil
@@ -492,16 +567,21 @@ func (s *Store) BoardBooks(ctx context.Context, kind string, limit, offset int) 
 	q := `
 SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
        seed.books.est_year, seed.books.status, seed.books.words, seed.books.clicks,
-       seed.books.favs,
+       seed.books.favs, seed.books.form,
        COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url
 FROM seed.books
 LEFT JOIN covers c ON c.nid = seed.books.nid
 WHERE is_licensed = 0`
+	args := []any{}
+	if form != "" {
+		q += " AND seed.books.form = ?"
+		args = append(args, form)
+	}
 	if kind == "finish" {
 		q += " AND status = '已完结'"
 	}
 	q += fmt.Sprintf(" ORDER BY %s LIMIT ? OFFSET ?", col)
-	args := []any{limit, offset}
+	args = append(args, limit, offset)
 
 	rows, err := s.DB.QueryContext(ctx, q, args...)
 	if err != nil {
@@ -516,7 +596,7 @@ WHERE is_licensed = 0`
 			words, clicks, favs sql.NullInt64
 		)
 		if err := rows.Scan(&item.NID, &item.Title, &item.Author, &gen,
-			&item.EstYear, &status, &words, &clicks, &favs, &cover); err != nil {
+			&item.EstYear, &status, &words, &clicks, &favs, &item.Form, &cover); err != nil {
 			return nil, err
 		}
 		item.Rank = len(items) + offset + 1
@@ -535,16 +615,20 @@ WHERE is_licensed = 0`
 // ordered by platform clicks (docs/12 §5: cover is a hard gate), keyset
 // paginated by (clicks, nid) for stable, overlap-free infinite scrolling.
 // cursor "" starts at the top; otherwise "clicks:nid" of the last item.
-func (s *Store) Discover(ctx context.Context, cursor string, limit int) ([]RankItem, error) {
+func (s *Store) Discover(ctx context.Context, cursor, form string, limit int) ([]RankItem, error) {
 	q := `
 SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
        seed.books.est_year, seed.books.status, seed.books.words, seed.books.clicks,
-       seed.books.favs,
+       seed.books.favs, seed.books.form,
        COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url
 FROM seed.books
 LEFT JOIN covers c ON c.nid = seed.books.nid
 WHERE is_licensed = 0 AND COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) IS NOT NULL`
 	args := []any{}
+	if form != "" {
+		q += " AND seed.books.form = ?"
+		args = append(args, form)
+	}
 	if cursor != "" {
 		var clicks int64
 		var nid int64
@@ -570,7 +654,7 @@ WHERE is_licensed = 0 AND COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) IS
 			words, clicks, favs sql.NullInt64
 		)
 		if err := rows.Scan(&item.NID, &item.Title, &item.Author, &gen,
-			&item.EstYear, &status, &words, &clicks, &favs, &cover); err != nil {
+			&item.EstYear, &status, &words, &clicks, &favs, &item.Form, &cover); err != nil {
 			return nil, err
 		}
 		item.Rank = len(items) + 1
@@ -675,47 +759,49 @@ func (s *Store) WatchPollDone(ctx context.Context, nid, at int64) error {
 // RandomBooks samples n unlicensed seed books uniformly at random
 // (ORDER BY RANDOM), used by the home "shuffle" grid. Cover and stats
 // included so cards render identically to board items.
-// longFormMinWords: the app's default header tab is long-form fiction
-// (docs/13 form definitions); random serial picks only draw from books
-// at or above this size.
-const longFormMinWords = 150000
-
 // megaBookMinWords: the home "随便看看" browse pool — big books only,
 // regardless of whether they are ongoing or finished.
 const megaBookMinWords = 600000
 
 // RandomBooks samples n unlicensed seed books uniformly at random
 // (ORDER BY RANDOM is a uniform permutation). status selects the pool:
-// "" draws from the whole seed, "serial" from ongoing long-form works
-// (status='连载中' AND words >= 15万), "finished" from completed long-form
-// works (status='已完结' AND words >= 15万) — both home showcase sections
-// mirror the default 长篇 tab. "browse" (the home 随便看看 section) draws
-// from big books only (words >= 60万), ongoing or finished. Any other
-// value is rejected.
-func (s *Store) RandomBooks(ctx context.Context, limit int, status string) ([]RankItem, error) {
+// "" draws from the whole seed, "serial" from ongoing works, "finished"
+// from completed works. "browse" (the home shuffle section) keeps the
+// big-book gate only for the default long-form tab; shorter forms must not
+// be filtered out by a size threshold. Every pool also honours the optional
+// form filter. Any other status value is rejected.
+func (s *Store) RandomBooks(ctx context.Context, limit int, status, form string) ([]RankItem, error) {
 	var pool string
 	switch status {
 	case "":
 		pool = ""
 	case "serial":
-		pool = " AND status = '连载中' AND words >= " + strconv.Itoa(longFormMinWords)
+		pool = " AND status = '连载中'"
 	case "finished":
-		pool = " AND status = '已完结' AND words >= " + strconv.Itoa(longFormMinWords)
+		pool = " AND status = '已完结'"
 	case "browse":
-		pool = " AND words >= " + strconv.Itoa(megaBookMinWords)
+		if form == "" || form == "long" {
+			pool = " AND words >= " + strconv.Itoa(megaBookMinWords)
+		}
 	default:
 		return nil, fmt.Errorf("unsupported random status %q", status)
 	}
 	query := `
 SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
        seed.books.est_year, seed.books.status, seed.books.words, seed.books.clicks,
-       seed.books.favs, seed.books.praises,
+       seed.books.favs, seed.books.praises, seed.books.form,
        COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url
 FROM seed.books
 LEFT JOIN covers c ON c.nid = seed.books.nid
-WHERE is_licensed = 0` + pool +
-		" ORDER BY RANDOM() LIMIT ?"
-	rows, err := s.DB.QueryContext(ctx, query, limit)
+WHERE is_licensed = 0` + pool
+	args := []any{}
+	if form != "" {
+		query += " AND seed.books.form = ?"
+		args = append(args, form)
+	}
+	query += " ORDER BY RANDOM() LIMIT ?"
+	args = append(args, limit)
+	rows, err := s.DB.QueryContext(ctx, query, args...)
 	return s.scanRankItems(ctx, rows, err)
 }
 
@@ -736,7 +822,7 @@ func (s *Store) scanRankItems(ctx context.Context, rows *sql.Rows,
 			praises sql.NullInt64
 		)
 		if err := rows.Scan(&item.NID, &item.Title, &item.Author, &gen,
-			&item.EstYear, &status, &words, &clicks, &favs, &praises, &cover); err != nil {
+			&item.EstYear, &status, &words, &clicks, &favs, &praises, &item.Form, &cover); err != nil {
 			return nil, err
 		}
 		item.Genre = strPtr(gen)
@@ -762,7 +848,7 @@ func (s *Store) curated(ctx context.Context, limit int, extra string) ([]RankIte
 	query := `
 SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
        seed.books.est_year, seed.books.status, seed.books.words, seed.books.clicks,
-       seed.books.favs, seed.books.praises,
+       seed.books.favs, seed.books.praises, seed.books.form,
        COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url
 FROM seed.books
 LEFT JOIN covers c ON c.nid = seed.books.nid
@@ -1025,9 +1111,12 @@ type FeaturedBook struct {
 }
 
 // FeaturedBooks returns up to limit featured books for the home carousel.
-func (s *Store) FeaturedBooks(ctx context.Context, limit int) ([]FeaturedBook, error) {
+// An empty form means all forms; otherwise the curated pool is narrowed to
+// that form (licensed works stay included).
+func (s *Store) FeaturedBooks(ctx context.Context, limit int,
+	form string) ([]FeaturedBook, error) {
 	return s.featured(ctx, limit, 0,
-		"ORDER BY favs DESC, seed.books.nid ASC")
+		"ORDER BY favs DESC, seed.books.nid ASC", form)
 }
 
 // FeaturedAll returns one page of the featured=1 pool (编辑精选, includes
@@ -1041,22 +1130,28 @@ func (s *Store) FeaturedAll(ctx context.Context, limit, offset int,
 		dir = "ASC"
 	}
 	return s.featured(ctx, limit, offset,
-		"ORDER BY favs "+dir+", seed.books.nid ASC")
+		"ORDER BY favs "+dir+", seed.books.nid ASC", "")
 }
 
 // featured is the shared query for the featured=1 pool (编辑精选,
 // includes licensed works): static favs order or random reroll.
 func (s *Store) featured(ctx context.Context, limit, offset int,
-	orderBy string) ([]FeaturedBook, error) {
+	orderBy, form string) ([]FeaturedBook, error) {
 	query := `
 SELECT seed.books.nid, seed.books.title, seed.books.author,
        COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url, seed.books.favs
 FROM seed.books
 LEFT JOIN covers c ON c.nid = seed.books.nid
-WHERE featured = 1
-` + orderBy + `
+WHERE featured = 1`
+	args := []any{}
+	if form != "" {
+		query += " AND seed.books.form = ?"
+		args = append(args, form)
+	}
+	query += "\n" + orderBy + `
 LIMIT ? OFFSET ?`
-	rows, err := s.DB.QueryContext(ctx, query, limit, offset)
+	args = append(args, limit, offset)
+	rows, err := s.DB.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -1289,16 +1384,25 @@ ORDER BY h.viewed_at DESC LIMIT ?`, limit)
 // offset+limit) are taken. Sharing one seed across calls with different
 // offsets segments the pool without overlap — the daily banner carousel
 // and the 大图精选 section use the same day seed, offset 0 and N.
+// An empty form means all forms; otherwise only that form is shuffled.
 func (s *Store) BannerPick(ctx context.Context, seed int64, offset int,
-	limit int) ([]FeaturedBook, error) {
-	rows, err := s.DB.QueryContext(ctx, `
+	limit int, form string) ([]FeaturedBook, error) {
+	query := `
 SELECT seed.books.nid, seed.books.title, seed.books.author,
        COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url, seed.books.favs
 FROM seed.books
 LEFT JOIN covers c ON c.nid = seed.books.nid
-WHERE featured = 1
+WHERE featured = 1`
+	args := []any{}
+	if form != "" {
+		query += " AND seed.books.form = ?"
+		args = append(args, form)
+	}
+	query += `
 ORDER BY (seed.books.nid*2654435761 + ?) % 1000003, seed.books.nid
-LIMIT ? OFFSET ?`, seed, limit, offset)
+LIMIT ? OFFSET ?`
+	args = append(args, seed, limit, offset)
+	rows, err := s.DB.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

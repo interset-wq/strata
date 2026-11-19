@@ -29,7 +29,7 @@ ip_collab`，按「**征文标记（确定性）＞ 形态判据（估计）＞ 
 ## 1. 字段契约（面向实现）
 
 ```
-books 表增加一列（24 → 25 列）：
+books 表增加 `form` 列（已在 v3 落地，24 → 28 列，另加 lqs/lqs_pctl/vel_pctl）：
   form TEXT NOT NULL CHECK (form IN
     ('short','medium','long','dialogue','ip_collab'))
 索引：CREATE INDEX idx_books_form ON books(form, favs DESC);
@@ -175,7 +175,7 @@ def classify_form(row) -> str:
 | `ip_collab` | 935 | 0.4% | 六类封闭名单 |
 | 合计 | 241,758 | 100% | — |
 
-> 占比为 universe 口径；种子 books 是全库 30,878 本的子集，分布不同属正常。
+> 占比为 universe 口径；种子 books 是全库 26,339 本的子集，分布不同属正常。
 > 形态判据全库 35,552 / universe 35,325；与征文确定集交集 4,779，
 > 互斥并入 dialogue 后 dialogue 共 42,400。
 > 短篇边界由 3 万改 5 万后：short 115,115→130,841、medium 42,892→27,166，其余不变。
@@ -248,7 +248,7 @@ def classify_form(row) -> str:
 
 ## 7. 与现有资产的关系
 
-- `books` 25 列（加 form + 索引）；分位分母、D2 `deep_ranks` 不变；
+- `books` 28 列（v3 加 form/lqs/lqs_pctl/vel_pctl + 索引）；分位分母、D2 `deep_ranks` 不变；
   schema v2→v3、seed_version 顺延；validate/manifest 同步（§1）。
 - 引擎：榜单/发现流加 `form` 过滤；长篇榜排除 `dialogue`、短篇榜排除 `medium`；
   各形式给独立入口（对接契约 12 §6）。

@@ -1,41 +1,69 @@
 {
-  "schema_version": 2,
-  "seed_version": "20260503.2",
+  "schema_version": 3,
+  "seed_version": "20260503.4",
   "content_end": "2026-05-03",
-  "built_at": "2026-11-17T12:45:55+00:00",
-  "book_count": 30878,
+  "built_at": "2026-11-19T01:51:26+00:00",
+  "book_count": 26339,
   "licensed_count": 47,
-  "tag_count": 105,
-  "tag_rows": 111828,
+  "tag_count": 104,
+  "tag_rows": 82579,
   "gen_min": 2007,
   "gen_max": 2025,
   "counts": {
     "stats_universe": 241758,
-    "base": 29433,
-    "short_added": 1398,
+    "baseline_v0": 30831,
+    "admitted_v3": 26292,
     "licensed_added": 47,
-    "seed": 30878,
-    "deep_rank_rows": 14626
+    "seed": 26339,
+    "deep_rank_rows": 14626,
+    "lqs_scored_universe": 12126
   },
+  "admission_detail": {
+    "top_favs": 20000,
+    "monthly": 1555,
+    "featured": 620,
+    "short": 2000,
+    "time_excluded": 9074,
+    "time_gated_diagnostic": 4164,
+    "time_cut_diagnostic": 4910,
+    "deep": 7838
+  },
+  "favs_coverage": 0.938842,
+  "postconditions": [
+    {
+      "name": "P1 深榜书全部在种子内",
+      "pass": true,
+      "detail": "7838 本深榜书，缺 0"
+    },
+    {
+      "name": "P2 favs<5 且字数<1万必须有外部锚",
+      "pass": true,
+      "detail": "无锚噪声 0 本"
+    },
+    {
+      "name": "P3 收藏覆盖回退 ≤ 时间渠道放弃量",
+      "pass": true,
+      "detail": "新 93.88% vs V0 93.95%，差 -0.07pp（容差 0.2pp）"
+    }
+  ],
   "source": {
-    "dataset": "light-nook-labs/novel_hub",
-    "asset": "dataset.7z",
-    "files": 22,
-    "lines": 249832,
-    "unique_nids": 248230,
+    "dataset": "local:dataset/out/books.jsonl",
+    "dataset_sha256": "e3f82fcfb9f1a64c289e09b123097eb29340588aba21330daf07407d63d043e7",
     "analysis_rows": 245779,
-    "dropped_rows": 2451
+    "dropped_rows": 2451,
+    "upstream": "light-nook-labs/novel_hub",
+    "upstream_asset": "dataset.7z"
   },
   "files": {
     "db": {
       "name": "seed.db",
-      "bytes": 17993728,
-      "sha256": "6152d1780f9dba21e78ad2ad8f7624f81e088a560c99f6ca75d398fc6985e899"
+      "bytes": 19230720,
+      "sha256": "207c4520edfdee2407a095ee76b927aa371dab0fed9b732f1f97daa506c5636f"
     },
     "gz": {
       "name": "seed.db.gz",
-      "bytes": 7445426,
-      "sha256": "93d66832a2e8d07beb7ce6d04f0f53700d686652f20f19499c42e93e20f61693"
+      "bytes": 8434763,
+      "sha256": "ff6e175b92c44056d009053b8bf9253369d300ada705da673c5cfb14385ff740"
     }
   }
 }

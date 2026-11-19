@@ -56,7 +56,7 @@ func getJSON(t *testing.T, url string, status int) map[string]any {
 func TestHealthz(t *testing.T) {
 	srv, _ := newTestServer(t)
 	body := getJSON(t, srv.URL+"/strata/healthz", http.StatusOK)
-	if body["book_count"].(float64) != 6 || body["seed_version"] != "test-1" {
+	if body["book_count"].(float64) != 8 || body["seed_version"] != "test-1" {
 		t.Fatalf("body = %v", body)
 	}
 }
@@ -122,33 +122,33 @@ func TestBannerSegmented(t *testing.T) {
 
 func TestFeaturedAll(t *testing.T) {
 	srv, _ := newTestServer(t)
-	// testseed featured pool: 1003 (favs 900) then 1001 (favs 500).
-	// Default order: favs DESC.
+	// testseed featured pool: 1003 (long, favs 900), 1006 (ip_collab, 700),
+	// 1001 (long, 500), 1007 (medium, 400). Default order: favs DESC.
 	all := getJSON(t, srv.URL+"/strata/featured-all?limit=10", http.StatusOK)
 	items := all["items"].([]any)
-	if len(items) != 2 {
-		t.Fatalf("items = %d, want 2", len(items))
+	if len(items) != 4 {
+		t.Fatalf("items = %d, want 4", len(items))
 	}
 	if items[0].(map[string]any)["nid"] != 1003.0 ||
-		items[1].(map[string]any)["nid"] != 1001.0 {
-		t.Fatalf("desc order = %v, %v",
-			items[0].(map[string]any)["nid"], items[1].(map[string]any)["nid"])
+		items[3].(map[string]any)["nid"] != 1007.0 {
+		t.Fatalf("desc order = %v .. %v",
+			items[0].(map[string]any)["nid"], items[3].(map[string]any)["nid"])
 	}
 	// order=asc inverts.
 	asc := getJSON(t, srv.URL+"/strata/featured-all?limit=10&order=asc",
 		http.StatusOK)
 	a := asc["items"].([]any)
-	if a[0].(map[string]any)["nid"] != 1001.0 ||
-		a[1].(map[string]any)["nid"] != 1003.0 {
-		t.Fatalf("asc order = %v, %v",
-			a[0].(map[string]any)["nid"], a[1].(map[string]any)["nid"])
+	if a[0].(map[string]any)["nid"] != 1007.0 ||
+		a[3].(map[string]any)["nid"] != 1003.0 {
+		t.Fatalf("asc order = %v .. %v",
+			a[0].(map[string]any)["nid"], a[3].(map[string]any)["nid"])
 	}
 	// Pagination: limit=1 offset=1 skips the first row.
 	page := getJSON(t, srv.URL+"/strata/featured-all?limit=1&offset=1",
 		http.StatusOK)
 	p := page["items"].([]any)
-	if len(p) != 1 || p[0].(map[string]any)["nid"] != 1001.0 {
-		t.Fatalf("page = %v, want [1001]", p)
+	if len(p) != 1 || p[0].(map[string]any)["nid"] != 1006.0 {
+		t.Fatalf("page = %v, want [1006]", p)
 	}
 	// Past the end: empty, not an error.
 	empty := getJSON(t, srv.URL+"/strata/featured-all?limit=10&offset=5",
@@ -161,6 +161,74 @@ func TestFeaturedAll(t *testing.T) {
 		http.StatusBadRequest)
 	getJSON(t, srv.URL+"/strata/featured-all?offset=-1",
 		http.StatusBadRequest)
+}
+
+// TestFeaturedForm: the per-form featured pools that drive the home
+// carousel (docs/13). medium/ip_collab pools are small and shown in a
+// fixed favs order; short has no featured books of its own — the client
+// falls back to the IP pool, the API returns the empty short pool as-is.
+func TestFeaturedForm(t *testing.T) {
+	srv, _ := newTestServer(t)
+	byForm := func(form string) []any {
+		body := getJSON(t,
+			srv.URL+"/strata/featured?limit=10&form="+form, http.StatusOK)
+		return body["items"].([]any)
+	}
+	// ip_collab pool: exactly the one ip_collab featured book.
+	ip := byForm("ip_collab")
+	if len(ip) != 1 || ip[0].(map[string]any)["nid"] != 1006.0 {
+		t.Fatalf("ip_collab pool = %v", ip)
+	}
+	// medium pool: exactly the one medium featured book.
+	med := byForm("medium")
+	if len(med) != 1 || med[0].(map[string]any)["nid"] != 1007.0 {
+		t.Fatalf("medium pool = %v", med)
+	}
+	// short pool: empty — the client-side fallback is not the API's job.
+	short := byForm("short")
+	if len(short) != 0 {
+		t.Fatalf("short pool = %v, want empty", short)
+	}
+	// long pool: the two long featured books, favs DESC.
+	long := byForm("long")
+	if len(long) != 2 || long[0].(map[string]any)["nid"] != 1003.0 ||
+		long[1].(map[string]any)["nid"] != 1001.0 {
+		t.Fatalf("long pool = %v", long)
+	}
+	// No form: the whole pool, licensed works included (display layer).
+	all := byForm("")
+	if len(all) != 4 {
+		t.Fatalf("whole pool = %v, want 4", all)
+	}
+	// Invalid form rejected.
+	getJSON(t, srv.URL+"/strata/featured?form=novella",
+		http.StatusBadRequest)
+}
+
+// TestBannerForm: the seeded shuffle honours the form filter — every
+// drawn item must belong to the requested form.
+func TestBannerForm(t *testing.T) {
+	srv, _ := newTestServer(t)
+	body := getJSON(t, srv.URL+"/strata/banner?seed=20261119&limit=10&form=ip_collab",
+		http.StatusOK)
+	items := body["items"].([]any)
+	if len(items) != 1 || items[0].(map[string]any)["nid"] != 1006.0 {
+		t.Fatalf("banner ip_collab = %v", items)
+	}
+	// The long shuffle must never leak other forms.
+	long := getJSON(t, srv.URL+"/strata/banner?seed=20261119&limit=10&form=long",
+		http.StatusOK)
+	l := long["items"].([]any)
+	if len(l) != 2 {
+		t.Fatalf("banner long = %v, want 2", l)
+	}
+	for _, it := range l {
+		switch it.(map[string]any)["nid"].(float64) {
+		case 1001, 1003:
+		default:
+			t.Fatalf("banner long leaked form: %v", it)
+		}
+	}
 }
 
 func TestLicensedPool(t *testing.T) {
@@ -258,6 +326,57 @@ func TestRankingShort(t *testing.T) {
 	}
 	if items[0].(map[string]any)["nid"].(float64) != 1002 {
 		t.Fatalf("first = %v", items[0])
+	}
+}
+
+func TestRankingClassic(t *testing.T) {
+	srv, _ := newTestServer(t)
+	body := getJSON(t, srv.URL+"/strata/rankings/classic?limit=2", http.StatusOK)
+	items := body["items"].([]any)
+	if len(items) != 2 {
+		t.Fatalf("items = %d", len(items))
+	}
+	// Absolute favs across all years: 1003 (900) before 1001 (500).
+	first := items[0].(map[string]any)
+	if first["nid"].(float64) != 1003 || first["favs"].(float64) != 900 {
+		t.Fatalf("first = %v", first)
+	}
+	if first["form"] != "long" {
+		t.Fatalf("form = %v", first["form"])
+	}
+
+	body = getJSON(t, srv.URL+"/strata/rankings/classic?form=short", http.StatusOK)
+	items = body["items"].([]any)
+	if len(items) != 2 {
+		t.Fatalf("short items = %d", len(items))
+	}
+	if items[0].(map[string]any)["nid"].(float64) != 1002 ||
+		items[1].(map[string]any)["nid"].(float64) != 1004 {
+		t.Fatalf("short order = %v", items)
+	}
+
+	getJSON(t, srv.URL+"/strata/rankings/classic?form=novella",
+		http.StatusBadRequest)
+}
+
+func TestRandomFormFilter(t *testing.T) {
+	srv, _ := newTestServer(t)
+	body := getJSON(t, srv.URL+"/strata/random?limit=8&form=short", http.StatusOK)
+	items := body["items"].([]any)
+	if len(items) != 2 {
+		t.Fatalf("items = %d", len(items))
+	}
+	for _, it := range items {
+		if it.(map[string]any)["form"] != "short" {
+			t.Fatalf("form = %v", it)
+		}
+	}
+
+	// The browse pool must not apply the mega-book gate to short forms.
+	body = getJSON(t,
+		srv.URL+"/strata/random?limit=8&status=browse&form=short", http.StatusOK)
+	if len(body["items"].([]any)) != 2 {
+		t.Fatalf("browse short items = %v", body["items"])
 	}
 }
 

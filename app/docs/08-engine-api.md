@@ -11,20 +11,21 @@
 - 所有响应为 UTF-8 JSON；HTTP 状态码语义常规。
 - 错误响应统一为：
 
-  ```json
-  { "error": { "code": "invalid_argument", "message": "..." } }
-  ``
+```json
+{ "error": { "code": "invalid_argument", "message": "..." } }
+```
 
-  | code | HTTP | 含义 |
-  | --- | --- | --- |
-  | `invalid_argument` | 400 | 参数缺失/非法 |
-  | `not_found` | 404 | nid 不在种子里 |
-  | `internal` | 500 | 存储层/内部错误 |
+| code | HTTP | 含义 |
+| --- | --- | --- |
+| `invalid_argument` | 400 | 参数缺失/非法 |
+| `not_found` | 404 | nid 不在种子里 |
+| `internal` | 500 | 存储层/内部错误 |
 
 - **分页**：统一用 `limit` 查询参数，1..200，缺省 50；越界返回 `invalid_argument`。
   v1 不做游标翻页（榜单一次最多 200 条已够）。
 - 契约基线常量：`content_end`（种子数据截止日）、`gen_min`/`gen_max`（出生年份区间，
-  当前 2007..2025）、`book_count=30878`、`licensed_count=47`。以 `/strata/healthz`
+  当前 2007..2025）、`book_count=26339`、`licensed_count=47`。`form` 可选过滤：
+  `short|medium|long|dialogue|ip_collab`，空值表示全部。以 `/strata/healthz`
   实际返回为准，不要在 Dart 侧硬编码。
 
 ## 现有端点（已实现）
@@ -36,9 +37,9 @@
 ```json
 {
   "status": "ok",
-  "schema_version": 1,
-  "seed_version": "…",
-  "book_count": 30878,
+  "schema_version": 3,
+  "seed_version": "20260503.4",
+  "book_count": 26339,
   "licensed_count": 47,
   "content_end": "2026-05-03",
   "gen_min": 2007,
@@ -100,6 +101,37 @@ HTML 含书名/作者/分类/签约/封面/简介/收藏/赞/字数/状态/更�
 `comic_folder` 仅为官方恢复后复用的留档。`null`（未抓/失败）与 `0`（确认无改编）
 都不显示标注。
 
+### GET /strata/banner?seed=&offset=&limit=&form=（**已实现**）
+
+每日轮播：对 featured=1 全池（含 is_licensed，展示层）按日期种子（默认当天
+`yyyymmdd`）做等概率确定性洗牌，取 `[offset, offset+limit)` 段——同日稳定、隔天
+必变、分段不重叠。`form` 可选，洗牌前先收窄到单一形态。
+
+### GET /strata/featured?limit=&form=（**已实现**）
+
+编辑精选**固定序**：`ORDER BY favs DESC, nid ASC`，不做随机。池子不足 `limit`
+时原样返回（池空返回空数组）。
+
+**首页分形态轮播（docs/13 form）**：轮播随首页形态 tab 切换，行为按池大小定——
+
+| form          | featured 池（seed 20260503.4） | 轮播行为                                                                                                           |
+| ------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| `long`      | 662（含授权 44）               | 日期种子洗牌（`/banner`）                                                                                        |
+| `dialogue`  | 0                              | 空轮播（UI 渲染 `SizedBox.shrink`）                                                                              |
+| `medium`    | 3（全授权）                    | 池不足 6 张，**固定收藏序**（`/featured`）                                                                 |
+| `ip_collab` | 2                              | 同上，**固定**                                                                                               |
+| `short`     | 0                              | **复用 IP 的固定轮播**（UI 侧把 `form=short` 映射为 `ip_collab`；IP 形态 featured 按字数指标本也是短篇） |
+
+short→IP 的回退是 UI 的职责（`bannerProvider` 一处集中），API 保持纯过滤语义：
+`/featured?form=short` 返回空池，不替客户端做回退。
+
+### GET /strata/featured-all?limit=&offset=&order=（**已实现**）
+
+「大图精选 · 全部」gallery 分页：默认 `order=desc`（收藏降序，编辑精选池热门
+在前），`order=asc` 倒序。`nid` 作稳定 tie-breaker（注意 SQL 里必须写
+`seed.books.nid`——covers 表同名列，裸 `nid` 会歧义 500）。`limit` 1..200、
+`offset` ≥ 0，越界返回空数组而非 400，非法值 400。
+
 ### GET /strata/rankings/favs?year=&genre=&limit=
 
 - `year` 必填，须在 `gen_min..gen_max` 内，否则 400。
@@ -124,16 +156,22 @@ HTML 含书名/作者/分类/签约/封面/简介/收藏/赞/字数/状态/更�
 与 `genre` 可组合，均在分位榜口径内过滤。`contest` 取值在端上从 `contest=1` 结果
 聚合（items 的 `contest` 字段），不单独提供枚举端点。
 
-### GET /strata/rankings/board?kind=&limit=&offset=（**已实现**）
+### GET /strata/rankings/board?kind=&form=&limit=&offset=（**已实现**）
 
 Classic 全库榜（docs/12 展示列）：平台累计值排序，不涉及分位。`kind` 枚举：
 `recommend`(praises) / `popular`(clicks) / `favs` / `new`(est_date) / `finish`(已完结按 favs) /
 `words`。`offset` 分页（默认 0）。items 为 RankItem（含 `status`/`words`/`clicks`/`cover_url`）。
 
-### GET /strata/discover?cursor=&limit=（**已实现**）
+### GET /strata/rankings/classic?genre=&status=&contest=&form=&limit=&offset=（**已实现**）
+
+Classic 主线分类/状态/大赛列表：只按平台累计 `favs` 降序（`favs DESC, nid ASC`），
+不含分位或 LQS。`genre`/`status`/`contest` 与 `/rankings/favs` 同义；`contest=1`
+表示全部大赛作品。`items` 为 RankItem（含 `form`），`meta.ordering="favs"`。
+
+### GET /strata/discover?cursor=&form=&limit=（**已实现**）
 
 Classic 发现流（docs/12 §5）：候选池 = `is_licensed=0` 且**有封面**（封面硬门槛，
-12,107 本），按平台 `clicks` 降序，**keyset 游标分页**（cursor = 上一批末条
+全部有封面的种子书），按平台 `clicks` 降序，**keyset 游标分页**（cursor = 上一批末条
 `clicks:nid`，缺省从顶部开始），每批默认 20，stateless。响应含 `next_cursor`
 （批末返回，为空表示到底）。
 
@@ -152,7 +190,7 @@ App API 成功→精确元数据写观测 + cover 缓存；否则 HTML 兜底（
 仅 alive 写观测）。无论成败均盖章 `last_poll_at`，坏书不会卡死队列；
 失败不写观测行——数据页据实区分「暂无更新」与「数据缺口」。
 
-### GET /strata/random?limit=（**已实现**）
+### GET /strata/random?limit=&status=&form=（**已实现**）
 
 首页"换一换"网格数据源：`is_licensed=0` 种子库内 `ORDER BY RANDOM()` 均匀抽样
 （默认 limit，上限 max_limit），items 为 RankItem（含 status/words/clicks/favs/
@@ -248,13 +286,13 @@ HTML 基线，响应不带 `source` 字段——调用方无需区分。**独立
 
 ### 书架 / watchlist（Phase 4/5）
 
-| 端点 | 方法 | 语义 |
-| --- | --- | --- |
-| `/strata/shelf` | GET（**已实现**） | 书架列表，`items: [{nid, title, author, genre, added_at}]`，与种子 JOIN 取书名 |
-| `/strata/shelf` | PUT（**已实现**） | 收藏，body `{ "nid": 123456 }` |
-| `/strata/shelf/:nid` | DELETE（**已实现**） | 取消收藏 |
-| `/strata/watchlist` | GET | 观测列表（含 `role: self\|peer`，Phase 5） |
-| `/strata/watchlist` | POST/DELETE | 增删（`nid` + `role`，Phase 5） |
+| 端点                   | 方法                       | 语义                                                                             |
+| ---------------------- | -------------------------- | -------------------------------------------------------------------------------- |
+| `/strata/shelf`      | GET（**已实现**）    | 书架列表，`items: [{nid, title, author, genre, added_at}]`，与种子 JOIN 取书名 |
+| `/strata/shelf`      | PUT（**已实现**）    | 收藏，body `{ "nid": 123456 }`                                                 |
+| `/strata/shelf/:nid` | DELETE（**已实现**） | 取消收藏                                                                         |
+| `/strata/watchlist`  | GET                        | 观测列表（含 `role: self\|peer`，Phase 5）                                      |
+| `/strata/watchlist`  | POST/DELETE                | 增删（`nid` + `role`，Phase 5）                                              |
 
 只写 `user.db`；与种子的关联**只用 `nid`**（rowid 每次种子发布都会重排）。
 

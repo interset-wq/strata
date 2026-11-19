@@ -25,6 +25,7 @@ CREATE TABLE books(
   cover_url TEXT, updated_at TEXT, est_year INTEGER NOT NULL,
   est_date TEXT NOT NULL, est_conf TEXT NOT NULL, tags TEXT,
   fav_pctl REAL, click_pctl REAL, praise_pctl REAL, pr REAL, pctl_pr REAL,
+  form TEXT NOT NULL DEFAULT 'long',
   is_licensed INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE book_tags(nid INTEGER NOT NULL, tag TEXT NOT NULL);
@@ -53,6 +54,8 @@ var books = []book{
 	{nid: 1004, title: "Short D", author: "Author D", genre: "魔幻", status: "已完结", words: 40000, favs: 50, pctl: 0.1, year: 2010},
 	{nid: 2001, title: "Licensed", author: "天闻角川", genre: "魔幻", status: "已完结", words: 90000, favs: 99999, pctl: nil, licensed: 1, year: 2008},
 	{nid: 1005, title: "New E", author: "Author E", genre: "都市", status: "连载中", words: 150000, favs: 300, pctl: 0.95, year: 2025},
+	{nid: 1006, title: "IP F", author: "Author F", genre: "都市", status: "连载中", words: 80000, favs: 700, pctl: 0.8, featured: 1, year: 2012},
+	{nid: 1007, title: "Medium G", author: "Author G", genre: "科幻", status: "已完结", words: 120000, favs: 400, pctl: 0.7, featured: 1, year: 2013},
 }
 
 // Build writes assets/seed.db.gz + manifest.json and a user.db with one
@@ -89,6 +92,21 @@ VALUES(?,?,?,?, '免费', ?, NULL, ?, 1000, ?, 10, ?, NULL, '2026-04-01T00:00:00
 			db.Close()
 			return nil, err
 		}
+	}
+	if _, err := db.Exec(`UPDATE books SET form='short' WHERE nid IN (1002,1004)`); err != nil {
+		db.Close()
+		return nil, err
+	}
+	// 1006/1007 carry the small featured pools that drive the per-form
+	// carousel (docs/13): ip_collab and medium each get their own featured
+	// book; short deliberately has none (its carousel falls back to IP).
+	if _, err := db.Exec(`UPDATE books SET form='ip_collab' WHERE nid = 1006`); err != nil {
+		db.Close()
+		return nil, err
+	}
+	if _, err := db.Exec(`UPDATE books SET form='medium' WHERE nid = 1007`); err != nil {
+		db.Close()
+		return nil, err
 	}
 	if _, err := db.Exec(`INSERT INTO book_tags(nid,tag) VALUES
 	 (1001,'热血'),(1001,'战斗'),(1004,'战斗'),(2001,'战斗'),(1003,'2020萌神')`); err != nil {

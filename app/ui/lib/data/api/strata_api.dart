@@ -72,10 +72,14 @@ class StrataApi {
   }
 
   Future<List<RankItem>> rankingBoard(
-      {required String kind, int limit = 50, int offset = 0}) async {
+      {required String kind,
+      String? form,
+      int limit = 50,
+      int offset = 0}) async {
     final body = await _get('/rankings/board', {
       'kind': kind,
       'limit': '$limit',
+      'form': ?form,
       if (offset > 0) 'offset': '$offset',
     });
     return (body['items'] as List)
@@ -83,9 +87,34 @@ class StrataApi {
         .toList();
   }
 
-  Future<DiscoverPage> discover({String? cursor, int limit = 20}) async {
+  /// Classic category/status/contest list: absolute favs order, no
+  /// percentiles. This is the data-only browse pathway.
+  Future<List<RankItem>> rankingClassic({
+    String? genre,
+    String? status,
+    String? contest,
+    String? form,
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    final body = await _get('/rankings/classic', {
+      'limit': '$limit',
+      'genre': ?genre,
+      'status': ?status,
+      'contest': ?contest,
+      'form': ?form,
+      if (offset > 0) 'offset': '$offset',
+    });
+    return (body['items'] as List)
+        .map((e) => RankItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<DiscoverPage> discover(
+      {String? cursor, String? form, int limit = 20}) async {
     final body = await _get('/discover', {
       'limit': '$limit',
+      'form': ?form,
       if (cursor != null && cursor.isNotEmpty) 'cursor': cursor,
     });
     return DiscoverPage.fromJson(body as Map<String, dynamic>);
@@ -153,10 +182,12 @@ class StrataApi {
     await _delete('/watchlist/$nid');
   }
 
-  Future<List<RankItem>> randomBooks({int limit = 8, String? status}) async {
+  Future<List<RankItem>> randomBooks(
+      {int limit = 8, String? status, String? form}) async {
     final body = await _get('/random', {
       'limit': '$limit',
       'status': ?status,
+      'form': ?form,
     });
     return (body['items'] as List)
         .map((e) => RankItem.fromJson(e as Map<String, dynamic>))
@@ -187,20 +218,30 @@ class StrataApi {
   }
 
   /// 编辑精选（seed featured=1，构建期人工选定，非"热门"）。
-  Future<List<FeaturedItem>> featured({int limit = 6}) async {
-    final body = await _get('/featured', {'limit': '$limit'});
+  /// 传 form 时只取该形态的 featured 池，池子不足 limit 时原样返回。
+  Future<List<FeaturedItem>> featured({int limit = 6, String? form}) async {
+    final params = {'limit': '$limit'};
+    if (form != null) params['form'] = form;
+    final body = await _get('/featured', params);
     return (body['items'] as List)
         .map((e) => FeaturedItem.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 
   /// 每日 banner：日期种子对整个 banner 池（含 is_licensed）等概率抽取。
+  /// form 非空时只在该形态的 featured 池内洗牌。
   Future<List<FeaturedItem>> banners(
       {required int seed,
       int limit = 6,
-      int offset = 0}) async {
-    final body = await _get('/banner',
-        {'seed': '$seed', 'limit': '$limit', 'offset': '$offset'});
+      int offset = 0,
+      String? form}) async {
+    final params = {
+      'seed': '$seed',
+      'limit': '$limit',
+      'offset': '$offset',
+    };
+    if (form != null) params['form'] = form;
+    final body = await _get('/banner', params);
     return (body['items'] as List)
         .map((e) => FeaturedItem.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -410,6 +451,7 @@ class RankItem {
   final int? words;
   final int? clicks;
   final int? praises;
+  final String form;
   final List<String> tags;
 
   RankItem.fromJson(Map<String, dynamic> m)
@@ -427,6 +469,7 @@ class RankItem {
         words = m['words'] as int?,
         clicks = m['clicks'] as int?,
         praises = (m['praises'] as num?)?.toInt(),
+        form = m['form'] as String? ?? '',
         tags = ((m['tags'] as List?) ?? const [])
             .map((e) => e.toString())
             .toList();

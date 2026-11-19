@@ -90,6 +90,7 @@ func New(s *store.Store) *gin.Engine {
 	group.DELETE("/watchlist/:nid", srv.watchRemove)
 	group.GET("/rankings/favs", srv.rankingFavs)
 	group.GET("/rankings/board", srv.rankingBoard)
+	group.GET("/rankings/classic", srv.rankingClassic)
 	group.GET("/discover", srv.discover)
 	group.GET("/rankings/deep", srv.rankingDeep)
 	group.GET("/rankings/short", srv.rankingShort)
@@ -468,7 +469,11 @@ func (s *Server) random(c *gin.Context) {
 			"status must be empty, \"serial\", \"finished\" or \"browse\"")
 		return
 	}
-	items, err := s.store.RandomBooks(c.Request.Context(), limit, status)
+	form, ok := parseForm(c)
+	if !ok {
+		return
+	}
+	items, err := s.store.RandomBooks(c.Request.Context(), limit, status, form)
 	if err != nil {
 		fail(c, http.StatusInternalServerError, "internal", err.Error())
 		return
@@ -569,14 +574,18 @@ func (s *Server) rankingBoard(c *gin.Context) {
 			return
 		}
 	}
-	items, err := s.store.BoardBooks(c.Request.Context(), kind, limit, offset)
+	form, ok := parseForm(c)
+	if !ok {
+		return
+	}
+	items, err := s.store.BoardBooks(c.Request.Context(), kind, form, limit, offset)
 	if err != nil {
 		fail(c, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"meta": gin.H{"kind": kind, "pool": "seed", "ordering": "cumulative",
-			"licensed_excluded": true},
+			"form": form, "licensed_excluded": true},
 		"items": items,
 	})
 }
@@ -584,12 +593,51 @@ func (s *Server) rankingBoard(c *gin.Context) {
 // discover is the classic discovery stream (docs/12 §5): cover-bearing
 // books by platform clicks, keyset pagination via cursor "clicks:nid",
 // 20 per batch, stateless.
+func (s *Server) rankingClassic(c *gin.Context) {
+	limit, ok := parseLimit(c)
+	if !ok {
+		return
+	}
+	offset := 0
+	if raw := c.Query("offset"); raw != "" {
+		var err error
+		if offset, err = strconv.Atoi(raw); err != nil || offset < 0 {
+			fail(c, http.StatusBadRequest, "invalid_argument",
+				"offset must be a non-negative integer")
+			return
+		}
+	}
+	form, ok := parseForm(c)
+	if !ok {
+		return
+	}
+	items, err := s.store.ClassicBooks(c.Request.Context(),
+		c.Query("genre"), c.Query("status"), c.Query("contest"), form, limit, offset)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"meta": gin.H{
+			"kind": "classic", "pool": "seed", "ordering": "favs",
+			"genre": c.Query("genre"), "status": c.Query("status"),
+			"contest": c.Query("contest"), "form": form,
+			"licensed_excluded": true,
+		},
+		"items": items,
+	})
+}
+
 func (s *Server) discover(c *gin.Context) {
 	limit, ok := parseLimit(c)
 	if !ok {
 		return
 	}
-	items, err := s.store.Discover(c.Request.Context(), c.Query("cursor"), limit)
+	form, ok := parseForm(c)
+	if !ok {
+		return
+	}
+	items, err := s.store.Discover(c.Request.Context(), c.Query("cursor"), form, limit)
 	if err != nil {
 		fail(c, http.StatusBadRequest, "invalid_argument", err.Error())
 		return
@@ -602,7 +650,8 @@ func (s *Server) discover(c *gin.Context) {
 		}
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"meta":        gin.H{"pool": "seed", "ordering": "clicks", "cover_required": true},
+		"meta": gin.H{"pool": "seed", "ordering": "clicks", "cover_required": true,
+			"form": form},
 		"items":       items,
 		"next_cursor": nextCursor,
 	})
@@ -928,9 +977,14 @@ func (s *Server) observations(c *gin.Context) {
 
 // banner picks the daily banner set: a uniform deterministic shuffle of the
 // whole banner pool (seed featured=1, licensed included) keyed by a date
-// seed so every day draws a different, cacheable set.
+// seed so every day draws a different, cacheable set. An optional form
+// narrows the pool to one form before shuffling.
 func (s *Server) banner(c *gin.Context) {
 	limit, ok := parseLimit(c)
+	if !ok {
+		return
+	}
+	form, ok := parseForm(c)
 	if !ok {
 		return
 	}
@@ -952,7 +1006,8 @@ func (s *Server) banner(c *gin.Context) {
 		}
 		offset = o
 	}
-	items, err := s.store.BannerPick(c.Request.Context(), day, offset, limit)
+	items, err := s.store.BannerPick(c.Request.Context(), day, offset, limit,
+		form)
 	if err != nil {
 		fail(c, http.StatusInternalServerError, "internal", err.Error())
 		return
@@ -962,12 +1017,17 @@ func (s *Server) banner(c *gin.Context) {
 
 // featured returns editor-picked books (seed featured=1) for the home
 // carousel — a static, build-time curation, never presented as "hot".
+// An optional form narrows the pool; a short pool is returned as-is.
 func (s *Server) featured(c *gin.Context) {
 	limit, ok := parseLimit(c)
 	if !ok {
 		return
 	}
-	items, err := s.store.FeaturedBooks(c.Request.Context(), limit)
+	form, ok := parseForm(c)
+	if !ok {
+		return
+	}
+	items, err := s.store.FeaturedBooks(c.Request.Context(), limit, form)
 	if err != nil {
 		fail(c, http.StatusInternalServerError, "internal", err.Error())
 		return
@@ -1047,6 +1107,24 @@ func (s *Server) shelfRemove(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+var validForms = map[string]bool{
+	"short": true, "medium": true, "long": true, "dialogue": true, "ip_collab": true,
+}
+
+// parseForm returns the optional docs/13 form filter. Empty means all forms.
+func parseForm(c *gin.Context) (string, bool) {
+	form := c.Query("form")
+	if form == "" {
+		return "", true
+	}
+	if !validForms[form] {
+		fail(c, http.StatusBadRequest, "invalid_argument",
+			"form must be short|medium|long|dialogue|ip_collab")
+		return "", false
+	}
+	return form, true
 }
 
 func parseLimit(c *gin.Context) (int, bool) {

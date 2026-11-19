@@ -60,7 +60,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                   Icon(Icons.search,
                       size: 56, color: scheme.onSurfaceVariant.withValues(alpha: .5)),
                   const SizedBox(height: 12),
-                  Text('输入关键词搜索 30,878 本种子',
+                  Text('输入关键词搜索 26,339 本种子',
                       style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
                 ],
               ),

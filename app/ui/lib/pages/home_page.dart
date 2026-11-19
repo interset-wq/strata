@@ -20,27 +20,26 @@ final boardProvider = FutureProvider.autoDispose.family<List<RankItem>, String>(
 
 /// 连载发现：从全库连载书中均匀抽样（ORDER BY RANDOM，等概率），
 /// 每次下拉刷新重掷一批。
-final serialShowcaseProvider = FutureProvider.autoDispose<List<RankItem>>((
-  ref,
-) async {
+final serialShowcaseProvider = FutureProvider.autoDispose
+    .family<List<RankItem>, String>((ref, form) async {
   final handle = await ref.watch(bootProvider.future);
-  return handle.api.randomBooks(limit: 8, status: 'serial');
+  return handle.api.randomBooks(limit: 8, status: 'serial', form: form);
 });
 
 /// 完结精选：形态照搬连载发现——从完结长篇中均匀抽样 8 本，
 /// 下拉刷新换一批，更多入口进 100 本二级页。
-final finishedShowcaseProvider =
-    FutureProvider.autoDispose<List<RankItem>>((ref) async {
+final finishedShowcaseProvider = FutureProvider.autoDispose
+    .family<List<RankItem>, String>((ref, form) async {
   final handle = await ref.watch(bootProvider.future);
-  return handle.api.randomBooks(limit: 8, status: 'finished');
+  return handle.api.randomBooks(limit: 8, status: 'finished', form: form);
 });
 
 /// 随便看看：形态照搬连载发现——从 60 万字以上的大书中均匀抽样 8 本
 ///（不限连载/完结），下拉刷新换一批，更多入口进 100 本二级页。
-final browseShowcaseProvider =
-    FutureProvider.autoDispose<List<RankItem>>((ref) async {
+final browseShowcaseProvider = FutureProvider.autoDispose
+    .family<List<RankItem>, String>((ref, form) async {
   final handle = await ref.watch(bootProvider.future);
-  return handle.api.randomBooks(limit: 8, status: 'browse');
+  return handle.api.randomBooks(limit: 8, status: 'browse', form: form);
 });
 
 /// 首页：编辑精选轮播 → 入口宫格 → 分类找书 → 继续浏览。
@@ -55,6 +54,8 @@ class HomePage extends ConsumerStatefulWidget {
 class _HomePageState extends ConsumerState<HomePage> {
   final _scroll = ScrollController();
   bool _showTop = false;
+  static const _formValues = ['long', 'medium', 'short', 'dialogue', 'ip_collab'];
+  String _form = 'long';
 
   @override
   void initState() {
@@ -73,16 +74,16 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final banners = ref.watch(bannerProvider);
+    final banners = ref.watch(bannerProvider(_form));
     return Scaffold(
       body: RefreshIndicator(
         onRefresh: () async {
-          ref.invalidate(bannerProvider);
+          ref.invalidate(bannerProvider(_form));
           ref.invalidate(boardProvider);
-          ref.invalidate(serialShowcaseProvider);
-          ref.invalidate(finishedShowcaseProvider);
-          ref.invalidate(browseShowcaseProvider);
-          await ref.read(bannerProvider.future);
+          ref.invalidate(serialShowcaseProvider(_form));
+          ref.invalidate(finishedShowcaseProvider(_form));
+          ref.invalidate(browseShowcaseProvider(_form));
+          await ref.read(bannerProvider(_form).future);
         },
         child: SafeArea(
           bottom: false,
@@ -95,11 +96,19 @@ class _HomePageState extends ConsumerState<HomePage> {
                   controller: _scroll,
                   padding: const EdgeInsets.symmetric(vertical: 8),
               children: [
-                _formTabs(context, () {
-                  ref.invalidate(serialShowcaseProvider);
-                  ref.invalidate(finishedShowcaseProvider);
-                  ref.invalidate(browseShowcaseProvider);
-                }),
+                _formTabs(
+                  context,
+                  onSelect: (i) {
+                    final next = _formValues[i];
+                    if (next == _form) return;
+                    setState(() => _form = next);
+                  },
+                  onRefresh: () {
+                    ref.invalidate(serialShowcaseProvider(_form));
+                    ref.invalidate(finishedShowcaseProvider(_form));
+                    ref.invalidate(browseShowcaseProvider(_form));
+                  },
+                ),
                 _searchRow(context),
                 BannerCarousel(
                   items: items,
@@ -109,14 +118,14 @@ class _HomePageState extends ConsumerState<HomePage> {
                 _entryGrid(context),
                 _sectionTitle(context, '连载发现',
                     onMore: () => context.push('/serial-random')),
-                _ShowcaseSection(provider: serialShowcaseProvider),
+                _ShowcaseSection(provider: serialShowcaseProvider(_form)),
                 _sectionTitle(context, '完结精选',
                     onMore: () => context.push('/finished-random')),
-                _ShowcaseSection(provider: finishedShowcaseProvider),
+                _ShowcaseSection(provider: finishedShowcaseProvider(_form)),
                 _entryCards(context),
                 _sectionTitle(context, '随便看看',
                     onMore: () => context.push('/browse-random')),
-                _ShowcaseSection(provider: browseShowcaseProvider),
+                _ShowcaseSection(provider: browseShowcaseProvider(_form)),
                 _sectionTitle(context, '大图精选',
                     onMore: () => context.push('/featured-gallery')),
                 const _LargeImageSection(),
@@ -143,7 +152,11 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   // header form tab（docs/13 form 字段）：长篇（=小说，15万字以上）/中篇/短篇/对话/IP。
   // 无品牌行——移动端惯例，顶部即内容导航。刷新挂在行末。
-  Widget _formTabs(BuildContext context, VoidCallback onRefresh) {
+  Widget _formTabs(
+    BuildContext context, {
+    required ValueChanged<int> onSelect,
+    required VoidCallback onRefresh,
+  }) {
     final scheme = Theme.of(context).colorScheme;
     const forms = ['长篇', '中篇', '短篇', '对话', 'IP'];
     return SizedBox(
@@ -153,22 +166,31 @@ class _HomePageState extends ConsumerState<HomePage> {
           const SizedBox(width: 16),
           for (var i = 0; i < forms.length; i++) ...[
             if (i > 0) const SizedBox(width: 20),
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
-              decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(
-                    width: 2,
-                    color: i == 0 ? scheme.primary : Colors.transparent,
+            InkWell(
+              onTap: () => onSelect(i),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
+                decoration: BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(
+                      width: 2,
+                      color: _formValues[i] == _form
+                          ? scheme.primary
+                          : Colors.transparent,
+                    ),
                   ),
                 ),
-              ),
-              child: Text(
-                forms[i],
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: i == 0 ? FontWeight.w700 : FontWeight.w400,
-                  color: i == 0 ? scheme.primary : scheme.onSurfaceVariant,
+                child: Text(
+                  forms[i],
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: _formValues[i] == _form
+                        ? FontWeight.w700
+                        : FontWeight.w400,
+                    color: _formValues[i] == _form
+                        ? scheme.primary
+                        : scheme.onSurfaceVariant,
+                  ),
                 ),
               ),
             ),

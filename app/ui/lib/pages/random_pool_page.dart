@@ -13,7 +13,7 @@ final randomPoolProvider =
     FutureProvider.autoDispose.family<List<RankItem>, String>((ref, status)
         async {
   final handle = await ref.watch(bootProvider.future);
-  return handle.api.randomBooks(limit: 100, status: status);
+  return handle.api.randomBooks(limit: 100, status: status, form: 'long');
 });
 
 /// 随机池 100 本二级页（连载/完结/随便看看共用，由 status/title 区分）。

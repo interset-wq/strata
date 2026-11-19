@@ -56,8 +56,6 @@ class _BrowsePageState extends ConsumerState<BrowsePage> {
 
   @override
   Widget build(BuildContext context) {
-    final meta = ref.watch(metaProvider);
-    final year = meta.value?.manifest.genMax;
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
@@ -66,25 +64,21 @@ class _BrowsePageState extends ConsumerState<BrowsePage> {
           IconButton(icon: Icon(Icons.search), onPressed: null),
         ],
       ),
-      body: year == null
-          ? const Center(child: CircularProgressIndicator())
-          : _Body(
-              mode: widget.mode,
-              year: year,
-              filter: _filter,
-              contest: _contest,
-              scroll: _scroll,
-              showTop: _showTop,
-              onFilter: (f) => setState(() => _filter = f),
-              onContest: (c) => setState(() => _contest = c),
-            ),
+      body: _Body(
+        mode: widget.mode,
+        filter: _filter,
+        contest: _contest,
+        scroll: _scroll,
+        showTop: _showTop,
+        onFilter: (f) => setState(() => _filter = f),
+        onContest: (c) => setState(() => _contest = c),
+      ),
     );
   }
 }
 
 class _Body extends ConsumerWidget {
   final BrowseMode mode;
-  final int year;
   final String? filter;
   final String contest;
   final ScrollController scroll;
@@ -94,7 +88,6 @@ class _Body extends ConsumerWidget {
 
   const _Body({
     required this.mode,
-    required this.year,
     required this.filter,
     required this.contest,
     required this.scroll,
@@ -170,20 +163,21 @@ class _Body extends ConsumerWidget {
   }
 
   String _caliberNote(BrowseMode mode) => switch (mode) {
-        BrowseMode.contest => '历年征文比赛参赛作品',
-        BrowseMode.short => '2 万字以下短篇 · 同代收藏分位排序',
-        _ => '同代收藏分位排序 · 排除授权作品',
+        BrowseMode.contest => '经典大赛累计收藏榜（排除授权作品）',
+        BrowseMode.short => '短篇 · 按平台累计收藏排序',
+        _ => '按平台累计收藏排序 · 排除授权作品',
       };
 
   Iterable<RankItem> _rankItems(BuildContext context, WidgetRef ref) {
-    final items = ref.watch(_browseProvider((mode: mode, year: year, filter: filter ?? '', contest: contest)));
+    final items = ref.watch(
+        _browseProvider((mode: mode, filter: filter ?? '', contest: contest)));
     return items.value ?? const [];
   }
 
   Future<void> _pickContest(BuildContext context, WidgetRef ref) async {
     final handle = await ref.read(bootProvider.future);
-    final items = await handle.api
-        .rankingFavs(year: year, contest: '1', limit: 200);
+    final items =
+        await handle.api.rankingClassic(contest: '1', limit: 200);
     final contests = <String>{
       for (final it in items)
         if (it.contest != null && it.contest!.isNotEmpty) it.contest!,
@@ -219,13 +213,12 @@ class _Body extends ConsumerWidget {
 // ---------------------------------------------------------------------------
 // 数据
 
-typedef _BrowseQuery = ({BrowseMode mode, int year, String filter, String contest});
+typedef _BrowseQuery = ({BrowseMode mode, String filter, String contest});
 
 final _browseProvider = FutureProvider.autoDispose
     .family<List<RankItem>, _BrowseQuery>((ref, q) async {
   final handle = await ref.watch(bootProvider.future);
-  return handle.api.rankingFavs(
-    year: q.year,
+  return handle.api.rankingClassic(
     genre: q.mode == BrowseMode.category ? q.filter : null,
     status: q.mode == BrowseMode.status ? q.filter : null,
     contest: q.mode == BrowseMode.contest ? (q.contest == '' ? '1' : q.contest) : null,
@@ -352,8 +345,8 @@ class _BoardCard extends StatelessWidget {
                               fg: scheme.primary, bg: scheme.primary.withValues(alpha: .12)),
                         _badge(context, '收藏 ${_wan(item.favs)}',
                             fg: scheme.onSurfaceVariant, icon: MetricIcons.favs),
-                        _badge(context, '分位 ${item.favPctl.toStringAsFixed(1)}%',
-                            fg: scheme.secondary),
+                        _badge(context, '点击 ${_wan(item.clicks ?? 0)}',
+                            fg: scheme.secondary, icon: MetricIcons.clicks),
                       ],
                     ),
                   ],

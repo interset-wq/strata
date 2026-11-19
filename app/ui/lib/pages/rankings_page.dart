@@ -24,7 +24,7 @@ final _boardProvider = FutureProvider.autoDispose
   return handle.api.rankingBoard(kind: arg.$1, limit: 50, offset: arg.$2);
 });
 
-/// 榜单页（mockups 10 屏定稿）：header tab（Classic 主线 + 量化预留）、
+/// 榜单页（mockups 10 屏定稿）：Classic 主线榜单。
 /// 官方式左侧榜单侧栏、右侧大封面卡列表、back-to-top。
 class RankingsPage extends ConsumerStatefulWidget {
   const RankingsPage({super.key});
@@ -67,7 +67,7 @@ class _RankingsPageState extends ConsumerState<RankingsPage> {
       ),
       body: Column(
         children: [
-          // header tab：Classic 主线，量化模式预留（数据分析中）
+          // header tab：Classic 主线
           Container(
             height: 42,
             decoration: BoxDecoration(
@@ -77,8 +77,6 @@ class _RankingsPageState extends ConsumerState<RankingsPage> {
               children: [
                 const SizedBox(width: 16),
                 _modeTab(context, 'Classic', true, null),
-                const SizedBox(width: 22),
-                _modeTab(context, '量化', false, '数据分析中'),
               ],
             ),
           ),

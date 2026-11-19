@@ -91,31 +91,10 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
                           fontWeight: FontWeight.w700,
                           color: scheme.primary)),
                 ),
-                const SizedBox(width: 22),
-                Container(
-                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Text('量化',
-                        style: TextStyle(
-                            fontSize: 14, color: scheme.onSurfaceVariant)),
-                    const SizedBox(width: 4),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 1),
-                      decoration: BoxDecoration(
-                          border: Border.all(
-                              color: scheme.outline.withValues(alpha: .4)),
-                          borderRadius: BorderRadius.circular(999)),
-                      child: Text('数据分析中',
-                          style: TextStyle(
-                              fontSize: 9, color: scheme.onSurfaceVariant)),
-                    ),
-                  ]),
-                ),
               ],
             ),
           ),
-          Text('按平台热度发现 · 上滑不断翻 · 12,107 本有封面',
+          Text('按平台热度发现 · 上滑不断翻',
               style: TextStyle(
                   fontSize: 11, color: scheme.onSurfaceVariant)),
           Expanded(
