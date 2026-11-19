@@ -35,6 +35,12 @@ praises 2,389（听雨）。这三条是 P7 断言的来源——short 层若有
 被时间下界自然挡掉。报告 22 §4 早已把标题 IP 词列为对话同人的强特征，但只覆盖
 头部，故仍不算确定性。
 
+正文征文优先（E.21，2026-11-19 用户裁定）：征文按组别投稿，对话组/点鸭/分支对话
+都带显式关键词（判据①已覆盖），其余征文标记（「X征长篇/中篇/短篇」「冬季征文」
+「玄幻征文」…）一律是**正文**。故 5–15 万字档内，有征文标记而无对话关键词的书
+不参与形态估计，形态由字数决定（`morph=False`）——`ckw` 是估计，征文标记是确定
+性证据，估计不得推翻确定性。短篇档不受此保护（同人征文仍按 E.17 判对话）。
+
 对话小说每章约 500 字、整本可连载很长，**单本字数不能判形态**（锚点 570712 为
 88 万字对话）。v2 动机：E.11/E.12 后 `form=short` 仍混入大量 2–5 万字对话小说
 （421290「成为符华圣痕的黑符」favs 7,881 > 真短篇头部「听雨」5,478），对话同字数
@@ -84,6 +90,10 @@ SHORT_MAX_PRAISES = 2_389
 FAN_MAX_WORDS = 50_000
 # 米哈游 IP 标题词的对话判定字数上界（E.18）：只吃短篇档，medium/long 另议。
 IP_MAX_WORDS = 50_000
+# 正文征文保护的字数档（E.21）：与 forms.SHORT_MAX_WORDS / MEDIUM_MAX_WORDS 对齐
+# （forms 侧有断言）。只保护中篇档——短篇档的同人征文仍按 E.17 判对话。
+PROSE_CONTEST_MIN_WORDS = 50_001
+PROSE_CONTEST_MAX_WORDS = 150_000
 # 标题 IP 特征词（米哈游系为主，对话小说同人集中区）
 IP_PATTERN = re.compile(
     "原神|崩坏|星穹|星铁|芙宁娜|钟离|纳西妲|琪亚娜|芽衣|姬子|雷电|梅比乌斯|"
@@ -117,6 +127,11 @@ def mark(df: pd.DataFrame) -> pd.DataFrame:
     d["mA"] = contest.str.contains("对话|点鸭", na=False)
     d["mT"] = contest.isin(USER_VERIFIED_T)
     d["marked"] = d["mA"] | d["mT"]
+    # E.21（2026-11-19 用户裁定）：有征文标记而未被判为对话的，属**正文组**——
+    # 征文按组别投稿，对话组/点鸭/分支对话都有显式关键词（上面两个判据已覆盖），
+    # 其余标记（「X征长篇/中篇/短篇」「冬季征文」「玄幻征文」…）一律是正文，
+    # 故其形态由字数决定，`ckw` 灰带不得推翻征文标记。此列供 forms 级 2.6 使用。
+    d["prose_contest"] = contest.ne("") & ~d["marked"]
     d["tong"] = (genre == "同人") | tags.str.contains("同人", na=False)
     d["unsigned"] = ~price.isin(["VIP", "签约"])
     # 形态判据 v2：clicks/字（快照值）。缺失 clicks 时 ckw=0，v2 条款不生效。
@@ -148,6 +163,10 @@ def mark(df: pd.DataFrame) -> pd.DataFrame:
     if clicks_num is not None:                                             # v2-d 天花板
         d["morph"] = d["morph"] | (after_start & (words <= 50_000)
                                    & clicks_num.gt(DIAL_CLICKS_CEIL))
+    # E.21：中篇档的正文征文不受形态估计影响（征文组别是确定性证据，见上）。
+    prose_medium = d["prose_contest"] & words.between(PROSE_CONTEST_MIN_WORDS,
+                                                      PROSE_CONTEST_MAX_WORDS)
+    d["morph"] = d["morph"] & ~prose_medium
     d["hidden"] = d["morph"] & ~d["marked"]
     return d
 

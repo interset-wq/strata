@@ -1,7 +1,8 @@
 """`form` 形式分类（`docs/form-definitions.md` §4 伪代码的可执行版）。
 
 六值互斥：`invalid / short / medium / long / dialogue / ip_collab`，逐级覆盖：
-字数兜底（含 invalid 下界）→ 对话形态 → 对话征文 → IP 合作。
+字数兜底（含 invalid 下界）→ 正文征文否决形态估计（E.21）→ 对话形态 → 短篇点击
+天花板 → 对话征文 → IP 合作。
 
 2026-11-19 用户裁定两项修正（见 `docs/form-definitions.md` §0/§3）：
 1. **取消篇幅征文命名覆盖字数**：征文名（「X征短篇/中篇/长篇」）只反映投稿赛道，
@@ -26,6 +27,9 @@ from lib import dialogue_form as DF
 INVALID_MAX_WORDS = 2_000   # 用户 2026-11-19 定：<2000 不是有效篇幅（app 章节下限）
 SHORT_MAX_WORDS = 50_000
 MEDIUM_MAX_WORDS = 150_000
+# E.21 的正文征文保护档必须与本模块的中篇档一致，否则两条规则会互相错位。
+assert DF.PROSE_CONTEST_MIN_WORDS == SHORT_MAX_WORDS + 1
+assert DF.PROSE_CONTEST_MAX_WORDS == MEDIUM_MAX_WORDS
 
 # §3.5 封闭名单：SFACG 近年无新增 IP 合作征文
 IP_COLLAB_NAMES = ("楚楚动仁", "崩坏3", "少女前线", "龙之谷", "失业魔王", "英雄再临")
@@ -51,6 +55,8 @@ def classify(df: pd.DataFrame) -> pd.Series:
     #       僵尸书章节数极少、clicks/字 天文高（4166 775 字 ckw=13.2；181214
     #       23 章 × 11 字 ckw=291），ckw 判据会把僵尸误判成对话（校准后实测
     #       2,405 本 invalid 被误翻）。只有确定性证据（级 3/4）能救回 invalid。
+    #       `morph` 本身已排除 E.21 的正文征文（中篇档）：有征文标记而无对话
+    #       关键词的书属正文组，形态由字数决定，ckw 灰带不得推翻征文标记。
     form = np.where((d["morph"].to_numpy()) & (form != "invalid"), "dialogue", form)
     # 级 2.5：短篇点击天花板（E.19，用户 App 目验）。真 short 的点击上界是
     #       「回到旧时光」215,723；越过此线却仍在短篇档（≤5 万字）的书不是真

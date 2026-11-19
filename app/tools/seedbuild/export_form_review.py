@@ -23,6 +23,9 @@ short:
     serial     status is 连载中 (an unfinished book is not a short story)
 
 medium (no known head yet):
+    prose-contest  carries a contest mark that is not a dialogue contest => the
+               book is a 正文 entry, medium by construction (E.21). Rows with
+               this flag are dropped from --suspect-only: no line to draw.
     ckw>=13    clicks/word at or above the short-dialogue threshold (v2-b)
     ckw>=10    softer dialogue signal
     C>1M       clicks above 1,000,000
@@ -58,6 +61,14 @@ CEIL_CLICKS = 215_723     # 回到旧时光, hard ceiling for a ≤50k-word shor
 # nid predate the product line, so their clicks are a decade of accumulation and
 # are not comparable with a modern short story.
 DIALOGUE_START_NID = 83_818
+# Flags that question the *form* — the only ones worth a reviewer's time.
+# For short there is a known head, so the click/reputation ceilings are the
+# signals. For medium there is none: the signals are structural (clicks per
+# word, escaped 同人 tags, the 5万 boundary), not quality.
+SUSPECT_FLAGS = {
+    "short": ("C>listen", "@ceil", "F>=1000", "P>=1000", "serial"),
+    "medium": ("ckw>=13", "ckw>=10", "tongue", "near5w"),
+}
 
 QUERY = """
 select b.nid, b.title, b.author, b.genre, b.price_type, b.status, b.contest,
@@ -105,6 +116,9 @@ def build_flags(row: pd.Series, form: str) -> str:
         if modern and row["clicks"] > LISTEN_CLICKS:
             flags.append("C>listen")
     else:
+        # E.21: a contest mark without 对话/点鸭 is a 正文 submission -> medium.
+        if str(row["contest"]).strip():
+            flags.append("prose-contest")
         if modern and row["ckw"] >= 13:
             flags.append("ckw>=13")
         elif modern and row["ckw"] >= 10:
@@ -147,10 +161,14 @@ def main() -> int:
     df["ckw"] = (df["clicks"] / df["words"].where(df["words"] > 0)).round(2)
     df["flags"] = df.apply(lambda r: build_flags(r, args.form), axis=1)
     if args.suspect_only:
-        # `pre-dialogue` alone is informational (early books are expected), not
-        # a suspicion; keep a row only when some other signal fires.
-        other = df["flags"].str.replace("pre-dialogue", "", regex=False).str.strip("|")
-        df = df[other != ""]
+        # Only form signals count (`pre-dialogue` is informational, quality
+        # flags are context). `prose-contest` is a verdict, not a suspicion
+        # (E.21): those books are medium by construction and leave the set.
+        parts = df["flags"].str.split("|")
+        wanted = SUSPECT_FLAGS[args.form]
+        form_signal = parts.apply(lambda t: any(f in wanted for f in t))
+        confirmed = parts.apply(lambda t: "prose-contest" in t)
+        df = df[form_signal & ~confirmed]
     df = df.sort_values(["clicks", "favs"], ascending=False).reset_index(drop=True)
     df.insert(0, "seq", range(1, len(df) + 1))
 
@@ -172,6 +190,7 @@ def main() -> int:
     print(f"ckw >= 13       {int((df['ckw'] >= 13).sum()):,}")
     print(f"ckw >= 10       {int((df['ckw'] >= 10).sum()):,}")
     print(f"clicks > 1M     {int((df['clicks'] > 1_000_000).sum()):,}")
+    print(f"prose-contest   {int(df['flags'].str.contains('prose-contest').sum()):,}")
     print()
     print(df.head(20)[["seq", "nid", "title", "words", "clicks", "favs",
                        "ckw", "status", "flags"]].to_string(index=False))
