@@ -10,6 +10,7 @@ import '../widgets/banner_large_card.dart';
 import '../widgets/back_to_top.dart';
 import '../widgets/cover_banner.dart';
 import '../widgets/default_cover.dart';
+import '../widgets/book_row_tile.dart';
 import 'browse_page.dart';
 
 /// Classic 排行行卡数据（board 端点），kind: finish / popular。
@@ -59,12 +60,23 @@ class _HomePageState extends ConsumerState<HomePage> {
   static const _formValues = ['long', 'medium', 'short', 'dialogue', 'ip_collab'];
   String _form = 'long';
 
+  // IP tab“随便看看”：ip_collab 全池（收藏降序），20 本/页，接近底部
+  // 上滑加载下一页。确定性列表，只有它能做 load-more。
+  List<RankItem> _ipItems = const [];
+  bool _ipLoading = false;
+  bool _ipDone = false;
+  String? _ipError;
+
   @override
   void initState() {
     super.initState();
     _scroll.addListener(() {
       final show = _scroll.hasClients && _scroll.offset > 500;
       if (show != _showTop) setState(() => _showTop = show);
+      if (_form == 'ip_collab' && _scroll.hasClients &&
+          _scroll.offset >= _scroll.position.maxScrollExtent - 300) {
+        _loadIpMore();
+      }
     });
   }
 
@@ -72,6 +84,33 @@ class _HomePageState extends ConsumerState<HomePage> {
   void dispose() {
     _scroll.dispose();
     super.dispose();
+  }
+
+  // IP tab“随便看看”下一页：classic 端点 form=ip_collab（收藏降序 +
+  // offset 分页），失败显示重试而不是静默吞掉。
+  Future<void> _loadIpMore() async {
+    if (_ipLoading || _ipDone) return;
+    setState(() {
+      _ipLoading = true;
+      _ipError = null;
+    });
+    try {
+      final handle = await ref.read(bootProvider.future);
+      final page = await handle.api.rankingClassic(
+          form: 'ip_collab', limit: 20, offset: _ipItems.length);
+      if (!mounted) return;
+      setState(() {
+        _ipItems = [..._ipItems, ...page];
+        _ipDone = page.length < 20;
+        _ipLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _ipError = '$e';
+        _ipLoading = false;
+      });
+    }
   }
 
   @override
@@ -92,7 +131,102 @@ class _HomePageState extends ConsumerState<HomePage> {
           child: banners.when(
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (e, _) => Center(child: Text('加载失败：$e')),
-            data: (items) => Stack(
+            data: (items) {
+              void selectForm(int i) {
+                final next = _formValues[i];
+                if (next == _form) return;
+                setState(() => _form = next);
+              }
+
+              void refreshShowcases() {
+                ref.invalidate(serialShowcaseProvider(_form));
+                ref.invalidate(finishedShowcaseProvider(_form));
+                ref.invalidate(browseShowcaseProvider(_form));
+              }
+              // IP tab 书少（54 本），不需要多个分区：轮播 + IP 入口行 +
+              // “随便看看”（全池列表，上滑加载更多），无 showcase 分区。
+              if (_form == 'ip_collab') {
+                if (_ipItems.isEmpty && !_ipLoading) {
+                  WidgetsBinding.instance
+                      .addPostFrameCallback((_) => _loadIpMore());
+                }
+                return Stack(
+                  children: [
+                    ListView(
+                      controller: _scroll,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      children: [
+                        _formTabs(context,
+                            onSelect: selectForm,
+                            onRefresh: refreshShowcases),
+                        _searchRow(context),
+                        BannerCarousel(
+                          items: items,
+                          onTap: (it) => context.push('/book/${it.nid}'),
+                        ),
+                        const SizedBox(height: 8),
+                        const IpEntryRow(),
+                        _sectionTitle(context, '随便看看'),
+                        Padding(
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 16),
+                          child: Column(
+                            children: [
+                              for (final it in _ipItems) BookRowTile(item: it),
+                              if (_ipError != null)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 24),
+                                  child: Center(
+                                    child: TextButton(
+                                      onPressed: _loadIpMore,
+                                      child: const Text('加载失败，点按重试'),
+                                    ),
+                                  ),
+                                )
+                              else if (_ipLoading)
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(
+                                      vertical: 24),
+                                  child: Center(
+                                      child:
+                                          CircularProgressIndicator(
+                                              strokeWidth: 2)),
+                                )
+                              else if (_ipDone && _ipItems.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                      0, 8, 0, 24),
+                                  child: Center(
+                                    child: Text(
+                                        '— 共 ${_ipItems.length} 本 —',
+                                        style: TextStyle(
+                                            fontSize: 11,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurfaceVariant)),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (_showTop)
+                      Positioned(
+                        right: 16,
+                        bottom: 24,
+                        child: BackToTop(
+                          onTap: () => _scroll.animateTo(
+                              0,
+                              duration: const Duration(milliseconds: 400),
+                              curve: Curves.easeOut),
+                        ),
+                      ),
+                  ],
+                );
+              }
+              return Stack(
               children: [
                 ListView(
                   controller: _scroll,
@@ -120,25 +254,20 @@ class _HomePageState extends ConsumerState<HomePage> {
                         onTap: (it) => context.push('/book/${it.nid}'),
                       ),
                 const SizedBox(height: 8),
-                // IP tab：入口行换成联动 IP（征文聚合）；其余 form 用通用宫格。
-                _form == 'ip_collab' ? _ipEntryRow() : _entryGrid(context),
+                _entryGrid(context),
                 _sectionTitle(context, '连载发现',
                     onMore: () => context.push('/serial-random')),
                 _ShowcaseSection(provider: serialShowcaseProvider(_form)),
                 _sectionTitle(context, '完结精选',
                     onMore: () => context.push('/finished-random')),
                 _ShowcaseSection(provider: finishedShowcaseProvider(_form)),
-                // 宽卡与大图精选是长篇池（授权作品/萌神/featured），
-                // IP 池没有对应内容，隐藏避免空卡。
-                if (_form != 'ip_collab') _entryCards(context),
+                _entryCards(context),
                 _sectionTitle(context, '随便看看',
                     onMore: () => context.push('/browse-random')),
                 _ShowcaseSection(provider: browseShowcaseProvider(_form)),
-                if (_form != 'ip_collab') ...[
-                  _sectionTitle(context, '大图精选',
-                      onMore: () => context.push('/featured-gallery')),
-                  const _LargeImageSection(),
-                ],
+                _sectionTitle(context, '大图精选',
+                    onMore: () => context.push('/featured-gallery')),
+                const _LargeImageSection(),
               ],
                 ),
                 if (_showTop)
@@ -153,7 +282,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                     ),
                   ),
               ],
-            ),
+            );
+            },
           ),
         ),
       ),
@@ -463,9 +593,15 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  // IP tab 入口行：命名 IP（收藏数前 2 的征文）+ 其他（长尾）。
-  // contest 即联动 IP 轴（崩坏3征文 → 崩坏3）；文字卡无 icon（docs/15）。
-  Widget _ipEntryRow() {
+}
+
+/// IP tab 入口行：命名 IP（收藏数前 2 的征文）+ 其他（长尾）。
+/// contest 即联动 IP 轴（崩坏3征文 → 崩坏3）；文字卡无 icon（docs/15）。
+class IpEntryRow extends ConsumerWidget {
+  const IpEntryRow({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
     return ref.watch(ipGroupsProvider).when(
           loading: () => const Padding(
