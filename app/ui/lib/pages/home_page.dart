@@ -84,6 +84,15 @@ class _HomePageState extends ConsumerState<HomePage> {
   bool _mediumDone = false;
   String? _mediumError;
 
+  // 对话 tab（6,189 本，无完结条款：2,574 完结 + 3,615 连载，E.22 口径）：
+  // 页内浏览体验与中篇同构（单行题材 chips + 页内无限列表，docs/16）；
+  // 轮播用封面合成纸墨 banner（无 featured 定制图池）。
+  String? _dialogueGenre;
+  List<RankItem> _dialogueItems = const [];
+  bool _dialogueLoading = false;
+  bool _dialogueDone = false;
+  String? _dialogueError;
+
   @override
   void initState() {
     super.initState();
@@ -96,6 +105,8 @@ class _HomePageState extends ConsumerState<HomePage> {
           _loadIpMore();
         } else if (_form == 'medium') {
           _loadMediumMore();
+        } else if (_form == 'dialogue') {
+          _loadDialogueMore();
         }
       }
     });
@@ -180,6 +191,50 @@ class _HomePageState extends ConsumerState<HomePage> {
       _mediumLoading = false;
     });
     _loadMediumMore();
+  }
+
+  // 对话 tab 页内列表下一页：classic 端点 form=dialogue + 题材轴
+  // （收藏降序；对话池无完结条款，不按 status 过滤，E.22）。
+  Future<void> _loadDialogueMore() async {
+    if (_dialogueLoading || _dialogueDone) return;
+    setState(() {
+      _dialogueLoading = true;
+      _dialogueError = null;
+    });
+    try {
+      final handle = await ref.read(bootProvider.future);
+      final page = await handle.api.rankingClassic(
+        form: 'dialogue',
+        genre: _dialogueGenre,
+        limit: 20,
+        offset: _dialogueItems.length,
+      );
+      if (!mounted) return;
+      setState(() {
+        _dialogueItems = [..._dialogueItems, ...page];
+        _dialogueDone = page.length < 20;
+        _dialogueLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _dialogueError = '$e';
+        _dialogueLoading = false;
+      });
+    }
+  }
+
+  // 对话题材切换：重置列表原地重载（同中篇，不回顶）。
+  void _setDialogueGenre(String? g) {
+    if (g == _dialogueGenre) return;
+    setState(() {
+      _dialogueGenre = g;
+      _dialogueItems = const [];
+      _dialogueDone = false;
+      _dialogueError = null;
+      _dialogueLoading = false;
+    });
+    _loadDialogueMore();
   }
 
   @override
@@ -339,6 +394,44 @@ class _HomePageState extends ConsumerState<HomePage> {
                   ],
                 );
               }
+              // 对话 tab（6,189 本）：页内浏览体验（纸墨轮播 + 单行题材
+              // chips + 页内无限列表），与中篇同构（docs/16）。
+              if (_form == 'dialogue') {
+                if (_dialogueItems.isEmpty && !_dialogueLoading) {
+                  WidgetsBinding.instance.addPostFrameCallback(
+                    (_) => _loadDialogueMore(),
+                  );
+                }
+                return Stack(
+                  children: [
+                    ListView(
+                      controller: _scroll,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      children: [
+                        _formTabs(context, onSelect: selectForm),
+                        _searchRow(context),
+                        _coverBannerCarousel('dialogue'),
+                        const SizedBox(height: 4),
+                        _dialogueGenreChips(context),
+                        const SizedBox(height: 4),
+                        _dialogueListSection(context),
+                      ],
+                    ),
+                    if (_showTop)
+                      Positioned(
+                        right: 16,
+                        bottom: 24,
+                        child: BackToTop(
+                          onTap: () => _scroll.animateTo(
+                            0,
+                            duration: const Duration(milliseconds: 400),
+                            curve: Curves.easeOut,
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              }
               // 中篇 tab（944 本）：页内浏览体验（单行题材 chips + 页内
               // 无限列表），与长篇（分区首页）/短篇（入口门户）/IP
               // （入口行+列表）刻意区分，见 docs/16。年份/赛道轴砍掉
@@ -399,13 +492,12 @@ class _HomePageState extends ConsumerState<HomePage> {
                         },
                       ),
                       _searchRow(context),
-                      // 对话/短篇 tab 无 featured 定制图：封面实时合成纸墨 banner。
-                      _form == 'dialogue'
-                          ? _coverBannerCarousel('dialogue')
-                          : BannerCarousel(
-                              items: items,
-                              onTap: (it) => context.push('/book/${it.nid}'),
-                            ),
+                      // 通用布局只服务长篇 tab（对话/中篇/短篇/IP 各有
+                      // 独立分支）：featured 池有定制 banner 图。
+                      BannerCarousel(
+                        items: items,
+                        onTap: (it) => context.push('/book/${it.nid}'),
+                      ),
                       const SizedBox(height: 8),
                       _entryGrid(context),
                       _sectionTitle(
@@ -804,6 +896,90 @@ class _HomePageState extends ConsumerState<HomePage> {
   // 中篇 tab 单行题材 chips（横向滚动，FilterChip 单选）：全部题材 +
   // 9 题材。原双轴双行 chips（题材行×年份行+优质互斥）可用性差
   // （用户 2026-11-19 定），简化为题材单轴。
+  // 对话 tab 单行题材 chips（横向滚动，FilterChip 单选）：全部题材 +
+  // 9 题材（同人占 75%，小题材最少 21 本仍可浏览）。
+  Widget _dialogueGenreChips(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final genres = ref.watch(genreGroupsProvider('dialogue'));
+    return genres.when(
+      loading: () => const SizedBox(height: 46),
+      error: (e, _) => const SizedBox(height: 46),
+      data: (r) => SizedBox(
+        height: 46,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          itemCount: r.groups.length + 1,
+          separatorBuilder: (_, _) => const SizedBox(width: 8),
+          itemBuilder: (_, i) {
+            final name = i == 0 ? null : r.groups[i - 1].genre;
+            return FilterChip(
+              label: Text(name ?? '全部题材',
+                  style: const TextStyle(fontSize: 12)),
+              selected: _dialogueGenre == name,
+              onSelected: (_) => _setDialogueGenre(name),
+              showCheckmark: false,
+              selectedColor: scheme.primary.withValues(alpha: .15),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  // 对话 tab 页内列表（与中篇同构）：BookRowTile + 失败重试 / 加载
+  // spinner / 空态 / "共 N 本"收尾。
+  Widget _dialogueListSection(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        children: [
+          for (final it in _dialogueItems) BookRowTile(item: it),
+          if (_dialogueError != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: TextButton(
+                  onPressed: _loadDialogueMore,
+                  child: const Text('加载失败，点按重试'),
+                ),
+              ),
+            )
+          else if (_dialogueLoading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          else if (_dialogueDone && _dialogueItems.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: Text(
+                  '该题材下暂无对话作品',
+                  style: TextStyle(
+                      fontSize: 12, color: scheme.onSurfaceVariant),
+                ),
+              ),
+            )
+          else if (_dialogueDone && _dialogueItems.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(0, 8, 0, 24),
+              child: Center(
+                child: Text(
+                  '— 共 ${_dialogueItems.length} 本 —',
+                  style: TextStyle(
+                      fontSize: 11, color: scheme.onSurfaceVariant),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _mediumGenreChips(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final genres = ref.watch(genreGroupsProvider('medium'));
