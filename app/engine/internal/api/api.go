@@ -104,6 +104,7 @@ func New(s *store.Store) *gin.Engine {
 	group.GET("/featured", srv.featured)
 	group.GET("/featured-all", srv.featuredAll)
 	group.GET("/cover-carousel", srv.coverCarousel)
+	group.GET("/calendar", srv.calendar)
 	group.GET("/ip-groups", srv.ipGroups)
 	group.GET("/year-groups", srv.yearGroups)
 	group.GET("/genre-groups", srv.genreGroups)
@@ -998,6 +999,72 @@ func (s *Server) observations(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"items": items})
+}
+
+// calendar serves the release-calendar view (docs/14 P1): seed books
+// grouped by est_date at day/week/month granularity. Display-only
+// pathway — the recommendation layer never consumes it. Weeks start on
+// Monday (Chinese convention). Empty dates are filled with zero-total
+// cells so the UI grid is always complete.
+func (s *Server) calendar(c *gin.Context) {
+	gran := c.Query("granularity")
+	anchorRaw := c.Query("anchor")
+	t, err := time.Parse("2006-01-02", anchorRaw)
+	if err != nil {
+		fail(c, http.StatusBadRequest, "invalid_argument", "anchor must be YYYY-MM-DD")
+		return
+	}
+	var from, to time.Time
+	var anchorLabel string
+	switch gran {
+	case "day":
+		from, to = t, t
+		anchorLabel = t.Format("2006-01-02")
+	case "week":
+		monday := t.AddDate(0, 0, -((int(t.Weekday())+6)%7))
+		from, to = monday, monday.AddDate(0, 0, 6)
+		anchorLabel = monday.Format("2006-01-02")
+	case "month":
+		first := time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, time.UTC)
+		from, to = first, first.AddDate(0, 1, -1)
+		anchorLabel = first.Format("2006-01")
+	default:
+		fail(c, http.StatusBadRequest, "invalid_argument",
+			"granularity must be day|week|month")
+		return
+	}
+	perCell, _ := strconv.Atoi(c.DefaultQuery("per_cell", "3"))
+	if perCell < 1 || perCell > 50 {
+		perCell = 3
+	}
+	days, err := s.store.BooksByDateRange(
+		c.Request.Context(), from.Format("2006-01-02"), to.Format("2006-01-02"),
+		gran != "month", perCell)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	cellMap := make(map[string]store.CalendarDay, len(days))
+	for _, d := range days {
+		cellMap[d.Date] = d
+	}
+	cells := make([]store.CalendarDay, 0, int(to.Sub(from).Hours()/24)+1)
+	for d := from; !d.After(to); d = d.AddDate(0, 0, 1) {
+		key := d.Format("2006-01-02")
+		if cell, ok := cellMap[key]; ok {
+			if gran == "month" {
+				cell.Items = nil // month grid shows totals only
+			}
+			cells = append(cells, cell)
+		} else {
+			cells = append(cells, store.CalendarDay{Date: key, Total: 0})
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"granularity": gran,
+		"anchor":      anchorLabel,
+		"cells":       cells,
+	})
 }
 
 // banner picks the daily banner set: a uniform deterministic shuffle of the

@@ -132,6 +132,12 @@ VALUES(?,?,?,?, '免费', ?, NULL, ?, 1000, ?, 10, ?, NULL, '2026-04-01T00:00:00
 		db.Close()
 		return nil, err
 	}
+	// 1003 carries a low-confidence est_date to pin the docs/14 conf
+	// rule: low rows never enter the day/week views, only the month view.
+	if _, err := db.Exec(`UPDATE books SET est_date='2011-01-05', est_conf='low' WHERE nid = 1003`); err != nil {
+		db.Close()
+		return nil, err
+	}
 	if _, err := db.Exec(`INSERT INTO book_tags(nid,tag) VALUES
 	 (1001,'热血'),(1001,'战斗'),(1004,'战斗'),(2001,'战斗'),(1003,'2020萌神')`); err != nil {
 		db.Close()

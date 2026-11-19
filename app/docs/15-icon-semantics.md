@@ -53,6 +53,12 @@
 | 优质短篇 | `Icons.star` | 短篇 tab 入口列表（同代分位榜，docs/form-definitions §6） |
 | 随机短篇 | `Icons.shuffle` | 短篇 tab 入口列表（短篇随机池，/strata/random?status=short） |
 
+## 主导航（底部 Tab Bar）
+
+| 语义 | icon | 使用处 |
+| --- | --- | --- |
+| 发书日历 | `Icons.event_available_outlined` | 底部 Tab Bar 第 3 位（2026-11-19 替换搜索——搜索入口在各 form tab 页内）；选中态用实心 `Icons.event_available`（规范 4：filled = 已激活） |
+
 ## 状态占位
 
 | 语义 | icon | 使用处 |

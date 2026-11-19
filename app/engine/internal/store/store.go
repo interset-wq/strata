@@ -1308,6 +1308,73 @@ func (s *Store) ShelfRemove(ctx context.Context, nid int64) error {
 }
 
 // ShelfList joins the shelf with seed titles.
+// CalendarBook is one seed book on the release calendar (docs/14 P1):
+// est_date dating + conf tier. Display-only; the recommendation layer
+// never consumes calendar data.
+type CalendarBook struct {
+	NID      int64   `json:"nid"`
+	Title    string  `json:"title"`
+	Author   string  `json:"author"`
+	Genre    *string `json:"genre"`
+	Favs     int64   `json:"favs"`
+	CoverURL *string `json:"cover_url"`
+	EstDate  string  `json:"est_date"`
+	EstConf  string  `json:"est_conf"`
+}
+
+// CalendarDay is one date cell of the release calendar. Items carries
+// the favourites-top books and is set only for day/week granularity;
+// the month view keeps totals only (its cells are too small for cards).
+type CalendarDay struct {
+	Date  string         `json:"date"`
+	Total int            `json:"total"`
+	Items []CalendarBook `json:"items,omitempty"`
+}
+
+// BooksByDateRange returns seed books whose est_date falls in
+// [from, to] (YYYY-MM-DD inclusive), grouped by date, favourites desc
+// inside each cell (docs/14 §1.2). The calendar is a display-only view
+// over the stats universe: licensed books are excluded, matching the
+// generation boards. With excludeLow the est_conf='low' rows (anchor gap
+// > 365d) are dropped — they are only reliable in the month view
+// (docs/14 §1.3). est_date carries no index on purpose: the full seed
+// scan is <10 ms on 30k rows.
+func (s *Store) BooksByDateRange(ctx context.Context, from, to string, excludeLow bool, perCell int) ([]CalendarDay, error) {
+	q := `SELECT nid, title, author, genre, favs, cover_url, est_date, est_conf
+FROM books
+WHERE est_date >= ? AND est_date <= ? AND is_licensed = 0`
+	args := []any{from, to}
+	if excludeLow {
+		q += ` AND est_conf != 'low'`
+	}
+	q += `
+ORDER BY est_date ASC, favs DESC, nid ASC`
+	rows, err := s.DB.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var days []CalendarDay
+	cur := ""
+	for rows.Next() {
+		var b CalendarBook
+		if err := rows.Scan(&b.NID, &b.Title, &b.Author, &b.Genre, &b.Favs, &b.CoverURL, &b.EstDate, &b.EstConf); err != nil {
+			return nil, err
+		}
+		if b.EstDate != cur {
+			days = append(days, CalendarDay{Date: b.EstDate})
+			cur = b.EstDate
+		}
+		cell := &days[len(days)-1]
+		cell.Total++
+		if len(cell.Items) < perCell {
+			cell.Items = append(cell.Items, b)
+		}
+	}
+	return days, rows.Err()
+}
+
 func (s *Store) ShelfList(ctx context.Context) ([]ShelfItem, error) {
 	rows, err := s.DB.QueryContext(ctx, `
 SELECT s.nid, b.title, b.author, b.genre, s.added_at

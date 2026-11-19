@@ -12,6 +12,7 @@ import '../pages/history_page.dart';
 import '../pages/home_page.dart';
 import '../pages/ip_books_page.dart';
 import '../pages/rankings_page.dart';
+import '../pages/calendar_page.dart';
 import '../pages/search_page.dart';
 import '../pages/image_viewer_page.dart';
 import '../pages/random_pool_page.dart';
@@ -20,7 +21,8 @@ import '../pages/watchlist_page.dart';
 import '../pages/settings_page.dart';
 import '../pages/shelf_page.dart';
 
-/// 底部 Tab 承载 4 个一级页；详情页是二级页，在 Shell 之外全屏推入。
+/// 底部 Tab 承载 5 个一级页（搜索已让位给发书日历，docs/14 P1）；
+/// 搜索是二级页（各页搜索框入口推入），详情页在 Shell 之外全屏推入。
 final router = GoRouter(
   initialLocation: '/boot',
   routes: [
@@ -46,9 +48,9 @@ final router = GoRouter(
               label: '榜单',
             ),
             NavigationDestination(
-              icon: Icon(Icons.search_outlined),
-              selectedIcon: Icon(Icons.search),
-              label: '搜索',
+              icon: Icon(Icons.event_available_outlined),
+              selectedIcon: Icon(Icons.event_available),
+              label: '日历',
             ),
             NavigationDestination(
               icon: Icon(Icons.collections_bookmark_outlined),
@@ -71,7 +73,7 @@ final router = GoRouter(
           GoRoute(path: '/rankings', builder: (_, _) => const RankingsPage()),
         ]),
         StatefulShellBranch(routes: [
-          GoRoute(path: '/search', builder: (_, _) => const SearchPage()),
+          GoRoute(path: '/calendar', builder: (_, _) => const CalendarPage()),
         ]),
         StatefulShellBranch(routes: [
           GoRoute(path: '/shelf', builder: (_, _) => const ShelfPage()),
@@ -87,6 +89,8 @@ final router = GoRouter(
         nid: int.parse(state.pathParameters['nid']!),
       ),
     ),
+    // 搜索是二级页：入口在首页搜索胶囊与各 form tab 搜索框，不再占底部导航位。
+    GoRoute(path: '/search', builder: (_, _) => const SearchPage()),
     GoRoute(
       path: '/browse',
       builder: (_, state) => BrowsePage(

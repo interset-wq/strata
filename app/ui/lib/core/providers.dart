@@ -88,6 +88,38 @@ final coverCarouselProvider =
   return handle.api.coverCarousel(form: form, limit: bannerCarouselCount);
 });
 
+/// 发书日历查询参数（family 键）：粒度 + 锚点日 + 每格条目上限。
+class CalendarQuery {
+  final String granularity; // day|week|month
+  final String anchor; // YYYY-MM-DD
+  final int perCell;
+
+  const CalendarQuery({
+    required this.granularity,
+    required this.anchor,
+    this.perCell = 3,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      other is CalendarQuery &&
+      other.granularity == granularity &&
+      other.anchor == anchor &&
+      other.perCell == perCell;
+
+  @override
+  int get hashCode => Object.hash(granularity, anchor, perCell);
+}
+
+/// 发书日历（docs/14 P1）：seed 书按 est_date 聚合成日期格。
+/// month 视图只有 total；day/week 另带 per_cell 条收藏序条目。
+final calendarProvider =
+    FutureProvider.family<CalendarResponse, CalendarQuery>((ref, q) async {
+  final handle = await ref.watch(bootProvider.future);
+  return handle.api.calendar(
+      granularity: q.granularity, anchor: q.anchor, perCell: q.perCell);
+});
+
 /// IP tab 入口行：ip_collab 池按征文（contest）聚合（count DESC）。
 /// 端上取前 2 组作命名 IP 入口，其余折成“其他”。
 final ipGroupsProvider = FutureProvider<IpGroupsResult>((ref) async {

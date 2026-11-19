@@ -273,6 +273,20 @@ class StrataApi {
         .toList();
   }
 
+  /// 发书日历（docs/14 P1）：seed 书按 est_date 聚合成日期格。
+  /// granularity=day|week|month（周一起算周）；anchor=YYYY-MM-DD。
+  /// month 视图只有 total（格太小不放卡片）；day/week 另带 per_cell 条
+  /// 收藏序条目。est_conf=low 的书只进 month 视图（引擎侧过滤）。
+  Future<CalendarResponse> calendar({
+    required String granularity,
+    required String anchor,
+    int perCell = 3,
+  }) async {
+    final body = await _get(
+        '/calendar', {'granularity': granularity, 'anchor': anchor, 'per_cell': '$perCell'});
+    return CalendarResponse.fromJson(body as Map<String, dynamic>);
+  }
+
   /// IP tab 入口行：一个 form 的书按征文（contest）聚合，
   /// count DESC（引擎侧稳定排序）；total 用于端上折出“其他”入口。
   Future<IpGroupsResult> ipGroups({
@@ -499,6 +513,53 @@ class Manifest {
         tagRows = m['tag_rows'] as int,
         genMin = m['gen_min'] as int,
         genMax = m['gen_max'] as int;
+}
+
+class CalendarItem {
+  final int nid;
+  final String title;
+  final String author;
+  final String? genre;
+  final int favs;
+  final String? coverUrl;
+  final String estDate; // YYYY-MM-DD
+  final String estConf; // exact|high|mid|low（docs/14 §1.3 精度分档）
+
+  CalendarItem.fromJson(Map<String, dynamic> m)
+      : nid = m['nid'] as int,
+        title = m['title'] as String,
+        author = m['author'] as String,
+        genre = m['genre'] as String?,
+        favs = m['favs'] as int,
+        coverUrl = m['cover_url'] as String?,
+        estDate = m['est_date'] as String,
+        estConf = m['est_conf'] as String? ?? 'mid';
+}
+
+class CalendarDay {
+  final String date; // YYYY-MM-DD
+  final int total;
+  final List<CalendarItem> items; // 仅 day/week；month 视图为空
+
+  CalendarDay.fromJson(Map<String, dynamic> m)
+      : date = m['date'] as String,
+        total = m['total'] as int,
+        items = ((m['items'] as List?) ?? const [])
+            .map((e) => CalendarItem.fromJson(e as Map<String, dynamic>))
+            .toList();
+}
+
+class CalendarResponse {
+  final String granularity; // day|week|month
+  final String anchor; // day/week → YYYY-MM-DD（周一）；month → YYYY-MM
+  final List<CalendarDay> cells;
+
+  CalendarResponse.fromJson(Map<String, dynamic> m)
+      : granularity = m['granularity'] as String,
+        anchor = m['anchor'] as String,
+        cells = (m['cells'] as List)
+            .map((e) => CalendarDay.fromJson(e as Map<String, dynamic>))
+            .toList();
 }
 
 class RankItem {

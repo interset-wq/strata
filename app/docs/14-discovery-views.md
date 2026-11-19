@@ -3,6 +3,12 @@
 > **设计定案 v1.0**。来源：竞品 `sf.iluyf.com`（上游 `github.com/jiuweiyaya/sfacg-rank`）
 > 借鉴评估。原则：**只用已有数据在展示层长出新视图，不新增任何 HTTP 请求**。
 > 双模式契约见 12；观测成熟度红线见 05 §5；定年口径见 `docs/metrics-definitions.md` §1.1。
+>
+> **实现状态（2026-11-19）**：发书日历已上线——引擎 `GET /strata/calendar`
+> （granularity=day|week|month，周一起算周，low 档只入月视图，右删失 =
+> manifest genMin..genMax），Flutter 日历 tab（底部导航第 3 位，替换搜索——
+> 搜索入口在各 form tab 页内，不再占导航位）。增长榜多窗口（P2）待观测
+> 数据积累后做；观测时序桶分层（P3）悬置不变。
 
 ## 0. 结论
 
