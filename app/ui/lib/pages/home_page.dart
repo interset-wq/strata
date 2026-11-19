@@ -73,13 +73,12 @@ class _HomePageState extends ConsumerState<HomePage> {
   bool _ipDone = false;
   String? _ipError;
 
-  // 中篇 tab（944 本，words 5万–15万）：页内浏览体验——双轴 chip 行
-  // （题材 × 年份，+ 优质 order=pct）+ 页内无限列表（照搬 IP tab
-  // "随便看看"分区模式）。与三个已有 tab 的体验刻意区分：长篇=分区
-  // 首页、短篇=入口门户、IP=入口行+列表、中篇=页内浏览器（docs/16）。
+  // 中篇 tab（944 本，words 5万–15万）：页内浏览体验——单行题材 chips +
+  // 页内无限列表（照搬 IP tab "随便看看"分区模式）。双轴双行 chips
+  // 可用性差（用户 2026-11-19 定），简化为题材单轴；年份/优质轴砍掉。
+  // 与三个已有 tab 的体验刻意区分：长篇=分区首页、短篇=入口门户、
+  // IP=入口行+列表、中篇=页内浏览器（docs/16）。
   String? _mediumGenre;
-  int? _mediumYear;
-  bool _mediumQuality = false;
   List<RankItem> _mediumItems = const [];
   bool _mediumLoading = false;
   bool _mediumDone = false;
@@ -138,8 +137,8 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
   }
 
-  // 中篇 tab 页内列表下一页：classic 端点 form=medium + 双轴
-  // （genre/year）+ order（优质 = 同代收藏分位，docs/form-definitions §6）。
+  // 中篇 tab 页内列表下一页：classic 端点 form=medium + 题材轴
+  // （收藏降序；年份/优质轴随双行 chips 砍掉）。
   Future<void> _loadMediumMore() async {
     if (_mediumLoading || _mediumDone) return;
     setState(() {
@@ -151,8 +150,6 @@ class _HomePageState extends ConsumerState<HomePage> {
       final page = await handle.api.rankingClassic(
         form: 'medium',
         genre: _mediumGenre,
-        year: _mediumYear,
-        order: _mediumQuality ? 'pct' : null,
         limit: 20,
         offset: _mediumItems.length,
       );
@@ -171,33 +168,17 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
   }
 
-  // 中篇 chip 切轴：重置列表、回顶、重载。
-  void _resetMediumList() {
-    _mediumItems = const [];
-    _mediumDone = false;
-    _mediumError = null;
-    _mediumLoading = false;
-  }
-
-  void _setMediumAxis({String? genre, bool quality = false}) {
-    final g = quality ? null : genre;
-    if (g == _mediumGenre && quality == _mediumQuality) return;
+  // 中篇题材切换：重置列表原地重载（不回顶——列表就在 chip 行下方，
+  // 重置后滚动位置自然回到列表头部附近，用户仍看得见新列表）。
+  void _setMediumGenre(String? g) {
+    if (g == _mediumGenre) return;
     setState(() {
       _mediumGenre = g;
-      _mediumQuality = quality;
-      _resetMediumList();
+      _mediumItems = const [];
+      _mediumDone = false;
+      _mediumError = null;
+      _mediumLoading = false;
     });
-    _scroll.jumpTo(0);
-    _loadMediumMore();
-  }
-
-  void _setMediumYear(int? y) {
-    if (y == _mediumYear) return;
-    setState(() {
-      _mediumYear = y;
-      _resetMediumList();
-    });
-    _scroll.jumpTo(0);
     _loadMediumMore();
   }
 
@@ -358,10 +339,10 @@ class _HomePageState extends ConsumerState<HomePage> {
                   ],
                 );
               }
-              // 中篇 tab（944 本）：页内浏览体验（双轴 chip 行 + 页内无限
-              // 列表），与长篇（分区首页）/短篇（入口门户）/IP（入口行+
-              // 列表）刻意区分，见 docs/16。赛道轴（53 组且多为"X征长篇"
-              // 名）不进 chip，省略。
+              // 中篇 tab（944 本）：页内浏览体验（单行题材 chips + 页内
+              // 无限列表），与长篇（分区首页）/短篇（入口门户）/IP
+              // （入口行+列表）刻意区分，见 docs/16。年份/赛道轴砍掉
+              // （双轴双行 chips 可用性差，用户 2026-11-19 定）。
               if (_form == 'medium') {
                 if (_mediumItems.isEmpty && !_mediumLoading) {
                   WidgetsBinding.instance.addPostFrameCallback(
@@ -383,7 +364,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                           onTap: (it) => context.push('/book/${it.nid}'),
                         ),
                         const SizedBox(height: 4),
-                        _mediumFilterChips(context),
+                        _mediumGenreChips(context),
                         const SizedBox(height: 4),
                         _mediumListSection(context),
                       ],
@@ -820,62 +801,35 @@ class _HomePageState extends ConsumerState<HomePage> {
   // 原五格宫格只有一行高、页面只占半屏，改纵向列表（用户 2026-11-19 定）：
   // 每行图标 + 标题 + 描述 + 箭头，撑满页面。icon 登记见 docs/15
   // （比赛/题材复用全局宫格语义）。
-  // 中篇 tab 双轴 chip 行（横向滚动，FilterChip 单选）：
-  // 行 1 = 优质 / 全部题材 / 各题材（优质与题材互斥）；
-  // 行 2 = 全部年份 / 各年份（与行 1 正交）。
-  Widget _mediumFilterChips(BuildContext context) {
+  // 中篇 tab 单行题材 chips（横向滚动，FilterChip 单选）：全部题材 +
+  // 9 题材。原双轴双行 chips（题材行×年份行+优质互斥）可用性差
+  // （用户 2026-11-19 定），简化为题材单轴。
+  Widget _mediumGenreChips(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final genres = ref.watch(genreGroupsProvider('medium'));
-    final years = ref.watch(yearGroupsProvider('medium'));
-    FilterChip fc(String label, bool selected, VoidCallback onTap) {
-      return FilterChip(
-        label: Text(label, style: const TextStyle(fontSize: 12)),
-        selected: selected,
-        onSelected: (_) => onTap(),
-        showCheckmark: false,
-        selectedColor: scheme.primary.withValues(alpha: .15),
-      );
-    }
-    Widget chipRow(List<Widget> chips) {
-      return SizedBox(
+    return genres.when(
+      loading: () => const SizedBox(height: 46),
+      error: (e, _) => const SizedBox(height: 46),
+      data: (r) => SizedBox(
         height: 46,
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          itemCount: chips.length,
+          itemCount: r.groups.length + 1,
           separatorBuilder: (_, _) => const SizedBox(width: 8),
-          itemBuilder: (_, i) => chips[i],
+          itemBuilder: (_, i) {
+            final name = i == 0 ? null : r.groups[i - 1].genre;
+            return FilterChip(
+              label: Text(name ?? '全部题材',
+                  style: const TextStyle(fontSize: 12)),
+              selected: _mediumGenre == name,
+              onSelected: (_) => _setMediumGenre(name),
+              showCheckmark: false,
+              selectedColor: scheme.primary.withValues(alpha: .15),
+            );
+          },
         ),
-      );
-    }
-    return Column(
-      children: [
-        genres.when(
-          loading: () => const SizedBox(height: 46),
-          error: (e, _) => const SizedBox(height: 46),
-          data: (r) => chipRow([
-            fc('优质', _mediumQuality,
-                () => _setMediumAxis(quality: true)),
-            fc('全部题材', !_mediumQuality && _mediumGenre == null,
-                () => _setMediumAxis()),
-            for (final g in r.groups)
-              fc(
-                  g.genre,
-                  !_mediumQuality && _mediumGenre == g.genre,
-                  () => _setMediumAxis(genre: g.genre)),
-          ]),
-        ),
-        years.when(
-          loading: () => const SizedBox(height: 46),
-          error: (e, _) => const SizedBox(height: 46),
-          data: (r) => chipRow([
-            fc('全部年份', _mediumYear == null, () => _setMediumYear(null)),
-            for (final y in r.groups)
-              fc('${y.year}', _mediumYear == y.year,
-                  () => _setMediumYear(y.year)),
-          ]),
-        ),
-      ],
+      ),
     );
   }
 
