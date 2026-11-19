@@ -141,8 +141,8 @@ resp = requests.get("https://api.sfacg.com/novels/730611",
 | ------------------ | ----- | ---------------------- | ---------------------------------------------------------------------------------- |
 | `novelId`        | int   | `id`                 | 主键                                                                               |
 | `novelName`      | str   | `title`              | 标题                                                                               |
-| `authorId`       | int   | —                     | 作者 id（**新增维度**，可做作者生态）                                        |
-| `authorName`     | str   | `author`             | 作者名                                                                             |
+| `authorId`       | int   | —                     | **账号唯一身份**（改名/大小写不变，可做作者生态；见下表后注）                 |
+| `authorName`     | str   | `author`             | 作者**显示名**（可改，不能当身份；见下表后注）                                     |
 | `addTime`        | str   | —                     | **上架时间，精确到秒**（`2024-12-27T19:03:11`）                            |
 | `lastUpdateTime` | str   | `updated_at`         | 最后更新时间，精确到秒                                                             |
 | `markCount`      | int   | `favs`               | 收藏数（精确整数）                                                                 |
@@ -157,6 +157,15 @@ resp = requests.get("https://api.sfacg.com/novels/730611",
 | `bgBanner`       | str   | **`featured`** | 横幅图 URL，仅 0.3% 非空，可以通过id拼接得到                                       |
 | `allowDown`      | bool  | —                     | 历史遗留字段                                                                       |
 | `point`          | float | —                     | 历史遗留字段                                                                       |
+
+**作者身份（2026-11-18 实测，见 `dataset/README.md` §5）**：
+
+- `authorId` 是账号唯一身份；`authorName` 是**显示名，可改**（改名后同一 `authorId`
+  在不同书上返回不同 `authorName`，已实证 11 组、28 本）。
+- 用户名**大小写不敏感**：`kola` / `KOLA` 同为 `authorId=382`。
+- 用户名**空格敏感**：`First Order`(7505) / `firstorder`(12459)、
+  `dark digger`(16612) / `darkdigger`(39896) 是不同账号。
+- 推论：按名字做同作者判定时必须 `casefold` 且**不得去空格**；有 `authorId` 时以 id 为准。
 
 ### 3.2 章节列表的 15 字段
 
