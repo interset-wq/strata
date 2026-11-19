@@ -56,7 +56,7 @@ func getJSON(t *testing.T, url string, status int) map[string]any {
 func TestHealthz(t *testing.T) {
 	srv, _ := newTestServer(t)
 	body := getJSON(t, srv.URL+"/strata/healthz", http.StatusOK)
-	if body["book_count"].(float64) != 8 || body["seed_version"] != "test-1" {
+	if body["book_count"].(float64) != 9 || body["seed_version"] != "test-1" {
 		t.Fatalf("body = %v", body)
 	}
 }
@@ -203,6 +203,34 @@ func TestFeaturedForm(t *testing.T) {
 	// Invalid form rejected.
 	getJSON(t, srv.URL+"/strata/featured?form=novella",
 		http.StatusBadRequest)
+}
+
+// TestCoverCarousel: the 对话 tab's composed-banner pool — cover-bearing
+// books of one form by favs DESC. form is mandatory (the client always
+// names one); cover-less books never appear.
+func TestCoverCarousel(t *testing.T) {
+	srv, _ := newTestServer(t)
+	body := getJSON(t, srv.URL+"/strata/cover-carousel?form=dialogue&limit=10",
+		http.StatusOK)
+	items := body["items"].([]any)
+	if len(items) != 1 || items[0].(map[string]any)["nid"] != 1008.0 {
+		t.Fatalf("items = %v", items)
+	}
+	if items[0].(map[string]any)["cover_url"] == nil {
+		t.Fatalf("cover_required pool leaked a cover-less book: %v", items)
+	}
+	if meta := body["meta"].(map[string]any); meta["cover_required"] != true {
+		t.Fatalf("meta = %v", meta)
+	}
+	// form is mandatory and must be a known value.
+	getJSON(t, srv.URL+"/strata/cover-carousel?limit=10", http.StatusBadRequest)
+	getJSON(t, srv.URL+"/strata/cover-carousel?form=novella", http.StatusBadRequest)
+	// A form with no cover-bearing books returns empty, not an error.
+	empty := getJSON(t, srv.URL+"/strata/cover-carousel?form=medium",
+		http.StatusOK)
+	if len(empty["items"].([]any)) != 0 {
+		t.Fatalf("medium pool = %v, want empty", empty["items"])
+	}
 }
 
 // TestBannerForm: the seeded shuffle honours the form filter — every

@@ -79,6 +79,14 @@ final bannerProvider = FutureProvider.autoDispose
 const bannerCarouselCount = 6;
 const largeImageCount = 6;
 
+/// 对话 tab 轮播：dialogue 池中有封面的书（收藏降序固定序，不随日期变）。
+/// dialogue 形态没有 featured 定制图，端上用封面实时合成纸墨 banner
+/// （重纸纱 + 衬线书名 + 指标行），见 widgets/cover_banner.dart。
+final dialogueCarouselProvider = FutureProvider<List<RankItem>>((ref) async {
+  final handle = await ref.watch(bootProvider.future);
+  return handle.api.coverCarousel(limit: bannerCarouselCount);
+});
+
 /// 大图精选：全形态 featured 池的每日后段（文字在图下方，点图全屏查看）。
 /// 不受首页形态 tab 影响，也不与形态轮播共用池子。
 final largeImageProvider = FutureProvider<List<FeaturedItem>>((ref) async {

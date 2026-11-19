@@ -873,6 +873,28 @@ func (s *Store) MoeGoddessBooks(ctx context.Context, limit int) ([]RankItem, err
 			"WHERE tag LIKE '____萌神')")
 }
 
+// CoverCarousel returns the top-fav cover-bearing books of one form: the
+// 对话 tab has no featured custom art, so the client composes paper-and-ink
+// banners from cover + text. Cover-less books are excluded up front; the
+// order is static favs DESC (the dialogue pool is a stable long tail).
+func (s *Store) CoverCarousel(ctx context.Context, form string,
+	limit int) ([]RankItem, error) {
+	query := `
+SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
+       seed.books.est_year, seed.books.status, seed.books.words, seed.books.clicks,
+       seed.books.favs, seed.books.praises, seed.books.form,
+       COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url
+FROM seed.books
+LEFT JOIN covers c ON c.nid = seed.books.nid
+WHERE seed.books.form = ?
+  AND COALESCE(c.cover, seed.books.cover_url) IS NOT NULL
+  AND COALESCE(c.cover, seed.books.cover_url) != ''
+ORDER BY seed.books.favs DESC, seed.books.nid ASC
+LIMIT ?`
+	rows, err := s.DB.QueryContext(ctx, query, form, limit)
+	return s.scanRankItems(ctx, rows, err)
+}
+
 // attachTags fills item.Tags from seed.book_tags with a single batched
 // query (avoids N+1 for the random-serial page's 100 rows).
 func (s *Store) attachTags(ctx context.Context, items []RankItem) {

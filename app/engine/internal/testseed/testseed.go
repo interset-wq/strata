@@ -56,6 +56,7 @@ var books = []book{
 	{nid: 1005, title: "New E", author: "Author E", genre: "都市", status: "连载中", words: 150000, favs: 300, pctl: 0.95, year: 2025},
 	{nid: 1006, title: "IP F", author: "Author F", genre: "都市", status: "连载中", words: 80000, favs: 700, pctl: 0.8, featured: 1, year: 2012},
 	{nid: 1007, title: "Medium G", author: "Author G", genre: "科幻", status: "已完结", words: 120000, favs: 400, pctl: 0.7, featured: 1, year: 2013},
+	{nid: 1008, title: "Dialogue H", author: "Author H", genre: "都市", status: "连载中", words: 50000, favs: 200, pctl: 0.6, year: 2014},
 }
 
 // Build writes assets/seed.db.gz + manifest.json and a user.db with one
@@ -105,6 +106,12 @@ VALUES(?,?,?,?, '免费', ?, NULL, ?, 1000, ?, 10, ?, NULL, '2026-04-01T00:00:00
 		return nil, err
 	}
 	if _, err := db.Exec(`UPDATE books SET form='medium' WHERE nid = 1007`); err != nil {
+		db.Close()
+		return nil, err
+	}
+	// 1008 feeds the cover-composed 对话 carousel: a dialogue-form book
+	// with a cover (cover-less books are invisible in that pool).
+	if _, err := db.Exec(`UPDATE books SET form='dialogue', cover_url='cover-1008.jpg' WHERE nid = 1008`); err != nil {
 		db.Close()
 		return nil, err
 	}

@@ -103,6 +103,7 @@ func New(s *store.Store) *gin.Engine {
 	group.POST("/history/:nid", srv.recordHistory)
 	group.GET("/featured", srv.featured)
 	group.GET("/featured-all", srv.featuredAll)
+	group.GET("/cover-carousel", srv.coverCarousel)
 	group.GET("/banner", srv.banner)
 	group.GET("/shelf", srv.shelfList)
 	group.PUT("/shelf", srv.shelfAdd)
@@ -1069,6 +1070,33 @@ func (s *Server) featuredAll(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"items": items})
+}
+
+// coverCarousel serves the 对话 tab's composed banners: cover-bearing
+// books of one form by favs DESC (static — long-tail pool). The client
+// draws a paper-and-ink banner from each cover; cover-less books never
+// appear, so the pool filter guarantees a drawable result.
+func (s *Server) coverCarousel(c *gin.Context) {
+	limit, ok := parseLimit(c)
+	if !ok {
+		return
+	}
+	form := c.Query("form")
+	if form == "" || !validForms[form] {
+		fail(c, http.StatusBadRequest, "invalid_argument",
+			"form must be short|medium|long|dialogue|ip_collab")
+		return
+	}
+	items, err := s.store.CoverCarousel(c.Request.Context(), form, limit)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"meta": gin.H{"pool": "seed", "ordering": "favs", "form": form,
+			"cover_required": true},
+		"items": items,
+	})
 }
 
 // shelfList returns the local shelf joined with seed titles.

@@ -132,6 +132,14 @@ short→IP 的回退是 UI 的职责（`bannerProvider` 一处集中），API �
 `seed.books.nid`——covers 表同名列，裸 `nid` 会歧义 500）。`limit` 1..200、
 `offset` ≥ 0，越界返回空数组而非 400，非法值 400。
 
+### GET /strata/cover-carousel?form=&limit=（**已实现**）
+
+对话 tab 合成轮播源：`form` 必填（同 `/banner` 的枚举校验），池 = 该 form
+**且有封面**（covers 观测或 seed `cover_url` 非空）的书，`favs DESC, nid ASC`
+静态序（dialogue 是长尾形态，不随日期重掷）。引擎只保证 URL 存在，不保证
+CDN 可达——封面 404 时 UI 回退纸底占位（docs/15 占位语义）。items 为
+RankItem（`cover_url` 必填非空）。
+
 ### GET /strata/rankings/favs?year=&genre=&limit=
 
 - `year` 必填，须在 `gen_min..gen_max` 内，否则 400。

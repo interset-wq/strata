@@ -258,6 +258,17 @@ class StrataApi {
         .toList();
   }
 
+  /// 对话轮播：form 池中有封面的书（收藏降序固定序，不随日期变）。
+  /// dialogue 池没有 featured 定制图，端上用封面合成纸墨 banner。
+  Future<List<RankItem>> coverCarousel(
+      {int limit = 6, String form = 'dialogue'}) async {
+    final body =
+        await _get('/cover-carousel', {'limit': '$limit', 'form': form});
+    return (body['items'] as List)
+        .map((e) => RankItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<void> shelfAdd(int nid) async {
     await _postBody('/shelf', {'nid': nid});
   }

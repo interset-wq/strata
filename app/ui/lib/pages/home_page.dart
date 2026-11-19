@@ -7,6 +7,7 @@ import '../data/api/strata_api.dart';
 import '../widgets/banner_carousel.dart';
 import '../widgets/banner_large_card.dart';
 import '../widgets/back_to_top.dart';
+import '../widgets/cover_banner.dart';
 import '../widgets/default_cover.dart';
 import 'browse_page.dart';
 
@@ -110,10 +111,13 @@ class _HomePageState extends ConsumerState<HomePage> {
                   },
                 ),
                 _searchRow(context),
-                BannerCarousel(
-                  items: items,
-                  onTap: (it) => context.push('/book/${it.nid}'),
-                ),
+                // 对话 tab 无 featured 定制图：封面实时合成纸墨 banner。
+                _form == 'dialogue'
+                    ? _dialogueCarousel()
+                    : BannerCarousel(
+                        items: items,
+                        onTap: (it) => context.push('/book/${it.nid}'),
+                      ),
                 const SizedBox(height: 8),
                 _entryGrid(context),
                 _sectionTitle(context, '连载发现',
@@ -425,6 +429,30 @@ class _HomePageState extends ConsumerState<HomePage> {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  // 对话 tab 轮播：静态收藏序（不随日期变），封面合成纸墨 banner。
+  Widget _dialogueCarousel() {
+    final list = ref.watch(dialogueCarouselProvider);
+    return list.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.symmetric(horizontal: 16),
+        child: AspectRatio(
+          aspectRatio: 2.2,
+          child: Center(
+              child: CircularProgressIndicator(strokeWidth: 2)),
+        ),
+      ),
+      error: (e, _) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Text('加载失败：$e',
+            style: const TextStyle(fontSize: 12)),
+      ),
+      data: (items) => CoverBannerCarousel(
+        items: items,
+        onTap: (it) => context.push('/book/${it.nid}'),
       ),
     );
   }
