@@ -58,7 +58,7 @@ SCHEMA = Path(__file__).resolve().parent / "schema.sql"
 DATASET = REPO / "dataset" / "out" / "books.jsonl"
 
 SCHEMA_VERSION = 3
-SEED_VERSION = "20260503.14"
+SEED_VERSION = "20260503.15"
 CONTENT_END = pd.Timestamp("2026-05-03")
 GEN_MIN, GEN_MAX = 2007, 2025
 
@@ -67,9 +67,12 @@ EXPECT_UNIVERSE = 241_864       # 241,758 + 108（E.14 补充书，est_year 全�
 EXPECT_ANALYSIS_ROWS = 245_887  # 245,779 + 108 月榜遗漏书（E.14）
 EXPECT_DATASET_ROWS = 248_338   # v20260503.7: 248,230 + 108 月榜遗漏书（E.14）
 EXPECT_LICENSED = 47
-EXPECT_ADMITTED = 18_184       # E.16 天花板条款（words≤5万 & clicks>215,723 → dialogue）：+106
-EXPECT_SEED = 18_231           # 18,184 + 47 licensed
-EXPECT_COVERAGE_MIN = 0.970    # eligible 口径（弃书+invalid 剔除后；详见 P3）
+EXPECT_ADMITTED = 18_884       # E.17 同人短字数条款（tong & words≤5万 → dialogue）：+700
+EXPECT_SEED = 18_931           # 18,884 + 47 licensed
+EXPECT_COVERAGE_MIN = 0.9650   # eligible 口径（弃书+invalid 剔除后；详见 P3）。
+# E.17 同人短字数条款把 6,012 本同人从 short 移入 dialogue：这些书不再受 E.11
+# 弃书约束，eligible 分母因此多出 0.87% 的收藏，而种子只吸收其中 700 本有质量锚
+# 的书。门槛随分母下调，P3 的同分母对比（vs V0 +0.00pp）才是回归判据。
 
 # Baseline V0 counts, kept only for the audit trail (app/docs/09 appendix E).
 V0_BASE = 29_433

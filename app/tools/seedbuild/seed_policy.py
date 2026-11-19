@@ -44,6 +44,8 @@ sys.path.insert(0, str(ANALYSIS))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from lib import eras, paths  # noqa: E402
+from lib import dialogue_form as DF  # noqa: E402
+from lib import forms as FM  # noqa: E402
 from deep_ranks import build_deep_ranks  # noqa: E402
 
 # Policy constants (pinned). The velocity group is diagnostic only — see admit().
@@ -280,7 +282,7 @@ def admit(df: pd.DataFrame, content_end: pd.Timestamp,
 
 
 def postconditions(df: pd.DataFrame, res: dict) -> list[tuple[str, bool, str]]:
-    """Checks the rebuild must assert before shipping (P1-P6).
+    """Checks the rebuild must assert before shipping (P1-P7).
 
     P1/P3 use the **eligible** denominator (连载 short/medium + invalid excluded):
     those books voluntarily lost coverage under E.11/E.12, so counting them as a
@@ -317,6 +319,15 @@ def postconditions(df: pd.DataFrame, res: dict) -> list[tuple[str, bool, str]]:
     p5 = not (stray & res["ids"])
     # P6: invalid（<2000 字僵尸书）在任何渠道都不得入种——保底候选 >=1万天然排除。
     p6 = not (invalid & res["ids"])
+    # P7: 短篇三条天花板（E.17，用户 App 目验）。回到旧时光 clicks 215,723 是
+    #     真短篇点击上限，听雨 5,478 favs / 2,389 赞是收藏与点赞上限。种子内
+    #     short 若有书越过任一条，其形态必定不是短篇（对话/长篇误判）。
+    form_in_seed = FM.classify(df).where(df["id"].isin(res["ids"]))
+    short_mask = form_in_seed.eq("short")
+    over_c = df.loc[short_mask & (df["clicks"] > DF.DIAL_CLICKS_CEIL)]
+    over_f = df.loc[short_mask & (df["favs"] > DF.SHORT_MAX_FAVS)]
+    over_p = df.loc[short_mask & (df["praises"] > DF.SHORT_MAX_PRAISES)]
+    p7 = over_c.empty and over_f.empty and over_p.empty
     return [
         ("P1 合格深榜书全部在种子内", p1,
          f"{len(res['deep'] - ineligible):,} 本合格深榜书，"
@@ -337,6 +348,11 @@ def postconditions(df: pd.DataFrame, res: dict) -> list[tuple[str, bool, str]]:
          f"越界 {len(stray & res['ids'])} 本"),
         ("P6 invalid（<2000字僵尸）零入种", p6,
          f"invalid {len(invalid):,} 本，入种 {len(invalid & res['ids'])} 本"),
+        ("P7 short 层不越短篇三条天花板", p7,
+         f"short {int(short_mask.sum()):,} 本；越点击 "
+         f"{len(over_c)}、越收藏 {len(over_f)}、越点赞 {len(over_p)}"
+         + (f"：{(over_c['id'].tolist() + over_f['id'].tolist() + over_p['id'].tolist())[:5]}"
+            if not p7 else "")),
     ]
 
 
