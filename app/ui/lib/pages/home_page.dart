@@ -73,7 +73,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   bool _ipDone = false;
   String? _ipError;
 
-  // 中篇 tab（944 本，words 5万–15万）：页内浏览体验——单行题材 chips +
+  // 中篇 tab（小池，words 5万–15万，池规模随种子版本变化）：页内浏览体验——单行题材 chips +
   // 页内无限列表（照搬 IP tab "随便看看"分区模式）。双轴双行 chips
   // 可用性差（用户 2026-11-19 定），简化为题材单轴；年份/优质轴砍掉。
   // 与三个已有 tab 的体验刻意区分：长篇=分区首页、短篇=入口门户、
@@ -84,7 +84,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   bool _mediumDone = false;
   String? _mediumError;
 
-  // 对话 tab（6,189 本，无完结条款：2,574 完结 + 3,615 连载，E.22 口径）：
+  // 对话 tab（无完结条款：完结+连载混合，E.22 口径，池规模随种子版本变化）：
   // 页内浏览体验与中篇同构（单行题材 chips + 页内无限列表，docs/16）；
   // 轮播用封面合成纸墨 banner（无 featured 定制图池）。
   String? _dialogueGenre;
@@ -394,7 +394,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                   ],
                 );
               }
-              // 对话 tab（6,189 本）：页内浏览体验（纸墨轮播 + 单行题材
+              // 对话 tab（无完结条款）：页内浏览体验（纸墨轮播 + 单行题材
               // chips + 页内无限列表），与中篇同构（docs/16）。
               if (_form == 'dialogue') {
                 if (_dialogueItems.isEmpty && !_dialogueLoading) {
@@ -432,7 +432,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                   ],
                 );
               }
-              // 中篇 tab（944 本）：页内浏览体验（单行题材 chips + 页内
+              // 中篇 tab（小池）：页内浏览体验（单行题材 chips + 页内
               // 无限列表），与长篇（分区首页）/短篇（入口门户）/IP
               // （入口行+列表）刻意区分，见 docs/16。年份/赛道轴砍掉
               // （双轴双行 chips 可用性差，用户 2026-11-19 定）。
