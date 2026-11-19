@@ -99,6 +99,23 @@ jobs:
           print(f"seed {meta['seed_version']}: books={meta['book_count']} deep_ranks={rows}")
           PY
 
+      - name: Prepare stable release signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::warning::ANDROID_KEYSTORE_BASE64 secret is not set — this release will be signed with the debug key"
+            exit 0
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > app/ui/android/app/release-keystore.jks
+          printf 'storeFile=release-keystore.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+            "$KEYSTORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" \
+            > app/ui/android/app/keystore.properties
+          echo "stable signing key in place (alias: $KEY_ALIAS)"
+
       - name: Build release APK (arm64)
         working-directory: app/ui
         run: |
@@ -122,6 +139,8 @@ jobs:
           unzip -l "$APK" | grep 'lib/arm64-v8a/libstrata.so'
           AAPT=$(find "$ANDROID_SDK_ROOT/build-tools" -name aapt | sort -V | tail -1)
           "$AAPT" dump permissions "$APK" | grep 'android.permission.INTERNET'
+          APSIG=$(find "$ANDROID_SDK_ROOT/build-tools" -name apksigner | sort -V | tail -1)
+          "$APSIG" verify --print-certs "$APK"
 
       - name: Dump failure log into the repo
         if: failure()
