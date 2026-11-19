@@ -8,6 +8,10 @@
       - (同人特征 & clicks/字 ≥ 6)；
       - (非同人 & words ≤ 5 万 & clicks/字 ≥ 13)；
       - (非同人 & 5–15 万字 & clicks/字 ≥ 30)；
+      - (words ≤ 5 万 & clicks > 真短篇点击天花板)：天花板 = 「回到旧时光」
+        clicks 215,723——用户 App 目验确认其为真短篇点击上限（36 本误判短篇
+        全部 >226k；真短篇章节少、曝光低，clicks 上不去）。此条款**不限
+        同人/签约**，专收 ckw 6–13 灰带的高曝光对话文（E.16）；
       - 保留原条款 (同人 + 未签约 + ≤ 2 万字)。
   * ③ 标题 IP 特征：含米哈游等 IP 词 = 同人对话小说的强特征（辅助）。
 
@@ -42,6 +46,9 @@ MORPH_MAX_WORDS = 20_000
 DIAL_CKW_FAN = 6.0      # 同人特征（genre/tags 含同人）
 DIAL_CKW_SHORT = 13.0   # 非同人 & words ≤ 5 万
 DIAL_CKW_MEDIUM = 30.0  # 非同人 & 5–15 万字
+# 真短篇点击天花板（E.16，2026-11-19 用户裁定）：回到旧时光 clicks=215,723 为
+# 真 short 点击上限；words ≤ 5 万且越过此线者判对话（不限同人/签约）。
+DIAL_CLICKS_CEIL = 215_723
 # 标题 IP 特征词（米哈游系为主，对话小说同人集中区）
 IP_PATTERN = re.compile(
     "原神|崩坏|星穹|星铁|芙宁娜|钟离|纳西妲|琪亚娜|芽衣|姬子|雷电|梅比乌斯|"
@@ -78,9 +85,11 @@ def mark(df: pd.DataFrame) -> pd.DataFrame:
     d["tong"] = (genre == "同人") | tags.str.contains("同人", na=False)
     d["unsigned"] = ~price.isin(["VIP", "签约"])
     # 形态判据 v2：clicks/字（快照值）。缺失 clicks 时 ckw=0，v2 条款不生效。
+    clicks_num = None
     if "clicks" in d.columns:
         w = words.clip(lower=1).to_numpy()
-        d["ckw"] = pd.to_numeric(d["clicks"], errors="coerce").fillna(0).to_numpy() / w
+        clicks_num = pd.to_numeric(d["clicks"], errors="coerce").fillna(0)
+        d["ckw"] = clicks_num.to_numpy() / w
     else:
         d["ckw"] = np.zeros(len(d))
     d["morph"] = (
@@ -90,6 +99,9 @@ def mark(df: pd.DataFrame) -> pd.DataFrame:
         | (~d["tong"] & words.between(50_001, 150_000)
            & d["ckw"].ge(DIAL_CKW_MEDIUM))                                 # v2-c
     )
+    if clicks_num is not None:                                             # v2-d 天花板
+        d["morph"] = d["morph"] | ((words <= 50_000)
+                                   & clicks_num.gt(DIAL_CLICKS_CEIL))
     d["hidden"] = d["morph"] & ~d["marked"]
     d["ip_title"] = title.str.contains(IP_PATTERN, na=False)
     return d

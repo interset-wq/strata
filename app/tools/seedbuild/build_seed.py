@@ -58,7 +58,7 @@ SCHEMA = Path(__file__).resolve().parent / "schema.sql"
 DATASET = REPO / "dataset" / "out" / "books.jsonl"
 
 SCHEMA_VERSION = 3
-SEED_VERSION = "20260503.13"
+SEED_VERSION = "20260503.14"
 CONTENT_END = pd.Timestamp("2026-05-03")
 GEN_MIN, GEN_MAX = 2007, 2025
 
@@ -67,8 +67,8 @@ EXPECT_UNIVERSE = 241_864       # 241,758 + 108（E.14 补充书，est_year 全�
 EXPECT_ANALYSIS_ROWS = 245_887  # 245,779 + 108 月榜遗漏书（E.14）
 EXPECT_DATASET_ROWS = 248_338   # v20260503.7: 248,230 + 108 月榜遗漏书（E.14）
 EXPECT_LICENSED = 47
-EXPECT_ADMITTED = 18_078       # E.14: +108 月榜遗漏书（18,058 + 净 19，深榜互有挤出）；E.15 新锚点 104→281 定年重估净 +1
-EXPECT_SEED = 18_125           # 18,078 + 47 licensed
+EXPECT_ADMITTED = 18_184       # E.16 天花板条款（words≤5万 & clicks>215,723 → dialogue）：+106
+EXPECT_SEED = 18_231           # 18,184 + 47 licensed
 EXPECT_COVERAGE_MIN = 0.970    # eligible 口径（弃书+invalid 剔除后；详见 P3）
 
 # Baseline V0 counts, kept only for the audit trail (app/docs/09 appendix E).
