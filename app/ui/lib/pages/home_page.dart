@@ -172,7 +172,10 @@ class _HomePageState extends ConsumerState<HomePage> {
                               const EdgeInsets.symmetric(horizontal: 16),
                           child: Column(
                             children: [
-                              for (final it in _ipItems) BookRowTile(item: it),
+                              for (final it in _ipItems)
+                                BookRowTile(
+                                    item: it,
+                                    ipLabel: contestIpLabel(it.contest)),
                               if (_ipError != null)
                                 Padding(
                                   padding: const EdgeInsets.symmetric(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../app/theme.dart';
 import '../data/api/strata_api.dart';
 import 'default_cover.dart';
 import 'metric_badge.dart';
@@ -10,7 +11,11 @@ import 'metric_badge.dart';
 class BookRowTile extends StatelessWidget {
   final RankItem item;
 
-  const BookRowTile({super.key, required this.item});
+  /// IP 徽标（tag 行首位，比普通 tag 更重）：列表混排多个联动 IP 时
+  /// 每本需要 IP 标识（IP tab“随便看看”、“其他”长尾页）。
+  final String? ipLabel;
+
+  const BookRowTile({super.key, required this.item, this.ipLabel});
 
   static String wan(int? n) {
     if (n == null) return '';
@@ -43,6 +48,7 @@ class BookRowTile extends StatelessWidget {
       if (item.praises != null && item.praises! > 0)
         (MetricIcons.praises, wan(item.praises)),
     ];
+    final ip = ipLabel;
 
     return InkWell(
       onTap: () => context.push('/book/${item.nid}'),
@@ -97,6 +103,24 @@ class BookRowTile extends StatelessWidget {
                       spacing: 4,
                       runSpacing: 4,
                       children: [
+                        if (ip != null && ip.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: scheme.primary.withValues(alpha: .16),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                  color:
+                                      scheme.primary.withValues(alpha: .5)),
+                            ),
+                            child: Text(ip,
+                                style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    fontFamily: StrataTokens.serif,
+                                    color: scheme.primary)),
+                          ),
                         for (final t in tags.take(3))
                           Container(
                             padding: const EdgeInsets.symmetric(

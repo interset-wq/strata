@@ -72,7 +72,14 @@ class _IpBooksPageState extends ConsumerState<IpBooksPage> {
                     controller: _scroll,
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
                     itemCount: list.length,
-                    itemBuilder: (context, i) => BookRowTile(item: list[i]),
+                    itemBuilder: (context, i) => BookRowTile(
+                      item: list[i],
+                      // “其他”长尾混排多个 IP，需要徽标；单一 IP 页全页同 IP，
+                      // 与页面标题重复，不显示。
+                      ipLabel: widget.group == 'other'
+                          ? contestIpLabel(list[i].contest)
+                          : null,
+                    ),
                   ),
                   if (_showTop)
                     Positioned(

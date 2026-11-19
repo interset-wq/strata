@@ -585,6 +585,19 @@ class SearchItem {
         favs = m['favs'] as int?;
 }
 
+/// contest（征文）→ 联动 IP 展示名（崩坏3征文 → 崩坏3，
+/// 失业魔王同人征文 → 失业魔王）。contest 为空返回 null（无征文标）。
+String? contestIpLabel(String? contest) {
+  if (contest == null || contest.isEmpty) return null;
+  var s = contest;
+  if (s.endsWith('同人征文')) {
+    s = s.substring(0, s.length - 4);
+  } else if (s.endsWith('征文')) {
+    s = s.substring(0, s.length - 2);
+  }
+  return s.isEmpty ? contest : s;
+}
+
 /// IP 入口行的一个分组：contest（征文）→ 联动 IP，count 本数。
 class IpGroup {
   final String contest;
@@ -595,16 +608,8 @@ class IpGroup {
   factory IpGroup.fromJson(Map<String, dynamic> j) => IpGroup(
       contest: j['contest'] as String, count: (j['count'] as num).toInt());
 
-  /// 展示名：去“征文”/“同人征文”后缀（崩坏3征文 → 崩坏3）。
-  String get label {
-    var s = contest;
-    if (s.endsWith('同人征文')) {
-      s = s.substring(0, s.length - 4);
-    } else if (s.endsWith('征文')) {
-      s = s.substring(0, s.length - 2);
-    }
-    return s.isEmpty ? contest : s;
-  }
+  /// 展示名：由 contest 推导（崩坏3征文 → 崩坏3）。
+  String get label => contestIpLabel(contest) ?? contest;
 }
 
 /// IP 入口行结果：total = 池总量（用于端上折出“其他”），
