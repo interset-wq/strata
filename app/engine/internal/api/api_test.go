@@ -276,6 +276,12 @@ func TestIpBooks(t *testing.T) {
 		items[1].(map[string]any)["nid"] != 1009.0 {
 		t.Fatalf("items = %v", items)
 	}
+	// regression: the ip-books scan must return contest — the client
+	// renders the IP badge from it on mixed-IP lists.
+	if items[0].(map[string]any)["contest"] != "崩坏3征文" {
+		t.Fatalf("items[0].contest = %v, want 崩坏3征文",
+			items[0].(map[string]any)["contest"])
+	}
 	// other: 龙之谷征文 is outside the top-2 by count → 1011.
 	body = getJSON(t,
 		srv.URL+"/strata/ip-books?form=ip_collab&group=other&limit=10",

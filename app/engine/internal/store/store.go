@@ -980,7 +980,7 @@ GROUP BY contest ORDER BY COUNT(*) DESC, contest ASC LIMIT 2`, form)
 	query := `
 SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
        seed.books.est_year, seed.books.status, seed.books.words, seed.books.clicks,
-       seed.books.favs, seed.books.praises, seed.books.form,
+       seed.books.favs, seed.books.praises, seed.books.contest, seed.books.form,
        COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url
 FROM seed.books
 LEFT JOIN covers c ON c.nid = seed.books.nid
@@ -988,7 +988,42 @@ WHERE ` + where +
 		` ORDER BY seed.books.favs DESC, seed.books.nid ASC LIMIT ? OFFSET ?`
 	args = append(args, limit, offset)
 	rows, err := s.DB.QueryContext(ctx, query, args...)
-	return s.scanRankItems(ctx, rows, err)
+	if err != nil {
+		return nil, err
+	}
+	// 13-column scan (with contest — the client renders an IP badge from
+	// it on mixed-IP lists); kept separate from scanRankItems, which
+	// scans the 12-column shape shared by the other pools. Tags attached
+	// as usual.
+	defer rows.Close()
+	items := make([]RankItem, 0, limit)
+	for rows.Next() {
+		var (
+			item                         RankItem
+			gen, status, contest, cover  sql.NullString
+			words, clicks, favs, praises sql.NullInt64
+		)
+		if err := rows.Scan(&item.NID, &item.Title, &item.Author, &gen,
+			&item.EstYear, &status, &words, &clicks, &favs, &praises,
+			&contest, &item.Form, &cover); err != nil {
+			return nil, err
+		}
+		item.Rank = len(items) + offset + 1
+		item.Genre = strPtr(gen)
+		item.Status = strPtr(status)
+		item.Words = intPtr(words)
+		item.Clicks = intPtr(clicks)
+		item.Favs = intPtr(favs)
+		item.Praises = intPtr(praises)
+		item.Contest = strPtr(contest)
+		item.CoverURL = strPtr(cover)
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	s.attachTags(ctx, items)
+	return items, nil
 }
 
 // attachTags fills item.Tags from seed.book_tags with a single batched
