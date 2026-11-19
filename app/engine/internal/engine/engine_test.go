@@ -32,7 +32,7 @@ func TestStartServesAndShutsDown(t *testing.T) {
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
 		t.Fatal(err)
 	}
-	if body["book_count"].(float64) != 9 || body["seed_version"] != "test-1" {
+	if body["book_count"].(float64) != 12 || body["seed_version"] != "test-1" {
 		t.Fatalf("healthz body = %v", body)
 	}
 

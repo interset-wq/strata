@@ -9,6 +9,7 @@ import '../pages/discover_page.dart';
 import '../pages/featured_gallery_page.dart';
 import '../pages/history_page.dart';
 import '../pages/home_page.dart';
+import '../pages/ip_books_page.dart';
 import '../pages/rankings_page.dart';
 import '../pages/search_page.dart';
 import '../pages/image_viewer_page.dart';
@@ -95,6 +96,14 @@ final router = GoRouter(
       ),
     ),
     GoRoute(path: '/discover', builder: (_, _) => const DiscoverPage()),
+    GoRoute(
+      path: '/ip-books',
+      builder: (_, state) {
+        final group = state.uri.queryParameters['group'] ?? '';
+        final label = state.uri.queryParameters['label'] ?? group;
+        return IpBooksPage(group: group, label: label);
+      },
+    ),
     GoRoute(path: '/watchlist', builder: (_, _) => const WatchlistPage()),
     GoRoute(path: '/history', builder: (_, _) => const HistoryPage()),
     GoRoute(path: '/serial-random',

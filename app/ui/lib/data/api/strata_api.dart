@@ -269,6 +269,31 @@ class StrataApi {
         .toList();
   }
 
+  /// IP tab 入口行：一个 form 的书按征文（contest）聚合，
+  /// count DESC（引擎侧稳定排序）；total 用于端上折出“其他”入口。
+  Future<IpGroupsResult> ipGroups({String form = 'ip_collab'}) async {
+    final body = await _get('/ip-groups', {'form': form});
+    return IpGroupsResult(
+      total: (body['total'] as num).toInt(),
+      groups: (body['groups'] as List)
+          .map((e) => IpGroup.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+
+  /// 一个 IP 入口的列表：group 是征文名（精确匹配）或 'other'
+  /// （收藏数前 2 名征文之外的长尾）；组内收藏降序。
+  Future<List<RankItem>> ipBooks(
+      {String form = 'ip_collab',
+      required String group,
+      int limit = 100}) async {
+    final body = await _get(
+        '/ip-books', {'limit': '$limit', 'form': form, 'group': group});
+    return (body['items'] as List)
+        .map((e) => RankItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<void> shelfAdd(int nid) async {
     await _postBody('/shelf', {'nid': nid});
   }
@@ -558,6 +583,37 @@ class SearchItem {
         genre = m['genre'] as String?,
         estYear = m['est_year'] as int,
         favs = m['favs'] as int?;
+}
+
+/// IP 入口行的一个分组：contest（征文）→ 联动 IP，count 本数。
+class IpGroup {
+  final String contest;
+  final int count;
+
+  const IpGroup({required this.contest, required this.count});
+
+  factory IpGroup.fromJson(Map<String, dynamic> j) => IpGroup(
+      contest: j['contest'] as String, count: (j['count'] as num).toInt());
+
+  /// 展示名：去“征文”/“同人征文”后缀（崩坏3征文 → 崩坏3）。
+  String get label {
+    var s = contest;
+    if (s.endsWith('同人征文')) {
+      s = s.substring(0, s.length - 4);
+    } else if (s.endsWith('征文')) {
+      s = s.substring(0, s.length - 2);
+    }
+    return s.isEmpty ? contest : s;
+  }
+}
+
+/// IP 入口行结果：total = 池总量（用于端上折出“其他”），
+/// groups = 按征文（contest）聚合、count DESC 的分组。
+class IpGroupsResult {
+  final int total;
+  final List<IpGroup> groups;
+
+  const IpGroupsResult({required this.total, required this.groups});
 }
 
 class FeaturedItem {

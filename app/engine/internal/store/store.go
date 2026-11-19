@@ -895,6 +895,102 @@ LIMIT ?`
 	return s.scanRankItems(ctx, rows, err)
 }
 
+// IpGroup is one contest (征文) cluster of an IP pool: the IP tab groups
+// books by which IP they collab with, and in the seed that axis is the
+// contest field (崩坏3征文 → 崩坏3, 少女前线征文 → 少女前线, …).
+type IpGroup struct {
+	Contest string `json:"contest"`
+	Count   int    `json:"count"`
+}
+
+// IpGroups aggregates one form's books by contest for the IP tab's entry
+// row: named IPs by count DESC (stable contest ASC tie-break) plus the
+// pool total, so the client can fold the tail into an "other" entry.
+func (s *Store) IpGroups(ctx context.Context, form string) (int,
+	[]IpGroup, error) {
+	var total int
+	if err := s.DB.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM seed.books WHERE form = ?`, form).Scan(&total); err != nil {
+		return 0, nil, err
+	}
+	rows, err := s.DB.QueryContext(ctx, `
+SELECT contest, COUNT(*) AS c FROM seed.books
+WHERE form = ? AND contest IS NOT NULL AND contest != ''
+GROUP BY contest ORDER BY c DESC, contest ASC`, form)
+	if err != nil {
+		return 0, nil, err
+	}
+	defer rows.Close()
+	groups := []IpGroup{}
+	for rows.Next() {
+		var g IpGroup
+		if err := rows.Scan(&g.Contest, &g.Count); err != nil {
+			return 0, nil, err
+		}
+		groups = append(groups, g)
+	}
+	if err := rows.Err(); err != nil {
+		return 0, nil, err
+	}
+	return total, groups, nil
+}
+
+// IpBooks lists one IP entry: group names a contest exactly, or
+// "other" for the long tail outside the top-2 contests by count (the
+// named entries). favs DESC within the group — the IP pool is small
+// and stable, no randomness.
+func (s *Store) IpBooks(ctx context.Context, form, group string,
+	limit, offset int) ([]RankItem, error) {
+	where := "seed.books.form = ?"
+	args := []any{form}
+	if group == "other" {
+		var top []string
+		rows, err := s.DB.QueryContext(ctx, `
+SELECT contest FROM seed.books
+WHERE form = ? AND contest IS NOT NULL AND contest != ''
+GROUP BY contest ORDER BY COUNT(*) DESC, contest ASC LIMIT 2`, form)
+		if err != nil {
+			return nil, err
+		}
+		for rows.Next() {
+			var c string
+			if err := rows.Scan(&c); err != nil {
+				rows.Close()
+				return nil, err
+			}
+			top = append(top, c)
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return nil, err
+		}
+		where += " AND contest IS NOT NULL AND contest != ''"
+		if len(top) > 0 {
+			ph := make([]string, len(top))
+			for i, c := range top {
+				ph[i] = "?"
+				args = append(args, c)
+			}
+			where += fmt.Sprintf(" AND contest NOT IN (%s)", strings.Join(ph, ","))
+		}
+	} else {
+		where += " AND contest = ?"
+		args = append(args, group)
+	}
+	query := `
+SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
+       seed.books.est_year, seed.books.status, seed.books.words, seed.books.clicks,
+       seed.books.favs, seed.books.praises, seed.books.form,
+       COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url
+FROM seed.books
+LEFT JOIN covers c ON c.nid = seed.books.nid
+WHERE ` + where +
+		` ORDER BY seed.books.favs DESC, seed.books.nid ASC LIMIT ? OFFSET ?`
+	args = append(args, limit, offset)
+	rows, err := s.DB.QueryContext(ctx, query, args...)
+	return s.scanRankItems(ctx, rows, err)
+}
+
 // attachTags fills item.Tags from seed.book_tags with a single batched
 // query (avoids N+1 for the random-serial page's 100 rows).
 func (s *Store) attachTags(ctx context.Context, items []RankItem) {

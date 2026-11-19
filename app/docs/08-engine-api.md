@@ -132,6 +132,19 @@ short→IP 的回退是 UI 的职责（`bannerProvider` 一处集中），API �
 `seed.books.nid`——covers 表同名列，裸 `nid` 会歧义 500）。`limit` 1..200、
 `offset` ≥ 0，越界返回空数组而非 400，非法值 400。
 
+### GET /strata/ip-groups?form=（**已实现**）
+
+IP tab 入口行：`form` 必填，池按征文（`contest`，非空）`GROUP BY` 聚合，
+`count DESC, contest ASC` 稳定序。返回 `total`（池总量，含无 contest 的
+书）+ `groups: [{contest, count}]`。端上取前 2 组作命名 IP 入口
+（崩坏3征文 → 崩坏3，去“征文”后缀），其余折成“其他”（total − 前 2 之和）。
+
+### GET /strata/ip-books?form=&group=&limit=&offset=（**已实现**）
+
+一个 IP 入口的列表：`group` 必填——征文名（精确匹配）或 `'other'`
+（收藏数前 2 名征文之外的长尾，引擎内部算 top-2）。组内 `favs DESC,
+nid ASC`，分页同 `/rankings/classic`。未知征文名返回空列表不报错。
+
 ### GET /strata/cover-carousel?form=&limit=（**已实现**）
 
 对话 tab 合成轮播源：`form` 必填（同 `/banner` 的枚举校验），池 = 该 form

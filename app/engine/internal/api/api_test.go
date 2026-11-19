@@ -56,7 +56,7 @@ func getJSON(t *testing.T, url string, status int) map[string]any {
 func TestHealthz(t *testing.T) {
 	srv, _ := newTestServer(t)
 	body := getJSON(t, srv.URL+"/strata/healthz", http.StatusOK)
-	if body["book_count"].(float64) != 9 || body["seed_version"] != "test-1" {
+	if body["book_count"].(float64) != 12 || body["seed_version"] != "test-1" {
 		t.Fatalf("body = %v", body)
 	}
 }
@@ -230,6 +230,67 @@ func TestCoverCarousel(t *testing.T) {
 		http.StatusOK)
 	if len(empty["items"].([]any)) != 0 {
 		t.Fatalf("medium pool = %v, want empty", empty["items"])
+	}
+}
+
+// TestIpGroups: the IP tab's entry row — one form's books aggregated by
+// contest (征文), count DESC with a stable contest ASC tie-break.
+func TestIpGroups(t *testing.T) {
+	srv, _ := newTestServer(t)
+	body := getJSON(t, srv.URL+"/strata/ip-groups?form=ip_collab",
+		http.StatusOK)
+	if body["total"].(float64) != 4 {
+		t.Fatalf("total = %v, want 4", body["total"])
+	}
+	groups := body["groups"].([]any)
+	want := []struct {
+		contest string
+		count   int
+	}{
+		{"崩坏3征文", 2}, {"少女前线征文", 1}, {"龙之谷征文", 1},
+	}
+	if len(groups) != len(want) {
+		t.Fatalf("groups = %v", groups)
+	}
+	for i, w := range want {
+		g := groups[i].(map[string]any)
+		if g["contest"] != w.contest || int(g["count"].(float64)) != w.count {
+			t.Fatalf("groups[%d] = %v, want %v", i, g, w)
+		}
+	}
+	// form is mandatory.
+	getJSON(t, srv.URL+"/strata/ip-groups", http.StatusBadRequest)
+}
+
+// TestIpBooks: one IP entry list — a contest named exactly, or "other"
+// for the long tail outside the top-2 contests by count.
+func TestIpBooks(t *testing.T) {
+	srv, _ := newTestServer(t)
+	// named group: 崩坏3征文 = 1006 + 1009, favs DESC.
+	body := getJSON(t,
+		srv.URL+"/strata/ip-books?form=ip_collab&group=崩坏3征文&limit=10",
+		http.StatusOK)
+	items := body["items"].([]any)
+	if len(items) != 2 ||
+		items[0].(map[string]any)["nid"] != 1006.0 ||
+		items[1].(map[string]any)["nid"] != 1009.0 {
+		t.Fatalf("items = %v", items)
+	}
+	// other: 龙之谷征文 is outside the top-2 by count → 1011.
+	body = getJSON(t,
+		srv.URL+"/strata/ip-books?form=ip_collab&group=other&limit=10",
+		http.StatusOK)
+	items = body["items"].([]any)
+	if len(items) != 1 || items[0].(map[string]any)["nid"] != 1011.0 {
+		t.Fatalf("other = %v, want [1011]", items)
+	}
+	// group is mandatory; an unknown contest returns empty, not an error.
+	getJSON(t, srv.URL+"/strata/ip-books?form=ip_collab", http.StatusBadRequest)
+	empty := getJSON(t,
+		srv.URL+"/strata/ip-books?form=ip_collab&group=不存在的征文",
+		http.StatusOK)
+	if len(empty["items"].([]any)) != 0 {
+		t.Fatalf("unknown contest = %v, want empty", empty["items"])
 	}
 }
 

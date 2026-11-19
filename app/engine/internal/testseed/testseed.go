@@ -57,6 +57,9 @@ var books = []book{
 	{nid: 1006, title: "IP F", author: "Author F", genre: "都市", status: "连载中", words: 80000, favs: 700, pctl: 0.8, featured: 1, year: 2012},
 	{nid: 1007, title: "Medium G", author: "Author G", genre: "科幻", status: "已完结", words: 120000, favs: 400, pctl: 0.7, featured: 1, year: 2013},
 	{nid: 1008, title: "Dialogue H", author: "Author H", genre: "都市", status: "连载中", words: 50000, favs: 200, pctl: 0.6, year: 2014},
+	{nid: 1009, title: "IP J", author: "Author J", genre: "都市", status: "连载中", words: 30000, favs: 100, pctl: 0.5, year: 2014},
+	{nid: 1010, title: "IP K", author: "Author K", genre: "科幻", status: "已完结", words: 120000, favs: 80, pctl: 0.5, year: 2015},
+	{nid: 1011, title: "IP L", author: "Author L", genre: "奇幻", status: "连载中", words: 20000, favs: 50, pctl: 0.4, year: 2016},
 }
 
 // Build writes assets/seed.db.gz + manifest.json and a user.db with one
@@ -101,7 +104,21 @@ VALUES(?,?,?,?, '免费', ?, NULL, ?, 1000, ?, 10, ?, NULL, '2026-04-01T00:00:00
 	// 1006/1007 carry the small featured pools that drive the per-form
 	// carousel (docs/13): ip_collab and medium each get their own featured
 	// book; short deliberately has none (its carousel falls back to IP).
-	if _, err := db.Exec(`UPDATE books SET form='ip_collab' WHERE nid = 1006`); err != nil {
+	if _, err := db.Exec(`UPDATE books SET form='ip_collab', contest='崩坏3征文' WHERE nid = 1006`); err != nil {
+		db.Close()
+		return nil, err
+	}
+	// 1009–1011 feed the IP tab: 崩坏3征文 tail, 少女前线征文, and
+	// 龙之谷征文 (the "other" long tail outside the top-2 by count).
+	if _, err := db.Exec(`UPDATE books SET form='ip_collab', contest='崩坏3征文' WHERE nid = 1009`); err != nil {
+		db.Close()
+		return nil, err
+	}
+	if _, err := db.Exec(`UPDATE books SET form='ip_collab', contest='少女前线征文' WHERE nid = 1010`); err != nil {
+		db.Close()
+		return nil, err
+	}
+	if _, err := db.Exec(`UPDATE books SET form='ip_collab', contest='龙之谷征文' WHERE nid = 1011`); err != nil {
 		db.Close()
 		return nil, err
 	}

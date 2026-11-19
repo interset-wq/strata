@@ -57,7 +57,7 @@ func TestLoadManifest(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if m.SeedVersion != "test-1" || m.BookCount != 9 {
+	if m.SeedVersion != "test-1" || m.BookCount != 12 {
 		t.Fatalf("manifest = %+v", m)
 	}
 }

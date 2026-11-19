@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../app/theme.dart';
 import '../core/providers.dart';
 import '../data/api/strata_api.dart';
 import '../widgets/banner_carousel.dart';
@@ -119,20 +120,25 @@ class _HomePageState extends ConsumerState<HomePage> {
                         onTap: (it) => context.push('/book/${it.nid}'),
                       ),
                 const SizedBox(height: 8),
-                _entryGrid(context),
+                // IP tab：入口行换成联动 IP（征文聚合）；其余 form 用通用宫格。
+                _form == 'ip_collab' ? _ipEntryRow() : _entryGrid(context),
                 _sectionTitle(context, '连载发现',
                     onMore: () => context.push('/serial-random')),
                 _ShowcaseSection(provider: serialShowcaseProvider(_form)),
                 _sectionTitle(context, '完结精选',
                     onMore: () => context.push('/finished-random')),
                 _ShowcaseSection(provider: finishedShowcaseProvider(_form)),
-                _entryCards(context),
+                // 宽卡与大图精选是长篇池（授权作品/萌神/featured），
+                // IP 池没有对应内容，隐藏避免空卡。
+                if (_form != 'ip_collab') _entryCards(context),
                 _sectionTitle(context, '随便看看',
                     onMore: () => context.push('/browse-random')),
                 _ShowcaseSection(provider: browseShowcaseProvider(_form)),
-                _sectionTitle(context, '大图精选',
-                    onMore: () => context.push('/featured-gallery')),
-                const _LargeImageSection(),
+                if (_form != 'ip_collab') ...[
+                  _sectionTitle(context, '大图精选',
+                      onMore: () => context.push('/featured-gallery')),
+                  const _LargeImageSection(),
+                ],
               ],
                 ),
                 if (_showTop)
@@ -455,6 +461,84 @@ class _HomePageState extends ConsumerState<HomePage> {
         onTap: (it) => context.push('/book/${it.nid}'),
       ),
     );
+  }
+
+  // IP tab 入口行：命名 IP（收藏数前 2 的征文）+ 其他（长尾）。
+  // contest 即联动 IP 轴（崩坏3征文 → 崩坏3）；文字卡无 icon（docs/15）。
+  Widget _ipEntryRow() {
+    final scheme = Theme.of(context).colorScheme;
+    return ref.watch(ipGroupsProvider).when(
+          loading: () => const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 16),
+            child: SizedBox(
+              height: 56,
+              child:
+                  Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            ),
+          ),
+          error: (e, _) => Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Center(
+                child: Text('加载失败：$e',
+                    style: const TextStyle(fontSize: 12))),
+          ),
+          data: (r) {
+            final named = r.groups.take(2).toList();
+            final otherCount = r.total - named.fold(0, (s, g) => s + g.count);
+            final entries = [
+              for (final g in named) (g.label, g.contest, g.count),
+              if (otherCount > 0) ('其他', 'other', otherCount),
+            ];
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: SizedBox(
+                height: 56,
+                child: Row(
+                  children: [
+                    for (final (label, group, count) in entries)
+                      Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.only(
+                              right: label == entries.last.$1 ? 0 : 8),
+                          child: InkWell(
+                            onTap: () => context.push(
+                                '/ip-books?group=${Uri.encodeComponent(group)}'
+                                '&label=${Uri.encodeComponent(label)}'),
+                            borderRadius: BorderRadius.circular(12),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: scheme.primary.withValues(alpha: .12),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              alignment: Alignment.center,
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(label,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontFamily: StrataTokens.serif,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 13,
+                                      )),
+                                  const SizedBox(height: 2),
+                                  Text('$count 本',
+                                      style: TextStyle(
+                                          fontSize: 10,
+                                          color: scheme.onSurfaceVariant)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
   }
 }
 

@@ -104,6 +104,8 @@ func New(s *store.Store) *gin.Engine {
 	group.GET("/featured", srv.featured)
 	group.GET("/featured-all", srv.featuredAll)
 	group.GET("/cover-carousel", srv.coverCarousel)
+	group.GET("/ip-groups", srv.ipGroups)
+	group.GET("/ip-books", srv.ipBooks)
 	group.GET("/banner", srv.banner)
 	group.GET("/shelf", srv.shelfList)
 	group.PUT("/shelf", srv.shelfAdd)
@@ -1095,6 +1097,68 @@ func (s *Server) coverCarousel(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"meta": gin.H{"pool": "seed", "ordering": "favs", "form": form,
 			"cover_required": true},
+		"items": items,
+	})
+}
+
+// ipGroups serves the IP tab's entry row: one form's books aggregated by
+// contest (征文) — named IPs count DESC, total for the client's "other"
+// fold. form=ip_collab is the intended caller.
+func (s *Server) ipGroups(c *gin.Context) {
+	form, ok := parseForm(c)
+	if !ok || form == "" {
+		fail(c, http.StatusBadRequest, "invalid_argument",
+			"form must be short|medium|long|dialogue|ip_collab")
+		return
+	}
+	total, groups, err := s.store.IpGroups(c.Request.Context(), form)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"meta":   gin.H{"pool": "seed", "form": form, "ordering": "count"},
+		"total":  total,
+		"groups": groups,
+	})
+}
+
+// ipBooks serves one IP entry list: group names a contest exactly, or
+// "other" for the long tail outside the top-2 contests by count.
+func (s *Server) ipBooks(c *gin.Context) {
+	form, ok := parseForm(c)
+	if !ok || form == "" {
+		fail(c, http.StatusBadRequest, "invalid_argument",
+			"form must be short|medium|long|dialogue|ip_collab")
+		return
+	}
+	group := c.Query("group")
+	if group == "" {
+		fail(c, http.StatusBadRequest, "invalid_argument",
+			"group must be a contest name or 'other'")
+		return
+	}
+	limit, ok := parseLimit(c)
+	if !ok {
+		return
+	}
+	offset := 0
+	if raw := c.Query("offset"); raw != "" {
+		var err error
+		if offset, err = strconv.Atoi(raw); err != nil || offset < 0 {
+			fail(c, http.StatusBadRequest, "invalid_argument",
+				"offset must be a non-negative integer")
+			return
+		}
+	}
+	items, err := s.store.IpBooks(c.Request.Context(), form, group, limit, offset)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"meta":  gin.H{"pool": "seed", "form": form, "group": group,
+			"ordering": "favs"},
 		"items": items,
 	})
 }

@@ -87,6 +87,13 @@ final dialogueCarouselProvider = FutureProvider<List<RankItem>>((ref) async {
   return handle.api.coverCarousel(limit: bannerCarouselCount);
 });
 
+/// IP tab 入口行：ip_collab 池按征文（contest）聚合（count DESC）。
+/// 端上取前 2 组作命名 IP 入口，其余折成“其他”。
+final ipGroupsProvider = FutureProvider<IpGroupsResult>((ref) async {
+  final handle = await ref.watch(bootProvider.future);
+  return handle.api.ipGroups(form: 'ip_collab');
+});
+
 /// 大图精选：全形态 featured 池的每日后段（文字在图下方，点图全屏查看）。
 /// 不受首页形态 tab 影响，也不与形态轮播共用池子。
 final largeImageProvider = FutureProvider<List<FeaturedItem>>((ref) async {
