@@ -38,7 +38,7 @@
 {
   "status": "ok",
   "schema_version": 3,
-  "seed_version": "20260503.11",
+  "seed_version": "20260503.12",
   "book_count": 18477,
   "licensed_count": 47,
   "content_end": "2026-05-03",
@@ -114,7 +114,7 @@ HTML 含书名/作者/分类/签约/封面/简介/收藏/赞/字数/状态/更�
 
 **首页分形态轮播（docs/13 form）**：轮播随首页形态 tab 切换，行为按池大小定——
 
-| form          | featured 池（seed 20260503.11） | 轮播行为                                                                                                           |
+| form          | featured 池（seed 20260503.12） | 轮播行为                                                                                                           |
 | ------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
 | `long`      | 662（含授权 44）               | 日期种子洗牌（`/banner`）                                                                                        |
 | `dialogue`  | 0                              | 空轮播（UI 渲染 `SizedBox.shrink`）                                                                              |
@@ -195,7 +195,7 @@ Classic 主线分类/状态/大赛列表：只按平台累计 `favs` 降序（`f
 表示全部大赛作品。`year` 可选（正整数，按 `est_year` 精确过滤；非法值 400）。
 `items` 为 RankItem（含 `form`），`meta.ordering="favs"`。
 
-短篇 tab（docs/form-definitions §3.1 完结条款）以
+短篇 tab（docs/form-definitions §4 收录资格）以
 `form=short&status=已完结[&year=Y|&contest=X]` 调本端点做年份榜/比赛榜/总榜。
 
 ### GET /strata/discover?cursor=&form=&limit=（**已实现**）

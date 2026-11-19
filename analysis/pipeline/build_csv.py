@@ -378,6 +378,35 @@ def main() -> int:
 
     records, load_stats = load_jsonl(C.JSONL_DIR)
     check_fields(records)
+    # 月榜遗漏书补充（E.14）：字段同构，nid 与主源互斥（构建时断言）。
+    # 跳过 check_fields：补充行含溯源键（addTime/rank_months 等），15 字段
+    # 已由产出脚本保证，manifest 记 sha256 可复核。
+    supplement_stats = None
+    if C.RANK_MISSING.exists():
+        import hashlib
+        digest = hashlib.sha256(C.RANK_MISSING.read_bytes()).hexdigest()
+        n = 0
+        for line in C.RANK_MISSING.open(encoding="utf-8"):
+            if not line.strip():
+                continue
+            row = json.loads(line)
+            nid = int(row["nid"])
+            if nid in records:
+                raise SystemExit(f"rank_missing nid {nid} 与主源冲突")
+            # 分析库封面省略公共前缀（rs/rss 同图床别名），与主源口径一致
+            cover = row.get("cover") or ""
+            if "/NovelCover/Big/" in cover:
+                row = dict(row)
+                row["cover"] = cover.split("/NovelCover/Big/", 1)[1].split("?", 1)[0]
+            records[nid] = row
+            n += 1
+        supplement_stats = {"path": "dataset/rank_missing.jsonl", "lines": n,
+                            "sha256": digest,
+                            "observed_at": "2026-11-19",
+                            "note": "月榜遗漏书（报告10 §A）；计数为 2026-11 App API 当期值"}
+        load_stats["lines"] += n
+        load_stats["duplicate_rows"] = load_stats["lines"] - len(records)
+        print(f"补充月榜遗漏书 {n} 本（{supplement_stats['note']}）")
     df, tally, genre_fixes, dropped = build(records)
 
     C.OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -400,6 +429,7 @@ def main() -> int:
     manifest = {
         "dataset": "novel_hub",
         "source": C.SOURCE,
+        "supplement": supplement_stats,
         "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "table": "novels",
         "rows": int(len(df)),

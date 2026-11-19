@@ -23,9 +23,17 @@
   故键只做 casefold；同时已知 `authorId` 优先——改名后名字不同但账号相同（11 组实证）
   仍按同账号处理，`authorId` 冲突才是真混作者。
 
+- **月榜遗漏书并入**（2026-11-19，用户定）：月榜（2013-03 起）上榜但缺失于 5 月快照
+  的 108 本（报告 10 §A；快照后建档/已删除的不算遗漏）。由
+  `analysis/fetchers/build_rank_missing_supplement.py` 产出 `rank_missing.jsonl`
+  （15 字段同构 + addTime/authorId/上榜记录等溯源字段）。**计数为 2026-11 App API
+  当期值**（快照里没有这批书、无 5 月值），`observed_at` 逐本记录，manifest 记
+  `rank_missing_observed`。这批书天然带月榜质量锚（`seed_policy.monthly_ids`）。
+
 用法：
     cd dataset && uv run python build.py [--src GLOB] [--covers PATH] [--crawl PATH]
-                                         [--api-novels PATH] [--author-ids PATH] [--out DIR]
+                                         [--api-novels PATH] [--author-ids PATH]
+                                         [--rank-missing PATH] [--out DIR]
 
 产物（`dataset/out/`，不入库）：
     books.jsonl     每行一本书，15 字段，tags 仍是数组
@@ -53,6 +61,7 @@ COVERS_DEFAULT = ROOT / "cover-check" / "covers_raw.jsonl"
 CRAWL_DEFAULT = ROOT / "analysis" / "out" / "cover_urls.jsonl"
 API_NOVELS_DEFAULT = ROOT / "analysis" / "out" / "app_api_novels.jsonl"
 AUTHOR_IDS_DEFAULT = Path(__file__).resolve().parent / "author_ids.jsonl"
+RANK_MISSING_DEFAULT = Path(__file__).resolve().parent / "rank_missing.jsonl"
 OUT_DEFAULT = Path(__file__).resolve().parent / "out"
 
 FIELDS = [
@@ -413,11 +422,43 @@ def main() -> None:
                     help="全字段 App 样本 jsonl（novelCover，优先级低；传空串禁用）")
     ap.add_argument("--author-ids", default=str(AUTHOR_IDS_DEFAULT),
                     help="authorId 探测证据 jsonl（nid→authorId，用于同账号判定）")
+    ap.add_argument("--rank-missing", default=str(RANK_MISSING_DEFAULT),
+                    help="月榜遗漏书补充 jsonl（传空串禁用）")
     ap.add_argument("--out", default=str(OUT_DEFAULT), help="产物目录")
-    ap.add_argument("--version", default="20260503.6", help="数据集版本号")
+    ap.add_argument("--version", default="20260503.7", help="数据集版本号")
     args = ap.parse_args()
 
     records, inputs, audit = load_records(args.src)
+    rank_path = Path(args.rank_missing) if args.rank_missing else None
+    rank_nids: set[int] = set()
+    if rank_path is not None and rank_path.exists():
+        digest = hashlib.sha256(rank_path.read_bytes()).hexdigest()
+        n = 0
+        with rank_path.open(encoding="utf-8") as fh:
+            for line in fh:
+                if not line.strip():
+                    continue
+                n += 1
+                raw = json.loads(line)
+                nid = int(raw["nid"])
+                rank_nids.add(nid)
+                if nid in {r["nid"] for r in records}:
+                    raise SystemExit(f"rank_missing nid {nid} 与主源冲突（不应发生："
+                                     f"补充集按定义不在库内）")
+                rec = {"nid": nid}
+                for f in TEXT_FIELDS:
+                    rec[f] = clean_text(raw.get(f), f, audit, nid)
+                for f in INT_FIELDS:
+                    rec[f] = clean_int(raw.get(f), f, audit, nid)
+                rec["cover"] = clean_text(raw.get("cover"), "cover", audit, nid)
+                rec["banner"] = bool(raw.get("banner"))
+                rec["tags"] = []
+                records.append(rec)
+        inputs.append({"path": str(rank_path.resolve().relative_to(ROOT)).replace("\\", "/"),
+                       "lines": n, "sha256": digest, "role": "rank_missing",
+                       "observed_at": "2026-11-19",
+                       "note": "月榜遗漏书（报告10 §A）；计数为 2026-11 App API 当期值，"
+                               "晚于 2026-05-03 快照上界，见 build.py 文档头"})
     lines_read = sum(i["lines"] for i in inputs)
     books = dedupe(records)
     crawl_path = Path(args.crawl) if args.crawl else None
@@ -450,7 +491,14 @@ def main() -> None:
         "dataset": "strata-books",
         "version": args.version,
         "generated_at": datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
-        "content_upper_bound": max(r["last_update"] for r in books if r["last_update"]),
+        "content_upper_bound": max(
+            (r["last_update"] for r in books
+             if r["last_update"] and r["nid"] not in rank_nids),
+            default="",
+        ),
+        # 补充书的 last_update 是 2026-11 观测值（晚于快照上界），不计入上界；
+        # 数值仍保留在行内，属事实记录而非快照内容。
+        "rank_missing_observed": ("2026-11-19" if rank_nids else None),
         "scope": "全量书籍目录，不做授权剔除与存活判定；不用于分析口径",
         "fields": FIELDS,
         "inputs": inputs,

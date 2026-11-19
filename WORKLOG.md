@@ -333,3 +333,29 @@ Never delete or rewrite other agents' entries.
     (84.0 MB) with the new seed asset.
 - **Next**: device smoke test the new APK (debug build for tap debugging), then
   verify home form tabs, browse absolute favs, and detail percentile display.
+
+---
+
+## 2026-11-19 - E.14: fold 108 monthly-rank missing books into dataset and seed
+
+- **Did**: fetched App-API metadata for the 193 rank-listed books absent from
+  the library (report 10 group A; e.g. 5976 S.M.S-舍子花, 2009-06-02, 23,306
+  favs, best rank 2). 182 fetched, 11 deleted (404). Calibre: addTime ≤
+  2026-05-03 bound (74 post-bound births and 11 dead excluded) → 108 books in
+  `dataset/rank_missing.jsonl` (15-field schema + addTime/authorId/rank provenance);
+  counters are 2026-11 App-API values (observed_at per book; excluded from
+  dataset content_upper_bound); praises scraped from mobile HTML (App API lacks
+  the field), favs cross-checked mobile-vs-API (0 mismatches >5%).
+- **Pipelines**: dataset v20260503.7 (248,338 books); analysis corpus via
+  `build_csv.py` supplement merge (novels.csv 245,887 rows; cover paths
+  normalised relative); seed v20260503.12 = 18,077 + 47 = 18,124. Universe
+  241,758 → 241,864. 87/108 admitted via monthly anchor; 19 excluded as
+  serializing short/medium (E.11), 2 born 2026 outside the gen cap; P1-P6 all
+  PASS, coverage 97.05% (eligible), non-licensed covers 17,265/18,077 (95.5%).
+  New fetchers: `fetch_rank_missing.py`, `build_rank_missing_supplement.py`.
+- **Verified**: `build.py` assertions pass; `validate.py` seed checks pass;
+  `audit_seed.py` rebuilt against the new denominator (`seed_v3_quality.md`);
+  seed.db.gz synced to `app/ui/assets/`.
+- **Note**: 2026-born rankers (772261 凤傲天后悔 13,030 favs) remain outside the
+  stats universe by the est_year ≤ 2025 cap — a pre-existing calibre decision,
+  revisit only if the gen cap itself changes.

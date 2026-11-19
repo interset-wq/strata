@@ -14,6 +14,10 @@ DATA_DIR = paths.DATA_DIR
 ARCHIVE = paths.ARCHIVE
 EXTRACT_DIR = paths.EXTRACT_DIR
 JSONL_DIR = paths.JSONL_DIR
+# 月榜遗漏书补充（E.14，2026-11-19）：月榜上榜但缺失于 5 月快照的 108 本，
+# 由 analysis/fetchers/build_rank_missing_supplement.py 产出；字段与 meta jsonl
+# 同构（15 字段 + 溯源键）。计数为 2026-11 App API 当期值，晚于快照上界。
+RANK_MISSING = paths.ROOT.parent / "dataset" / "rank_missing.jsonl"
 OUT_DIR = paths.OUT_DIR
 CSV_FILE = paths.CSV_FILE
 SQL_FILE = paths.SQL_FILE

@@ -9,7 +9,7 @@
 > **红线**：不改 `pr`、不改分位五列与其分母、不改报告 23、不动定年；`lqs` 只作排序信号，
 > **不作质量标签**展示。
 > 数字全部由 `analysis/lib/lqs.py` 现算（`cd analysis && uv run python -m lib.lqs`），
-> 口径为 universe 241,758 行，禁止硬编码。
+> 口径为 universe 241,864 行，禁止硬编码。
 > 使用方：推荐层（`app/docs/12-dual-mode.md` §3.2 白名单）、种子构建（`app/docs/02-data-model.md`）。
 
 ---

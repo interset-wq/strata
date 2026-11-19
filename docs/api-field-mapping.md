@@ -5,7 +5,7 @@
 > [`metrics-definitions.md`](./metrics-definitions.md)（自定义指标口径）配套。
 >
 > **实证基础**：本地 `analysis/out/app_api_novels.jsonl`（114,381 条，2026-11-16/17 抓取）
-> 与 `analysis/out/novels.csv`（245,779 行，内容上界 2026-05-03）按 `nid` 内连接，
+> 与 `analysis/out/novels.csv`（245,887 行，内容上界 2026-05-03）按 `nid` 内连接，
 > **配对 110,365 本**。所有一致率为这对样本的现算值，非估计。
 >
 > **样本局限**：`app_api_novels.jsonl` 只抓了 `tid=21` 魔幻（88,528）、`tid=22` 玄幻（25,852）
@@ -90,7 +90,7 @@
 一次请求能拿回当期值，不等于能直接写回 `books`——三个派生口径会被打破：
 
 1. **分位列**：`fav_pctl/click_pctl/praise_pctl/pr/pctl_pr` 是在**完整 universe
-   （241,758 行）构建期按世代算出的**，种子只是其中 18,058 行子集（不含 47 授权）。只刷 `books`
+   （241,864 行）构建期按世代算出的**，种子只是其中 18,077 行子集（不含 47 授权）。只刷 `books`
    的绝对值、不重算分位，分位数就与新值脱节。
 2. **`pr`**：App 不返回 `praises`，刷新 `favs` 后 `pr = praises/favs` 分母变了、分子没变，
    赞藏比失真。
