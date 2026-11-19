@@ -69,6 +69,23 @@ SUSPECT_FLAGS = {
     "short": ("C>listen", "@ceil", "F>=1000", "P>=1000", "serial"),
     "medium": ("ckw>=13", "ckw>=10", "tongue", "near5w"),
 }
+# E.22: 详情页 DOM 的对话产品线声明是**确定性证据**，章节真值表见
+# `analysis/anchors/web_dialogue.jsonl`。已被 DOM 判为散文的书，`ckw` 再高也只是
+# 病毒式传播（264982 ckw=12.1、40325 ckw=11.8 均为「第一章」结构的散文），
+# 估计值不得反驳确定性——它们不进可疑集，只在 flags 里留 `web-prose` 备查。
+WEB_TRUTH = REPO / "analysis" / "anchors" / "web_dialogue.jsonl"
+
+
+def load_web_truth() -> dict[int, str]:
+    import json
+    if not WEB_TRUTH.exists():
+        return {}
+    out: dict[int, str] = {}
+    for line in WEB_TRUTH.read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            rec = json.loads(line)
+            out[int(rec["nid"])] = str(rec["form"])
+    return out
 
 QUERY = """
 select b.nid, b.title, b.author, b.genre, b.price_type, b.status, b.contest,
@@ -105,9 +122,12 @@ def _read(path: Path, form: str) -> pd.DataFrame:
         conn.close()
 
 
-def build_flags(row: pd.Series, form: str) -> str:
+def build_flags(row: pd.Series, form: str, web_truth: dict[int, str] | None = None) -> str:
     flags = []
     modern = row["nid"] >= DIALOGUE_START_NID
+    truth = (web_truth or {}).get(int(row["nid"]), "")
+    if truth == "prose":
+        flags.append("web-prose")     # E.22 确定性：详情页有正文 → 散文产品线
     if not modern:
         flags.append("pre-dialogue")
     if form == "short":
@@ -119,10 +139,11 @@ def build_flags(row: pd.Series, form: str) -> str:
         # E.21: a contest mark without 对话/点鸭 is a 正文 submission -> medium.
         if str(row["contest"]).strip():
             flags.append("prose-contest")
-        if modern and row["ckw"] >= 13:
-            flags.append("ckw>=13")
-        elif modern and row["ckw"] >= 10:
-            flags.append("ckw>=10")
+        if modern and truth != "prose":
+            if row["ckw"] >= 13:
+                flags.append("ckw>=13")
+            elif row["ckw"] >= 10:
+                flags.append("ckw>=10")
         if row["clicks"] > 1_000_000:
             flags.append("C>1M")
         if row["favs"] >= 5_000:
@@ -159,15 +180,17 @@ def main() -> int:
         return 1
 
     df["ckw"] = (df["clicks"] / df["words"].where(df["words"] > 0)).round(2)
-    df["flags"] = df.apply(lambda r: build_flags(r, args.form), axis=1)
+    web_truth = load_web_truth()
+    df["flags"] = df.apply(lambda r: build_flags(r, args.form, web_truth), axis=1)
     if args.suspect_only:
         # Only form signals count (`pre-dialogue` is informational, quality
         # flags are context). `prose-contest` is a verdict, not a suspicion
         # (E.21): those books are medium by construction and leave the set.
+        # `web-prose`（E.22）同样是判定：详情页有正文，形态已确定，不再可疑。
         parts = df["flags"].str.split("|")
         wanted = SUSPECT_FLAGS[args.form]
         form_signal = parts.apply(lambda t: any(f in wanted for f in t))
-        confirmed = parts.apply(lambda t: "prose-contest" in t)
+        confirmed = parts.apply(lambda t: "prose-contest" in t or "web-prose" in t)
         df = df[form_signal & ~confirmed]
     df = df.sort_values(["clicks", "favs"], ascending=False).reset_index(drop=True)
     df.insert(0, "seq", range(1, len(df) + 1))

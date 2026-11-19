@@ -1,8 +1,8 @@
 """`form` 形式分类（`docs/form-definitions.md` §4 伪代码的可执行版）。
 
 六值互斥：`invalid / short / medium / long / dialogue / ip_collab`，逐级覆盖：
-字数兜底（含 invalid 下界）→ 正文征文否决形态估计（E.21）→ 对话形态 → 短篇点击
-天花板 → 对话征文 → IP 合作。
+字数兜底（含 invalid 下界）→ 对话形态估计 → 详情页 DOM 的散文证据（撤销估计）→
+短篇点击天花板 → 对话征文 → 详情页 DOM 的对话证据 → IP 合作。
 
 2026-11-19 用户裁定两项修正（见 `docs/form-definitions.md` §0/§3）：
 1. **取消篇幅征文命名覆盖字数**：征文名（「X征短篇/中篇/长篇」）只反映投稿赛道，
@@ -23,6 +23,7 @@ import numpy as np
 import pandas as pd
 
 from lib import dialogue_form as DF
+from lib import web_dialogue as WD
 
 INVALID_MAX_WORDS = 2_000   # 用户 2026-11-19 定：<2000 不是有效篇幅（app 章节下限）
 SHORT_MAX_WORDS = 50_000
@@ -57,7 +58,13 @@ def classify(df: pd.DataFrame) -> pd.Series:
     #       2,405 本 invalid 被误翻）。只有确定性证据（级 3/4）能救回 invalid。
     #       `morph` 本身已排除 E.21 的正文征文（中篇档）：有征文标记而无对话
     #       关键词的书属正文组，形态由字数决定，ckw 灰带不得推翻征文标记。
-    form = np.where((d["morph"].to_numpy()) & (form != "invalid"), "dialogue", form)
+    # 级 1.2：详情页 DOM 的**散文**证据（E.22）——撤销形态估计的假阳性。
+    #       DOM 预读章节区渲染出正文 = 该书是散文产品线，ckw 高企只是病毒式传播
+    #       （264982「转生成蝴蝶的我来到了斗罗大陆」ckw=12.1、40325 ckw=11.8，
+    #       章节为「第一章」，形态估计会把它们划进对话）。
+    wd = WD.apply(d).to_numpy()
+    morph = d["morph"].to_numpy() & (wd != "prose")
+    form = np.where(morph & (form != "invalid"), "dialogue", form)
     # 级 2.5：短篇点击天花板（E.19，用户 App 目验）。真 short 的点击上界是
     #       「回到旧时光」215,723；越过此线却仍在短篇档（≤5 万字）的书不是真
     #       短篇——是内容被替换为无意义文本的僵尸（When It Sucks，34,297 字
@@ -71,6 +78,13 @@ def classify(df: pd.DataFrame) -> pd.Series:
                         & (clicks > DF.DIAL_CLICKS_CEIL), "invalid", form)
     # 级 3：对话征文（确定性）——可救回 invalid
     form = np.where(d["marked"].to_numpy(), "dialogue", form)
+    # 级 3.5：详情页 DOM 的**对话**证据（E.22，最高确定性）。
+    #       产品线声明优先于征文组别：3 本带正文征文标记的书被 DOM 判为对话
+    #       （448045 玄幻征文、683752 冬季恋曲征文、607079 冬季征文）——作者用
+    #       对话编辑器写作但投了正文组，E.21 的「正文征文否决形态估计」在此让位。
+    #       也覆盖 4 本「第一章」命名的沉浸式互动小说（745405 / 746269 / 729181 /
+    #       758261），章节命名判据对它们全部失效。
+    form = np.where(wd == "dialogue", "dialogue", form)
     # 级 4：IP 合作（最高）
     ip = contest.map(lambda x: any(name in x for name in IP_COLLAB_NAMES))
     form = np.where(ip.to_numpy(), "ip_collab", form)

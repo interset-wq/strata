@@ -58,7 +58,7 @@ SCHEMA = Path(__file__).resolve().parent / "schema.sql"
 DATASET = REPO / "dataset" / "out" / "books.jsonl"
 
 SCHEMA_VERSION = 3
-SEED_VERSION = "20260503.19"
+SEED_VERSION = "20260503.20"
 CONTENT_END = pd.Timestamp("2026-05-03")
 GEN_MIN, GEN_MAX = 2007, 2025
 
