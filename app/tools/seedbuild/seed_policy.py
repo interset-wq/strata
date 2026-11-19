@@ -122,8 +122,13 @@ def invalid_ids(df: pd.DataFrame) -> set[int]:
     残缺的僵尸书（锚点 4166 辞别黄昏的小镇 words=775）。`form` 可能对这类书
     仍标 dialogue/ip_collab（确定性证据救回），那些不算 invalid。
 
-    **征文保底也不豁免**：保底候选 words >= 10_000，天然与 invalid（<2000）
-    互斥，故 P6 要求 invalid 在最终种子里恒为 0。
+    **E.19 第二类 invalid**：`words ≤ 5 万` 且 `clicks > 215,723`（回到旧时光）
+    的书不是真短篇——是内容被替换为无意义文本的僵尸（When It Sucks）或作者
+    恶意标注完结的长篇（字数只统计到前段），数据不可信。这类书与 <2000 字
+    僵尸一样无收录资格。
+
+    **征文保底也不豁免**：P6 是兜底守门，无论候选来自哪个渠道，invalid 在
+    最终种子里恒为 0。
     """
     form = _form(df)
     return set(df.loc[form.eq("invalid").to_numpy(), "id"])
@@ -317,15 +322,14 @@ def postconditions(df: pd.DataFrame, res: dict) -> list[tuple[str, bool, str]]:
     # P5: 弃书只能通过征文保底豁免回到种子；其他渠道一律不得带入。
     stray = abandoned - res["contest_added"]
     p5 = not (stray & res["ids"])
-    # P6: invalid（<2000 字僵尸书）在任何渠道都不得入种——保底候选 >=1万天然排除。
+    # P6: invalid（<2000 字僵尸 / 越短篇点击天花板的假短篇）在任何渠道都不得入种。
     p6 = not (invalid & res["ids"])
-    # P7: 短篇三条天花板（E.17，用户 App 目验）。回到旧时光 clicks 215,723 是
-    #     真短篇点击上限，听雨 5,478 favs / 2,389 赞是收藏与点赞上限。种子内
-    #     short 若有书越过任一条，其形态必定不是短篇（对话/长篇误判）。
-    #     E.18：只对对话体时代（nid >= 83,818）生效——早期书的 clicks 是十余年
-    #     累积，与当代不可比（回到旧时光本身 2012 建档）。
-    modern = df["id"] >= DF.DIALOGUE_START_NID
-    form_in_seed = FM.classify(df).where(df["id"].isin(res["ids"]) & modern)
+    # P7: 短篇三条天花板（E.17/E.19，用户 App 目验）。回到旧时光 clicks 215,723
+    #     是全时期真短篇点击上限（早期书的点击虽累积十数年，`When It Sucks`
+    #     162 万这类越线者已被 E.19 判为僵尸/假短篇、归 invalid，不再留在
+    #     short 层）。听雨 5,478 favs / 2,389 赞是收藏与点赞上限。short 层若有
+    #     书越过任一条，说明 classify 的天花板条款失效，断言失败。
+    form_in_seed = FM.classify(df).where(df["id"].isin(res["ids"]))
     short_mask = form_in_seed.eq("short")
     over_c = df.loc[short_mask & (df["clicks"] > DF.DIAL_CLICKS_CEIL)]
     over_f = df.loc[short_mask & (df["favs"] > DF.SHORT_MAX_FAVS)]
@@ -349,7 +353,7 @@ def postconditions(df: pd.DataFrame, res: dict) -> list[tuple[str, bool, str]]:
          f"{len(res['abandon_exempt'])} 本经质量锚入种），种子内 "
          f"{len(res['abandoned_in_seed'])} 本（均须来自征文保底），"
          f"越界 {len(stray & res['ids'])} 本"),
-        ("P6 invalid（<2000字僵尸）零入种", p6,
+        ("P6 invalid（僵尸/假短篇）零入种", p6,
          f"invalid {len(invalid):,} 本，入种 {len(invalid & res['ids'])} 本"),
         ("P7 short 层不越短篇三条天花板", p7,
          f"short {int(short_mask.sum()):,} 本；越点击 "

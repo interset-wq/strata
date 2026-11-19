@@ -52,6 +52,17 @@ def classify(df: pd.DataFrame) -> pd.Series:
     #       23 章 × 11 字 ckw=291），ckw 判据会把僵尸误判成对话（校准后实测
     #       2,405 本 invalid 被误翻）。只有确定性证据（级 3/4）能救回 invalid。
     form = np.where((d["morph"].to_numpy()) & (form != "invalid"), "dialogue", form)
+    # 级 2.5：短篇点击天花板（E.19，用户 App 目验）。真 short 的点击上界是
+    #       「回到旧时光」215,723；越过此线却仍在短篇档（≤5 万字）的书不是真
+    #       短篇——是内容被替换为无意义文本的僵尸（When It Sucks，34,297 字
+    #       162 万点击，阅读按钮仍在）或作者恶意标注完结的长篇（字数只统计到
+    #       前段）。两者字数、状态、点击数都不可信，归 invalid 而非 long：
+    #       没有可靠字数可判它是长篇。级 2 命中的对话不受影响（当代越线书多是
+    #       对话，v2-d 已判 dialogue）。
+    if "clicks" in d.columns:
+        clicks = pd.to_numeric(d["clicks"], errors="coerce").fillna(0).to_numpy()
+        form = np.where((form == "short") & (words <= SHORT_MAX_WORDS)
+                        & (clicks > DF.DIAL_CLICKS_CEIL), "invalid", form)
     # 级 3：对话征文（确定性）——可救回 invalid
     form = np.where(d["marked"].to_numpy(), "dialogue", form)
     # 级 4：IP 合作（最高）

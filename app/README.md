@@ -1,7 +1,7 @@
 # app/ —— 书层 Strata
 
 手机端 App 本体。当前进度：Go 引擎已实现（`engine/`：localhost HTTP API + 双库挂载），
-种子资产已生成（`assets/`，18,877 本；schema v3）；Flutter UI 与 FFI 集成进行中。
+种子资产已生成（`assets/`，18,870 本；schema v3）；Flutter UI 与 FFI 集成进行中。
 
 早期设计稿与实测档案在 [`../archive/`](../archive/)，但方案已过时、数字口径已更新，
 仅作沿革参考；产品重新设计时以分析报告为准。
