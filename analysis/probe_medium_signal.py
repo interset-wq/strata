@@ -192,6 +192,50 @@ def main() -> int:
     print(f"  → mqs 可评分 {len(got)}/{len(sm)}（{len(got)/len(sm):.0%}），"
           f"收藏中位 {int(got['favs'].median()):,}，字数中位 {int(got['words'].median()):,}；"
           f"其余 {len(sm)-len(got)} 本 favs<{EVIDENCE_MIN_FAVS} 回退 fav_pctl")
+
+    # ---- 6. K 的稳健性：bootstrap + 行为弹性 ----
+    print("\n== 6. K 不是过拟合（两条独立检验）==")
+    rng = np.random.default_rng(7)
+    ks = []
+    for _ in range(400):
+        b = pool.sample(len(pool), replace=True, random_state=int(rng.integers(1e9)))
+        target, best, bk = _wmed(b), 1e9, None
+        for k in np.arange(0.0, 0.61, 0.02):
+            t = b.assign(_s=b["q"] * (1 - k + k * b["mlen"])).nlargest(W, "_s")
+            err = abs(t["words"].median() / target - 1)
+            if err < best:
+                best, bk = err, k
+        if bk is not None:
+            ks.append(bk)
+    ks = pd.Series(ks)
+    print(f"  bootstrap(400) K* 中位 {ks.median():.2f} | P25–P75 "
+          f"{ks.quantile(.25):.2f}–{ks.quantile(.75):.2f} | P10–P90 "
+          f"{ks.quantile(.1):.2f}–{ks.quantile(.9):.2f}")
+    print(f"  K={LEN_K} 位于 K* 分布的 {100*(ks <= LEN_K).mean():.0f}% 分位"
+          f"（接近 50% 即无偏）")
+
+    # 行为弹性：同代 × pr 五分位格内 log(favs) ~ log(words)
+    print("\n  行为弹性（同代 × pr 五分位格内，n>=20）：")
+    allm = d[(d["form"] == "medium") & d["words"].between(MED_LO, MED_HI)
+             & (d["favs"] >= 10)].copy()
+    allm["pr"] = (allm["praises"] / allm["favs"]).clip(upper=PR_CAP)
+    for label, sub in (("全部中篇", allm), (f"已完结", allm[allm["status"] == DONE]),
+                       ("连载中", allm[allm["status"] != DONE])):
+        x = sub.copy()
+        x["pr_q"] = x.groupby("est_year")["pr"].transform(
+            lambda s: pd.qcut(s.rank(method="first"), 5, labels=False, duplicates="drop"))
+        betas = []
+        for _, g in x.groupby(["est_year", "pr_q"], observed=True):
+            if len(g) < 20 or g["words"].nunique() < 8:
+                continue
+            betas.append(np.polyfit(np.log(g["words"].to_numpy(float)),
+                                    np.log(g["favs"].to_numpy(float)), 1)[0])
+        bta = float(np.median(betas))
+        mult = np.exp(bta * np.log(MED_HI / MED_LO))
+        print(f"    {label:<8}格子 {len(betas):>3} | β={bta:.3f} | 5→15 万收藏 "
+              f"{mult:.2f}× | 若追平偏好 K={1-1/mult:.2f}")
+    print(f"  → 追平偏好（K≈0.41）会让 Top100 篇幅过冲 +6%（用先验替代代表性），"
+          f"故取对齐值 {LEN_K}")
     return 0
 
 

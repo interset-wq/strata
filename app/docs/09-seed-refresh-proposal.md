@@ -745,3 +745,24 @@ E.1–E.8 的书数与版本由本节取代；时间渠道取消的决定不变�
     分组的统计继续带该注记。
   - IP 名单不扩充（原待议：提瓦特/英桀/泰拉/七国/升格者）。种子已 100% 有 DOM 真值，
     扩词只改 universe 估计，不产生任何展示收益，反而要重跑全部断言。
+
+#### E.26 客户端种子同步（2026-11-19，用户：主线走经典模式，不引入新指标）
+
+- **问题**：种子有**两份产物**，容易只更新一份——`app/assets/`（分析与构建侧，`.gz`
+  被 gitignore，靠 release 分发）与 `app/ui/assets/`（**打进 APK**，入库）。E.22–E.25
+  三轮都只更新了前者，`app/ui/assets` 仍停在 `20260503.19`：书数 18,750、
+  `long` 11,641 / `dialogue` 5,302 / `medium` 944 / `short` 801，且含 7 本 Web 死链。
+  `v0.1.0-pre.7` 的 APK 打包的正是这份。
+- **判据**：`release.yml` 只校验 `manifest.files.db` 的 size/sha256（不校验书数），
+  因此旧种子能静默通过 CI；`grep -rn "18750" app/` 也只剩 UI 注释。
+- **落地**：`cp app/assets/{seed.db.gz,manifest.json} app/ui/assets/`（清单与库必须同批，
+  sha256 才自洽）。同步后 `ui` 侧 = `20260503.23` / 18,656 本：`long` 11,216 /
+  `dialogue` 6,189 / `short` 609 / `medium` 580 / `ip_collab` 62、死链 0。
+  **展示影响集中在 form 过滤**：425 本原被当长篇的对话书归位、`medium` 中 364 本
+  实为对话/散文混判被纠正、`short` 192 本越线书改判——中篇 tab 池 944 → 580，
+  对话 tab 池 5,302 → 6,189。
+- **同步裁定**（用户：目前不引入新指标，只出文档）：`lqs` / `mqs` 不接引擎、不进推荐层，
+  规格归档（`docs/lqs-ranking-integration.md`、`docs/medium-quality-score.md` 均已标
+  「归档不落地」），因为 app 开发主线是经典模式（classic），展示层只读平台累计值。
+- **剩余动作**：本次只提交资源与文档，未在本机构建 APK（`flutter` 工具链在 CI）；
+  下一次 release 会带上 `.23`，manifest 的 `seed_version` 变化即触发客户端换库。

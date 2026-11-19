@@ -47,6 +47,11 @@
 收藏量只用于分档归一（与分位分母同性质），不作打分项。
 引擎接入规格（排序键、游标、验收）见 `/docs/lqs-ranking-integration.md`。
 
+> **实施状态（2026-11-19）**：app 开发主线走**经典模式**（展示层只读平台累计值），
+> 推荐层施工推迟，`lqs` / `mqs` **均未接线**——引擎现排序键为 `fav_pctl`
+> （发现流）/ `clicks`（经典榜）。白名单与两份规格（`/docs/lqs-ranking-integration.md`、
+> `/docs/medium-quality-score.md`）保留备查，重启推荐层时按当时种子重算覆盖率。
+
 **严禁** `clicks` / `favs` / `praises` 原始累计值进入推荐打分——否则马太效应从后门渗入。
 原始值只用于展示层锚点。
 
