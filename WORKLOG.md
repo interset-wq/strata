@@ -280,3 +280,56 @@ Never delete or rewrite other agents' entries.
 - **Next**: rankings/search/shelf pages only re-themed, still need layout
   polish; detail intro section awaits engine parser support; author
   workbench (Phase 5) untouched. Push still pending user approval.
+
+---
+
+## 2026-11-18 - Detail refresh uses every returned field
+
+- **Did**: completed the detail-refresh gap. `crawl.Detail` now parses title,
+  author, genre, price type, cover, summary, favs, praises, words, status and
+  updated_at from the single mobile HTML response. `AppNovel` now carries all
+  20 App API fields (authorId/typeId/categoryId/isSensitive/allowDown/etc.).
+  Added `user.db.book_meta` (schema v3) as the writable metadata overlay, and
+  unified `bookRefresh` + `watcher.pollOne` on `writeHTML`/`writeApp`.
+  `GET /strata/books/:nid` now returns `meta`, an enriched `effective` map,
+  and a local cover fallback; the Flutter detail page renders the local cover,
+  overlays title/author/status/genre, and shows summary/add_time/point/category.
+- **Verified**: `go test ./...` green (new parser and write-path tests),
+  `flutter analyze` + `flutter test` clean, fixture `temp/_page_48704.html`
+  now actually runs instead of skipping (fixed relative path). Rebuilt
+  `libstrata.so` with NDK 28.2 and release APK; APK contains the new
+  25,441,576-byte `.so`, `assets/seed.db.gz`, and INTERNET permission.
+- **Note**: seed remains read-only; observed values continue to live in
+  `observations`, while all book attributes live in `book_meta`. App API still
+  has no praises/summary and HTML still has no clicks, so each pathway keeps
+  the other's previous values instead of overwriting them with NULL.
+
+---
+
+## 2026-11-19 - Classic mode completion (data-only path)
+
+- **Did**:
+  - Engine: added `Store.ClassicBooks` and `GET /strata/rankings/classic`
+    (absolute `favs DESC, nid ASC`, optional genre/status/contest/form).
+    Added `form` to `RankItem`, `BoardBooks`, `Discover`, `RandomBooks`, and
+    the shared scan; added `parseForm` validation
+    (`short|medium|long|dialogue|ip_collab`).
+  - Random pools now honour `form`; the `browse` mega-book gate applies only
+    to the default long-form tab so short/medium/dialogue/IP tabs are not
+    empty.
+  - Flutter: `rankingClassic` API; browse page uses absolute favs (no year or
+    percentile); home form tabs now drive all three random showcases; browse
+    card shows cumulative clicks instead of `fav_pctl`; removed disabled
+    quant placeholder tabs and stale `30,878` / `12,107` copy.
+  - Docs: updated `08` with `/rankings/classic`, `form`, and new seed counts;
+    `03`/`04` counts; `12` endpoint/column/count references.
+- **Verified**:
+  - `go test ./...` in `app/engine`: all packages pass (new classic/form tests).
+  - `flutter analyze` and `flutter test`: clean/pass.
+  - Smoke-tested real seed `20260503.4`: healthz reports schema 3, 26,339 books;
+    classic returns 155640 / 48704 / 666497 in favs order; serial+short form
+    returns short books.
+  - Rebuilt `libstrata.so` (36,407,864 bytes, NDK 28.2) and release APK
+    (84.0 MB) with the new seed asset.
+- **Next**: device smoke test the new APK (debug build for tap debugging), then
+  verify home form tabs, browse absolute favs, and detail percentile display.

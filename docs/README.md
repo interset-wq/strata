@@ -13,8 +13,9 @@
 | [`sfacg-app-api.md`](./sfacg-app-api.md) | 接口事实 | SFACG **官方 App API**（`api.sfacg.com`）认证、19 字段、端点、77 推送位 |
 | [`sfacg-live-ranks.md`](./sfacg-live-ranks.md) | 接口事实 | 现网榜单端点（`MonthlyBoy.ashx` 任意月、月票/新书/热销口径） |
 | [`metrics-definitions.md`](./metrics-definitions.md) | **自定义指标** | 定年/universe/五分位/pr/覆盖率/断更/生命状态/推荐信号白名单的唯一权威定义 |
-| [`form-definitions.md`](./form-definitions.md) | **小说形式** | `form` 五值（short/medium/long/dialogue/ip_collab）判定优先级、边界、优质短篇判定 |
+| [`form-definitions.md`](./form-definitions.md) | **小说形式** | `form` 六值（invalid/short/medium/long/dialogue/ip_collab）判定优先级、边界、优质短篇判定 |
 | [`length-weighted-quality.md`](./length-weighted-quality.md) | **自定义指标** | 篇幅加权口碑分 `lqs`：长篇区排序信号，`pr` 的「世代 × 收藏档」分位 × 归一化篇幅系数（0.75–1.0）、校准与边界 |
+| [`lqs-ranking-integration.md`](./lqs-ranking-integration.md) | **实施规格** | 推荐层如何接入 `lqs`：现状排序基线、两级排序键、对话小配额、验收断言；指标定义仍在 `length-weighted-quality.md` |
 | [`api-field-mapping.md`](./api-field-mapping.md) | **字段对应** | App API 18 字段 ↔ CSV/books 列的实测对应、一致率、值映射、写回约束（`point`/`bgBanner` 误映射纠正） |
 
 ## 使用约定

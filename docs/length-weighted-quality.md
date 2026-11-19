@@ -1,7 +1,9 @@
 # 全局文档：篇幅加权口碑分 `lqs`
 
 > **状态**：2026-11-18 定案（用户：`pr` 排不掉 15–50 万字作品，而读者更愿意看长篇；
-> 推荐池篇幅偏短会直接削弱使用意愿）。**口径定稿、尚未实施**——随 `form` 列一起进种子 v3。
+> 推荐池篇幅偏短会直接削弱使用意愿）。**指标口径已定稿并随 `form` 列落进种子 v3**；
+> 推荐层接入的引擎规格见 [`lqs-ranking-integration.md`](./lqs-ranking-integration.md)
+> （只定规格，代码由执行方实现）。
 > **范围**：仅长篇区（`form = long` 且 `words > 15 万`，排除 `dialogue` / `ip_collab`）；
 > 中篇区（5–15 万）**待定**。
 > **红线**：不改 `pr`、不改分位五列与其分母、不改报告 23、不动定年；`lqs` 只作排序信号，
@@ -128,7 +130,10 @@ lqs = q × (0.75 + 0.25 × len)
 - 唯一实现 `analysis/lib/lqs.py`（`compute()` + 审计 CLI）；`build_seed.py` 调它，
   `validate.py` 加断言：`lqs ∈ [0,1]`、非空数 = 长篇区 `favs≥200` 数、
   `|rho(lqs, favs)| < 0.1`（防退化成热度榜）。
-- 引擎：发现流默认 `ORDER BY lqs DESC`；长篇榜增加 `sort=lqs` 选项；
+- 引擎：接入方式、排序键、分页游标、对话曝光与验收断言见
+  [`lqs-ranking-integration.md`](./lqs-ranking-integration.md)。
+  **不要直接 `ORDER BY lqs DESC` 替换所有流**——该文有各口径 Top100 的篇幅实测，
+  并区分展示流（`/discover` 按 `clicks`）与推荐流；长篇榜 `sort=lqs` 选项仍可选。
   详情/列表 API 暴露 `lqs` 与 `lqs_pctl`（供"同代分位"展示，见 `app/docs/08-engine-api.md`）。
 - 双模式：novly 模式展示收藏原值，但**排序**仍走 `lqs`（`app/docs/12-dual-mode.md` §3.2 白名单）。
 - 上线后若拿到留存数据，只用它调 `LEN_K`（0.2–0.4），不改公式结构。
