@@ -38,7 +38,7 @@
 {
   "status": "ok",
   "schema_version": 3,
-  "seed_version": "20260503.17",
+  "seed_version": "20260503.18",
   "book_count": 18477,
   "licensed_count": 47,
   "content_end": "2026-05-03",
@@ -114,7 +114,7 @@ HTML 含书名/作者/分类/签约/封面/简介/收藏/赞/字数/状态/更�
 
 **首页分形态轮播（docs/13 form）**：轮播随首页形态 tab 切换，行为按池大小定——
 
-| form          | featured 池（seed 20260503.17） | 轮播行为                                                                                                           |
+| form          | featured 池（seed 20260503.18） | 轮播行为                                                                                                           |
 | ------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
 | `long`      | 662（含授权 44）               | 日期种子洗牌（`/banner`）                                                                                        |
 | `dialogue`  | 0                              | 空轮播（UI 渲染 `SizedBox.shrink`）                                                                              |
@@ -140,9 +140,8 @@ contest 聚合端点：`form` 必填，池按征文（`contest`，非空）`GROU
 
 - IP tab 入口行（`form=ip_collab`）：端上取前 2 组作命名 IP 入口
   （崩坏3征文 → 崩坏3，去“征文”后缀），其余折成“其他”（total − 前 2 之和）。
-- 短篇 tab 比赛 chip 行（`form=short&status=已完结`）：`status` 可选
-  （精确匹配，缺省不过滤），total 与 groups 同口径——chip 的 count 与
-  列表（classic 同参过滤）一致。
+- 短篇 tab 比赛榜入口（`form=short`）：`status` 可选（精确匹配，缺省
+  不过滤；短篇池本身经种子完结条款已干净，UI 不传 status）。
 
 ### GET /strata/ip-books?form=&group=&limit=&offset=（**已实现**）
 
@@ -157,6 +156,18 @@ nid ASC`，分页同 `/rankings/classic`。未知征文名返回空列表不报�
 静态序（dialogue 是长尾形态，不随日期重掷）。引擎只保证 URL 存在，不保证
 CDN 可达——封面 404 时 UI 回退纸底占位（docs/15 占位语义）。items 为
 RankItem（`cover_url` 必填非空）。
+
+### GET /strata/year-groups?form=（**已实现**）
+
+短篇 tab 年份榜入口：`form` 必填（同 `/banner` 的枚举校验），池按
+`est_year` 聚合（`est_year DESC`）。返回 `total`（池总量）+
+`groups: [{year, count}]`。
+
+### GET /strata/genre-groups?form=（**已实现**）
+
+短篇 tab 题材浏览入口：`form` 必填（同上），池按 `genre`（非空）聚合
+（`count DESC, genre ASC` 稳定序）。返回 `total`（池总量）+
+`groups: [{genre, count}]`。
 
 ### GET /strata/rankings/favs?year=&genre=&limit=
 
@@ -188,15 +199,18 @@ Classic 全库榜（docs/12 展示列）：平台累计值排序，不涉及分�
 `recommend`(praises) / `popular`(clicks) / `favs` / `new`(est_date) / `finish`(已完结按 favs) /
 `words`。`offset` 分页（默认 0）。items 为 RankItem（含 `status`/`words`/`clicks`/`cover_url`）。
 
-### GET /strata/rankings/classic?genre=&status=&contest=&form=&year=&limit=&offset=（**已实现**）
+### GET /strata/rankings/classic?genre=&status=&contest=&form=&year=&order=&limit=&offset=（**已实现**）
 
-Classic 主线分类/状态/大赛列表：只按平台累计 `favs` 降序（`favs DESC, nid ASC`），
-不含分位或 LQS。`genre`/`status`/`contest` 与 `/rankings/favs` 同义；`contest=1`
-表示全部大赛作品。`year` 可选（正整数，按 `est_year` 精确过滤；非法值 400）。
-`items` 为 RankItem（含 `form`），`meta.ordering="favs"`。
+Classic 主线分类/状态/大赛列表：默认按平台累计 `favs` 降序（`favs DESC, nid ASC`）。
+`genre`/`status`/`contest` 与 `/rankings/favs` 同义；`contest=1` 表示全部大赛作品。
+`year` 可选（正整数，按 `est_year` 精确过滤；非法值 400）。`order` 可选：
+`favs`（默认）或 `pct`（同代收藏分位 `fav_pctl DESC`、NULL 末尾——
+docs/form-definitions §6 优质短篇口径；非法值 400）。`items` 为 RankItem
+（含 `form`），`meta.ordering` 回显实际排序（`favs`/`fav_pctl`）。
 
-短篇 tab（docs/form-definitions §4 收录资格）以
-`form=short&status=已完结[&year=Y|&contest=X]` 调本端点做年份榜/比赛榜/总榜。
+短篇 tab（docs/form-definitions §4 收录资格）的年份榜/比赛榜/题材榜/优质榜
+以 `form=short[&year=Y|&contest=X|&genre=G|&order=pct]` 调本端点（不带
+status——种子层已实施完结条款，池本身已干净）。
 
 ### GET /strata/discover?cursor=&form=&limit=（**已实现**）
 
@@ -225,6 +239,9 @@ App API 成功→精确元数据写观测 + cover 缓存；否则 HTML 兜底（
 首页"换一换"网格数据源：`is_licensed=0` 种子库内 `ORDER BY RANDOM()` 均匀抽样
 （默认 limit，上限 max_limit），items 为 RankItem（含 status/words/clicks/favs/
 cover_url）。诚实随机——官方"次元新书/专题推荐"的换一换同款模式。
+`status` 池：`serial`（连载中）/ `finished`（已完结）/ `browse`（长篇口径
+words≥60万）/ `short`（短篇池：无状态/字数条件，`form` 传 `short`，
+form 过滤即池本身）。
 
 ### GET /strata/rankings/short?limit=
 

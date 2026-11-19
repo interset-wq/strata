@@ -85,31 +85,34 @@ def abandoned_ids(df: pd.DataFrame) -> set[int]:
     没写完（弃书），比已完结劣质书更没有资格进种子。`form` 仍是纯篇幅
     标签、不随 status 变；本函数只在种子收录层生效。
 
-    **E.13 质量豁免（2026-11-19，用户定）**：同代 `fav_pctl ≥ 0.98` 的连载
-    短/中篇不算弃书——status 字段不可靠（24132「回到旧时光」同代前 0.85%
+    **E.13 质量豁免（2026-11-19，用户定，仅 short）**：同代 `fav_pctl ≥ 0.98`
+    的连载短篇不算弃书——status 字段不可靠（24132「回到旧时光」同代前 0.85%
     的短篇，作者只是忘了点完结）。豁免不是直接入库：这些书仍须有质量锚
-    （Top20k/月榜/banner/短篇补/深榜）才能进种子。E.12 对话形态判据 v2
-    会把其中同人高互动连载判成 dialogue（不适用弃书规则），故实际豁免
-    规模约 140 本。
+    （Top20k/月榜/banner/短篇补/深榜）才能进种子。
 
-    **征文保底（E.9）豁免**：本函数不用于 `contest_guarantee` 的候选池，
-    部分比赛完结率极低，保底必须从全池选，否则 P4 无法达成。
+    **E.20（2026-11-19，用户定）：中篇无豁免**。`form=medium` 且连载中的书
+    一律弃书，不看 fav_pctl——5–15 万字仍在连载的中篇，绝大多数是作者弃掉的
+    长篇（字数还会涨、结构是长篇），给它们开口子等于让大量太监长篇进种子。
+    中篇必须 `status=已完结` 才有收录资格，征文保底也不例外（P8 守门）。
     """
     form = _form(df)
-    mask = (form.isin(ABANDON_FORMS).to_numpy()
-            & df["status"].ne("已完结").to_numpy()
-            & df["fav_pctl"].lt(ABANDON_PCTL_EXEMPT).to_numpy())
+    serial = df["status"].ne("已完结").to_numpy()
+    is_short = form.eq("short").to_numpy()
+    is_medium = form.eq("medium").to_numpy()
+    low = df["fav_pctl"].lt(ABANDON_PCTL_EXEMPT).to_numpy()
+    mask = (is_medium & serial) | (is_short & serial & low)
     return set(df.loc[mask, "id"])
 
 
 def exempt_from_abandon(df: pd.DataFrame) -> set[int]:
-    """E.13 豁免集：连载中的 short/medium 但同代 fav_pctl ≥ 0.98。
+    """E.13 豁免集：连载中的 **short** 且同代 fav_pctl ≥ 0.98。
 
+    E.20 起中篇不再豁免——连载中篇一律弃书（见 `abandoned_ids`）。
     这些书不进 ineligible；若原本有质量锚则照常经锚入种（P3/P1 的合格
     分母包含它们）。
     """
     form = _form(df)
-    mask = (form.isin(ABANDON_FORMS).to_numpy()
+    mask = (form.eq("short").to_numpy()
             & df["status"].ne("已完结").to_numpy()
             & df["fav_pctl"].ge(ABANDON_PCTL_EXEMPT).to_numpy())
     return set(df.loc[mask, "id"])
@@ -206,13 +209,16 @@ def contest_guarantee(df: pd.DataFrame, existing: set[int]) -> tuple[set[int], d
     added: set[int] = set()
     detail: dict[str, dict] = {}
     contest = df["contest"].fillna("").astype(str).str.strip()
+    # E.20: a serialising medium book is never eligible, contest floor included.
+    serial_medium = _form(df).eq("medium") & df["status"].ne("已完结")
     for name in sorted(contest[contest != ""].unique()):
         group = df[contest == name]
         held = set(group.loc[group["id"].isin(existing), "id"])
         need = max(0, min(CONTEST_MIN_PER, len(group)) - len(held))
         pool = group[(group["favs"] >= CONTEST_MIN_FAVS)
                      & (group["words"] >= CONTEST_MIN_WORDS)
-                     & (~group["id"].isin(held))]
+                     & (~group["id"].isin(held))
+                     & (~serial_medium.loc[group.index])]
         picked = set(pool.sort_values(
             ["fav_pctl", "favs", "id"], ascending=[False, False, True]
         ).head(need)["id"])
@@ -231,8 +237,9 @@ def admit(df: pd.DataFrame, content_end: pd.Timestamp,
     ``active`` / ``gated`` / ``cut`` are computed for diagnostics only and are
     never unioned into ``ids``. See the module docstring for the decision.
 
-    E.11+13: 连载中的 short/medium（弃书，同代 pctl≥0.98 豁免）从质量锚剔除；
-    征文保底（E.9）豁免该规则、仍从全池选书，以保住低完结率比赛的代表性。
+    E.11+13: 连载中的 short/medium（弃书，short 同代 pctl≥0.98 豁免）从质量锚
+    剔除；E.20 起中篇无任何豁免（连载中篇一律出局，保底也不例外）。
+    征文保底（E.9）对 short 豁免该规则、仍从全池选书，以保住低完结率比赛的代表性。
     E.12: `form=invalid`（words<2000 的僵尸书）无收录资格，从质量锚剔除；
     征文保底候选 words>=1万、天然不碰 invalid，故保底也不带入。
     """
@@ -287,7 +294,7 @@ def admit(df: pd.DataFrame, content_end: pd.Timestamp,
 
 
 def postconditions(df: pd.DataFrame, res: dict) -> list[tuple[str, bool, str]]:
-    """Checks the rebuild must assert before shipping (P1-P7).
+    """Checks the rebuild must assert before shipping (P1-P8).
 
     P1/P3 use the **eligible** denominator (连载 short/medium + invalid excluded):
     those books voluntarily lost coverage under E.11/E.12, so counting them as a
@@ -335,6 +342,11 @@ def postconditions(df: pd.DataFrame, res: dict) -> list[tuple[str, bool, str]]:
     over_f = df.loc[short_mask & (df["favs"] > DF.SHORT_MAX_FAVS)]
     over_p = df.loc[short_mask & (df["praises"] > DF.SHORT_MAX_PRAISES)]
     p7 = over_c.empty and over_f.empty and over_p.empty
+    # P8: E.20 中篇必须已完结——连载中篇零入种，征文保底也不例外。
+    form_all = FM.classify(df)
+    serial_medium = set(df.loc[(form_all == "medium").to_numpy()
+                               & df["status"].ne("已完结").to_numpy(), "id"])
+    p8 = not (serial_medium & res["ids"])
     return [
         ("P1 合格深榜书全部在种子内", p1,
          f"{len(res['deep'] - ineligible):,} 本合格深榜书，"
@@ -360,6 +372,9 @@ def postconditions(df: pd.DataFrame, res: dict) -> list[tuple[str, bool, str]]:
          f"{len(over_c)}、越收藏 {len(over_f)}、越点赞 {len(over_p)}"
          + (f"：{(over_c['id'].tolist() + over_f['id'].tolist() + over_p['id'].tolist())[:5]}"
             if not p7 else "")),
+        ("P8 连载中篇零入种（中篇必须已完结）", p8,
+         f"连载中篇 {len(serial_medium):,} 本，入种 "
+         f"{len(serial_medium & res['ids'])} 本"),
     ]
 
 

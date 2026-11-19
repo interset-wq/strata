@@ -1,6 +1,6 @@
 # `form` 形式字段与种子收录资格——权威口径
 
-> **状态**：已实施，`seed_version=20260503.17` 落地（含 E.9–E.19 全部条款）。
+> **状态**：已实施，`seed_version=20260503.18` 落地（含 E.9–E.20 全部条款）。
 > 本文是 `books.form` 六值判定与收录资格的**唯一权威口径**；实现真源：
 > 分类 `analysis/lib/forms.py::classify`（对话判据 `analysis/lib/dialogue_form.py`），
 > 收录资格 `app/tools/seedbuild/seed_policy.py`。本文不改代码、不改定年、不硬编码分布数字。
@@ -148,29 +148,33 @@ universe 935 本。判定 = `contest` 精确命中六类封闭名单：
 def seed_admit(row, form) -> bool:
     if form == "invalid":
         return False                                  # 僵尸，无豁免（P6）
-    if form in ("short", "medium") and row.status != "已完结":
-        if row.fav_pctl < 0.98:
-            return False                              # 连载短/中篇 = 弃书（E.11）
+    if form == "medium" and row.status != "已完结":
+        return False                                  # 中篇必须已完结（E.20，无豁免）
+    if form == "short" and row.status != "已完结" and row.fav_pctl < 0.98:
+        return False                                  # 连载短篇 = 弃书（E.11）
     return True
 ```
 
 - **弃书规则（E.11）**：短/中篇阅读本质是「一口气读完」，连载中视为作者弃书，
   丧失收录资格（`status` 字段不可靠，见下条豁免的存在理由）。
-- **质量豁免（E.13）**：同代 `fav_pctl ≥ 0.98` 的连载短/中篇不算弃书——作者可能只是
-  忘点完结（锚点 24132）。豁免**不等于直接入库**：仍须经质量锚（Top20k/月榜/banner/
-  短篇双分位/深榜）入种，实际豁免 134 本。
+- **中篇无豁免（E.20，用户定）**：`medium` 且连载中的书一律出局，不看 `fav_pctl`。
+  5–15 万字仍在连载的中篇，绝大多数是作者弃掉的长篇（字数还会涨、结构是长篇），
+  开口子等于放大量太监长篇进种子。征文保底也不例外，P8 守门。
+- **质量豁免（E.13，仅 short）**：同代 `fav_pctl ≥ 0.98` 的连载**短篇**不算弃书——
+  作者可能只是忘点完结（锚点 24132）。豁免**不等于直接入库**：仍须经质量锚
+  （Top20k/月榜/banner/短篇双分位/深榜）入种，实际豁免 31 本。
 - **征文保底豁免（E.9）**：每征文 ≥3 本保底从全池选书、不查 status（部分比赛完结率
-  极低）；保底候选 `words ≥ 1万`，天然不碰 invalid，故 invalid 无豁免。
-  种子内连载短/中篇只能来自保底路径（P5 守门）。
+  极低）；保底候选 `words ≥ 1万`，天然不碰 invalid，故 invalid 无豁免。E.20 起
+  保底也不得选连载中篇。种子内连载短篇只能来自保底路径（P5 守门）。
 - **短篇双分位渠道噪声底（E.15）**：Top-2000 候选须 `favs ≥ 5`（与征文保底同门槛；
   分位仍在全池上算，先过滤会缩小组内分母、整体扭曲排名）。翻年改组曾让
   38821（favs=3 的 3-6k×2014 小组头部）无锚入种，违反 P2。
 
-**七条后置断言**（`seed_policy.postconditions()`，重建时强制）：
+**八条后置断言**（`seed_policy.postconditions()`，重建时强制）：
 P1 合格深榜书全入池；P2 favs<5 且 <1 万字须有外部锚；P3 收藏覆盖回退 ≤0.2pp
 （合格书口径，分母剔除弃书+invalid）；P4 每征文 ≥3 本；P5 弃书仅经保底入种；
-P6 invalid 零入种；P7 种子内 short 不越三条天花板（全时期）。`20260503.17`：
-P1–P7 全 PASS。
+P6 invalid 零入种；P7 种子内 short 不越三条天花板（全时期）；P8 连载中篇零入种。
+`20260503.18`：P1–P8 全 PASS。
 
 ## 5. Universe 分布（快照，使用时现算）
 
@@ -183,9 +187,9 @@ P1–P7 全 PASS。
 | `dialogue` | 42,296 | 17.5% |
 | `ip_collab` | 935 | 0.4% |
 
-种子 `20260503.17` = 18,870 本（18,823 合格 + 47 授权日轻）：从质量锚剔除弃书
-134,366 本（另 143 本 E.13 豁免经质量锚入种）+ invalid 24,021 本；种子内 invalid
-恒 0；合格书口径收藏覆盖 96.65%（vs V0 96.66%，-0.01pp）。E.14（2026-11-19）并入 108 本
+种子 `20260503.18` = 18,758 本（18,711 合格 + 47 授权日轻）：从质量锚剔除弃书
+134,478 本（另 31 本 E.13 豁免经质量锚入种）+ invalid 24,021 本；种子内 invalid
+恒 0；合格书口径收藏覆盖 96.64%（vs V0 96.65%，-0.01pp）。E.14（2026-11-19）并入 108 本
 月榜遗漏书（上榜但缺失于快照，计数为 2026-11 App API 当期值），87 本入种，
 19 本连载短/中篇按弃书规则排除、2 本 2026 年建档在世代上限之外；E.15 并入 177 条
 定年锚点（104→281），est_year 翻年仅 759 本、universe 不变；E.16（2026-11-19）按真短篇点击天花板把
@@ -193,7 +197,8 @@ words≤5 万且 clicks>215,723 的 155 本翻为对话（种子内 43 本短篇
 用户 App 目验确认）；E.17 把同人且 ≤5 万字的 5,853 本翻为对话；E.18 加时间下界
 （形态判据只在 `nid ≥ 83,818` 生效，回退 1,709 本早期书）并按标题 IP 词把 1,745 本
 短篇翻为对话；E.19 把越过短篇点击天花板的 23 本僵尸/假短篇归 invalid（种子内 7 本
-出库）。E.17 的 eligible 分母扩张使覆盖率绝对门槛由 97.0% 调至 96.5%
+出库）；E.20 取消中篇的弃书豁免——连载中篇一律出库（种子 medium 1,057→944，
+-112；其中 7 本原本经 E.13 质量豁免入种，其余经质量锚）。E.17 的 eligible 分母扩张使覆盖率绝对门槛由 97.0% 调至 96.5%
 （P3 的同分母对比才是回归判据：E.19 仍为 -0.01pp）。
 种子内六值分布由构建现算，以 `manifest.json` 为准，本文不硬编码。
 
@@ -233,7 +238,7 @@ favs≥2000 档 = 18,904/26,887，有重叠）；② 劣质书拉扁中位数（
 | 六值分类单一真源 | `analysis/lib/forms.py::classify`（判据常量在此） |
 | 对话形态判据 v2 | `analysis/lib/dialogue_form.py::mark` |
 | 收录资格 / 弃书 / 豁免 | `app/tools/seedbuild/seed_policy.py`（`abandoned_ids`、`exempt_from_abandon`、`invalid_ids`、`contest_guarantee`） |
-| 后置断言 P1–P7 | `seed_policy.postconditions()` |
+| 后置断言 P1–P8 | `seed_policy.postconditions()` |
 | 取值域断言 + 分布 | `app/tools/seedbuild/validate.py` → `manifest.json` |
 | 引擎 form 过滤 | `app/engine/internal/api`（`validForms` 含 invalid） |
 
