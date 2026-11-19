@@ -2,9 +2,11 @@
 
 方法
 ----
-103 个锚点是作品创建时间实测：91 个来自 API（``addTime``），12 条为用户
+281 个锚点是作品创建时间实测：91 个来自 API（``addTime``），12 条为用户
 核实创建时间（2026-11-16 并入，``source=user_verified``，见
-``references/verified-dates.md``）。``nid`` 为站点全局自增
+``references/verified-dates.md``），177 条为 E.15 月榜遗漏书（2026-11-19
+并入，``source=app_api``，App API 逐本 ``addTime``；高 nid 段由此外推转
+内插）。``nid`` 为站点全局自增
 主键、严格单调，故可在锚点之间插值出任意 nid 的创建日期。
 
 插值在 log(nid) 空间进行：nid 增速 20 年间从约 2 涨到约 330 本/天（180 倍），
@@ -265,8 +267,9 @@ def staleness_days(df: pd.DataFrame, content_end: pd.Timestamp) -> pd.Series:
 def leave_one_out(anchors: pd.DataFrame | None = None) -> pd.DataFrame:
     """留一法误差。留出单元 = 同一秒时间戳的整组锚点。
 
-    ``anchors`` 缺省用全部锚点（103 = 91 API 实测 + 12 条用户核实）；
-    传入过滤后的锚点可对比并入前后的误差口径。
+    ``anchors`` 缺省用全部锚点（281 = 91 API 实测 + 12 条用户核实 + 177 条
+    E.15 app_api）；传入过滤后的锚点可对比并入前后的误差口径。
+    E.15 并入前后（interp 段）：p90 10d→3d、均值 13.8d→5.1d。
     """
     a = anchors if anchors is not None else load_anchors()
     recs = []

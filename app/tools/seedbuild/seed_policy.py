@@ -168,13 +168,23 @@ def monthly_ids(df: pd.DataFrame) -> set[int]:
 
 
 def short_supplement(df: pd.DataFrame) -> set[int]:
-    """Report 19: dual-percentile Top-2000 over (word bin x generation)."""
+    """Report 19: dual-percentile Top-2000 over (word bin x generation).
+
+    favs >= NOISE_FAVS guard (2026-11-19, E.15): tiny bin x gen groups can put
+    a favs=3 book at their group top and push it into the global Top-2000 at
+    the margin (38821 surfaced when anchor-dating shifts reshuffled groups);
+    P2 forbids unanchored favs<5 & words<10k seed books. The percentile MUST
+    be computed on the full pool (filtering first shrinks group denominators
+    and distorts ranks wholesale, -52 seed books in one sweep); only the
+    *candidates* are filtered. Same threshold as the contest floor (5).
+    """
     short = df[(df["words"] <= SHORT_MAX_WORDS) & (df["status"] == "已完结")].copy()
     short["wb"] = pd.cut(short["words"], SHORT_BINS, labels=SHORT_LABELS, right=True)
     short["grp"] = short["wb"].astype(str) + "|" + short["est_year"].astype(str)
     g = short.groupby("grp", observed=True)["favs"]
     short["p_grp"] = g.rank(ascending=True, method="average") / g.transform("size")
-    return set(short.sort_values("p_grp", ascending=False).head(SHORT_TOP_N)["id"])
+    cand = short[short["favs"] >= NOISE_FAVS]
+    return set(cand.sort_values("p_grp", ascending=False).head(SHORT_TOP_N)["id"])
 
 
 def contest_guarantee(df: pd.DataFrame, existing: set[int]) -> tuple[set[int], dict]:

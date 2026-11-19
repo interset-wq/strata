@@ -1,21 +1,21 @@
 {
   "schema_version": 3,
-  "seed_version": "20260503.12",
+  "seed_version": "20260503.13",
   "content_end": "2026-05-03",
-  "built_at": "2026-11-19T09:07:59+00:00",
-  "book_count": 18124,
+  "built_at": "2026-11-19T09:26:33+00:00",
+  "book_count": 18125,
   "licensed_count": 47,
   "tag_count": 102,
-  "tag_rows": 59637,
+  "tag_rows": 59649,
   "gen_min": 2007,
   "gen_max": 2025,
   "counts": {
     "stats_universe": 241864,
-    "baseline_v0": 30867,
-    "admitted_v3": 18077,
+    "baseline_v0": 30832,
+    "admitted_v3": 18078,
     "licensed_added": 47,
-    "seed": 18124,
-    "deep_rank_rows": 14626,
+    "seed": 18125,
+    "deep_rank_rows": 14621,
     "lqs_scored_universe": 12209
   },
   "admission_detail": {
@@ -23,10 +23,10 @@
     "monthly": 1661,
     "featured": 620,
     "short": 2000,
-    "time_excluded": 9356,
-    "time_gated_diagnostic": 4168,
-    "time_cut_diagnostic": 4910,
-    "deep": 7839,
+    "time_excluded": 9322,
+    "time_gated_diagnostic": 4159,
+    "time_cut_diagnostic": 4886,
+    "deep": 7835,
     "contest_floor": {
       "contests": 96,
       "added": 11,
@@ -83,21 +83,21 @@
       }
     },
     "abandoned": {
-      "total": 139055,
+      "total": 139053,
       "in_seed": 2,
-      "exempt_pctl_098": 133
+      "exempt_pctl_098": 135
     },
     "invalid": {
       "total": 23998,
       "in_seed": 0
     }
   },
-  "favs_coverage": 0.970474,
+  "favs_coverage": 0.970488,
   "postconditions": [
     {
       "name": "P1 合格深榜书全部在种子内",
       "pass": true,
-      "detail": "4,670 本合格深榜书，缺 0"
+      "detail": "4,669 本合格深榜书，缺 0"
     },
     {
       "name": "P2 favs<5 且字数<1万必须有外部锚",
@@ -107,7 +107,7 @@
     {
       "name": "P3 收藏覆盖回退 ≤ 时间渠道放弃量（合格书口径）",
       "pass": true,
-      "detail": "新 97.05% vs V0 97.04%，差 +0.00pp（容差 0.2pp）"
+      "detail": "新 97.05% vs V0 97.04%，差 +0.01pp（容差 0.2pp）"
     },
     {
       "name": "P4 每个征文至少 3 本",
@@ -117,7 +117,7 @@
     {
       "name": "P5 弃书仅经征文保底豁免入种",
       "pass": true,
-      "detail": "弃书 139,055 本（另有同代 pctl≥0.98 豁免 133 本经质量锚入种），种子内 2 本（均须来自征文保底），越界 0 本"
+      "detail": "弃书 139,053 本（另有同代 pctl≥0.98 豁免 135 本经质量锚入种），种子内 2 本（均须来自征文保底），越界 0 本"
     },
     {
       "name": "P6 invalid（<2000字僵尸）零入种",
@@ -136,13 +136,13 @@
   "files": {
     "db": {
       "name": "seed.db",
-      "bytes": 15085568,
-      "sha256": "c4fe9b7f52e6f39ef778065396a5c4aced875af761545958a2653fd66d4ad0c5"
+      "bytes": 15093760,
+      "sha256": "38a230569f1e28344cdcb44324e46c4eee605605cf89f2f4777db53cd2842375"
     },
     "gz": {
       "name": "seed.db.gz",
-      "bytes": 6749446,
-      "sha256": "d8ce49508a7c7ab743de514bab81b232ec32a18def1b102150b775fb1d1816ab"
+      "bytes": 6709476,
+      "sha256": "70181d5363813d39a4a737192ded26aeaa503072db77454df076eee7f2aa633f"
     }
   }
 }

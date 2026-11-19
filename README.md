@@ -70,7 +70,7 @@
 | 唯一原始数据集 | `analysis/data/extracted/dataset/data/meta*.jsonl`，22 文件 / 249,832 行             |
 | 规范化书目表   | `analysis/out/novels.csv`，245,887 行 × 15 列（构建时已剔除正版日轻 47 行）         |
 | 数据内容上界   | **2026-05-03**（原始 jsonl 的 `max(last_update)`，即扫描起点，非统一读取时刻） |
-| 上架年定年     | `analysis/lib/eras.py`，104 锚点、log(nid) 分段线性，留一法 P99 = 50 天              |
+| 上架年定年     | `analysis/lib/eras.py`，281 锚点、log(nid) 分段线性，内插段留一法 p90 3 天              |
 | 在架覆盖率     | 约 69.3%（报告 10 已重写：三态判据 + 按 nid 段分层加权；旧 68.9% 量级未变、口径已改）  |
 | 产出           | 19 份基准报告 + 3 份补充报告、88 张图，均由生成器产出                                  |
 
