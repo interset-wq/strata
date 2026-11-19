@@ -1,22 +1,22 @@
 {
   "schema_version": 3,
-  "seed_version": "20260503.20",
+  "seed_version": "20260503.21",
   "content_end": "2026-05-03",
-  "built_at": "2026-11-19T12:40:58+00:00",
-  "book_count": 18750,
+  "built_at": "2026-11-19T13:01:32+00:00",
+  "book_count": 18757,
   "licensed_count": 47,
   "tag_count": 102,
-  "tag_rows": 61920,
+  "tag_rows": 61945,
   "gen_min": 2007,
   "gen_max": 2025,
   "counts": {
     "stats_universe": 241864,
     "baseline_v0": 30832,
-    "admitted_v3": 18703,
+    "admitted_v3": 18710,
     "licensed_added": 47,
-    "seed": 18750,
+    "seed": 18757,
     "deep_rank_rows": 14621,
-    "lqs_scored_universe": 12211
+    "lqs_scored_universe": 12203
   },
   "admission_detail": {
     "top_favs": 20000,
@@ -83,7 +83,7 @@
       }
     },
     "abandoned": {
-      "total": 134486,
+      "total": 134466,
       "in_seed": 1,
       "exempt_pctl_098": 31
     },
@@ -92,12 +92,12 @@
       "in_seed": 0
     }
   },
-  "favs_coverage": 0.966338,
+  "favs_coverage": 0.966328,
   "postconditions": [
     {
       "name": "P1 合格深榜书全部在种子内",
       "pass": true,
-      "detail": "4,541 本合格深榜书，缺 0"
+      "detail": "4,542 本合格深榜书，缺 0"
     },
     {
       "name": "P2 favs<5 且字数<1万必须有外部锚",
@@ -117,7 +117,7 @@
     {
       "name": "P5 弃书仅经征文保底豁免入种",
       "pass": true,
-      "detail": "弃书 134,486 本（另有同代 pctl≥0.98 豁免 31 本经质量锚入种），种子内 1 本（均须来自征文保底），越界 0 本"
+      "detail": "弃书 134,466 本（另有同代 pctl≥0.98 豁免 31 本经质量锚入种），种子内 1 本（均须来自征文保底），越界 0 本"
     },
     {
       "name": "P6 invalid（僵尸/假短篇）零入种",
@@ -132,7 +132,7 @@
     {
       "name": "P8 连载中篇零入种（中篇必须已完结）",
       "pass": true,
-      "detail": "连载中篇 22,128 本，入种 0 本"
+      "detail": "连载中篇 22,115 本，入种 0 本"
     }
   ],
   "source": {
@@ -146,13 +146,13 @@
   "files": {
     "db": {
       "name": "seed.db",
-      "bytes": 15536128,
-      "sha256": "ff60bd3a67fea8b104f3e462006dc4c113ad2bc78949f013d48f2a241e627100"
+      "bytes": 15544320,
+      "sha256": "9989a298b6399f3ad9c047ddd32ae0833b17c192268b725825a608f96eb397fc"
     },
     "gz": {
       "name": "seed.db.gz",
-      "bytes": 6892576,
-      "sha256": "c9971b0f616cd32f6eff74f6e788d27012a80191360fd1581916a43516b3c49f"
+      "bytes": 6890408,
+      "sha256": "e2e7f73ae183f7385f49e14156f8a00d653f08549f49dd0e1fd83d26608bc106"
     }
   }
 }
