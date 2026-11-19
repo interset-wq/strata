@@ -170,13 +170,25 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 口径标注（docs/14 §1.3：UI 必须标注估计口径）
+            // 口径标注（docs/14 §1.3 + 样本口径）：本日历聚合的是内置库
+            // （seed 收录子集），不是全站新书数；日期是创建时间估计。
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 2, 16, 6),
-              child: Text(
-                '上架日期（估计）· 按作品创建时间聚合，非首章发布日期',
-                style:
-                    TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '内置库样本 · 各格本数为内置库中估计于当日发书的作品数，非全站新书量',
+                    style: TextStyle(
+                        fontSize: 11, color: scheme.onSurfaceVariant),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '上架日期 = 作品创建时间估计，非首章发布日期',
+                    style: TextStyle(
+                        fontSize: 11, color: scheme.onSurfaceVariant),
+                  ),
+                ],
               ),
             ),
             // 粒度切换：月/周/日（从日/周切回月 = 回到月网格）
@@ -243,7 +255,9 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
 
   Widget _buildMonth(CalendarResponse resp, ColorScheme scheme) {
     final days = resp.cells;
-    if (days.isEmpty) return _empty('本月没有发书日历作品');
+    if (days.isEmpty) {
+      return _empty('内置库没有估计在本月发书的作品');
+    }
     final firstWeekday = DateTime.parse(days.first.date).weekday - 1;
     final total = days.fold<int>(0, (s, c) => s + c.total);
     return Padding(
@@ -323,7 +337,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
           const SizedBox(height: 8),
           Center(
             child: Text(
-              '本月共 $total 本（按估计上架日期）',
+              '内置库估计本月发书 $total 本 · 非全站口径',
               style:
                   TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
             ),
@@ -338,7 +352,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
   Widget _buildWeek(CalendarResponse resp, ColorScheme scheme) {
     final days = resp.cells;
     if (days.every((c) => c.total == 0)) {
-      return _empty('本周没有发书日历作品');
+      return _empty('内置库没有估计在本周发书的作品');
     }
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
@@ -437,7 +451,9 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
 
   Widget _buildDay(CalendarResponse resp, ColorScheme scheme) {
     final day = resp.cells.single;
-    if (day.total == 0) return _empty('当日无记录作品');
+    if (day.total == 0) {
+      return _empty('内置库没有估计在当日发书的作品');
+    }
     return Stack(
       children: [
         ListView.separated(
@@ -451,7 +467,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                 child: Padding(
                   padding: const EdgeInsets.all(12),
                   child: Text(
-                    '— 共 ${day.total} 本 · 按收藏排序 —',
+                    '— 内置库估计当日发书 ${day.total} 本 · 按收藏排序 —',
                     style: TextStyle(
                         fontSize: 11, color: scheme.onSurfaceVariant),
                   ),
