@@ -322,7 +322,10 @@ def postconditions(df: pd.DataFrame, res: dict) -> list[tuple[str, bool, str]]:
     # P7: 短篇三条天花板（E.17，用户 App 目验）。回到旧时光 clicks 215,723 是
     #     真短篇点击上限，听雨 5,478 favs / 2,389 赞是收藏与点赞上限。种子内
     #     short 若有书越过任一条，其形态必定不是短篇（对话/长篇误判）。
-    form_in_seed = FM.classify(df).where(df["id"].isin(res["ids"]))
+    #     E.18：只对对话体时代（nid >= 83,818）生效——早期书的 clicks 是十余年
+    #     累积，与当代不可比（回到旧时光本身 2012 建档）。
+    modern = df["id"] >= DF.DIALOGUE_START_NID
+    form_in_seed = FM.classify(df).where(df["id"].isin(res["ids"]) & modern)
     short_mask = form_in_seed.eq("short")
     over_c = df.loc[short_mask & (df["clicks"] > DF.DIAL_CLICKS_CEIL)]
     over_f = df.loc[short_mask & (df["favs"] > DF.SHORT_MAX_FAVS)]

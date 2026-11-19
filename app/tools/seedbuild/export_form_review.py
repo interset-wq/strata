@@ -36,6 +36,11 @@ DEFAULT_OUT = REPO / "analysis" / "out" / "seed_form_short_review.csv"
 
 LISTEN_CLICKS = 114_482   # 听雨, best-known short story by clicks
 CEIL_CLICKS = 215_723     # 回到旧时光, hard ceiling for a ≤50k-word short
+# E.18: 对话体 2017-07 才存在 (dialogue monthly board opens). Books below this
+# nid predate the product line, so their clicks are a decade of accumulation and
+# are not comparable with a modern short story — they must not be flagged by the
+# click ceiling. 回到旧时光 itself (24132, 2012) is one of them.
+DIALOGUE_START_NID = 83_818
 
 QUERY = """
 select b.nid, b.title, b.author, b.genre, b.price_type, b.status, b.contest,
@@ -74,9 +79,12 @@ def _read(path: Path) -> pd.DataFrame:
 
 def build_flags(row: pd.Series) -> str:
     flags = []
-    if row["clicks"] > CEIL_CLICKS:
+    modern = row["nid"] >= DIALOGUE_START_NID
+    if not modern:
+        flags.append("pre-dialogue")
+    if modern and row["clicks"] > CEIL_CLICKS:
         flags.append("@ceil")
-    if row["clicks"] > LISTEN_CLICKS:
+    if modern and row["clicks"] > LISTEN_CLICKS:
         flags.append("C>listen")
     if row["favs"] >= 1_000:
         flags.append("F>=1000")
@@ -103,7 +111,10 @@ def main() -> int:
     df["ckw"] = (df["clicks"] / df["words"].where(df["words"] > 0)).round(2)
     df["flags"] = df.apply(build_flags, axis=1)
     if args.suspect_only:
-        df = df[df["flags"] != ""]
+        # `pre-dialogue` alone is informational (early books are expected), not
+        # a suspicion; keep a row only when some other signal fires.
+        other = df["flags"].str.replace("pre-dialogue", "", regex=False).str.strip("|")
+        df = df[other != ""]
     df = df.sort_values(["clicks", "favs"], ascending=False).reset_index(drop=True)
     df.insert(0, "seq", range(1, len(df) + 1))
 

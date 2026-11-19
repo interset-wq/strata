@@ -21,7 +21,19 @@
 
 短篇上限（用户目验，E.17 固化）：点击 215,723（回到旧时光）、favs 5,478 与
 praises 2,389（听雨）。这三条是 P7 断言的来源——short 层若有书越过 favs/赞
-天花板，说明还有形态误判。
+天花板，说明还有形态误判。**断言只对 `nid ≥ 83,818`（对话体时代）生效**：
+早期书的 clicks 是十余年累积，与当代不可比（回到旧时光本身 2012 建档）。
+
+时间下界（E.18，2026-11-19 用户裁定）：对话体出现之前的 nid 不可能是对话。
+证据链——历史月榜 `MonthlyBoy.ashx` 的 rank=4（对话月票榜）首月为 2017-07
+（2016-10 至 2017-06 全空），同月出现首批「五征对话小说」投稿，最小 nid
+83,818 / 2017-07-03；此前十年无任何对话征文标记。故形态判据全部加
+`nid ≥ 83,818` 下界，早期同人短篇按散文计（回退 1,709 本）。
+
+标题 IP 条款（E.18）：`ip_title & words ≤ 5 万` → 对话。用户判定「有崩坏等
+米哈游特征的都是对话」；早期书里的「崩坏」是普通词汇（崩坏の迷宫 2010），
+被时间下界自然挡掉。报告 22 §4 早已把标题 IP 词列为对话同人的强特征，但只覆盖
+头部，故仍不算确定性。
 
 对话小说每章约 500 字、整本可连载很长，**单本字数不能判形态**（锚点 570712 为
 88 万字对话）。v2 动机：E.11/E.12 后 `form=short` 仍混入大量 2–5 万字对话小说
@@ -57,12 +69,21 @@ DIAL_CKW_MEDIUM = 30.0  # 非同人 & 5–15 万字
 # 真短篇点击天花板（E.16，2026-11-19 用户裁定）：回到旧时光 clicks=215,723 为
 # 真 short 点击上限；words ≤ 5 万且越过此线者判对话（不限同人/签约）。
 DIAL_CLICKS_CEIL = 215_723
+# 对话体时间下界（E.18，2026-11-19 用户裁定）：「对话体出现之前的 id 一定
+# 不可能是对话」。硬证据 = 历史月榜 rank=4（对话月票榜）首月 2017-07
+# （2016-10…2017-06 全部为空），同月出现首批「五征对话小说」投稿，最小 nid
+# 83,818（2017-07-03）。此前 10 年没有任何对话征文标记，早期同人短篇是散文。
+# 形态判据全部只在此后生效；征文标记（确定性）不受此限。
+DIALOGUE_START = "2017-07"
+DIALOGUE_START_NID = 83_818
 # 真短篇收藏/点赞天花板（E.17，听雨 5,478 / 2,389）：仅用于 P7 断言，
 # 不参与形态判定——越过者说明该书的 short 身份另有问题，须人工复核。
 SHORT_MAX_FAVS = 5_478
 SHORT_MAX_PRAISES = 2_389
 # 同人短字数上界（E.17）：>5 万字的同人是正常散文连载，不判对话。
 FAN_MAX_WORDS = 50_000
+# 米哈游 IP 标题词的对话判定字数上界（E.18）：只吃短篇档，medium/long 另议。
+IP_MAX_WORDS = 50_000
 # 标题 IP 特征词（米哈游系为主，对话小说同人集中区）
 IP_PATTERN = re.compile(
     "原神|崩坏|星穹|星铁|芙宁娜|钟离|纳西妲|琪亚娜|芽衣|姬子|雷电|梅比乌斯|"
@@ -106,19 +127,28 @@ def mark(df: pd.DataFrame) -> pd.DataFrame:
         d["ckw"] = clicks_num.to_numpy() / w
     else:
         d["ckw"] = np.zeros(len(d))
-    d["morph"] = (
+    d["ip_title"] = title.str.contains(IP_PATTERN, na=False)
+    # E.18 时间下界：对话体 2017-07 才存在，之前的 nid 一律不判形态。
+    nid_col = "id" if "id" in d.columns else ("nid" if "nid" in d.columns else None)
+    if nid_col is None:
+        after_start = pd.Series(True, index=d.index)
+    else:
+        after_start = (pd.to_numeric(d[nid_col], errors="coerce").fillna(0)
+                       >= DIALOGUE_START_NID)
+    d["dialogue_era"] = after_start
+    d["morph"] = after_start & (
         (d["tong"] & d["unsigned"] & (words <= MORPH_MAX_WORDS))          # 原条款
         | (d["tong"] & d["ckw"].ge(DIAL_CKW_FAN))                          # v2-a
         | (~d["tong"] & (words <= 50_000) & d["ckw"].ge(DIAL_CKW_SHORT))   # v2-b
         | (~d["tong"] & words.between(50_001, 150_000)
            & d["ckw"].ge(DIAL_CKW_MEDIUM))                                 # v2-c
         | (d["tong"] & (words <= FAN_MAX_WORDS))                           # v2-e（E.17）
+        | (d["ip_title"] & (words <= IP_MAX_WORDS))                        # v2-f（E.18）
     )
     if clicks_num is not None:                                             # v2-d 天花板
-        d["morph"] = d["morph"] | ((words <= 50_000)
+        d["morph"] = d["morph"] | (after_start & (words <= 50_000)
                                    & clicks_num.gt(DIAL_CLICKS_CEIL))
     d["hidden"] = d["morph"] & ~d["marked"]
-    d["ip_title"] = title.str.contains(IP_PATTERN, na=False)
     return d
 
 
