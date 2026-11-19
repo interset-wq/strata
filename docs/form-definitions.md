@@ -30,6 +30,7 @@ CREATE INDEX idx_books_form ON books(form, favs DESC);   -- schema v2→v3，24�
 
 | 级 | 判据 | 性质 | 覆写值 |
 |---|---|---|---|
+| **-1（最高）** | **用户直接裁定**（§3.5.1 / E.27） | 确定性（人工目验） | 任意值 |
 | 0（兜底） | 字数切档（含 invalid 下界） | 估计 | `invalid/short/medium/long` |
 | 0.5 | 正文征文否决对话形态（§3.5 / E.21） | 确定性 | 保持字数档（仅中篇档） |
 | 1 | 对话形态判据 v2（§3.5） | 估计（章节真值校准） | `dialogue` |
@@ -39,9 +40,14 @@ CREATE INDEX idx_books_form ON books(form, favs DESC);   -- schema v2→v3，24�
 | 3.5 | 详情页 DOM 的**对话**证据（§3.5 / E.22） | 确定性（产品线声明，优先于征文组别） | `dialogue` |
 | 3（最高） | IP 合作封闭名单（§3.6） | 确定性 | `ip_collab` |
 
+- **用户裁定压过一切（E.27）**：`analysis/anchors/form_user_verified.jsonl` 里的 nid
+  直接决定 `form`，不再走任何估计或爬取。理由：数据出众的书判错代价最大（头部书会被
+  排进错误的 tab），而这类书**很少**，逐本问人比再爬一遍便宜。用户 2026-11-19：
+  「不需要 DOM 判决，很多你可以直接问我，因为对话数据非常出众的作品非常少」。
+  格式与用法见 §3.5.1。
 - **对话高于篇幅**：对话每章约 500 字、整本可长（锚点 88 万字），先按字数切会把长对话
   排进长篇榜——这正是 form 要消除的噪声。
-- **IP 置顶**：名单封闭、确定性最高，与对话/短篇实测零交。
+- **IP 置顶**（除用户裁定外最高）：名单封闭、确定性最高，与对话/短篇实测零交。
 - **DOM 两级插入（E.22，用户定）**：对话小说/互动小说不支持 Web 阅读，详情页预读区
   只放产品声明（`全新的对话小说版本…` / `全新的沉浸式互动小说…`），散文页放正文首段。
   故「DOM 有正文」撤销一切形态估计（级 1.2），「DOM 是对话声明」直接判对话并覆盖
@@ -178,6 +184,21 @@ universe 43,277 本。互动小说并入本值。
 有对话征文标记的作者名下，`short` 仅 28%、`medium` 60%、`long` 32% 是对话（基线 7%），
 秋米拉 7 本即横跨 long/short/dialogue。作者信号只有 4–8 倍lift，作为特征可用，
 作为传播规则会把 4,000+ 本散文误判为对话。**form 是作品级属性，禁做作者级传播**。
+
+#### 3.5.1 用户裁定通道（级 -1，E.27）
+
+数据出众的书判错代价最大（会排进错误的 tab），而这类书**很少**；逐本问人比再爬一遍
+便宜，也比任何估计可靠。用户 2026-11-19：「不需要 DOM 判决，很多你可以直接问我，因为
+对话数据非常出众的作品非常少」。
+
+- **文件**：`analysis/anchors/form_user_verified.jsonl`，一行一本，字段
+  `nid` / `form` / `reason`（为什么这么判）/ `verified_on`（日期）。文件不存在 = 不干预。
+- **加载**：`lib/forms.py::user_forms()`（`lru_cache`）→ `classify()` 末尾整体覆写，
+  优先级高于 DOM、征文与 IP 名单，且**豁免一切资格规则**以外的推导（仅决定 form）。
+- **用法**：用户点名某书形态有误 → 追加一行 → 重跑 `build_seed.py`（P 断言会照常校验
+  天花板/资格；若裁定与 P6/P7/P8/P9 冲突，说明裁定本身需要复核，不许绕过断言）。
+- **不做的事**：不因为裁定扩大爬取、不为裁定加启发式；裁定是终点不是训练集
+  （E.23/E.24 已证明跨档/作者传播会把散文大规模误判）。
 
 ### 3.6 `ip_collab`（IP 合作）
 
@@ -317,6 +338,7 @@ favs≥2000 档 = 18,904/26,887，有重叠）；② 劣质书拉扁中位数（
 | 职责 | 位置 |
 |---|---|
 | 六值分类单一真源 | `analysis/lib/forms.py::classify`（判据常量在此） |
+| 用户裁定（级 -1） | `analysis/anchors/form_user_verified.jsonl` → `forms.user_forms()` |
 | 对话形态判据 v2 | `analysis/lib/dialogue_form.py::mark` |
 | 收录资格 / 弃书 / 豁免 | `app/tools/seedbuild/seed_policy.py`（`abandoned_ids`、`exempt_from_abandon`、`invalid_ids`、`dead_ids`、`contest_guarantee`） |
 | 后置断言 P1–P9 | `seed_policy.postconditions()` |

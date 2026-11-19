@@ -19,11 +19,42 @@
 
 from __future__ import annotations
 
+import json
+from functools import lru_cache
+
 import numpy as np
 import pandas as pd
 
 from lib import dialogue_form as DF
+from lib import paths
 from lib import web_dialogue as WD
+
+# 用户直接裁定的形态（最高优先，覆盖下面所有级）。用户 2026-11-19：
+# 「不需要 DOM 判决，很多你可以直接问我，因为对话数据非常出众的作品非常少」——
+# 数据量大的书判错代价最大，逐本问人比再爬一遍便宜。
+USER_FORM_FILE = paths.ANCHORS_DIR / "form_user_verified.jsonl"
+
+
+@lru_cache(maxsize=1)
+def user_forms() -> dict[int, str]:
+    """`nid -> form`，来自 `analysis/anchors/form_user_verified.jsonl`。
+
+    行格式：`{"nid": 172004, "form": "long", "reason": "…", "verified_on": "2026-11-19"}`。
+    文件不存在即空表（默认不干预）。
+    """
+    if not USER_FORM_FILE.exists():
+        return {}
+    out: dict[int, str] = {}
+    for line in USER_FORM_FILE.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("//"):
+            continue
+        row = json.loads(line)
+        form = str(row["form"])
+        if form not in FORMS:
+            raise ValueError(f"form_user_verified: 非法形态 {form!r}（nid={row.get('nid')}）")
+        out[int(row["nid"])] = form
+    return out
 
 INVALID_MAX_WORDS = 2_000   # 用户 2026-11-19 定：<2000 不是有效篇幅（app 章节下限）
 SHORT_MAX_WORDS = 50_000
@@ -88,6 +119,15 @@ def classify(df: pd.DataFrame) -> pd.Series:
     # 级 4：IP 合作（最高）
     ip = contest.map(lambda x: any(name in x for name in IP_COLLAB_NAMES))
     form = np.where(ip.to_numpy(), "ip_collab", form)
+    # 级 -1：用户直接裁定（真正的最高——覆盖 DOM、征文与 IP 名单）。
+    #       数据出众的书判错代价最大，而这类书很少，逐本问人比再爬一遍便宜。
+    uv = user_forms()
+    if uv:
+        nid = pd.to_numeric(
+            d["id"] if "id" in d.columns else d.get("nid"), errors="coerce"
+        )
+        decided = nid.map(lambda x: uv.get(int(x)) if pd.notna(x) else None)
+        form = np.where(decided.notna().to_numpy(), decided.to_numpy(), form)
     return pd.Series(form, index=df.index, name="form")
 
 
