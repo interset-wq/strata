@@ -5,6 +5,7 @@ import '../pages/book_data_page.dart';
 import '../pages/book_detail_page.dart';
 import '../pages/boot_page.dart';
 import '../pages/browse_page.dart';
+import '../pages/classic_list_page.dart';
 import '../pages/discover_page.dart';
 import '../pages/featured_gallery_page.dart';
 import '../pages/history_page.dart';
@@ -115,6 +116,30 @@ final router = GoRouter(
     GoRoute(path: '/browse-random',
         builder: (_, _) => const RandomPoolPage(
             status: 'browse', title: '随便看看 · 100 本')),
+    // 短篇 tab：通用榜单列表页（年份/比赛/题材轴在页内切换，无中间页）+ 随机池。
+    GoRoute(path: '/short-random',
+        builder: (_, _) => const RandomPoolPage(
+            status: 'short', title: '随机短篇 · 100 本')),
+    GoRoute(
+      path: '/classic-list',
+      builder: (_, state) {
+        final q = state.uri.queryParameters;
+        return ClassicListPage(
+          title: q['title'] ?? '榜单',
+          form: q['form'] ?? 'short',
+          year: int.tryParse(q['year'] ?? ''),
+          contest: q['contest'],
+          genre: q['genre'],
+          order: q['order'] ?? 'favs',
+          yearSwitchable: (q['year-switchable'] ?? '') == '1',
+          contestSwitchable: (q['contest-switchable'] ?? '') == '1',
+          genreSwitchable: (q['genre-switchable'] ?? '') == '1',
+        );
+      },
+    ),
+    GoRoute(path: '/short-random',
+        builder: (_, _) => const RandomPoolPage(
+            status: 'short', title: '随机短篇 · 100 本')),
     GoRoute(path: '/licensed',
         builder: (_, _) =>
             const PoolListPage(kind: 'licensed', title: '授权作品')),

@@ -25,6 +25,7 @@
 | 观测时序 | `Icons.timeline` | 详情页「观测数据」入口 |
 | 阅读记录入口 | `Icons.history` | 首页搜索行右侧 |
 | 搜索 | `Icons.search` | 首页搜索框、榜单页 |
+| 形式推断说明 | `Icons.info` | 首页 form tab 行末按钮：弹出「关于小说形式」模态框（形式为推断，非官方分类；原右上角刷新按钮改造，刷新走下拉手势） |
 
 ## 分类入口（首页宫格）
 
@@ -41,6 +42,16 @@
 | --- | --- | --- |
 | 授权作品（licensed） | `Icons.lock` | 首页宽卡入口（可点击用实心，与规则 4 一致） |
 | 萌神获奖 | `Icons.emoji_events` | 首页宽卡入口（与宫格"征文比赛"同"获奖"语义，复用） |
+
+## 分类入口（短篇 tab 入口列表）
+
+| 语义 | icon | 使用处 |
+| --- | --- | --- |
+| 年份榜 | `Icons.calendar_month` | 短篇 tab 入口列表（年份列表入口） |
+| 比赛榜 | `Icons.emoji_events` | 短篇 tab 入口列表（复用"征文比赛"语义） |
+| 题材浏览 | `Icons.category` | 短篇 tab 入口列表（复用"分类找书"语义） |
+| 优质短篇 | `Icons.star` | 短篇 tab 入口列表（同代分位榜，docs/form-definitions §6） |
+| 随机短篇 | `Icons.shuffle` | 短篇 tab 入口列表（短篇随机池，/strata/random?status=short） |
 
 ## 状态占位
 

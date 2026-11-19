@@ -663,3 +663,89 @@ func TestWriteAppPersistsEveryField(t *testing.T) {
 		t.Fatalf("cover = %v", body["cover"])
 	}
 }
+
+// TestYearGroups: the short tab's year entry — one form's pool aggregated
+// by est_year (DESC) plus the pool total.
+func TestYearGroups(t *testing.T) {
+	srv, _ := newTestServer(t)
+	body := getJSON(t, srv.URL+"/strata/year-groups?form=short",
+		http.StatusOK)
+	if body["total"].(float64) != 2 {
+		t.Fatalf("total = %v, want 2", body["total"])
+	}
+	groups := body["groups"].([]any)
+	if len(groups) != 1 ||
+		int(groups[0].(map[string]any)["year"].(float64)) != 2010 ||
+		int(groups[0].(map[string]any)["count"].(float64)) != 2 {
+		t.Fatalf("groups = %v, want [{2010 2}]", groups)
+	}
+	// form is mandatory.
+	getJSON(t, srv.URL+"/strata/year-groups", http.StatusBadRequest)
+}
+
+// TestGenreGroups: the short tab's genre browse entry — one form's pool
+// aggregated by genre (count DESC) plus the pool total.
+func TestGenreGroups(t *testing.T) {
+	srv, _ := newTestServer(t)
+	body := getJSON(t, srv.URL+"/strata/genre-groups?form=short",
+		http.StatusOK)
+	if body["total"].(float64) != 2 {
+		t.Fatalf("total = %v, want 2", body["total"])
+	}
+	groups := body["groups"].([]any)
+	if len(groups) != 2 {
+		t.Fatalf("groups = %v, want 2 genres", groups)
+	}
+	for _, g := range groups {
+		if int(g.(map[string]any)["count"].(float64)) != 1 {
+			t.Fatalf("groups = %v, want count 1 each", groups)
+		}
+	}
+	// form is mandatory.
+	getJSON(t, srv.URL+"/strata/genre-groups", http.StatusBadRequest)
+}
+
+// TestRankingClassicOrderPct: order=pct ranks by same-generation favorite
+// percentile (docs/form-definitions §6 quality short books) and inverts a
+// favs order; the default stays favs DESC; invalid order is rejected.
+func TestRankingClassicOrderPct(t *testing.T) {
+	srv, _ := newTestServer(t)
+	// testseed: 1004 (pctl 0.6, favs 50) outranks 1002 (pctl 0.5, favs 100)
+	// on percentile — pct order must invert the favs order.
+	body := getJSON(t,
+		srv.URL+"/strata/rankings/classic?form=short&limit=10&order=pct",
+		http.StatusOK)
+	items := body["items"].([]any)
+	if len(items) != 2 ||
+		items[0].(map[string]any)["nid"] != 1004.0 ||
+		items[1].(map[string]any)["nid"] != 1002.0 {
+		t.Fatalf("pct items = %v, want [1004 1002]", items)
+	}
+	// Default ordering is still favs DESC.
+	body = getJSON(t, srv.URL+"/strata/rankings/classic?form=short&limit=10",
+		http.StatusOK)
+	items = body["items"].([]any)
+	if items[0].(map[string]any)["nid"] != 1002.0 ||
+		items[1].(map[string]any)["nid"] != 1004.0 {
+		t.Fatalf("favs items = %v, want [1002 1004]", items)
+	}
+	getJSON(t, srv.URL+"/strata/rankings/classic?form=short&order=bogus",
+		http.StatusBadRequest)
+}
+
+// TestRandomShort: the short tab's random pool — the form filter is the
+// pool itself, no words threshold.
+func TestRandomShort(t *testing.T) {
+	srv, _ := newTestServer(t)
+	body := getJSON(t,
+		srv.URL+"/strata/random?status=short&form=short&limit=100",
+		http.StatusOK)
+	items := body["items"].([]any)
+	seen := map[int64]bool{}
+	for _, it := range items {
+		seen[int64(it.(map[string]any)["nid"].(float64))] = true
+	}
+	if len(items) != 2 || !seen[1002] || !seen[1004] {
+		t.Fatalf("items = %v, want {1002 1004}", items)
+	}
+}

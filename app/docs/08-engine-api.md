@@ -141,7 +141,9 @@ contest 聚合端点：`form` 必填，池按征文（`contest`，非空）`GROU
 - IP tab 入口行（`form=ip_collab`）：端上取前 2 组作命名 IP 入口
   （崩坏3征文 → 崩坏3，去“征文”后缀），其余折成“其他”（total − 前 2 之和）。
 - 短篇 tab 比赛榜入口（`form=short`）：`status` 可选（精确匹配，缺省
-  不过滤；短篇池本身经种子完结条款已干净，UI 不传 status）。
+  不过滤；短篇池本身经种子完结条款已干净，UI 不传 status）。用途 =
+  `/classic-list` 比赛榜页的**赛道 Drawer**（AppBar 汉堡/左缘右滑打开，
+  本地搜索过滤 + 选中态，选中后标题追加赛道标签）。
 
 ### GET /strata/ip-books?form=&group=&limit=&offset=（**已实现**）
 
@@ -161,13 +163,15 @@ RankItem（`cover_url` 必填非空）。
 
 短篇 tab 年份榜入口：`form` 必填（同 `/banner` 的枚举校验），池按
 `est_year` 聚合（`est_year DESC`）。返回 `total`（池总量）+
-`groups: [{year, count}]`。
+`groups: [{year, count}]`。用途 = `/classic-list` 年份榜页的**年份
+bottom sheet**（页内切换、无中间页，用户 2026-11-19 定）。
 
 ### GET /strata/genre-groups?form=（**已实现**）
 
-短篇 tab 题材浏览入口：`form` 必填（同上），池按 `genre`（非空）聚合
+短篇 tab 题材榜入口：`form` 必填（同上），池按 `genre`（非空）聚合
 （`count DESC, genre ASC` 稳定序）。返回 `total`（池总量）+
-`groups: [{genre, count}]`。
+`groups: [{genre, count}]`。用途 = `/classic-list` 题材榜页的
+**FilterChip 行**（「全部题材」+ 各题材标签，单选切换）。
 
 ### GET /strata/rankings/favs?year=&genre=&limit=
 
@@ -210,7 +214,9 @@ docs/form-definitions §6 优质短篇口径；非法值 400）。`items` 为 Ra
 
 短篇 tab（docs/form-definitions §4 收录资格）的年份榜/比赛榜/题材榜/优质榜
 以 `form=short[&year=Y|&contest=X|&genre=G|&order=pct]` 调本端点（不带
-status——种子层已实施完结条款，池本身已干净）。
+status——种子层已实施完结条款，池本身已干净）。三个轴入口**不做中间页**：
+直达 `/classic-list` 榜单页，页内用三种不重复的控件切轴——年份 =
+ModalBottomSheet、比赛 = Drawer、题材 = FilterChip（用户 2026-11-19 定）。
 
 ### GET /strata/discover?cursor=&form=&limit=（**已实现**）
 

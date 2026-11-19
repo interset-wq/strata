@@ -6,19 +6,22 @@ import '../data/api/strata_api.dart';
 import '../widgets/back_to_top.dart';
 import '../widgets/book_row_tile.dart';
 
-/// 随机池：从指定状态池中等概率抽取 100 本（serial=连载长篇，
-/// finished=完结长篇，browse=60万字大书，与首页三个随机区一一对应）。
+/// 随机池：从指定池中等概率抽取 100 本（serial=连载长篇，
+/// finished=完结长篇，browse=60万字大书，short=短篇池，
+/// 与首页随机区/短篇 tab 一一对应）。
 /// 每次"换一批"或下拉刷新都重掷一次（ORDER BY RANDOM，等概率）。
 final randomPoolProvider =
     FutureProvider.autoDispose.family<List<RankItem>, String>((ref, status)
         async {
   final handle = await ref.watch(bootProvider.future);
-  return handle.api.randomBooks(limit: 100, status: status, form: 'long');
+  // short 池 = form=short（无字数门槛）；其余池仍是长篇口径。
+  final form = status == 'short' ? 'short' : 'long';
+  return handle.api.randomBooks(limit: 100, status: status, form: form);
 });
 
-/// 随机池 100 本二级页（连载/完结/随便看看共用，由 status/title 区分）。
+/// 随机池 100 本二级页（连载/完结/随便看看/随机短篇共用，由 status/title 区分）。
 class RandomPoolPage extends ConsumerStatefulWidget {
-  final String status; // 'serial' | 'finished' | 'browse'
+  final String status; // 'serial' | 'finished' | 'browse' | 'short'
   final String title;
 
   const RandomPoolPage({

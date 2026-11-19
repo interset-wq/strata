@@ -105,6 +105,8 @@ func New(s *store.Store) *gin.Engine {
 	group.GET("/featured-all", srv.featuredAll)
 	group.GET("/cover-carousel", srv.coverCarousel)
 	group.GET("/ip-groups", srv.ipGroups)
+	group.GET("/year-groups", srv.yearGroups)
+	group.GET("/genre-groups", srv.genreGroups)
 	group.GET("/ip-books", srv.ipBooks)
 	group.GET("/banner", srv.banner)
 	group.GET("/shelf", srv.shelfList)
@@ -467,9 +469,10 @@ func (s *Server) random(c *gin.Context) {
 		return
 	}
 	status := c.Query("status")
-	if status != "" && status != "serial" && status != "finished" && status != "browse" {
+	if status != "" && status != "serial" && status != "finished" &&
+		status != "browse" && status != "short" {
 		fail(c, http.StatusBadRequest, "invalid_status",
-			"status must be empty, \"serial\", \"finished\" or \"browse\"")
+			"status must be empty, \"serial\", \"finished\", \"browse\" or \"short\"")
 		return
 	}
 	form, ok := parseForm(c)
@@ -623,18 +626,28 @@ func (s *Server) rankingClassic(c *gin.Context) {
 			return
 		}
 	}
+	order := c.Query("order")
+	if order != "" && order != "favs" && order != "pct" {
+		fail(c, http.StatusBadRequest, "invalid_argument",
+			"order must be \"favs\" or \"pct\"")
+		return
+	}
 	items, err := s.store.ClassicBooks(c.Request.Context(),
-		c.Query("genre"), c.Query("status"), c.Query("contest"), form, year, limit, offset)
+		c.Query("genre"), c.Query("status"), c.Query("contest"), form, year, limit, offset, order)
 	if err != nil {
 		fail(c, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
+	ordering := "favs"
+	if order == "pct" {
+		ordering = "fav_pctl"
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"meta": gin.H{
-			"kind": "classic", "pool": "seed", "ordering": "favs",
+			"kind": "classic", "pool": "seed", "ordering": ordering,
 			"genre": c.Query("genre"), "status": c.Query("status"),
 			"contest": c.Query("contest"), "form": form, "year": year,
-			"licensed_excluded": true,
+			"order": order, "licensed_excluded": true,
 		},
 		"items": items,
 	})
@@ -1128,6 +1141,48 @@ func (s *Server) ipGroups(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"meta":   gin.H{"pool": "seed", "form": form, "status": c.Query("status"), "ordering": "count"},
+		"total":  total,
+		"groups": groups,
+	})
+}
+
+// yearGroups serves the short tab's year entry: a form's seed books
+// aggregated by est_year (DESC) plus the pool total.
+func (s *Server) yearGroups(c *gin.Context) {
+	form, ok := parseForm(c)
+	if !ok || form == "" {
+		fail(c, http.StatusBadRequest, "invalid_argument",
+			"form must be invalid|short|medium|long|dialogue|ip_collab")
+		return
+	}
+	total, groups, err := s.store.YearGroups(c.Request.Context(), form)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"meta":   gin.H{"pool": "seed", "form": form, "ordering": "year_desc"},
+		"total":  total,
+		"groups": groups,
+	})
+}
+
+// genreGroups serves the short tab's genre browse entry: a form's seed
+// books aggregated by genre (count DESC) plus the pool total.
+func (s *Server) genreGroups(c *gin.Context) {
+	form, ok := parseForm(c)
+	if !ok || form == "" {
+		fail(c, http.StatusBadRequest, "invalid_argument",
+			"form must be invalid|short|medium|long|dialogue|ip_collab")
+		return
+	}
+	total, groups, err := s.store.GenreGroups(c.Request.Context(), form)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"meta":   gin.H{"pool": "seed", "form": form, "ordering": "count"},
 		"total":  total,
 		"groups": groups,
 	})

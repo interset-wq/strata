@@ -369,7 +369,7 @@ WHERE est_year = ? AND is_licensed = 0 AND fav_pctl IS NOT NULL`
 // same-generation percentiles: Classic mode mirrors novly's cumulative view
 // and has no quantitative layer.
 func (s *Store) ClassicBooks(ctx context.Context, genre, status, contest, form string,
-	year, limit, offset int) ([]RankItem, error) {
+	year, limit, offset int, order string) ([]RankItem, error) {
 	query := `
 SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
        seed.books.est_year, seed.books.status, seed.books.words, seed.books.clicks,
@@ -403,7 +403,14 @@ WHERE seed.books.is_licensed = 0`
 		query += " AND seed.books.est_year = ?"
 		args = append(args, year)
 	}
-	query += " ORDER BY seed.books.favs DESC, seed.books.nid ASC LIMIT ? OFFSET ?"
+	switch order {
+	case "pct":
+		// 优质短篇榜：同代收藏分位（docs/form-definitions §6）；SQLite
+		// NULL 按最小值，DESC 排末尾。
+		query += " ORDER BY seed.books.fav_pctl DESC, seed.books.favs DESC, seed.books.nid ASC LIMIT ? OFFSET ?"
+	default:
+		query += " ORDER BY seed.books.favs DESC, seed.books.nid ASC LIMIT ? OFFSET ?"
+	}
 	args = append(args, limit, offset)
 
 	rows, err := s.DB.QueryContext(ctx, query, args...)
@@ -787,6 +794,8 @@ func (s *Store) RandomBooks(ctx context.Context, limit int, status, form string)
 		if form == "" || form == "long" {
 			pool = " AND words >= " + strconv.Itoa(megaBookMinWords)
 		}
+	case "short":
+		pool = "" // 短篇池：form=short 本身就是过滤，无字数门槛
 	default:
 		return nil, fmt.Errorf("unsupported random status %q", status)
 	}
@@ -935,6 +944,84 @@ GROUP BY contest ORDER BY c DESC, contest ASC`, args...)
 	for rows.Next() {
 		var g IpGroup
 		if err := rows.Scan(&g.Contest, &g.Count); err != nil {
+			return 0, nil, err
+		}
+		groups = append(groups, g)
+	}
+	if err := rows.Err(); err != nil {
+		return 0, nil, err
+	}
+	return total, groups, nil
+}
+
+// YearGroup is one est_year cohort of a form pool: the short tab's year
+// entry (books per year).
+type YearGroup struct {
+	Year  int `json:"year"`
+	Count int `json:"count"`
+}
+
+// YearGroups aggregates one form's seed books by est_year (DESC) plus the
+// pool total.
+func (s *Store) YearGroups(ctx context.Context, form string) (int,
+	[]YearGroup, error) {
+	var total int
+	if err := s.DB.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM seed.books WHERE form = ?`,
+		form).Scan(&total); err != nil {
+		return 0, nil, err
+	}
+	rows, err := s.DB.QueryContext(ctx, `
+SELECT est_year, COUNT(*) AS c FROM seed.books
+WHERE form = ?
+GROUP BY est_year ORDER BY est_year DESC`, form)
+	if err != nil {
+		return 0, nil, err
+	}
+	defer rows.Close()
+	groups := []YearGroup{}
+	for rows.Next() {
+		var g YearGroup
+		if err := rows.Scan(&g.Year, &g.Count); err != nil {
+			return 0, nil, err
+		}
+		groups = append(groups, g)
+	}
+	if err := rows.Err(); err != nil {
+		return 0, nil, err
+	}
+	return total, groups, nil
+}
+
+// GenreGroup is one genre of a form pool: the short tab's genre browse
+// entry (books per genre).
+type GenreGroup struct {
+	Genre string `json:"genre"`
+	Count int    `json:"count"`
+}
+
+// GenreGroups aggregates one form's seed books by genre (count DESC, genre
+// ASC tie-break) plus the pool total.
+func (s *Store) GenreGroups(ctx context.Context, form string) (int,
+	[]GenreGroup, error) {
+	var total int
+	if err := s.DB.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM seed.books WHERE form = ?`,
+		form).Scan(&total); err != nil {
+		return 0, nil, err
+	}
+	rows, err := s.DB.QueryContext(ctx, `
+SELECT genre, COUNT(*) AS c FROM seed.books
+WHERE form = ? AND genre IS NOT NULL AND genre != ''
+GROUP BY genre ORDER BY c DESC, genre ASC`, form)
+	if err != nil {
+		return 0, nil, err
+	}
+	defer rows.Close()
+	groups := []GenreGroup{}
+	for rows.Next() {
+		var g GenreGroup
+		if err := rows.Scan(&g.Genre, &g.Count); err != nil {
 			return 0, nil, err
 		}
 		groups = append(groups, g)

@@ -87,14 +87,15 @@ class StrataApi {
         .toList();
   }
 
-  /// Classic category/status/contest list: absolute favs order, no
-  /// percentiles. This is the data-only browse pathway.
+  /// Classic category/status/contest list: absolute favs order by default,
+  /// or same-generation favorite percentile (order='pct', 优质短篇口径).
   Future<List<RankItem>> rankingClassic({
     String? genre,
     String? status,
     String? contest,
     String? form,
     int? year,
+    String? order,
     int limit = 50,
     int offset = 0,
   }) async {
@@ -105,6 +106,7 @@ class StrataApi {
       'contest': ?contest,
       'form': ?form,
       if (year != null) 'year': '$year',
+      'order': ?order,
       if (offset > 0) 'offset': '$offset',
     });
     return (body['items'] as List)
@@ -282,6 +284,28 @@ class StrataApi {
       total: (body['total'] as num).toInt(),
       groups: (body['groups'] as List)
           .map((e) => IpGroup.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+
+  /// 短篇 tab 年份入口：form 池按 est_year 聚合（年份降序）。
+  Future<YearGroupsResult> yearGroups({String form = 'short'}) async {
+    final body = await _get('/year-groups', {'form': form});
+    return YearGroupsResult(
+      total: (body['total'] as num).toInt(),
+      groups: (body['groups'] as List)
+          .map((e) => YearGroup.fromJson(e as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+
+  /// 短篇 tab 题材浏览：form 池按 genre 聚合（本数降序）。
+  Future<GenreGroupsResult> genreGroups({String form = 'short'}) async {
+    final body = await _get('/genre-groups', {'form': form});
+    return GenreGroupsResult(
+      total: (body['total'] as num).toInt(),
+      groups: (body['groups'] as List)
+          .map((e) => GenreGroup.fromJson(e as Map<String, dynamic>))
           .toList(),
     );
   }
@@ -638,6 +662,42 @@ class IpGroupsResult {
   final List<IpGroup> groups;
 
   const IpGroupsResult({required this.total, required this.groups});
+}
+
+/// 年份分组：est_year → 本数（年份降序）。
+class YearGroup {
+  final int year;
+  final int count;
+
+  const YearGroup({required this.year, required this.count});
+
+  factory YearGroup.fromJson(Map<String, dynamic> j) => YearGroup(
+      year: (j['year'] as num).toInt(), count: (j['count'] as num).toInt());
+}
+
+class YearGroupsResult {
+  final int total;
+  final List<YearGroup> groups;
+
+  const YearGroupsResult({required this.total, required this.groups});
+}
+
+/// 题材分组：genre → 本数（本数降序）。
+class GenreGroup {
+  final String genre;
+  final int count;
+
+  const GenreGroup({required this.genre, required this.count});
+
+  factory GenreGroup.fromJson(Map<String, dynamic> j) => GenreGroup(
+      genre: j['genre'] as String, count: (j['count'] as num).toInt());
+}
+
+class GenreGroupsResult {
+  final int total;
+  final List<GenreGroup> groups;
+
+  const GenreGroupsResult({required this.total, required this.groups});
 }
 
 class FeaturedItem {

@@ -80,11 +80,12 @@ const bannerCarouselCount = 6;
 const largeImageCount = 6;
 
 /// 对话 tab 轮播：dialogue 池中有封面的书（收藏降序固定序，不随日期变）。
-/// dialogue 形态没有 featured 定制图，端上用封面实时合成纸墨 banner
-/// （重纸纱 + 衬线书名 + 指标行），见 widgets/cover_banner.dart。
-final dialogueCarouselProvider = FutureProvider<List<RankItem>>((ref) async {
+/// dialogue/short 形态没有 featured 定制图，端上用封面实时合成纸墨 banner
+/// （重纸纱 + 衬线书名 + 指标行），见 widgets/cover_banner.dart。按 form 分池。
+final coverCarouselProvider =
+    FutureProvider.family<List<RankItem>, String>((ref, form) async {
   final handle = await ref.watch(bootProvider.future);
-  return handle.api.coverCarousel(limit: bannerCarouselCount);
+  return handle.api.coverCarousel(form: form, limit: bannerCarouselCount);
 });
 
 /// IP tab 入口行：ip_collab 池按征文（contest）聚合（count DESC）。
@@ -94,11 +95,23 @@ final ipGroupsProvider = FutureProvider<IpGroupsResult>((ref) async {
   return handle.api.ipGroups(form: 'ip_collab');
 });
 
-/// 短篇 tab 比赛 chip 行：短篇池（已完结口径，与列表数据源一致）按
-/// 征文聚合（count DESC）。
+/// 短篇 tab 比赛下拉：短篇池按征文（contest，投稿赛道）聚合（count DESC）。
+/// 与列表同源（不按 status 过滤，见 docs/form-definitions §4）。
 final shortContestGroupsProvider = FutureProvider<IpGroupsResult>((ref) async {
   final handle = await ref.watch(bootProvider.future);
-  return handle.api.ipGroups(form: 'short', status: '已完结');
+  return handle.api.ipGroups(form: 'short');
+});
+
+/// 短篇 tab 年份入口页：短篇池按 est_year 聚合（年份降序）。
+final shortYearsProvider = FutureProvider<YearGroupsResult>((ref) async {
+  final handle = await ref.watch(bootProvider.future);
+  return handle.api.yearGroups();
+});
+
+/// 短篇 tab 题材浏览入口页：短篇池按 genre 聚合（本数降序）。
+final shortGenresProvider = FutureProvider<GenreGroupsResult>((ref) async {
+  final handle = await ref.watch(bootProvider.future);
+  return handle.api.genreGroups();
 });
 
 /// 大图精选：全形态 featured 池的每日后段（文字在图下方，点图全屏查看）。
