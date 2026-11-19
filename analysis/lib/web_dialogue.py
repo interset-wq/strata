@@ -44,6 +44,7 @@ import pandas as pd
 from lib import paths
 
 TRUTH_FILE = paths.ANCHORS_DIR / "web_dialogue.jsonl"
+DEAD_FILE = paths.ANCHORS_DIR / "web_dead.jsonl"
 FALLBACK_DIALOGUE_NIDS = (607_079,)   # unknown 但章节单位=「话」（29/30 话）
 
 
@@ -80,3 +81,21 @@ def coverage() -> dict[str, int]:
     truth = load()
     from collections import Counter
     return dict(Counter(truth.values()))
+
+
+@functools.lru_cache(maxsize=1)
+def dead_nids() -> frozenset[int]:
+    """详情页确认「小说不存在」的书（E.25）：Web 死链，种子恒不得收录。
+
+    判据是详情页正文文案「小说不存在」（HTTP 仍 200，符合 MEMORY §15 的
+    「状态码不可信」）。抓取时 19,190 本里只有这 7 本出现该页，且逐本串行
+    重试稳定复现——是逐本下架，不是并发风控。这些书元数据仍留在 jsonl 快照
+    里（收藏、字数、更新时间都真实），所以只能靠 DOM 判活剔除。
+    """
+    if not DEAD_FILE.exists():
+        return frozenset()
+    out = set()
+    for line in DEAD_FILE.read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            out.add(int(json.loads(line)["nid"]))
+    return frozenset(out)

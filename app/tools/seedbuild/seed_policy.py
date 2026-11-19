@@ -137,6 +137,22 @@ def invalid_ids(df: pd.DataFrame) -> set[int]:
     return set(df.loc[form.eq("invalid").to_numpy(), "id"])
 
 
+def dead_ids(df: pd.DataFrame) -> set[int]:
+    """E.25 Web 死链：详情页文案「小说不存在」的书无展示资格。
+
+    jsonl 快照是单向游标扫描的产物，抓过之后再被下架的书仍带着完整的
+    字数/收藏/更新时间，形态规则与质量锚都无从察觉——只有 PC 详情页判活
+    能发现。与 E.12 的 invalid 不同，这些书**内容本身可能是好的**，只是
+    现在打不开（例如 746895 小小娇美人 favs 9,933）；app 详情页会 404，
+    所以必须零入种，且不像 invalid 那样可以靠确定性形态证据救回。
+
+    来源 `analysis/anchors/web_dead.jsonl`（7 本，2026-11-19 串行复核）。
+    """
+    from lib.web_dialogue import dead_nids
+
+    return set(dead_nids()) & set(df["id"])
+
+
 def load_universe(csv: Path | None = None) -> pd.DataFrame:
     """Analysis universe: licensed Japanese LN dropped, est_year 2007..2025."""
     df = pd.read_csv(csv or paths.OUT_DIR / "novels.csv")
@@ -254,13 +270,14 @@ def admit(df: pd.DataFrame, content_end: pd.Timestamp,
 
     abandoned = abandoned_ids(df)
     invalid = invalid_ids(df)
+    dead = dead_ids(df)
     exempt = exempt_from_abandon(df)
-    ineligible = abandoned | invalid
+    ineligible = abandoned | invalid | dead
     anchors = (core | short | deep) - ineligible
 
     ids = set(anchors)
     contest_added, contest_detail = contest_guarantee(df, ids)  # 豁免弃书：全池
-    contest_added -= invalid                                   # 但不豁免 invalid
+    contest_added -= invalid | dead                             # 但不豁免 invalid/死链
     ids |= contest_added
 
     # Diagnostic only: what the retired V2 time gate would have admitted.
@@ -283,6 +300,7 @@ def admit(df: pd.DataFrame, content_end: pd.Timestamp,
         "abandoned_in_seed": abandoned & ids,
         "abandon_exempt": exempt,
         "invalid": invalid,
+        "dead": dead,
         "ineligible": ineligible,
         "loose": loose,
         "gated": gated,
@@ -294,7 +312,7 @@ def admit(df: pd.DataFrame, content_end: pd.Timestamp,
 
 
 def postconditions(df: pd.DataFrame, res: dict) -> list[tuple[str, bool, str]]:
-    """Checks the rebuild must assert before shipping (P1-P8).
+    """Checks the rebuild must assert before shipping (P1-P9).
 
     P1/P3 use the **eligible** denominator (连载 short/medium + invalid excluded):
     those books voluntarily lost coverage under E.11/E.12, so counting them as a
@@ -347,6 +365,10 @@ def postconditions(df: pd.DataFrame, res: dict) -> list[tuple[str, bool, str]]:
     serial_medium = set(df.loc[(form_all == "medium").to_numpy()
                                & df["status"].ne("已完结").to_numpy(), "id"])
     p8 = not (serial_medium & res["ids"])
+    # P9: E.25 Web 死链（详情页「小说不存在」）在任何渠道都不得入种——快照
+    #     里它们的收藏/字数都还正常，形态规则看不出异常，只有详情页判活能拦住。
+    dead = res["dead"]
+    p9 = not (dead & res["ids"])
     return [
         ("P1 合格深榜书全部在种子内", p1,
          f"{len(res['deep'] - ineligible):,} 本合格深榜书，"
@@ -375,6 +397,9 @@ def postconditions(df: pd.DataFrame, res: dict) -> list[tuple[str, bool, str]]:
         ("P8 连载中篇零入种（中篇必须已完结）", p8,
          f"连载中篇 {len(serial_medium):,} 本，入种 "
          f"{len(serial_medium & res['ids'])} 本"),
+        ("P9 Web 死链零入种（详情页「小说不存在」）", p9,
+         f"死链 {len(dead)} 本，入种 {len(dead & res['ids'])} 本"
+         + (f"：{sorted(dead & res['ids'])}" if not p9 else "")),
     ]
 
 

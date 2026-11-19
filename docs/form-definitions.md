@@ -216,11 +216,11 @@ def seed_admit(row, form) -> bool:
   分位仍在全池上算，先过滤会缩小组内分母、整体扭曲排名）。翻年改组曾让
   38821（favs=3 的 3-6k×2014 小组头部）无锚入种，违反 P2。
 
-**八条后置断言**（`seed_policy.postconditions()`，重建时强制）：
+**九条后置断言**（`seed_policy.postconditions()`，重建时强制）：
 P1 合格深榜书全入池；P2 favs<5 且 <1 万字须有外部锚；P3 收藏覆盖回退 ≤0.2pp
 （合格书口径，分母剔除弃书+invalid）；P4 每征文 ≥3 本；P5 弃书仅经保底入种；
-P6 invalid 零入种；P7 种子内 short 不越三条天花板（全时期）；P8 连载中篇零入种。
-`20260503.22`：P1–P8 全 PASS。
+P6 invalid 零入种；P7 种子内 short 不越三条天花板（全时期）；P8 连载中篇零入种；
+P9 Web 死链零入种（E.25）。`20260503.23`：P1–P9 全 PASS。
 
 ## 5. Universe 分布（快照，使用时现算）
 
@@ -233,15 +233,16 @@ P6 invalid 零入种；P7 种子内 short 不越三条天花板（全时期）�
 | `dialogue` | 43,277 | 17.9% |
 | `ip_collab` | 935 | 0.4% |
 
-种子 `20260503.22` = 18,663 本（18,616 合格 + 47 授权日轻）：从质量锚剔除弃书
-134,486 本（另 31 本 E.13 豁免经质量锚入种）+ invalid 23,906 本；种子内 invalid
-恒 0；合格书口径收藏覆盖 96.63%（vs V0 96.65%，-0.01pp）。
+种子 `20260503.23` = 18,656 本（18,609 合格 + 47 授权日轻）：从质量锚剔除弃书
+134,587 本（另 31 本 E.13 豁免经质量锚入种）+ invalid 23,906 本 + Web 死链 7 本
+（E.25）；种子内 invalid 恒 0；合格书口径收藏覆盖 96.63%（vs V0 96.64%，-0.01pp）。
 
 **种子 form 已无估计值（E.24）**：18,616 本合格书逐本核验详情页 DOM（16,960 +
 1,750 = 18,710 次请求，0 失败），核验前 `short` 801 本里 216 本（27%）实为对话、
 `dialogue` 5,680 本里 144 本实为散文、`long` 11,575 本里 428 本（3.7%）实为对话。
-核验后 `dialogue` 6,189 / `long` 11,222 / `short` 609 / `medium` 581 / `ip_collab` 62；
-144 本假对话按字数回归后发现多数连载中、按弃书规则出局，种子 18,757→**18,663**。
+核验后 `dialogue` 6,189 / `long` 11,172 / `short` 609 / `medium` 577 / `ip_collab` 62；
+144 本假对话按字数回归后发现多数连载中、按弃书规则出局，种子 18,757→**18,663**，
+E.25 再剔除 7 本 Web 死链 → **18,656**。
 
 **universe 的 form 仍是规则估计，且短篇档误差很大（E.24 实测）**：600 本分层随机
 样本（每层 200）显示——规则判 `dialogue` 的 41,227 本只有 **69.2%** 真是对话
@@ -270,6 +271,15 @@ words≤5 万且 clicks>215,723 的 155 本翻为对话（种子内 43 本短篇
 558 本维持中篇（含 2 本 `ckw` 10–12 的病毒式传播散文，形态估计的假阳性被撤销）。
 E.17 的 eligible 分母扩张使覆盖率绝对门槛由 97.0% 调至 96.5%
 （P3 的同分母对比才是回归判据：E.19 仍为 -0.01pp）。
+E.25（2026-11-19）种子剔除 **7 本 Web 死链**：详情页文案「小说不存在」（HTTP 仍 200，
+符合状态码不可信）。jsonl 快照是单向游标扫描的产物，书在抓过之后被下架仍带着完整的
+字数/收藏/更新时间（746895 小小娇美人 favs 9,933、704626 你管这叫约会 5,315），
+形态规则与质量锚都看不出异常，只有逐本详情页判活能发现。18,710 次抓取里只有这 7 本
+出现该页，且串行重试稳定复现（是逐本下架、非并发风控）。名单固化在
+`analysis/anchors/web_dead.jsonl`，进 `ineligible`，P9 守门。
+用户同期裁定**不追求更高精度**：不再追加短篇/中篇 triage 爬取（可将 universe 覆盖率
+推到 99.8% 的 2 小时抓取作废），universe 的 form 仍按 E.24 的误差区间标注使用；
+IP 名单也不再扩充——种子书已 100% 有 DOM 真值，扩词只影响 universe 估计，无展示收益。
 种子内六值分布由构建现算，以 `manifest.json` 为准，本文不硬编码。
 
 ## 6. 优质短篇判定（与 `form` 正交，推荐层用）
@@ -308,8 +318,8 @@ favs≥2000 档 = 18,904/26,887，有重叠）；② 劣质书拉扁中位数（
 |---|---|
 | 六值分类单一真源 | `analysis/lib/forms.py::classify`（判据常量在此） |
 | 对话形态判据 v2 | `analysis/lib/dialogue_form.py::mark` |
-| 收录资格 / 弃书 / 豁免 | `app/tools/seedbuild/seed_policy.py`（`abandoned_ids`、`exempt_from_abandon`、`invalid_ids`、`contest_guarantee`） |
-| 后置断言 P1–P8 | `seed_policy.postconditions()` |
+| 收录资格 / 弃书 / 豁免 | `app/tools/seedbuild/seed_policy.py`（`abandoned_ids`、`exempt_from_abandon`、`invalid_ids`、`dead_ids`、`contest_guarantee`） |
+| 后置断言 P1–P9 | `seed_policy.postconditions()` |
 | 取值域断言 + 分布 | `app/tools/seedbuild/validate.py` → `manifest.json` |
 | 引擎 form 过滤 | `app/engine/internal/api`（`validForms` 含 invalid） |
 

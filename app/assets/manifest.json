@@ -1,20 +1,20 @@
 {
   "schema_version": 3,
-  "seed_version": "20260503.22",
+  "seed_version": "20260503.23",
   "content_end": "2026-05-03",
-  "built_at": "2026-11-19T13:47:49+00:00",
-  "book_count": 18663,
+  "built_at": "2026-11-19T13:56:05+00:00",
+  "book_count": 18656,
   "licensed_count": 47,
   "tag_count": 102,
-  "tag_rows": 61599,
+  "tag_rows": 61571,
   "gen_min": 2007,
   "gen_max": 2025,
   "counts": {
     "stats_universe": 241864,
     "baseline_v0": 30832,
-    "admitted_v3": 18616,
+    "admitted_v3": 18609,
     "licensed_added": 47,
-    "seed": 18663,
+    "seed": 18656,
     "deep_rank_rows": 14621,
     "lqs_scored_universe": 11796
   },
@@ -23,7 +23,7 @@
     "monthly": 1661,
     "featured": 620,
     "short": 2000,
-    "time_excluded": 9308,
+    "time_excluded": 9313,
     "time_gated_diagnostic": 4159,
     "time_cut_diagnostic": 4886,
     "deep": 7835,
@@ -92,12 +92,12 @@
       "in_seed": 0
     }
   },
-  "favs_coverage": 0.966285,
+  "favs_coverage": 0.966277,
   "postconditions": [
     {
       "name": "P1 合格深榜书全部在种子内",
       "pass": true,
-      "detail": "4,523 本合格深榜书，缺 0"
+      "detail": "4,521 本合格深榜书，缺 0"
     },
     {
       "name": "P2 favs<5 且字数<1万必须有外部锚",
@@ -133,6 +133,11 @@
       "name": "P8 连载中篇零入种（中篇必须已完结）",
       "pass": true,
       "detail": "连载中篇 22,119 本，入种 0 本"
+    },
+    {
+      "name": "P9 Web 死链零入种（详情页「小说不存在」）",
+      "pass": true,
+      "detail": "死链 7 本，入种 0 本"
     }
   ],
   "source": {
@@ -146,13 +151,13 @@
   "files": {
     "db": {
       "name": "seed.db",
-      "bytes": 15462400,
-      "sha256": "185c7a129b8397d91aa62c96193f1a939159537a8640a2bc4c12168b48488b21"
+      "bytes": 15458304,
+      "sha256": "5cef1585a932cb8b3fc0be834507c8dfa2088fb9c062e1d73435ff7ac74a20ce"
     },
     "gz": {
       "name": "seed.db.gz",
-      "bytes": 6855787,
-      "sha256": "4a6ba88c42093e5d580198c07301dd5027bd923b7aa977ab8bb8886dbc1dd565"
+      "bytes": 6857259,
+      "sha256": "3df95e5f20ac3d7d37914da0ba3afb25bd4f4aec19c40acaf036cc68d5127007"
     }
   }
 }

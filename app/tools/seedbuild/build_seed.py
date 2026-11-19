@@ -58,7 +58,7 @@ SCHEMA = Path(__file__).resolve().parent / "schema.sql"
 DATASET = REPO / "dataset" / "out" / "books.jsonl"
 
 SCHEMA_VERSION = 3
-SEED_VERSION = "20260503.22"
+SEED_VERSION = "20260503.23"
 CONTENT_END = pd.Timestamp("2026-05-03")
 GEN_MIN, GEN_MAX = 2007, 2025
 
@@ -67,8 +67,8 @@ EXPECT_UNIVERSE = 241_864       # 241,758 + 108（E.14 补充书，est_year 全�
 EXPECT_ANALYSIS_ROWS = 245_887  # 245,779 + 108 月榜遗漏书（E.14）
 EXPECT_DATASET_ROWS = 248_338   # v20260503.7: 248,230 + 108 月榜遗漏书（E.14）
 EXPECT_LICENSED = 47
-EXPECT_ADMITTED = 18_616       # E.24 全种子 DOM 核验：144 本假对话回归正文档、其中弃书出局
-EXPECT_SEED = 18_663           # 18,616 + 47 licensed
+EXPECT_ADMITTED = 18_609       # E.24 全种子 DOM 核验 + E.25 移除 7 本 Web 死链
+EXPECT_SEED = 18_656           # 18,609 + 47 licensed
 EXPECT_COVERAGE_MIN = 0.9650   # eligible 口径（弃书+invalid 剔除后；详见 P3）。
 # E.17 同人短字数条款把 6,012 本同人从 short 移入 dialogue：这些书不再受 E.11
 # 弃书约束，eligible 分母因此多出 0.87% 的收藏，而种子只吸收其中 700 本有质量锚
