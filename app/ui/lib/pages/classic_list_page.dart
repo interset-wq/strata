@@ -166,7 +166,7 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
   // 风格，美观性一般，改 bottom sheet）。数据 = /year-groups。
   Widget _yearSelector() {
     final scheme = Theme.of(context).colorScheme;
-    final res = ref.watch(shortYearsProvider);
+    final res = ref.watch(yearGroupsProvider(widget.form));
     return res.when(
       loading: () => const SizedBox(height: 52),
       error: (e, _) => const SizedBox(height: 52),
@@ -336,7 +336,7 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
   // 选中态。material drawer 的标准触发 = AppBar 汉堡 / 屏幕左缘右滑。
   Widget _buildContestDrawer() {
     final scheme = Theme.of(context).colorScheme;
-    final res = ref.watch(shortContestGroupsProvider);
+    final res = ref.watch(contestGroupsProvider(widget.form));
     return Drawer(
       backgroundColor: scheme.surface,
       child: SafeArea(
@@ -433,7 +433,7 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
   // 题材 chip 行：「全部题材」+ 各题材（本数），FilterChip 单选切换。
   Widget _genreChips() {
     final scheme = Theme.of(context).colorScheme;
-    final res = ref.watch(shortGenresProvider);
+    final res = ref.watch(genreGroupsProvider(widget.form));
     return res.when(
       loading: () => const SizedBox(height: 48),
       error: (e, _) => const SizedBox(height: 48),

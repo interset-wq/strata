@@ -95,23 +95,27 @@ final ipGroupsProvider = FutureProvider<IpGroupsResult>((ref) async {
   return handle.api.ipGroups(form: 'ip_collab');
 });
 
-/// 短篇 tab 比赛下拉：短篇池按征文（contest，投稿赛道）聚合（count DESC）。
+/// 赛道聚合（contest，count DESC）by form：榜单页轴切换的数据源
+/// （短篇比赛榜 Drawer，form 可复用于其他形态）。
 /// 与列表同源（不按 status 过滤，见 docs/form-definitions §4）。
-final shortContestGroupsProvider = FutureProvider<IpGroupsResult>((ref) async {
+final contestGroupsProvider =
+    FutureProvider.family<IpGroupsResult, String>((ref, form) async {
   final handle = await ref.watch(bootProvider.future);
-  return handle.api.ipGroups(form: 'short');
+  return handle.api.ipGroups(form: form);
 });
 
-/// 短篇 tab 年份入口页：短篇池按 est_year 聚合（年份降序）。
-final shortYearsProvider = FutureProvider<YearGroupsResult>((ref) async {
+/// 年份聚合（est_year DESC）by form：榜单页年份 bottom sheet / chip 行。
+final yearGroupsProvider =
+    FutureProvider.family<YearGroupsResult, String>((ref, form) async {
   final handle = await ref.watch(bootProvider.future);
-  return handle.api.yearGroups();
+  return handle.api.yearGroups(form: form);
 });
 
-/// 短篇 tab 题材浏览入口页：短篇池按 genre 聚合（本数降序）。
-final shortGenresProvider = FutureProvider<GenreGroupsResult>((ref) async {
+/// 题材聚合（count DESC）by form：榜单页题材 chip / 中篇 tab 题材行。
+final genreGroupsProvider =
+    FutureProvider.family<GenreGroupsResult, String>((ref, form) async {
   final handle = await ref.watch(bootProvider.future);
-  return handle.api.genreGroups();
+  return handle.api.genreGroups(form: form);
 });
 
 /// 大图精选：全形态 featured 池的每日后段（文字在图下方，点图全屏查看）。

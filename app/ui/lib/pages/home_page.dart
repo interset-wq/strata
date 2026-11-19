@@ -73,6 +73,18 @@ class _HomePageState extends ConsumerState<HomePage> {
   bool _ipDone = false;
   String? _ipError;
 
+  // 中篇 tab（944 本，words 5万–15万）：页内浏览体验——双轴 chip 行
+  // （题材 × 年份，+ 优质 order=pct）+ 页内无限列表（照搬 IP tab
+  // "随便看看"分区模式）。与三个已有 tab 的体验刻意区分：长篇=分区
+  // 首页、短篇=入口门户、IP=入口行+列表、中篇=页内浏览器（docs/16）。
+  String? _mediumGenre;
+  int? _mediumYear;
+  bool _mediumQuality = false;
+  List<RankItem> _mediumItems = const [];
+  bool _mediumLoading = false;
+  bool _mediumDone = false;
+  String? _mediumError;
+
   @override
   void initState() {
     super.initState();
@@ -83,6 +95,8 @@ class _HomePageState extends ConsumerState<HomePage> {
           _scroll.offset >= _scroll.position.maxScrollExtent - 300) {
         if (_form == 'ip_collab') {
           _loadIpMore();
+        } else if (_form == 'medium') {
+          _loadMediumMore();
         }
       }
     });
@@ -124,6 +138,69 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
   }
 
+  // 中篇 tab 页内列表下一页：classic 端点 form=medium + 双轴
+  // （genre/year）+ order（优质 = 同代收藏分位，docs/form-definitions §6）。
+  Future<void> _loadMediumMore() async {
+    if (_mediumLoading || _mediumDone) return;
+    setState(() {
+      _mediumLoading = true;
+      _mediumError = null;
+    });
+    try {
+      final handle = await ref.read(bootProvider.future);
+      final page = await handle.api.rankingClassic(
+        form: 'medium',
+        genre: _mediumGenre,
+        year: _mediumYear,
+        order: _mediumQuality ? 'pct' : null,
+        limit: 20,
+        offset: _mediumItems.length,
+      );
+      if (!mounted) return;
+      setState(() {
+        _mediumItems = [..._mediumItems, ...page];
+        _mediumDone = page.length < 20;
+        _mediumLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _mediumError = '$e';
+        _mediumLoading = false;
+      });
+    }
+  }
+
+  // 中篇 chip 切轴：重置列表、回顶、重载。
+  void _resetMediumList() {
+    _mediumItems = const [];
+    _mediumDone = false;
+    _mediumError = null;
+    _mediumLoading = false;
+  }
+
+  void _setMediumAxis({String? genre, bool quality = false}) {
+    final g = quality ? null : genre;
+    if (g == _mediumGenre && quality == _mediumQuality) return;
+    setState(() {
+      _mediumGenre = g;
+      _mediumQuality = quality;
+      _resetMediumList();
+    });
+    _scroll.jumpTo(0);
+    _loadMediumMore();
+  }
+
+  void _setMediumYear(int? y) {
+    if (y == _mediumYear) return;
+    setState(() {
+      _mediumYear = y;
+      _resetMediumList();
+    });
+    _scroll.jumpTo(0);
+    _loadMediumMore();
+  }
+
   @override
   Widget build(BuildContext context) {
     final banners = ref.watch(bannerProvider(_form));
@@ -135,7 +212,9 @@ class _HomePageState extends ConsumerState<HomePage> {
           ref.invalidate(serialShowcaseProvider(_form));
           ref.invalidate(finishedShowcaseProvider(_form));
           ref.invalidate(browseShowcaseProvider(_form));
-          ref.invalidate(shortContestGroupsProvider);
+          ref.invalidate(contestGroupsProvider);
+          ref.invalidate(yearGroupsProvider);
+          ref.invalidate(genreGroupsProvider);
           await ref.read(bannerProvider(_form).future);
         },
         child: SafeArea(
@@ -262,6 +341,51 @@ class _HomePageState extends ConsumerState<HomePage> {
                             ],
                           ),
                         ),
+                      ],
+                    ),
+                    if (_showTop)
+                      Positioned(
+                        right: 16,
+                        bottom: 24,
+                        child: BackToTop(
+                          onTap: () => _scroll.animateTo(
+                            0,
+                            duration: const Duration(milliseconds: 400),
+                            curve: Curves.easeOut,
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              }
+              // 中篇 tab（944 本）：页内浏览体验（双轴 chip 行 + 页内无限
+              // 列表），与长篇（分区首页）/短篇（入口门户）/IP（入口行+
+              // 列表）刻意区分，见 docs/16。赛道轴（53 组且多为"X征长篇"
+              // 名）不进 chip，省略。
+              if (_form == 'medium') {
+                if (_mediumItems.isEmpty && !_mediumLoading) {
+                  WidgetsBinding.instance.addPostFrameCallback(
+                    (_) => _loadMediumMore(),
+                  );
+                }
+                return Stack(
+                  children: [
+                    ListView(
+                      controller: _scroll,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      children: [
+                        _formTabs(context, onSelect: selectForm),
+                        _searchRow(context),
+                        // 中篇 featured 池 3 本：固定序收藏降序轮播
+                        // （bannerProvider('medium')，不做每日随机）。
+                        BannerCarousel(
+                          items: items,
+                          onTap: (it) => context.push('/book/${it.nid}'),
+                        ),
+                        const SizedBox(height: 4),
+                        _mediumFilterChips(context),
+                        const SizedBox(height: 4),
+                        _mediumListSection(context),
                       ],
                     ),
                     if (_showTop)
@@ -696,6 +820,118 @@ class _HomePageState extends ConsumerState<HomePage> {
   // 原五格宫格只有一行高、页面只占半屏，改纵向列表（用户 2026-11-19 定）：
   // 每行图标 + 标题 + 描述 + 箭头，撑满页面。icon 登记见 docs/15
   // （比赛/题材复用全局宫格语义）。
+  // 中篇 tab 双轴 chip 行（横向滚动，FilterChip 单选）：
+  // 行 1 = 优质 / 全部题材 / 各题材（优质与题材互斥）；
+  // 行 2 = 全部年份 / 各年份（与行 1 正交）。
+  Widget _mediumFilterChips(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final genres = ref.watch(genreGroupsProvider('medium'));
+    final years = ref.watch(yearGroupsProvider('medium'));
+    FilterChip fc(String label, bool selected, VoidCallback onTap) {
+      return FilterChip(
+        label: Text(label, style: const TextStyle(fontSize: 12)),
+        selected: selected,
+        onSelected: (_) => onTap(),
+        showCheckmark: false,
+        selectedColor: scheme.primary.withValues(alpha: .15),
+      );
+    }
+    Widget chipRow(List<Widget> chips) {
+      return SizedBox(
+        height: 46,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          itemCount: chips.length,
+          separatorBuilder: (_, _) => const SizedBox(width: 8),
+          itemBuilder: (_, i) => chips[i],
+        ),
+      );
+    }
+    return Column(
+      children: [
+        genres.when(
+          loading: () => const SizedBox(height: 46),
+          error: (e, _) => const SizedBox(height: 46),
+          data: (r) => chipRow([
+            fc('优质', _mediumQuality,
+                () => _setMediumAxis(quality: true)),
+            fc('全部题材', !_mediumQuality && _mediumGenre == null,
+                () => _setMediumAxis()),
+            for (final g in r.groups)
+              fc(
+                  g.genre,
+                  !_mediumQuality && _mediumGenre == g.genre,
+                  () => _setMediumAxis(genre: g.genre)),
+          ]),
+        ),
+        years.when(
+          loading: () => const SizedBox(height: 46),
+          error: (e, _) => const SizedBox(height: 46),
+          data: (r) => chipRow([
+            fc('全部年份', _mediumYear == null, () => _setMediumYear(null)),
+            for (final y in r.groups)
+              fc('${y.year}', _mediumYear == y.year,
+                  () => _setMediumYear(y.year)),
+          ]),
+        ),
+      ],
+    );
+  }
+
+  // 中篇 tab 页内列表（照搬 IP tab "随便看看"分区模式）：BookRowTile +
+  // 失败重试 / 加载 spinner / 空态（双轴组合可能为空）/ "共 N 本"收尾。
+  Widget _mediumListSection(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        children: [
+          for (final it in _mediumItems) BookRowTile(item: it),
+          if (_mediumError != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: TextButton(
+                  onPressed: _loadMediumMore,
+                  child: const Text('加载失败，点按重试'),
+                ),
+              ),
+            )
+          else if (_mediumLoading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          else if (_mediumDone && _mediumItems.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: Text(
+                  '该组合下暂无中篇作品',
+                  style: TextStyle(
+                      fontSize: 12, color: scheme.onSurfaceVariant),
+                ),
+              ),
+            )
+          else if (_mediumDone && _mediumItems.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(0, 8, 0, 24),
+              child: Center(
+                child: Text(
+                  '— 共 ${_mediumItems.length} 本 —',
+                  style: TextStyle(
+                      fontSize: 11, color: scheme.onSurfaceVariant),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _shortEntryGrid(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final entries = [
