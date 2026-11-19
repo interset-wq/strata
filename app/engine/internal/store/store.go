@@ -369,7 +369,7 @@ WHERE est_year = ? AND is_licensed = 0 AND fav_pctl IS NOT NULL`
 // same-generation percentiles: Classic mode mirrors novly's cumulative view
 // and has no quantitative layer.
 func (s *Store) ClassicBooks(ctx context.Context, genre, status, contest, form string,
-	limit, offset int) ([]RankItem, error) {
+	year, limit, offset int) ([]RankItem, error) {
 	query := `
 SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
        seed.books.est_year, seed.books.status, seed.books.words, seed.books.clicks,
@@ -398,6 +398,10 @@ WHERE seed.books.is_licensed = 0`
 	if form != "" {
 		query += " AND seed.books.form = ?"
 		args = append(args, form)
+	}
+	if year > 0 {
+		query += " AND seed.books.est_year = ?"
+		args = append(args, year)
 	}
 	query += " ORDER BY seed.books.favs DESC, seed.books.nid ASC LIMIT ? OFFSET ?"
 	args = append(args, limit, offset)
@@ -906,17 +910,23 @@ type IpGroup struct {
 // IpGroups aggregates one form's books by contest for the IP tab's entry
 // row: named IPs by count DESC (stable contest ASC tie-break) plus the
 // pool total, so the client can fold the tail into an "other" entry.
-func (s *Store) IpGroups(ctx context.Context, form string) (int,
+func (s *Store) IpGroups(ctx context.Context, form, status string) (int,
 	[]IpGroup, error) {
+	where := "WHERE form = ?"
+	args := []any{form}
+	if status != "" {
+		where += " AND status = ?"
+		args = append(args, status)
+	}
 	var total int
 	if err := s.DB.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM seed.books WHERE form = ?`, form).Scan(&total); err != nil {
+		`SELECT COUNT(*) FROM seed.books `+where, args...).Scan(&total); err != nil {
 		return 0, nil, err
 	}
 	rows, err := s.DB.QueryContext(ctx, `
 SELECT contest, COUNT(*) AS c FROM seed.books
-WHERE form = ? AND contest IS NOT NULL AND contest != ''
-GROUP BY contest ORDER BY c DESC, contest ASC`, form)
+`+where+` AND contest IS NOT NULL AND contest != ''
+GROUP BY contest ORDER BY c DESC, contest ASC`, args...)
 	if err != nil {
 		return 0, nil, err
 	}

@@ -1,6 +1,6 @@
 # APP 设计文档 02：数据模型与种子构建
 > **2026-11-19 V3 更新**：`schema_version=3`、`books` 28 列（新增 `form`/`lqs`/`lqs_pctl`/`vel_pctl`），
-> 种子 26,339 本（47 授权）、`seed_version=20260503.4`（已取消新书发现渠道，见 09 附录 E.8）；下方表格中的 24 列/30,878 为 v2 历史快照。
+> 种子 18,105 本（47 授权）、`seed_version=20260503.11`（已取消新书发现渠道，见 09 附录 E.8；征文保底见 E.9；封面补全见 E.10；弃书规则+invalid 见 E.11/E.12；弃书质量豁免+对话判据 v2 见 E.13）；下方表格中的 24 列/30,878 为 v2 历史快照。
 
 > **表结构定案 v1.0**。所有体积/耗时为真实建库实测（`app/tools/seedbuild/build_seed.py`），
 > 不引用历史文档旧数字。上游约束见 01 §2；搜索口径见 04。
@@ -43,7 +43,7 @@
 | 10     | `favs`                                                               | INTEGER    | 上游字段名 `like_num`，语义为收藏；5.0% 为 0                                                      |
 | 11     | `praises`                                                            | INTEGER    | 上游 `praise_num`；6.7% 为 0                                                                      |
 | 12     | `featured`                                                           | INTEGER    | banner 位 667 本（含正版 47）；图上无书名，UI 叠字                                                  |
-| 13     | `cover_url`                                                          | TEXT       | 仅 39.2% 非空（清洗置空所致，§2.4）；UNIQUE——平台每书唯一 URL（时间戳+随机序列），默认封面为 NULL   |
+| 13     | `cover_url`                                                          | TEXT       | v3 当前 17,290/18,105 非空（95.5%）；UNIQUE——平台每书唯一路径，`rs`/`rss` 视为同一图床；默认封面为 NULL   |
 | 14     | `updated_at`                                                         | TEXT       | 只可作时长用，不可作时间轴                                                                          |
 | 15     | `est_year`                                                           | INTEGER    | 定年（log-nid，104 锚点）；分位与世代榜分组键                                                       |
 | 16     | `est_date`                                                           | TEXT       | 定年日期                                                                                            |

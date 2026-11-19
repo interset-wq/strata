@@ -49,7 +49,7 @@
 
 - **定义**：`is_licensed=0` 且 `est_year ∈ [2007, 2025]` 的全库行，当前 **241,758 行**。
   2026 年为右删失样本（内容上界 2026-05），排除；正版日轻 47 本剔除。
-- 这是**所有分位的分母**。种子 `books`（约 30,878 本）只是它的精选子集，
+- 这是**所有分位的分母**。种子 `books`（18,105 本）只是它的精选子集，
   **在种子池内重算分位会改分母、得到错误值**。
 
 ---
@@ -168,7 +168,7 @@ len = log(字数/15万) / log(100万/15万)，夹在 [0,1]
 | --- | --- |
 | 官方字段的原始语义、端点参数 | [`sfacg-app-api.md`](./sfacg-app-api.md)、[`sfacg-endpoints.md`](./sfacg-endpoints.md) |
 | 指标的**物理存储**、列类型、索引、体积 | `app/docs/02-data-model.md` |
-| 小说形式 `form` 的五值判定与优先级 | [`form-definitions.md`](./form-definitions.md) |
+| 小说形式 `form` 的六值判定与优先级 | [`form-definitions.md`](./form-definitions.md) |
 | `lqs` 的完整定义、校准、行为与边界 | [`length-weighted-quality.md`](./length-weighted-quality.md) |
 | 深榜 D2 的指标与深度 | `app/docs/10-deep-ranks.md`、报告 21 |
 | 双模式展示/推荐解耦 | `app/docs/12-dual-mode.md` |

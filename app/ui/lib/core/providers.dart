@@ -94,6 +94,13 @@ final ipGroupsProvider = FutureProvider<IpGroupsResult>((ref) async {
   return handle.api.ipGroups(form: 'ip_collab');
 });
 
+/// 短篇 tab 比赛 chip 行：短篇池（已完结口径，与列表数据源一致）按
+/// 征文聚合（count DESC）。
+final shortContestGroupsProvider = FutureProvider<IpGroupsResult>((ref) async {
+  final handle = await ref.watch(bootProvider.future);
+  return handle.api.ipGroups(form: 'short', status: '已完结');
+});
+
 /// 大图精选：全形态 featured 池的每日后段（文字在图下方，点图全屏查看）。
 /// 不受首页形态 tab 影响，也不与形态轮播共用池子。
 final largeImageProvider = FutureProvider<List<FeaturedItem>>((ref) async {

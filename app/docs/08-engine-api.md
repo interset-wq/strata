@@ -25,7 +25,7 @@
   v1 不做游标翻页（榜单一次最多 200 条已够）。
 - 契约基线常量：`content_end`（种子数据截止日）、`gen_min`/`gen_max`（出生年份区间，
   当前 2007..2025）、`book_count=26339`、`licensed_count=47`。`form` 可选过滤：
-  `short|medium|long|dialogue|ip_collab`，空值表示全部。以 `/strata/healthz`
+  `invalid|short|medium|long|dialogue|ip_collab`，空值表示全部。以 `/strata/healthz`
   实际返回为准，不要在 Dart 侧硬编码。
 
 ## 现有端点（已实现）
@@ -38,8 +38,8 @@
 {
   "status": "ok",
   "schema_version": 3,
-  "seed_version": "20260503.4",
-  "book_count": 26339,
+  "seed_version": "20260503.11",
+  "book_count": 18477,
   "licensed_count": 47,
   "content_end": "2026-05-03",
   "gen_min": 2007,
@@ -114,7 +114,7 @@ HTML 含书名/作者/分类/签约/封面/简介/收藏/赞/字数/状态/更�
 
 **首页分形态轮播（docs/13 form）**：轮播随首页形态 tab 切换，行为按池大小定——
 
-| form          | featured 池（seed 20260503.4） | 轮播行为                                                                                                           |
+| form          | featured 池（seed 20260503.11） | 轮播行为                                                                                                           |
 | ------------- | ------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
 | `long`      | 662（含授权 44）               | 日期种子洗牌（`/banner`）                                                                                        |
 | `dialogue`  | 0                              | 空轮播（UI 渲染 `SizedBox.shrink`）                                                                              |
@@ -132,12 +132,17 @@ short→IP 的回退是 UI 的职责（`bannerProvider` 一处集中），API �
 `seed.books.nid`——covers 表同名列，裸 `nid` 会歧义 500）。`limit` 1..200、
 `offset` ≥ 0，越界返回空数组而非 400，非法值 400。
 
-### GET /strata/ip-groups?form=（**已实现**）
+### GET /strata/ip-groups?form=&status=（**已实现**）
 
-IP tab 入口行：`form` 必填，池按征文（`contest`，非空）`GROUP BY` 聚合，
+contest 聚合端点：`form` 必填，池按征文（`contest`，非空）`GROUP BY` 聚合，
 `count DESC, contest ASC` 稳定序。返回 `total`（池总量，含无 contest 的
-书）+ `groups: [{contest, count}]`。端上取前 2 组作命名 IP 入口
-（崩坏3征文 → 崩坏3，去“征文”后缀），其余折成“其他”（total − 前 2 之和）。
+书）+ `groups: [{contest, count}]`。
+
+- IP tab 入口行（`form=ip_collab`）：端上取前 2 组作命名 IP 入口
+  （崩坏3征文 → 崩坏3，去“征文”后缀），其余折成“其他”（total − 前 2 之和）。
+- 短篇 tab 比赛 chip 行（`form=short&status=已完结`）：`status` 可选
+  （精确匹配，缺省不过滤），total 与 groups 同口径——chip 的 count 与
+  列表（classic 同参过滤）一致。
 
 ### GET /strata/ip-books?form=&group=&limit=&offset=（**已实现**）
 
@@ -183,11 +188,15 @@ Classic 全库榜（docs/12 展示列）：平台累计值排序，不涉及分�
 `recommend`(praises) / `popular`(clicks) / `favs` / `new`(est_date) / `finish`(已完结按 favs) /
 `words`。`offset` 分页（默认 0）。items 为 RankItem（含 `status`/`words`/`clicks`/`cover_url`）。
 
-### GET /strata/rankings/classic?genre=&status=&contest=&form=&limit=&offset=（**已实现**）
+### GET /strata/rankings/classic?genre=&status=&contest=&form=&year=&limit=&offset=（**已实现**）
 
 Classic 主线分类/状态/大赛列表：只按平台累计 `favs` 降序（`favs DESC, nid ASC`），
 不含分位或 LQS。`genre`/`status`/`contest` 与 `/rankings/favs` 同义；`contest=1`
-表示全部大赛作品。`items` 为 RankItem（含 `form`），`meta.ordering="favs"`。
+表示全部大赛作品。`year` 可选（正整数，按 `est_year` 精确过滤；非法值 400）。
+`items` 为 RankItem（含 `form`），`meta.ordering="favs"`。
+
+短篇 tab（docs/form-definitions §3.1 完结条款）以
+`form=short&status=已完结[&year=Y|&contest=X]` 调本端点做年份榜/比赛榜/总榜。
 
 ### GET /strata/discover?cursor=&form=&limit=（**已实现**）
 

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pandas as pd
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 EXPECTED_TABLES = {"books", "book_tags", "seed_meta", "deep_ranks"}
 EXPECTED_INDEXES = {
     "idx_bt", "idx_updated", "idx_author", "idx_year_favpctl",
@@ -145,6 +145,27 @@ def check_db(db_path: Path, seed: pd.DataFrame, meta: dict) -> None:
         if bad_pr:
             _fail(errors, f"{bad_pr} rows violate pr rule (favs<10 -> NULL)")
 
+        # V3 quality columns: form is total; lqs/pctl are (0,1] or NULL.
+        bad_form = conn.execute(
+            "SELECT COUNT(*) FROM books WHERE form IS NULL OR form NOT IN"
+            " ('invalid','short','medium','long','dialogue','ip_collab')").fetchone()[0]
+        if bad_form:
+            _fail(errors, f"{bad_form} rows have invalid form")
+        bad_quality = conn.execute(
+            "SELECT COUNT(*) FROM books WHERE"
+            " (lqs IS NOT NULL AND (lqs <= 0 OR lqs > 1)) OR"
+            " (lqs_pctl IS NOT NULL AND (lqs_pctl <= 0 OR lqs_pctl > 1)) OR"
+            " (vel_pctl IS NOT NULL AND (vel_pctl <= 0 OR vel_pctl > 1))"
+        ).fetchone()[0]
+        if bad_quality:
+            _fail(errors, f"{bad_quality} rows have invalid lqs/vel percentiles")
+        ln_quality = conn.execute(
+            "SELECT COUNT(*) FROM books WHERE is_licensed=1 AND"
+            " (lqs IS NOT NULL OR lqs_pctl IS NOT NULL OR vel_pctl IS NOT NULL)"
+        ).fetchone()[0]
+        if ln_quality:
+            _fail(errors, f"{ln_quality} licensed rows carry quality scores")
+
         ln_range = conn.execute(
             "SELECT COUNT(*) FROM books WHERE is_licensed=0 AND"
             " (est_year < 2007 OR est_year > 2025)").fetchone()[0]
@@ -161,18 +182,30 @@ def check_db(db_path: Path, seed: pd.DataFrame, meta: dict) -> None:
         if dup:
             _fail(errors, f"{dup} duplicate nids")
 
-        # Title is unique on the platform; a duplicate here means a rename-window
-        # snapshot artifact (old book renamed/deleted, its name re-taken). Block
-        # the build and list the pairs so each case can be adjudicated manually.
+        # Titles are NOT globally unique: 24 duplicate titles in the analysis
+        # universe (13 across different authors). Only an exact duplicate of
+        # title + author + words + favs is a snapshot artifact; title reuse by
+        # another author is legitimate and is printed as an audit note.
+        title_reuse = []
         for title, nids in conn.execute(
                 "SELECT title, GROUP_CONCAT(nid) FROM books"
                 " GROUP BY title HAVING COUNT(*) > 1"):
-            _fail(errors, f"duplicate title {title!r}: nids {nids}")
+            rows = conn.execute(
+                "SELECT nid, author, words, favs FROM books WHERE title=?",
+                (title,)).fetchall()
+            signature = {(r["author"], r["words"], r["favs"]) for r in rows}
+            if len(rows) > 1 and len(signature) == 1:
+                _fail(errors, f"duplicate book record {title!r}: nids {nids}")
+            else:
+                title_reuse.append(f"{title!r}: {nids}")
+        if title_reuse:
+            print(f"validate: {len(title_reuse)} reused title(s) across distinct books"
+                  f" (audit only): {'; '.join(title_reuse[:6])}")
 
         print(
             f"validate: books={books} licensed={licensed} tags={tag_rows}/{tag_count}"
-            f" universe={meta['universe_rows']} base={meta['base']}"
-            f" short_added={meta['short_added']}"
+            f" universe={meta['universe_rows']} admitted={meta.get('admitted', '?')}"
+            f" v0={meta.get('baseline_v0', '?')}"
         )
     finally:
         conn.close()
@@ -192,7 +225,7 @@ if __name__ == "__main__":
         "seed_rows": conn.execute("SELECT COUNT(*) FROM books").fetchone()[0],
         "licensed_rows": conn.execute(
             "SELECT COUNT(*) FROM books WHERE is_licensed=1").fetchone()[0],
-        "universe_rows": 0, "base": 0, "short_added": 0,
+        "universe_rows": 0, "admitted": 0, "baseline_v0": 0,
     }
     conn.close()
     seed = pd.read_sql_query("SELECT * FROM books", sqlite3.connect(path))

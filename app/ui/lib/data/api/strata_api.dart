@@ -94,6 +94,7 @@ class StrataApi {
     String? status,
     String? contest,
     String? form,
+    int? year,
     int limit = 50,
     int offset = 0,
   }) async {
@@ -103,6 +104,7 @@ class StrataApi {
       'status': ?status,
       'contest': ?contest,
       'form': ?form,
+      if (year != null) 'year': '$year',
       if (offset > 0) 'offset': '$offset',
     });
     return (body['items'] as List)
@@ -271,8 +273,11 @@ class StrataApi {
 
   /// IP tab 入口行：一个 form 的书按征文（contest）聚合，
   /// count DESC（引擎侧稳定排序）；total 用于端上折出“其他”入口。
-  Future<IpGroupsResult> ipGroups({String form = 'ip_collab'}) async {
-    final body = await _get('/ip-groups', {'form': form});
+  Future<IpGroupsResult> ipGroups({
+    String form = 'ip_collab',
+    String? status,
+  }) async {
+    final body = await _get('/ip-groups', {'form': form, 'status': ?status});
     return IpGroupsResult(
       total: (body['total'] as num).toInt(),
       groups: (body['groups'] as List)
@@ -589,6 +594,20 @@ class SearchItem {
 /// 失业魔王同人征文 → 失业魔王）。contest 为空返回 null（无征文标）。
 String? contestIpLabel(String? contest) {
   if (contest == null || contest.isEmpty) return null;
+  var s = contest;
+  if (s.endsWith('同人征文')) {
+    s = s.substring(0, s.length - 4);
+  } else if (s.endsWith('征文')) {
+    s = s.substring(0, s.length - 2);
+  }
+  return s.isEmpty ? contest : s;
+}
+
+/// contest（征文）→ 短篇 tab 比赛 chip 的紧凑标签：
+/// 去「征文」/「同人征文」后缀（四征短篇 → 四征短篇、2025春季征文 →
+/// 2025春季），「超新星杯」特殊处理（“超新星杯”短篇大赛 → 超新星杯）。
+String contestChipLabel(String contest) {
+  if (contest.contains('超新星杯')) return '超新星杯';
   var s = contest;
   if (s.endsWith('同人征文')) {
     s = s.substring(0, s.length - 4);

@@ -1,39 +1,103 @@
 {
   "schema_version": 3,
-  "seed_version": "20260503.4",
+  "seed_version": "20260503.11",
   "content_end": "2026-05-03",
-  "built_at": "2026-11-19T01:51:26+00:00",
-  "book_count": 26339,
+  "built_at": "2026-11-19T08:19:18+00:00",
+  "book_count": 18105,
   "licensed_count": 47,
-  "tag_count": 104,
-  "tag_rows": 82579,
+  "tag_count": 102,
+  "tag_rows": 59810,
   "gen_min": 2007,
   "gen_max": 2025,
   "counts": {
     "stats_universe": 241758,
     "baseline_v0": 30831,
-    "admitted_v3": 26292,
+    "admitted_v3": 18058,
     "licensed_added": 47,
-    "seed": 26339,
+    "seed": 18105,
     "deep_rank_rows": 14626,
-    "lqs_scored_universe": 12126
+    "lqs_scored_universe": 12171
   },
   "admission_detail": {
     "top_favs": 20000,
     "monthly": 1555,
     "featured": 620,
     "short": 2000,
-    "time_excluded": 9074,
+    "time_excluded": 9354,
     "time_gated_diagnostic": 4164,
     "time_cut_diagnostic": 4910,
-    "deep": 7838
+    "deep": 7838,
+    "contest_floor": {
+      "contests": 96,
+      "added": 11,
+      "shortfalls": {
+        "九征短篇": {
+          "total": 428,
+          "held": 2,
+          "added": 1,
+          "need": 1,
+          "eligible": 123
+        },
+        "十一征短篇": {
+          "total": 440,
+          "held": 2,
+          "added": 1,
+          "need": 1,
+          "eligible": 148
+        },
+        "失业魔王同人征文": {
+          "total": 11,
+          "held": 1,
+          "added": 2,
+          "need": 2,
+          "eligible": 2
+        },
+        "怪谈异闻主题征文短篇": {
+          "total": 39,
+          "held": 2,
+          "added": 1,
+          "need": 1,
+          "eligible": 7
+        },
+        "楚楚动仁同人征文": {
+          "total": 31,
+          "held": 2,
+          "added": 1,
+          "need": 1,
+          "eligible": 8
+        },
+        "英雄再临同人征文": {
+          "total": 14,
+          "held": 0,
+          "added": 3,
+          "need": 3,
+          "eligible": 6
+        },
+        "龙之谷征文": {
+          "total": 128,
+          "held": 1,
+          "added": 2,
+          "need": 2,
+          "eligible": 55
+        }
+      }
+    },
+    "abandoned": {
+      "total": 139027,
+      "in_seed": 2,
+      "exempt_pctl_098": 140
+    },
+    "invalid": {
+      "total": 23995,
+      "in_seed": 0
+    }
   },
-  "favs_coverage": 0.938842,
+  "favs_coverage": 0.970406,
   "postconditions": [
     {
-      "name": "P1 深榜书全部在种子内",
+      "name": "P1 合格深榜书全部在种子内",
       "pass": true,
-      "detail": "7838 本深榜书，缺 0"
+      "detail": "4,657 本合格深榜书，缺 0"
     },
     {
       "name": "P2 favs<5 且字数<1万必须有外部锚",
@@ -41,14 +105,29 @@
       "detail": "无锚噪声 0 本"
     },
     {
-      "name": "P3 收藏覆盖回退 ≤ 时间渠道放弃量",
+      "name": "P3 收藏覆盖回退 ≤ 时间渠道放弃量（合格书口径）",
       "pass": true,
-      "detail": "新 93.88% vs V0 93.95%，差 -0.07pp（容差 0.2pp）"
+      "detail": "新 97.04% vs V0 97.03%，差 +0.01pp（容差 0.2pp）"
+    },
+    {
+      "name": "P4 每个征文至少 3 本",
+      "pass": true,
+      "detail": "96 个征文，缺口 0"
+    },
+    {
+      "name": "P5 弃书仅经征文保底豁免入种",
+      "pass": true,
+      "detail": "弃书 139,027 本（另有同代 pctl≥0.98 豁免 140 本经质量锚入种），种子内 2 本（均须来自征文保底），越界 0 本"
+    },
+    {
+      "name": "P6 invalid（<2000字僵尸）零入种",
+      "pass": true,
+      "detail": "invalid 23,995 本，入种 0 本"
     }
   ],
   "source": {
     "dataset": "local:dataset/out/books.jsonl",
-    "dataset_sha256": "e3f82fcfb9f1a64c289e09b123097eb29340588aba21330daf07407d63d043e7",
+    "dataset_sha256": "9a233b5348f9581537fe52564f0357aa59c073473f00fbdfd49089fc3e0ff0d0",
     "analysis_rows": 245779,
     "dropped_rows": 2451,
     "upstream": "light-nook-labs/novel_hub",
@@ -57,13 +136,13 @@
   "files": {
     "db": {
       "name": "seed.db",
-      "bytes": 19230720,
-      "sha256": "207c4520edfdee2407a095ee76b927aa371dab0fed9b732f1f97daa506c5636f"
+      "bytes": 15077376,
+      "sha256": "8acd78159ea6946af6bf851fa333541f0eef1abe6717389e4bda836817cde0d4"
     },
     "gz": {
       "name": "seed.db.gz",
-      "bytes": 8434763,
-      "sha256": "ff6e175b92c44056d009053b8bf9253369d300ada705da673c5cfb14385ff740"
+      "bytes": 6719087,
+      "sha256": "d557ea039f7e7d87756a2d95da8194cf9876fcc13b52902a15c7b07d7205e7af"
     }
   }
 }

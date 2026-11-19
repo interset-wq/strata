@@ -260,6 +260,20 @@ func TestIpGroups(t *testing.T) {
 	}
 	// form is mandatory.
 	getJSON(t, srv.URL+"/strata/ip-groups", http.StatusBadRequest)
+
+	// status filter (short tab contest chips aggregate the 已完结 pool;
+	// total follows the same caliber): only 1010 is 已完结.
+	body = getJSON(t, srv.URL+"/strata/ip-groups?form=ip_collab&status=已完结",
+		http.StatusOK)
+	if body["total"].(float64) != 1 {
+		t.Fatalf("done total = %v, want 1", body["total"])
+	}
+	groups = body["groups"].([]any)
+	if len(groups) != 1 ||
+		groups[0].(map[string]any)["contest"] != "少女前线征文" ||
+		int(groups[0].(map[string]any)["count"].(float64)) != 1 {
+		t.Fatalf("done groups = %v", groups)
+	}
 }
 
 // TestIpBooks: one IP entry list — a contest named exactly, or "other"
@@ -449,6 +463,24 @@ func TestRankingClassic(t *testing.T) {
 		items[1].(map[string]any)["nid"].(float64) != 1004 {
 		t.Fatalf("short order = %v", items)
 	}
+
+	// year filter (short tab year axis): 2010 holds both done shorts.
+	body = getJSON(t, srv.URL+
+		"/strata/rankings/classic?form=short&year=2010", http.StatusOK)
+	items = body["items"].([]any)
+	if len(items) != 2 ||
+		items[0].(map[string]any)["nid"].(float64) != 1002 {
+		t.Fatalf("year=2010 items = %v", items)
+	}
+	// No 2015 shorts in the test seed.
+	body = getJSON(t, srv.URL+
+		"/strata/rankings/classic?form=short&year=2015", http.StatusOK)
+	if items = body["items"].([]any); len(items) != 0 {
+		t.Fatalf("year=2015 items = %v", items)
+	}
+	// year must be a positive integer.
+	getJSON(t, srv.URL+"/strata/rankings/classic?year=0", http.StatusBadRequest)
+	getJSON(t, srv.URL+"/strata/rankings/classic?year=x", http.StatusBadRequest)
 
 	getJSON(t, srv.URL+"/strata/rankings/classic?form=novella",
 		http.StatusBadRequest)

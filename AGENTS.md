@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Strata (书层): reproducible research on 20 years of SFACG (菠萝包轻小说) bibliographic data, plus the
-product (`app/`: seed builder + Go engine implemented; Flutter UI not started). AGPL-3.0.
+product (`app/`: seed builder + Go engine + Flutter UI implemented). AGPL-3.0.
 Windows + PowerShell environment.
 
 ## Read first (do not scan the whole repo)
@@ -60,14 +60,23 @@ go run ./cmd/engine --data-dir ../../temp/engine-data
 - The engine prints `STRATA_ADDR=http://127.0.0.1:PORT` and `STRATA_SEED=...` on startup.
 - It must use a pure-Go SQLite driver (`modernc.org/sqlite` v1.62.0, which bundles SQLite 3.54.1); never `mattn/go-sqlite3` (cgo breaks iOS cross-compilation).
 
+Flutter (`app/ui/`): build **debug** APKs by default for device testing (user preference,
+2026-11-19). Release builds are only for final packaging.
+
+```powershell
+cd app/ui
+flutter build apk --debug      # app-debug.apk: debuggable via adb/logcat/run-as
+flutter analyze
+flutter test
+```
+
 Python on Windows: always pass `encoding="utf-8"` when reading files (`sys.stdout` is not UTF-8). Use `uv run` so the analysis venv/deps are used. Do not use bash/WSL unless the user asks.
 
 ## Data facts that change code
 
 - `analysis/out/novels.csv` is **245,779 rows and intentionally excludes 47 licensed Japanese light novels** (authors in `config.LICENSED_LN_AUTHORS`). Analysis must keep excluding them: reused nids corrupt dating and generation stats.
 - The app seed must re-add those 47 as `is_licensed=1` with NULL percentiles; they are searchable/detail-visible but excluded from A-class rankings and statistics.
-- Reproducible seed recipe: stats universe = `is_licensed=0` and `est_year in 2007..2025` (241,758 rows); percentiles are computed there, grouped by `est_year`. Seed pool = top 20k favs ∪ `est_date >= 2026-05-03 - 365d` ∪ `updated_at >= 2026-05-03 - 90d` ∪ archived monthly-rank nids ∪ banner = 29,433; short dual-percentile Top 2000 adds 1,398; plus 47 licensed = **30,878**. Use these exact relative cutoffs (report 18's one-day-later constants yield 29,396 and are not the canonical build).
-  **Superseded by `app/docs/09-seed-refresh-proposal.md` appendix E (decided 2026-11-18, not yet built)**: the two time channels are replaced by a quality gate (same-quarter `vel_pctl >= 0.5` and `favs >= 5`), and every D2 deep-rank book enters the pool. Target 30,503 books / 94.14% favourite coverage. Implemented as `app/tools/seedbuild/seed_policy.py` (`admit()` + `--audit`); until the rebuild lands, `build_seed.py` still ships the old recipe.
+- **Seed recipe (V3, rebuilt 2026-11-19; E.13 current)**: book source = `dataset/out/books.jsonl` (our own catalogue; raw jsonl only for the analysis table). Stats universe is still `is_licensed=0`, `est_year in 2007..2025` (241,758 rows), percentiles computed there by `est_year`. Admission = `seed_policy.admit()`: favs Top-20k ∪ monthly-rank nids ∪ banner ∪ short dual-percentile Top-2000 ∪ every D2 deep-rank book, **minus ineligible** = E.11 abandon (serializing short/medium with same-generation `fav_pctl < 0.98` have no admission right; E.13 quality exemption rescues top serializing shorts like 24132 whose authors forgot to mark complete — they still need a quality anchor; contest floor exempt) ∪ E.12 invalid (`words<2000` zombie books; no exemption). `form` is **six-valued** (`invalid/short/medium/long/dialogue/ip_collab`); E.13 dialogue-morph v2 uses composite engagement (clicks/word: 同人 ≥6, non-fan ≤5万字 ≥13, non-fan 5–15万字 ≥30, calibrated on n=193 App-API chapter ground truth, precision 0.92 / recall 0.85) because 2–5万字 dialogue novels were flooding `short` (421290 favs 7,881 > top prose short 听雨 5,478); morph estimates never rescue `invalid` (zombies have absurd clicks/word). **No new-book discovery channel** — the two time channels were retired 2026-11-19; `vel_pctl` is diagnostic only. Adds 47 licensed = **18,105 books** (was 30,878 / 26,348 / 18,477 / 17,335). `books` has 28 columns, `schema_version=3`, `seed_version=20260503.11`; non-licensed cover coverage **17,243/18,058 (95.5%)**; favourite coverage **97.04% on the eligible denominator** — six postconditions P1–P6 all pass. Deep ranks unchanged (14,626 rows). Every named contest keeps >= 3 books (E.9, P4); abandon books only re-enter via contest floor (P5); invalid never enters (P6). Rebuild: `cd analysis && uv run python ../app/tools/seedbuild/build_seed.py`; audit with `audit_seed.py` → `analysis/out/seed_v3_quality.md`. History: `app/docs/09` appendix E (E.13 supersedes E.1–E.12 on counts).
 - Percentiles are build-time only; never recompute them on device. `pr = praises/favs` with `favs < 10` set to NULL.
 - Two physical DBs: bundled read-only `seed.db`, writable `user.db` in app data. Join only by `nid` (never rowid, which reseeds on every seed release).
 - Cumulative metrics (`clicks`/`favs`/`praises`) are not comparable across generations; always rank by same-generation percentile.

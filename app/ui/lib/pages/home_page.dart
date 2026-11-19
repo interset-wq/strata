@@ -67,15 +67,29 @@ class _HomePageState extends ConsumerState<HomePage> {
   bool _ipDone = false;
   String? _ipError;
 
+  // 短篇 tab（form=short，池全部已完结——docs/form-definitions §3.1
+  // 完结条款；种子待重建，UI 先按 status='已完结' 过滤，前后一致）：
+  // 年份/比赛双轴 chip（互斥）+ 列表（favs DESC，20 本/页上滑加载）。
+  List<RankItem> _shortItems = const [];
+  bool _shortLoading = false;
+  bool _shortDone = false;
+  String? _shortError;
+  int? _shortYear; // 年份轴（null = 全部年份）
+  String? _shortContest; // 比赛轴（null = 总榜）
+
   @override
   void initState() {
     super.initState();
     _scroll.addListener(() {
       final show = _scroll.hasClients && _scroll.offset > 500;
       if (show != _showTop) setState(() => _showTop = show);
-      if (_form == 'ip_collab' && _scroll.hasClients &&
+      if (_scroll.hasClients &&
           _scroll.offset >= _scroll.position.maxScrollExtent - 300) {
-        _loadIpMore();
+        if (_form == 'ip_collab') {
+          _loadIpMore();
+        } else if (_form == 'short') {
+          _loadShortMore();
+        }
       }
     });
   }
@@ -113,6 +127,63 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
   }
 
+  // 短篇 tab 列表下一页：classic 端点 form=short + status='已完结'
+  // （完结条款）+ 可选 year/contest 轴，收藏降序 + offset 分页。
+  Future<void> _loadShortMore() async {
+    if (_shortLoading || _shortDone) return;
+    setState(() {
+      _shortLoading = true;
+      _shortError = null;
+    });
+    try {
+      final handle = await ref.read(bootProvider.future);
+      final page = await handle.api.rankingClassic(
+          form: 'short',
+          status: '已完结',
+          year: _shortYear,
+          contest: _shortContest,
+          limit: 20,
+          offset: _shortItems.length);
+      if (!mounted) return;
+      setState(() {
+        _shortItems = [..._shortItems, ...page];
+        _shortDone = page.length < 20;
+        _shortLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _shortError = '$e';
+        _shortLoading = false;
+      });
+    }
+  }
+
+  // 短篇 tab 轴切换：年份与比赛互斥（选一清另一），列表重置重载。
+  void _selectShortYear(int? year) {
+    if (year == _shortYear && _shortContest == null) return;
+    setState(() {
+      _shortYear = year;
+      _shortContest = null;
+      _shortItems = const [];
+      _shortDone = false;
+      _shortError = null;
+    });
+    _loadShortMore();
+  }
+
+  void _selectShortContest(String? contest) {
+    if (contest == _shortContest && _shortYear == null) return;
+    setState(() {
+      _shortContest = contest;
+      _shortYear = null;
+      _shortItems = const [];
+      _shortDone = false;
+      _shortError = null;
+    });
+    _loadShortMore();
+  }
+
   @override
   Widget build(BuildContext context) {
     final banners = ref.watch(bannerProvider(_form));
@@ -124,6 +195,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           ref.invalidate(serialShowcaseProvider(_form));
           ref.invalidate(finishedShowcaseProvider(_form));
           ref.invalidate(browseShowcaseProvider(_form));
+          ref.invalidate(shortContestGroupsProvider);
           await ref.read(bannerProvider(_form).future);
         },
         child: SafeArea(
@@ -142,6 +214,101 @@ class _HomePageState extends ConsumerState<HomePage> {
                 ref.invalidate(serialShowcaseProvider(_form));
                 ref.invalidate(finishedShowcaseProvider(_form));
                 ref.invalidate(browseShowcaseProvider(_form));
+              }
+              // 短篇 tab（docs/form-definitions §3.1）：收录池全部已完结
+              // （种子待重建，UI 先按 status='已完结' 过滤，前后一致）；
+              // 池小（约 1.4k 本）、tag 筛选意义不大，用年份/比赛双轴
+              // chip（互斥）切换榜轴 + 上滑加载列表。无轮播（短篇无
+              // featured），无 showcase 分区。
+              if (_form == 'short') {
+                if (_shortItems.isEmpty && !_shortLoading) {
+                  WidgetsBinding.instance
+                      .addPostFrameCallback((_) => _loadShortMore());
+                }
+                return Stack(
+                  children: [
+                    ListView(
+                      controller: _scroll,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      children: [
+                        _formTabs(context,
+                            onSelect: selectForm,
+                            onRefresh: refreshShowcases),
+                        _searchRow(context),
+                        _shortFilterRow(context),
+                        _sectionTitle(context, _shortListTitle()),
+                        Padding(
+                          padding:
+                              const EdgeInsets.symmetric(horizontal: 16),
+                          child: Column(
+                            children: [
+                              for (final it in _shortItems)
+                                BookRowTile(item: it),
+                              if (_shortError != null)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 24),
+                                  child: Center(
+                                    child: TextButton(
+                                      onPressed: _loadShortMore,
+                                      child: const Text('加载失败，点按重试'),
+                                    ),
+                                  ),
+                                )
+                              else if (_shortLoading)
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(
+                                      vertical: 24),
+                                  child: Center(
+                                      child:
+                                          CircularProgressIndicator(
+                                              strokeWidth: 2)),
+                                )
+                              else if (_shortDone && _shortItems.isEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                      vertical: 24),
+                                  child: Center(
+                                    child: Text('该条件下暂无作品',
+                                        style: TextStyle(
+                                            fontSize: 12,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurfaceVariant)),
+                                  ),
+                                )
+                              else if (_shortDone && _shortItems.isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                      0, 8, 0, 24),
+                                  child: Center(
+                                    child: Text(
+                                        '— 共 ${_shortItems.length} 本 —',
+                                        style: TextStyle(
+                                            fontSize: 11,
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurfaceVariant)),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (_showTop)
+                      Positioned(
+                        right: 16,
+                        bottom: 24,
+                        child: BackToTop(
+                          onTap: () => _scroll.animateTo(
+                              0,
+                              duration: const Duration(milliseconds: 400),
+                              curve: Curves.easeOut),
+                        ),
+                      ),
+                  ],
+                );
               }
               // IP tab 书少（54 本），不需要多个分区：轮播 + IP 入口行 +
               // “随便看看”（全池列表，上滑加载更多），无 showcase 分区。
@@ -291,6 +458,101 @@ class _HomePageState extends ConsumerState<HomePage> {
         ),
       ),
     );
+  }
+
+  // 短篇 tab 过滤行：年份/比赛双轴下拉选择器。原横滑 chip 行在 19 年 +
+  // 38 个比赛组下滚动过长，改两列下拉（各占半宽、可搜索）；两轴互斥
+  // （选一清另一）；DropdownMenu 非受控组件，用 key 跟随轴状态重建同步
+  // 显示。
+  Widget _shortFilterRow(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+      child: Row(
+        children: [
+          Expanded(child: _shortYearMenu(context)),
+          const SizedBox(width: 8),
+          Expanded(child: _shortContestMenu(context)),
+        ],
+      ),
+    );
+  }
+
+  // 年份下拉：2025 → 2007（硬编码，跟随种子快照年份范围；种子年份范围
+  // 变化时重估）+「全部」。
+  Widget _shortYearMenu(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return DropdownMenu<String>(
+      key: ValueKey('short-year-$_shortYear'),
+      initialSelection: _shortYear?.toString() ?? 'all',
+      onSelected: (v) =>
+          _selectShortYear(v != null && v != 'all' ? int.parse(v) : null),
+      dropdownMenuEntries: [
+        const DropdownMenuEntry(value: 'all', label: '全部年份'),
+        for (var y = 2025; y >= 2007; y--)
+          DropdownMenuEntry(value: '$y', label: '$y'),
+      ],
+      decorationBuilder: _shortMenuDecoration(scheme),
+      menuStyle: _shortMenuStyle(scheme),
+      expandedInsets: EdgeInsets.zero,
+    );
+  }
+
+  // 比赛下拉：引擎按 contest 聚合短篇池（已完结口径，与列表同源）
+  // count DESC；标签用紧凑形（contestChipLabel）。
+  Widget _shortContestMenu(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return ref.watch(shortContestGroupsProvider).when(
+          loading: () => const SizedBox.shrink(),
+          error: (e, _) => const SizedBox.shrink(),
+          data: (res) => DropdownMenu<String>(
+            key: ValueKey('short-contest-$_shortContest'),
+            initialSelection: _shortContest ?? 'all',
+            onSelected: (v) =>
+                _selectShortContest(v != null && v != 'all' ? v : null),
+            dropdownMenuEntries: [
+              const DropdownMenuEntry(value: 'all', label: '全部比赛'),
+              for (final g in res.groups)
+                DropdownMenuEntry(
+                    value: g.contest, label: contestChipLabel(g.contest)),
+            ],
+            decorationBuilder: _shortMenuDecoration(scheme),
+            menuStyle: _shortMenuStyle(scheme),
+            expandedInsets: EdgeInsets.zero,
+          ),
+        );
+  }
+
+  // 下拉容器样式（对齐搜索行：surface 底 + 细描边 + 圆角）。
+  InputDecoration Function(BuildContext, MenuController)
+      _shortMenuDecoration(ColorScheme scheme) {
+    final border = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(12),
+      borderSide: BorderSide(color: scheme.outline.withValues(alpha: .4)),
+    );
+    return (context, controller) => InputDecoration(
+          filled: true,
+          fillColor: scheme.surface,
+          border: border,
+          enabledBorder: border,
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: scheme.primary),
+          ),
+        );
+  }
+
+  MenuStyle _shortMenuStyle(ColorScheme scheme) => MenuStyle(
+        backgroundColor: WidgetStatePropertyAll(scheme.surface),
+        shape: WidgetStatePropertyAll(RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: scheme.outline.withValues(alpha: .3)))),
+      );
+
+  // 短篇 tab 列表标题：总榜 / 2020 短篇 / 四征短篇（比赛标签）。
+  String _shortListTitle() {
+    if (_shortContest != null) return contestChipLabel(_shortContest!);
+    if (_shortYear != null) return '$_shortYear 短篇';
+    return '总榜';
   }
 
   // header form tab（docs/13 form 字段）：长篇（=小说，15万字以上）/中篇/短篇/对话/IP。

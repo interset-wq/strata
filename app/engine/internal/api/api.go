@@ -614,8 +614,17 @@ func (s *Server) rankingClassic(c *gin.Context) {
 	if !ok {
 		return
 	}
+	year := 0
+	if raw := c.Query("year"); raw != "" {
+		var err error
+		if year, err = strconv.Atoi(raw); err != nil || year <= 0 {
+			fail(c, http.StatusBadRequest, "invalid_argument",
+				"year must be a positive integer")
+			return
+		}
+	}
 	items, err := s.store.ClassicBooks(c.Request.Context(),
-		c.Query("genre"), c.Query("status"), c.Query("contest"), form, limit, offset)
+		c.Query("genre"), c.Query("status"), c.Query("contest"), form, year, limit, offset)
 	if err != nil {
 		fail(c, http.StatusInternalServerError, "internal", err.Error())
 		return
@@ -624,7 +633,7 @@ func (s *Server) rankingClassic(c *gin.Context) {
 		"meta": gin.H{
 			"kind": "classic", "pool": "seed", "ordering": "favs",
 			"genre": c.Query("genre"), "status": c.Query("status"),
-			"contest": c.Query("contest"), "form": form,
+			"contest": c.Query("contest"), "form": form, "year": year,
 			"licensed_excluded": true,
 		},
 		"items": items,
@@ -1086,7 +1095,7 @@ func (s *Server) coverCarousel(c *gin.Context) {
 	form := c.Query("form")
 	if form == "" || !validForms[form] {
 		fail(c, http.StatusBadRequest, "invalid_argument",
-			"form must be short|medium|long|dialogue|ip_collab")
+			"form must be invalid|short|medium|long|dialogue|ip_collab")
 		return
 	}
 	items, err := s.store.CoverCarousel(c.Request.Context(), form, limit)
@@ -1108,16 +1117,17 @@ func (s *Server) ipGroups(c *gin.Context) {
 	form, ok := parseForm(c)
 	if !ok || form == "" {
 		fail(c, http.StatusBadRequest, "invalid_argument",
-			"form must be short|medium|long|dialogue|ip_collab")
+			"form must be invalid|short|medium|long|dialogue|ip_collab")
 		return
 	}
-	total, groups, err := s.store.IpGroups(c.Request.Context(), form)
+	total, groups, err := s.store.IpGroups(c.Request.Context(), form,
+		c.Query("status"))
 	if err != nil {
 		fail(c, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"meta":   gin.H{"pool": "seed", "form": form, "ordering": "count"},
+		"meta":   gin.H{"pool": "seed", "form": form, "status": c.Query("status"), "ordering": "count"},
 		"total":  total,
 		"groups": groups,
 	})
@@ -1129,7 +1139,7 @@ func (s *Server) ipBooks(c *gin.Context) {
 	form, ok := parseForm(c)
 	if !ok || form == "" {
 		fail(c, http.StatusBadRequest, "invalid_argument",
-			"form must be short|medium|long|dialogue|ip_collab")
+			"form must be invalid|short|medium|long|dialogue|ip_collab")
 		return
 	}
 	group := c.Query("group")
@@ -1157,7 +1167,7 @@ func (s *Server) ipBooks(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"meta":  gin.H{"pool": "seed", "form": form, "group": group,
+		"meta": gin.H{"pool": "seed", "form": form, "group": group,
 			"ordering": "favs"},
 		"items": items,
 	})
@@ -1202,7 +1212,7 @@ func (s *Server) shelfRemove(c *gin.Context) {
 }
 
 var validForms = map[string]bool{
-	"short": true, "medium": true, "long": true, "dialogue": true, "ip_collab": true,
+	"invalid": true, "short": true, "medium": true, "long": true, "dialogue": true, "ip_collab": true,
 }
 
 // parseForm returns the optional docs/13 form filter. Empty means all forms.
@@ -1213,7 +1223,7 @@ func parseForm(c *gin.Context) (string, bool) {
 	}
 	if !validForms[form] {
 		fail(c, http.StatusBadRequest, "invalid_argument",
-			"form must be short|medium|long|dialogue|ip_collab")
+			"form must be invalid|short|medium|long|dialogue|ip_collab")
 		return "", false
 	}
 	return form, true
