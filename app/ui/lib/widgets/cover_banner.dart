@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../app/theme.dart';
@@ -122,11 +123,12 @@ class CoverBannerCard extends StatelessWidget {
               AspectRatio(
                 aspectRatio: 3 / 4,
                 child: hasCover
-                    ? Image.network(
-                        coverUrl,
+                    ? CachedNetworkImage(
+                        imageUrl: coverUrl,
                         fit: BoxFit.cover,
-                        loadingBuilder: coverLoadingBuilder,
-                        errorBuilder: (_, _, _) =>
+                        placeholder: (_, _) =>
+                            const ColoredBox(color: Color(0x59B8AE9E)),
+                        errorWidget: (_, _, _) =>
                             _CoverPlaceholder(scheme: scheme),
                       )
                     : _CoverPlaceholder(scheme: scheme),

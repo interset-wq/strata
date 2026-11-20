@@ -563,12 +563,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
     if (coverUrl == null || coverUrl.isEmpty) {
       return defaultCover(it.nid);
     }
-    return Image.network(
-      coverImageUrl(coverUrl)!,
-      fit: BoxFit.cover,
-      loadingBuilder: coverLoadingBuilder,
-      errorBuilder: (_, _, _) => defaultCover(it.nid),
-    );
+    return coverImage(coverImageUrl(coverUrl) == null ? null : coverUrl, it.nid);
   }
 
   Widget _empty(String msg) {
@@ -629,12 +624,7 @@ class _CalendarBookRow extends StatelessWidget {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(6),
                 child: hasCover
-                    ? Image.network(
-                        coverImageUrl(coverUrl)!,
-                        fit: BoxFit.cover,
-                        loadingBuilder: coverLoadingBuilder,
-                        errorBuilder: (_, _, _) => defaultCover(item.nid),
-                      )
+                    ? coverImage(coverUrl, item.nid)
                     : defaultCover(item.nid),
               ),
             ),

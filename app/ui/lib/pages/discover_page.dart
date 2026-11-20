@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -170,11 +171,14 @@ class _DiscoverCard extends StatelessWidget {
                 child: hasCover
                     ? ClipRRect(
                         borderRadius: BorderRadius.circular(6),
-                        child: Image.network(
-                          'https://rs.sfacg.com/web/novel/images/images/beitouNew/\${it.nid}.jpg',
+                        child: CachedNetworkImage(
+                          imageUrl:
+                              'https://rs.sfacg.com/web/novel/images/images/beitouNew/${item.nid}.jpg',
                           fit: BoxFit.cover,
-                          loadingBuilder: coverLoadingBuilder,
-                          errorBuilder: (_, _, _) => defaultCover(item.nid, radius: 10),
+                          placeholder: (_, _) =>
+                              const ColoredBox(color: Color(0x59B8AE9E)),
+                          errorWidget: (_, _, _) =>
+                              defaultCover(item.nid, radius: 10),
                         ),
                       )
                     : defaultCover(item.nid, radius: 10),

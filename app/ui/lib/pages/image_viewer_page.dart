@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -90,17 +91,15 @@ class _ZoomableImageState extends State<_ZoomableImage> {
         minScale: 1,
         maxScale: 4,
         child: Center(
-          child: Image.network(
-            bannerCutUrl(widget.item.nid),
+          child: CachedNetworkImage(
+            imageUrl: bannerCutUrl(widget.item.nid),
             fit: BoxFit.contain,
-            loadingBuilder: (_, child, progress) {
-              if (progress == null) return child;
-              return const Center(
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Colors.white54));
-            },
+            placeholder: (_, _) => const Center(
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: Colors.white54),
+            ),
             // 与列表一致：404 只给占位，不做封面兜底。
-            errorBuilder: (_, _, _) => const Center(
+            errorWidget: (_, _, _) => const Center(
                 child: Icon(Icons.image_not_supported_outlined,
                     size: 48, color: Colors.white38)),
           ),

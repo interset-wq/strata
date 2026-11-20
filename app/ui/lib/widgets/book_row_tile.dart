@@ -71,13 +71,7 @@ class BookRowTile extends StatelessWidget {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(6),
                 child: hasCover
-                    ? Image.network(
-                        coverImageUrl(coverUrl)!,
-                        fit: BoxFit.cover,
-                        loadingBuilder: coverLoadingBuilder,
-                        errorBuilder: (_, _, _) =>
-                            defaultCover(item.nid),
-                      )
+                    ? coverImage(coverUrl, item.nid)
                     : defaultCover(item.nid),
               ),
             ),

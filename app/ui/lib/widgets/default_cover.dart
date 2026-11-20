@@ -1,4 +1,7 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+
+const _placeholderColor = Color(0x59B8AE9E);
 
 /// 官方默认封面兜底（用户拍板 2026-11-18）：cover_url 为空时用官方
 /// default / defaultNew 两张图，按 nid 取余绑定，避免全部同图的单调感。
@@ -28,12 +31,60 @@ String? coverImageUrl(String? raw) {
 
 /// 默认封面兜底图。radius>0 时裁圆角（与封面卡一致的 10）。
 Widget defaultCover(int nid, {BoxFit fit = BoxFit.cover, double radius = 0}) {
-  final image = Image.network(
-    defaultCoverUrl(nid),
+  final image = CachedNetworkImage(
+    imageUrl: defaultCoverUrl(nid),
     fit: fit,
-    loadingBuilder: coverLoadingBuilder,
+    placeholder: (_, _) => const ColoredBox(color: _placeholderColor),
+    errorWidget: (_, _, _) => const ColoredBox(color: _placeholderColor),
   );
   return radius > 0
       ? ClipRRect(borderRadius: BorderRadius.circular(radius), child: image)
       : image;
+}
+
+/// 统一的网络封面图（磁盘 + 内存缓存，cached_network_image）：
+/// - URL 走 coverImageUrl 归一化；空值直接用官方默认封面；
+/// - 加载中显示底色块（与 coverLoadingBuilder 同款）；
+/// - 失败两级兜底：默认封面（自身再失败 → 色块）。
+Widget coverImage(
+  String? raw,
+  int nid, {
+  double? width,
+  double? height,
+  BoxFit fit = BoxFit.cover,
+}) {
+  final url = coverImageUrl(raw) ?? defaultCoverUrl(nid);
+  return CachedNetworkImage(
+    imageUrl: url,
+    width: width,
+    height: height,
+    fit: fit,
+    placeholder: (_, _) => const ColoredBox(color: _placeholderColor),
+    errorWidget: (_, _, _) => Image(
+      image: CachedNetworkImageProvider(defaultCoverUrl(nid)),
+      width: width,
+      height: height,
+      fit: fit,
+      errorBuilder: (_, _, _) =>
+          const ColoredBox(color: _placeholderColor),
+    ),
+  );
+}
+
+/// 缓存网络图（banner/大图等无 nid 兜底语义处）：失败显示占位色块
+///（大图精选的"404 显示占位容器"口径不变）。
+Widget cachedImage(
+  String url, {
+  double? width,
+  double? height,
+  BoxFit fit = BoxFit.cover,
+}) {
+  return CachedNetworkImage(
+    imageUrl: url,
+    width: width,
+    height: height,
+    fit: fit,
+    placeholder: (_, _) => const ColoredBox(color: _placeholderColor),
+    errorWidget: (_, _, _) => const ColoredBox(color: _placeholderColor),
+  );
 }

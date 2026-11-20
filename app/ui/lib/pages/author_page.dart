@@ -271,24 +271,8 @@ class _AuthorPageState extends ConsumerState<AuthorPage> {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(6),
-                child: Image.network(
-                  coverImageUrl(b.coverUrl) ?? defaultCoverUrl(b.nid),
-                  width: 44,
-                  height: 62,
-                  fit: BoxFit.cover,
-                  loadingBuilder: coverLoadingBuilder,
-                  errorBuilder: (_, _, _) => Image.network(
-                    defaultCoverUrl(b.nid),
-                    width: 44,
-                    height: 62,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => ColoredBox(
-                      color: scheme.primary.withValues(alpha: .15),
-                      child: Icon(Icons.book_outlined,
-                          color: scheme.onSurfaceVariant),
-                    ),
-                  ),
-                ),
+                child: coverImage(b.coverUrl, b.nid,
+                    width: 44, height: 62),
               ),
               const SizedBox(width: 10),
               Expanded(

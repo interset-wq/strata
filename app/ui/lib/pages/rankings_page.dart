@@ -244,12 +244,7 @@ class _BoardCard extends StatelessWidget {
               child: hasCover
                   ? ClipRRect(
                       borderRadius: BorderRadius.circular(10),
-                      child: Image.network(
-                        coverImageUrl(coverUrl)!,
-                        fit: BoxFit.cover,
-                        loadingBuilder: coverLoadingBuilder,
-                        errorBuilder: (_, _, _) => defaultCover(item.nid, radius: 10),
-                      ),
+                      child: coverImage(coverUrl, item.nid),
                     )
                   : defaultCover(item.nid, radius: 10),
             ),

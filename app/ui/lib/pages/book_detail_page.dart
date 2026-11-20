@@ -186,19 +186,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                       child: SizedBox(
                         width: 92,
                         height: 128,
-                        child: Image.network(
-                          cover,
-                          fit: BoxFit.cover,
-                          loadingBuilder: coverLoadingBuilder,
-                          errorBuilder: (context, error, stackTrace) =>
-                              Image.network(
-                                _defaultCover,
-                            fit: BoxFit.cover,
-                            loadingBuilder: coverLoadingBuilder,
-                            errorBuilder: (_, _, _) => ColoredBox(
-                                color: scheme.primary.withValues(alpha: .15)),
-                          ),
-                        ),
+                        child: coverImage(cover, widget.nid),
                       ),
                     ),
                   ),

@@ -192,21 +192,8 @@ class _SearchPageState extends ConsumerState<SearchPage> {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(6),
-                child: Image.network(
-                  coverImageUrl(it.coverUrl) ?? defaultCoverUrl(it.nid),
-                  width: 52,
-                  height: 72,
-                  fit: BoxFit.cover,
-                  loadingBuilder: coverLoadingBuilder,
-                  errorBuilder: (_, _, _) => Image.network(
-                    defaultCoverUrl(it.nid),
-                    width: 52,
-                    height: 72,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => ColoredBox(
-                        color: scheme.primary.withValues(alpha: .15)),
-                  ),
-                ),
+                child: coverImage(it.coverUrl, it.nid,
+                    width: 52, height: 72),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -340,21 +327,8 @@ class _SearchPageState extends ConsumerState<SearchPage> {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(6),
-                child: Image.network(
-                  coverImageUrl(it.coverUrl) ?? defaultCoverUrl(it.nid),
-                  width: 52,
-                  height: 72,
-                  fit: BoxFit.cover,
-                  loadingBuilder: coverLoadingBuilder,
-                  errorBuilder: (_, _, _) => Image.network(
-                    defaultCoverUrl(it.nid),
-                    width: 52,
-                    height: 72,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => ColoredBox(
-                        color: scheme.primary.withValues(alpha: .15)),
-                  ),
-                ),
+                child: coverImage(it.coverUrl, it.nid,
+                    width: 52, height: 72),
               ),
               const SizedBox(width: 12),
               Expanded(

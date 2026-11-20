@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -5,7 +6,6 @@ import 'package:go_router/go_router.dart';
 import '../core/providers.dart';
 import '../data/api/strata_api.dart';
 import 'banner_carousel.dart';
-import 'default_cover.dart';
 
 /// 大图卡：banner cut 成品图（CDN 居中裁切 750×430），按原生比例零裁切；
 /// 点图进全屏查看器（在 items 列表内滑动），点文字进详情页。
@@ -68,11 +68,12 @@ class _BannerLargeCardState extends ConsumerState<BannerLargeCard> {
                     ? placeholder
                     : ColoredBox(
                         color: scheme.primary.withValues(alpha: .1),
-                        child: Image.network(
-                          bannerCutUrl(item.nid),
+                        child: CachedNetworkImage(
+                          imageUrl: bannerCutUrl(item.nid),
                           fit: BoxFit.cover,
-                          loadingBuilder: coverLoadingBuilder,
-                          errorBuilder: (_, _, _) {
+                          placeholder: (_, _) =>
+                              const ColoredBox(color: Color(0x59B8AE9E)),
+                          errorWidget: (_, _, _) {
                             setState(() => _bannerFailed = true);
                             return placeholder;
                           },

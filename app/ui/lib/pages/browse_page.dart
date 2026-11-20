@@ -308,12 +308,9 @@ class _BoardCard extends StatelessWidget {
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(6),
-                  child: Image.network(
+                  child: cachedImage(
                     cover,
                     fit: BoxFit.cover,
-                    loadingBuilder: coverLoadingBuilder,
-                    errorBuilder: (_, _, _) => ColoredBox(
-                        color: scheme.primary.withValues(alpha: .15)),
                   ),
                 ),
               ),
@@ -406,12 +403,10 @@ class _ShortCard extends StatelessWidget {
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(6),
-                  child: Image.network(
-                    coverImageUrl(item.coverUrl)!,
+                  child: cachedImage(
+                    coverImageUrl(item.coverUrl) ??
+                        defaultCoverUrl(item.nid),
                     fit: BoxFit.cover,
-                    loadingBuilder: coverLoadingBuilder,
-                    errorBuilder: (_, _, _) => ColoredBox(
-                        color: scheme.primary.withValues(alpha: .15)),
                   ),
                 ),
               ),

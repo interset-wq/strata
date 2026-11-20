@@ -133,21 +133,8 @@ class _CollectedPageState extends ConsumerState<CollectedPage> {
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(6),
-                child: Image.network(
-                  coverImageUrl(it.coverUrl) ?? defaultCoverUrl(it.nid),
-                  width: 44,
-                  height: 62,
-                  fit: BoxFit.cover,
-                  loadingBuilder: coverLoadingBuilder,
-                  errorBuilder: (_, _, _) => Image.network(
-                    defaultCoverUrl(it.nid),
-                    width: 44,
-                    height: 62,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, _, _) => ColoredBox(
-                        color: scheme.primary.withValues(alpha: .15)),
-                  ),
-                ),
+                child: coverImage(it.coverUrl, it.nid,
+                    width: 44, height: 62),
               ),
               const SizedBox(width: 10),
               Expanded(

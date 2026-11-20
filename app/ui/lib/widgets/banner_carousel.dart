@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../data/api/strata_api.dart';
@@ -176,10 +177,12 @@ class _SlideState extends State<_Slide> {
                   width: w * 1.45,
                   top: 0,
                   height: h,
-                  child: Image.network(
-                    widget.url,
+                  child: CachedNetworkImage(
+                    imageUrl: widget.url,
                     fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Center(
+                    placeholder: (_, _) =>
+                        const ColoredBox(color: Color(0x59B8AE9E)),
+                    errorWidget: (context, _, _) => Center(
                       child: Padding(
                         padding: const EdgeInsets.all(16),
                         child: Text(
