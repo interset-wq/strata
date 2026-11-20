@@ -197,6 +197,12 @@ final searchProvider =
   return handle.api.search(q);
 });
 
+/// 最近本地搜索关键词（搜索页空态 chips；每次提交后 invalidate）。
+final searchHistoryProvider = FutureProvider<List<String>>((ref) async {
+  final handle = await ref.watch(bootProvider.future);
+  return handle.api.searchHistory();
+});
+
 final bookProvider = FutureProvider.family<BookDetail, int>((ref, nid) async {
   final handle = await ref.watch(bootProvider.future);
   return handle.api.book(nid);

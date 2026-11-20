@@ -310,6 +310,21 @@ class StrataApi {
     return AuthorProfile.fromJson(body);
   }
 
+  /// 最近本地搜索关键词（搜索页空态，docs/08 §search-history）。
+  Future<List<String>> searchHistory({int limit = 10}) async {
+    final body = await _get('/search-history', {'limit': '$limit'});
+    return (body['items'] as List).map((e) => e.toString()).toList();
+  }
+
+  /// 官方 HTML 搜索（docs/08 §search-remote）：30 条硬上限 + 静默限流识别。
+  /// 6 秒内重复触发返回 429（抛异常）；限流不抛——rateLimited=true。
+  Future<RemoteSearchResult> searchRemote(String q) async {
+    final body = await _post(
+            '/search/remote?q=${Uri.encodeComponent(q)}')
+        as Map<String, dynamic>;
+    return RemoteSearchResult.fromJson(body);
+  }
+
   Future<CalendarResponse> calendar({
     required String granularity,
     required String anchor,
@@ -734,6 +749,7 @@ class SearchItem {
   final String? genre;
   final int estYear;
   final int? favs;
+  final String? coverUrl;
 
   SearchItem.fromJson(Map<String, dynamic> m)
       : nid = m['nid'] as int,
@@ -741,7 +757,44 @@ class SearchItem {
         author = m['author'] as String,
         genre = m['genre'] as String?,
         estYear = m['est_year'] as int,
-        favs = m['favs'] as int?;
+        favs = m['favs'] as int?,
+        coverUrl = m['cover_url'] as String?;
+}
+
+/// 官方搜索结果行（docs/08 §search-remote）：[inSeed] = 内置库命中；
+/// 库外为站内新书（详情按需抓取视图）。
+class RemoteSearchItem {
+  final int nid;
+  final String title;
+  final String author;
+  final String? updatedAt;
+  final String? coverUrl;
+  final String? summary;
+  final bool inSeed;
+
+  RemoteSearchItem.fromJson(Map<String, dynamic> m)
+      : nid = m['nid'] as int,
+        title = m['title'] as String,
+        author = m['author'] as String? ?? '',
+        updatedAt = m['updated_at'] as String?,
+        coverUrl = m['cover_url'] as String?,
+        summary = m['summary'] as String?,
+        inSeed = m['in_seed'] as bool? ?? false;
+}
+
+/// 官方搜索响应：[rateLimited] = 静默限流（HTTP 200 但指纹翻转，
+/// docs/sfacg-endpoints §2.1）——UI 明确提示，绝不伪造空结果。
+class RemoteSearchResult {
+  final bool rateLimited;
+  final int declared;
+  final List<RemoteSearchItem> items;
+
+  RemoteSearchResult.fromJson(Map<String, dynamic> m)
+      : rateLimited = m['meta']?['rate_limited'] as bool? ?? false,
+        declared = m['meta']?['declared'] as int? ?? 0,
+        items = ((m['items'] as List?) ?? const [])
+            .map((e) => RemoteSearchItem.fromJson(e as Map<String, dynamic>))
+            .toList();
 }
 
 /// contest（征文）→ 联动 IP 展示名（崩坏3征文 → 崩坏3，
