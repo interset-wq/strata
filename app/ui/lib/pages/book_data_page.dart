@@ -183,7 +183,7 @@ class _ObsRow extends StatelessWidget {
               if (o.favs != null)
                 _chip(context, '收藏 ${_wan(o.favs!)}', icon: MetricIcons.favs),
               if (o.praises != null)
-                _chip(context, '推荐 ${_wan(o.praises!)}',
+                _chip(context, '点赞 ${_wan(o.praises!)}',
                     icon: MetricIcons.praises),
               if (o.words != null)
                 _chip(context, '字数 ${_wan(o.words!)}',

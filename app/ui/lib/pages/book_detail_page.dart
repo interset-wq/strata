@@ -261,7 +261,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                     style: TextStyle(color: Colors.deepOrange),
                   ),
                 ),
-              // 六指标格：点击/收藏/推荐/字数（短评/长评来自观测，种子无）
+              // 六指标格：点击/收藏/点赞/字数（短评/长评来自观测，种子无）
               _metricGrid(context, eff, b),
               _pctlCard(context, b),
               _metaCard(context, d, eff, b),
@@ -465,7 +465,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
       Map<String, dynamic> b) {
     String v(String key) => _num(eff[key] ?? b[key]) ?? '—';
     final scheme = Theme.of(context).colorScheme;
-    final labels = [('点击', 'clicks'), ('收藏', 'favs'), ('推荐', 'praises'), ('字数', 'words')];
+    final labels = [('点击', 'clicks'), ('收藏', 'favs'), ('点赞', 'praises'), ('字数', 'words')];
     return Row(
       children: [
         for (final (label, key) in labels)
@@ -547,7 +547,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
             const SizedBox(height: 10),
             bar('收藏分位', pct(b['fav_pctl'])),
             bar('点击分位', pct(b['click_pctl'])),
-            bar('推荐分位', pct(b['praise_pctl'])),
+            bar('点赞分位', pct(b['praise_pctl'])),
             if (pr != null)
               Text('PR（赞/藏）${pr.toStringAsFixed(3)}',
                   style: TextStyle(

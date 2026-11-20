@@ -7,7 +7,7 @@ import '../widgets/book_row_card.dart';
 
 /// Classic 六榜（docs/12 展示列）：顶部横滑 tab 导航，平台累计值排序。
 const _boards = [
-  ('recommend', '推荐榜'),
+  ('recommend', '点赞榜'),
   ('popular', '人气榜'),
   ('favs', '收藏榜'),
   ('new', '新书榜'),
