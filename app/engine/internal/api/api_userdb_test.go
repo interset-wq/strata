@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-// Endpoints over the writable user DB (shelf / history / observations /
+// Endpoints over the writable user DB (watchlist / history / observations /
 // settings / watchlist / refresh cooldown). Store-level behaviour is
 // covered in internal/store/userdb_test.go; here we pin the HTTP contract:
 // request shapes, response envelopes, and error codes.
@@ -40,38 +40,53 @@ func reqJSON(t *testing.T, method, url, body string) (int, map[string]any) {
 	return resp.StatusCode, out
 }
 
-func TestShelfEndpoints(t *testing.T) {
+// TestWatchlistSaveEndpoints: the v6 watchlist endpoints — POST adds a
+// save-only entry by default (former bookshelf), PUT toggles tracking,
+// DELETE removes.
+func TestWatchlistSaveEndpoints(t *testing.T) {
 	srv, _ := newTestServer(t)
-	code, body := reqJSON(t, "GET", srv.URL+"/strata/shelf", "")
+	code, body := reqJSON(t, "GET", srv.URL+"/strata/watchlist", "")
 	if code != http.StatusOK || len(body["items"].([]any)) != 0 {
-		t.Fatalf("empty shelf = %d %+v", code, body)
+		t.Fatalf("empty watchlist = %d %+v", code, body)
 	}
-	code, body = reqJSON(t, "PUT", srv.URL+"/strata/shelf", `{"nid":1001}`)
-	if code != http.StatusOK || body["ok"] != true {
-		t.Fatalf("shelf add = %d %+v", code, body)
+	// no body = save-only (active=false), the former "add to shelf"
+	code, body = reqJSON(t, "POST", srv.URL+"/strata/watchlist/1001", "")
+	if code != http.StatusOK || body["meta"].(map[string]any)["added"] != true {
+		t.Fatalf("watch add = %d %+v", code, body)
 	}
 	// duplicate add stays ok (idempotent)
-	code, _ = reqJSON(t, "PUT", srv.URL+"/strata/shelf", `{"nid":1001}`)
+	code, _ = reqJSON(t, "POST", srv.URL+"/strata/watchlist/1001", "")
 	if code != http.StatusOK {
-		t.Fatalf("duplicate shelf add = %d", code)
+		t.Fatalf("duplicate watch add = %d", code)
 	}
-	code, body = reqJSON(t, "GET", srv.URL+"/strata/shelf", "")
+	code, body = reqJSON(t, "GET", srv.URL+"/strata/watchlist", "")
 	items := body["items"].([]any)
 	if code != http.StatusOK || len(items) != 1 ||
-		items[0].(map[string]any)["nid"].(float64) != 1001 {
-		t.Fatalf("shelf list = %d %+v", code, items)
+		items[0].(map[string]any)["nid"].(float64) != 1001 ||
+		items[0].(map[string]any)["active"] != false {
+		t.Fatalf("watchlist = %d %+v", code, items)
 	}
-	code, _ = reqJSON(t, "PUT", srv.URL+"/strata/shelf", `{}`)
+	// toggling tracking flips active
+	code, body = reqJSON(t, "PUT", srv.URL+"/strata/watchlist/1001", `{"active":true}`)
+	if code != http.StatusOK || body["meta"].(map[string]any)["active"] != true {
+		t.Fatalf("watch set active = %d %+v", code, body)
+	}
+	code, body = reqJSON(t, "GET", srv.URL+"/strata/watchlist", "")
+	items = body["items"].([]any)
+	if len(items) != 1 || items[0].(map[string]any)["active"] != true {
+		t.Fatalf("after toggle = %+v", items)
+	}
+	code, _ = reqJSON(t, "POST", srv.URL+"/strata/watchlist/abc", "")
 	if code != http.StatusBadRequest {
-		t.Fatalf("shelf add without nid = %d, want 400", code)
+		t.Fatalf("watch add with bad nid = %d, want 400", code)
 	}
-	code, body = reqJSON(t, "DELETE", srv.URL+"/strata/shelf/1001", "")
-	if code != http.StatusOK || body["ok"] != true {
-		t.Fatalf("shelf remove = %d %+v", code, body)
+	code, body = reqJSON(t, "DELETE", srv.URL+"/strata/watchlist/1001", "")
+	if code != http.StatusOK || body["meta"].(map[string]any)["removed"] != true {
+		t.Fatalf("watch remove = %d %+v", code, body)
 	}
-	code, body = reqJSON(t, "GET", srv.URL+"/strata/shelf", "")
+	code, body = reqJSON(t, "GET", srv.URL+"/strata/watchlist", "")
 	if code != http.StatusOK || len(body["items"].([]any)) != 0 {
-		t.Fatalf("shelf after remove = %d %+v", code, body)
+		t.Fatalf("watchlist after remove = %d %+v", code, body)
 	}
 }
 

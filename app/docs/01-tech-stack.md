@@ -56,10 +56,11 @@ App 进程
 | `seed.db` | 数据目录 `seed/seed-<version>.db`（解压副本） | 只读打开 | 按 `seed_version` 比对替换，整文件换名 |
 | `user.db` | 应用数据目录 | 读写 | 保留 |
 
-- `seed.db`：`books`（24 列）+ `book_tags` + `seed_meta`，9 索引；`banner`/`rank_snapshots`
-  作为独立资产随包分发，不建表。构建期产出，运行时只 SELECT。
+- `seed.db`：`books`（28 列）+ `book_tags` + `deep_ranks` + `calendar_universe`（发书日历）+ `seed_meta`，10 索引；
+  `banner`/`rank_snapshots` 作为独立资产随包分发，不建表。构建期产出，运行时只 SELECT。
 - `user.db`：`observations`（只追加，键 `nid + observed_at`）、`discovered`（搜索命中即收录，
-  不参与统计）、书架、标注、搜索历史。
+  不参与统计）、`watchlist`（统一列表：激活 = 追踪，未激活 = 只存——原「书架」与「追踪列表」
+  已合并，本 app 无阅读功能、书架语义不成立）、标注、搜索历史。
 - 跨库 `ATTACH` join；同一字段取 `observed_at` 较新者。**跨库关联只能用 `nid`**，
   rowid 跨种子版本会重排。
 - 不做 FTS5：种子规模小，内存索引足够；FTS5 中文 trigram 有已知失效。
@@ -95,7 +96,7 @@ app/
 ├── lib/                        # Flutter UI
 │   ├── data/api/               # localhost HTTP 客户端
 │   ├── domain/                 # Freezed 模型
-│   ├── features/               # rankings / detail / search / shelf
+│   ├── features/               # rankings / detail / search / watchlist（含统一兴趣列表）
 │   └── core/ffi/               # FFI 桥：启动引擎、就绪探测
 ├── engine/                     # 内嵌 Go 引擎
 │   ├── cmd/engine/main.go      # 库入口（非独立可执行）

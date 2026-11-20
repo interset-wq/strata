@@ -163,12 +163,6 @@ final largeImageProvider = FutureProvider<List<FeaturedItem>>((ref) async {
 /// 图片全屏查看器的当前图集（首页大图精选打开查看器前写入）。
 final imageViewerProvider = StateProvider<List<FeaturedItem>>((ref) => const []);
 
-/// 书架（“想读”，首页“继续浏览”数据源）。
-final shelfProvider = FutureProvider<List<ShelfItem>>((ref) async {
-  final handle = await ref.watch(bootProvider.future);
-  return handle.api.shelfList();
-});
-
 /// 外观主题：默认跟随系统（设置页可切浅色/深色）。
 final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.system);
 

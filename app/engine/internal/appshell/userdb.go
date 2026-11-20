@@ -7,9 +7,13 @@ import (
 	"path/filepath"
 )
 
-const userSchemaVersion = 5
+const userSchemaVersion = 6
 
-const userSchema = `
+// userSchemaV5 is the v5-era full user.db DDL: additive across
+// versions (v1 → v5), replayed idempotently on every schema pass — a
+// fresh database gets the whole v5 set, then migrateV5toV6 folds the
+// legacy bookshelf into the watchlist (docs/02 §v6).
+const userSchemaV5 = `
 CREATE TABLE IF NOT EXISTS observations(
   nid            INTEGER NOT NULL,
   observed_at    INTEGER NOT NULL,
@@ -174,13 +178,87 @@ func EnsureUserDB(path string) error {
 	if version >= userSchemaVersion {
 		return nil
 	}
-	if _, err := db.Exec(userSchema); err != nil {
+	if _, err := db.Exec(userSchemaV5); err != nil {
 		return fmt.Errorf("create user schema: %w", err)
+	}
+	if err := migrateV5toV6(db); err != nil {
+		return fmt.Errorf("migrate v5→v6: %w", err)
 	}
 	if _, err := db.Exec(fmt.Sprintf("PRAGMA user_version=%d", userSchemaVersion)); err != nil {
 		return err
 	}
 	return nil
+}
+
+// migrateV5toV6 folds the legacy bookshelf into the watchlist
+// (docs/02 §v6): the app has no reading feature, so "shelf" (save)
+// becomes an inactive (poll_enabled = 0) watchlist entry while
+// tracking entries keep their state; shelf_lists is renamed to
+// watch_lists and watchlist gains list_id. Every step is idempotent,
+// so a migration that crashes mid-way replays safely.
+func migrateV5toV6(db *sql.DB) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	if !hasColumn(tx, "watchlist", "list_id") {
+		if _, err := tx.Exec(`ALTER TABLE watchlist
+ADD COLUMN list_id INTEGER NOT NULL DEFAULT 0`); err != nil {
+			return err
+		}
+	}
+	if tableExists(tx, "shelf") {
+		if _, err := tx.Exec(`
+INSERT OR IGNORE INTO watchlist(nid, role, added_at, poll_enabled, poll_interval, note, list_id)
+SELECT nid, 'self', added_at, 0, 86400, note, COALESCE(list_id, 0)
+FROM shelf`); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(`DROP TABLE shelf`); err != nil {
+			return err
+		}
+	}
+	if tableExists(tx, "shelf_lists") && !tableExists(tx, "watch_lists") {
+		if _, err := tx.Exec(`ALTER TABLE shelf_lists RENAME TO watch_lists`); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// queryer is satisfied by both *sql.DB and *sql.Tx.
+type queryer interface {
+	QueryRow(query string, args ...any) *sql.Row
+	Query(query string, args ...any) (*sql.Rows, error)
+}
+
+func tableExists(q queryer, name string) bool {
+	var one int
+	err := q.QueryRow(
+		`SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?`, name).Scan(&one)
+	return err == nil
+}
+
+func hasColumn(q queryer, table, column string) bool {
+	rows, err := q.Query("PRAGMA table_info(" + table + ")")
+	if err != nil {
+		return false
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid, notNull, pk int
+		var name, dtype string
+		var dflt any
+		if err := rows.Scan(&cid, &name, &dtype, &notNull, &dflt, &pk); err != nil {
+			return false
+		}
+		if name == column {
+			return true
+		}
+	}
+	return false
 }
 
 func userDSN(path string) string {

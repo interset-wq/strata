@@ -178,8 +178,15 @@ class StrataApi {
         .toList();
   }
 
-  Future<void> watchAdd(int nid) async {
-    await _post('/watchlist/$nid');
+  /// 加入 watchlist（v6 统一列表）：[active]=false 只存（原「加入书架」），
+  /// true = 追踪（后台抓取 + 观测时序）。
+  Future<void> watchAdd(int nid, {bool active = false}) async {
+    await _postBody('/watchlist/$nid', {'active': active});
+  }
+
+  /// 切换追踪状态（v6）：PUT /watchlist/:nid {active}。
+  Future<void> watchSetActive(int nid, bool active) async {
+    await _putBody('/watchlist/$nid', {'active': active});
   }
 
   Future<void> watchRemove(int nid) async {
@@ -211,13 +218,6 @@ class StrataApi {
     final body = await _get('/moe-goddess', {'limit': '$limit'});
     return (body['items'] as List)
         .map((e) => RankItem.fromJson(e as Map<String, dynamic>))
-        .toList();
-  }
-
-  Future<List<ShelfItem>> shelfList() async {
-    final body = await _get('/shelf');
-    return (body['items'] as List)
-        .map((e) => ShelfItem.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 
@@ -335,14 +335,6 @@ class StrataApi {
     return (body['items'] as List)
         .map((e) => RankItem.fromJson(e as Map<String, dynamic>))
         .toList();
-  }
-
-  Future<void> shelfAdd(int nid) async {
-    await _postBody('/shelf', {'nid': nid});
-  }
-
-  Future<void> shelfRemove(int nid) async {
-    await _delete('/shelf/$nid');
   }
 
   Future<dynamic> _post(String path) async {
@@ -612,6 +604,8 @@ class WatchItem {
   final int addedAt;
   final String role;
   final String? note;
+  /// v6 统一列表：true = 追踪中（后台抓取），false = 只存（原书架条目）。
+  final bool active;
 
   WatchItem.fromJson(Map<String, dynamic> m)
       : nid = m['nid'] as int,
@@ -621,7 +615,8 @@ class WatchItem {
         coverUrl = m['cover_url'] as String?,
         addedAt = m['added_at'] as int,
         role = m['role'] as String? ?? 'self',
-        note = m['note'] as String?;
+        note = m['note'] as String?,
+        active = m['active'] as bool? ?? false;
 }
 
 class DiscoverPage {
@@ -776,21 +771,6 @@ class FeaturedItem {
         author = m['author'] as String,
         coverUrl = m['cover_url'] as String?,
         favs = m['favs'] as int?;
-}
-
-class ShelfItem {
-  final int nid;
-  final String title;
-  final String author;
-  final String? genre;
-  final int addedAt;
-
-  ShelfItem.fromJson(Map<String, dynamic> m)
-      : nid = m['nid'] as int,
-        title = m['title'] as String,
-        author = m['author'] as String,
-        genre = m['genre'] as String?,
-        addedAt = m['added_at'] as int;
 }
 
 class RefreshResult {

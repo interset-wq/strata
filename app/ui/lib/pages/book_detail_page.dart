@@ -26,8 +26,30 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
   bool _footprintLogged = false;
   String? refreshMessage;
   Color? refreshColor;
-  bool onShelf = false;
+  // v6 统一 watchlist：onWatch = 在列表里，tracking = 激活（后台抓取）。
+  bool onWatch = false;
+  bool tracking = false;
   Future<List<ObservationRow>>? observations;
+
+  @override
+  void initState() {
+    super.initState();
+    // 以当前书的 watchlist 状态初始化（v6 统一列表，本地查询）。
+    ref.read(bootProvider.future).then((h) async {
+      final items = await h.api.watchList();
+      for (final it in items) {
+        if (it.nid == widget.nid) {
+          if (mounted) {
+            setState(() {
+              onWatch = true;
+              tracking = it.active;
+            });
+          }
+          break;
+        }
+      }
+    }).onError((Object _, StackTrace _) {});
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -39,24 +61,17 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
         centerTitle: true,
         actions: [
           IconButton(
-            icon: const Icon(Icons.visibility_outlined),
-            tooltip: '加入追踪',
-            onPressed: () async {
-              final handle =
-                  await ref.read(bootProvider.future);
-              await handle.api.watchAdd(widget.nid);
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('已加入追踪')));
-              }
-            },
+            icon: Icon(tracking ? Icons.visibility : Icons.visibility_outlined),
+            tooltip: !onWatch
+                ? '加入追踪'
+                : (tracking ? '停止追踪' : '追踪更新'),
+            onPressed: _toggleTracking,
           ),
           IconButton(
-            icon: onShelf
-                ? const Icon(Icons.favorite)
-                : const Icon(Icons.favorite_border),
-            tooltip: onShelf ? '移出书架' : '收藏',
-            onPressed: onShelf ? _removeShelf : _addShelf,
+            icon:
+                Icon(onWatch ? Icons.bookmark : Icons.bookmark_add_outlined),
+            tooltip: onWatch ? '移出 watchlist' : '加入 watchlist',
+            onPressed: onWatch ? _removeWatch : _addWatch,
           ),
         ],
       ),
@@ -199,16 +214,16 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                     label: const Text('刷新观测'),
                   ),
                   const SizedBox(width: 12),
-                  onShelf
+                  onWatch
                       ? OutlinedButton.icon(
-                          onPressed: _removeShelf,
-                          icon: const Icon(Icons.favorite),
-                          label: const Text('已在书架'),
+                          onPressed: _removeWatch,
+                          icon: const Icon(Icons.bookmark),
+                          label: const Text('在 watchlist'),
                         )
                       : OutlinedButton.icon(
-                          onPressed: _addShelf,
-                          icon: const Icon(Icons.favorite_border),
-                          label: const Text('收藏'),
+                          onPressed: _addWatch,
+                          icon: const Icon(Icons.bookmark_add_outlined),
+                          label: const Text('加入 watchlist'),
                         ),
                 ],
               ),
@@ -271,16 +286,35 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
     }
   }
 
-  Future<void> _addShelf() async {
+  /// 加入 watchlist（v6：只存，原「收藏/加入书架」）。
+  Future<void> _addWatch() async {
     final handle = await ref.read(bootProvider.future);
-    await handle.api.shelfAdd(widget.nid);
-    setState(() => onShelf = true);
+    await handle.api.watchAdd(widget.nid);
+    setState(() => onWatch = true);
   }
 
-  Future<void> _removeShelf() async {
+  Future<void> _removeWatch() async {
     final handle = await ref.read(bootProvider.future);
-    await handle.api.shelfRemove(widget.nid);
-    setState(() => onShelf = false);
+    await handle.api.watchRemove(widget.nid);
+    setState(() {
+      onWatch = false;
+      tracking = false;
+    });
+  }
+
+  /// 追踪切换（v6）：不在列表 = 加入并激活；在列表 = 翻转 poll_enabled。
+  Future<void> _toggleTracking() async {
+    final handle = await ref.read(bootProvider.future);
+    final next = !tracking;
+    if (onWatch) {
+      await handle.api.watchSetActive(widget.nid, next);
+    } else {
+      await handle.api.watchAdd(widget.nid, active: true);
+    }
+    setState(() {
+      onWatch = true;
+      tracking = next;
+    });
   }
 
   Widget _observationsList() {

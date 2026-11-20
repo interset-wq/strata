@@ -225,11 +225,14 @@ Classic 发现流（docs/12 §5）：候选池 = `is_licensed=0` 且**有封面*
 `clicks:nid`，缺省从顶部开始），每批默认 20，stateless。响应含 `next_cursor`
 （批末返回，为空表示到底）。
 
-### GET/POST/DELETE /strata/watchlist（**已实现**）
+### GET/POST/PUT/DELETE /strata/watchlist（**已实现**，v6 起统一书架）
 
-作者工作台追踪列表（Phase 5，docs/12 §3.4 反馈回路隔离：观测数据只存 user.db）。
-GET 返回 `{items:[{nid,title,author,genre,cover_url,added_at,role,note}]}`（JOIN seed.books，
-按加入时间倒序）；POST/DELETE `/watchlist/:nid` 幂等增删。观测时序见
+用户兴趣的唯一列表（docs/02 §v6：本 app 无阅读功能，书架并入 watchlist——
+未激活 = 只存，激活 = 追踪）。GET 返回 `{items:[{nid,title,author,genre,cover_url,
+added_at,role,note,active}]}`（JOIN seed.books，按加入时间倒序，`active` = poll_enabled）；
+POST `/watchlist/:nid` body `{active?: bool, role?: string}`（缺省 active=false = 原「收藏」）；
+PUT `/watchlist/:nid` body `{active: bool}` 切换追踪；DELETE 幂等移除。旧 `/strata/shelf`
+GET/PUT/DELETE 已移除（数据由 user.db v6 迁移）。观测时序见
 `GET /books/:nid/observations`（按 observed_at 倒序，来源 source 标注），
 保留期由 PruneObservations 管理。
 
@@ -337,15 +340,14 @@ HTML 基线，响应不带 `source` 字段——调用方无需区分。**独立
 
 `observed_at` 倒序；`null` 表示该字段本次未抓（不是 0）。
 
-### 书架 / watchlist（Phase 4/5）
+### watchlist（原书架 + 追踪列表，v6 起统一）
 
 | 端点                   | 方法                       | 语义                                                                             |
 | ---------------------- | -------------------------- | -------------------------------------------------------------------------------- |
-| `/strata/shelf`      | GET（**已实现**）    | 书架列表，`items: [{nid, title, author, genre, added_at}]`，与种子 JOIN 取书名 |
-| `/strata/shelf`      | PUT（**已实现**）    | 收藏，body `{ "nid": 123456 }`                                                 |
-| `/strata/shelf/:nid` | DELETE（**已实现**） | 取消收藏                                                                         |
-| `/strata/watchlist`  | GET                        | 观测列表（含 `role: self\|peer`，Phase 5）                                      |
-| `/strata/watchlist`  | POST/DELETE                | 增删（`nid` + `role`，Phase 5）                                              |
+| `/strata/watchlist`      | GET（**已实现**）    | 统一列表（激活 + 未激活），`items` 含 `active`（= poll_enabled）                |
+| `/strata/watchlist/:nid` | POST（**已实现**）   | 加入，body `{active?, role?}`；active=false = 原「加入书架」                     |
+| `/strata/watchlist/:nid` | PUT（**已实现**）    | 切换追踪，body `{active: bool}`                                                  |
+| `/strata/watchlist/:nid` | DELETE（**已实现**） | 移除（观测历史保留）                                                             |
 
 只写 `user.db`；与种子的关联**只用 `nid`**（rowid 每次种子发布都会重排）。
 

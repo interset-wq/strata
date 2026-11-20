@@ -3,13 +3,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../widgets/default_cover.dart';
-import '../widgets/back_to_top.dart';
 
 import '../core/providers.dart';
 import '../data/api/strata_api.dart';
+import '../widgets/back_to_top.dart';
 
-/// 作者工作台 · 追踪列表（Phase 5，mockups 12 屏）：watchlist 管理。
-/// 观测数据只存本机 user.db（docs/12 §3.4 隔离红线）。
+/// Watchlist 页（v6 统一列表，原「书架」条目 = 未激活）：官方式筛选 chips
+/// 行、统一卡（激活/未激活徽标 + 追踪切换 + 移除）、空态引导。
+/// 数据 = 本地 watchlist（user.db.watchlist JOIN seed.books）。
+/// 观测时序在详情页看（docs/07）。
 class WatchlistPage extends ConsumerStatefulWidget {
   const WatchlistPage({super.key});
 
@@ -18,7 +20,8 @@ class WatchlistPage extends ConsumerStatefulWidget {
 }
 
 class _WatchlistPageState extends ConsumerState<WatchlistPage> {
-  late Future<List<WatchItem>> _watch;
+  late Future<List<WatchItem>> _items;
+  String? _genreFilter; // null = 全部
   final _scroll = ScrollController();
   bool _showTop = false;
 
@@ -39,23 +42,28 @@ class _WatchlistPageState extends ConsumerState<WatchlistPage> {
   }
 
   void _load() {
-    _watch = ref.read(bootProvider.future).then((h) => h.api.watchList());
+    _items = ref.read(bootProvider.future).then((h) => h.api.watchList());
   }
 
   Future<void> _remove(WatchItem item) async {
     final handle = await ref.read(bootProvider.future);
     await handle.api.watchRemove(item.nid);
     _load();
-    setState(() {});
+  }
+
+  Future<void> _toggle(WatchItem item) async {
+    final handle = await ref.read(bootProvider.future);
+    await handle.api.watchSetActive(item.nid, !item.active);
+    _load();
   }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('追踪管理')),
+      appBar: AppBar(title: const Text('Watchlist')),
       body: FutureBuilder<List<WatchItem>>(
-        future: _watch,
+        future: _items,
         builder: (context, snap) {
           if (snap.connectionState != ConnectionState.done) {
             return const Center(child: CircularProgressIndicator());
@@ -65,53 +73,81 @@ class _WatchlistPageState extends ConsumerState<WatchlistPage> {
           }
           final items = snap.data ?? [];
           if (items.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.visibility_outlined,
-                      size: 56,
-                      color: scheme.onSurfaceVariant.withValues(alpha: .5)),
-                  const SizedBox(height: 12),
-                  Text('还没有追踪的书',
-                      style: TextStyle(
-                          fontFamily: 'serif',
-                          fontSize: 17,
-                          fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 6),
-                  Text('在书籍详情页点「追踪」，这里记录观测时序',
-                      style: TextStyle(
-                          fontSize: 12, color: scheme.onSurfaceVariant)),
-                ],
-              ),
-            );
+            return _EmptyState(onBrowse: () => context.go('/'));
           }
-          return RefreshIndicator(
-            onRefresh: () async => _load(),
-            child: Stack(
-              children: [
-                ListView.builder(
-                  controller: _scroll,
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                  itemCount: items.length,
-                  itemBuilder: (context, i) => _WatchCard(
-                    item: items[i],
-                    onRemove: () => _remove(items[i]),
-                  ),
-                ),
-                if (_showTop)
-                  Positioned(
-                    right: 16,
-                    bottom: 24,
-                    child: BackToTop(
-                      onTap: () => _scroll.animateTo(
-                          0,
-                          duration: const Duration(milliseconds: 400),
-                          curve: Curves.easeOut),
+          // 官方式筛选 chips：全部 + 题材聚合（数据驱动，无假筛选）
+          final genres =
+              items.map((e) => e.genre).whereType<String>().toSet().toList()
+                ..sort();
+          final filtered = _genreFilter == null
+              ? items
+              : items.where((e) => e.genre == _genreFilter).toList();
+          return Stack(
+            children: [
+              Column(
+                children: [
+                  SizedBox(
+                    height: 44,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      children: [
+                        for (final g in ['全部', ...genres])
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: ChoiceChip(
+                              label: Text(g),
+                              selected:
+                                  _genreFilter == (g == '全部' ? null : g),
+                              onSelected: (_) => setState(
+                                  () => _genreFilter = g == '全部' ? null : g),
+                              labelStyle: TextStyle(
+                                  fontSize: 12,
+                                  color: _genreFilter ==
+                                          (g == '全部' ? null : g)
+                                      ? scheme.onPrimary
+                                      : scheme.onSurfaceVariant),
+                              selectedColor: scheme.primary,
+                            ),
+                          ),
+                      ],
                     ),
                   ),
-              ],
-            ),
+                  Expanded(
+                    child: filtered.isEmpty
+                        ? Center(
+                            child: Text(
+                                '该筛选下暂无条目',
+                                style: TextStyle(
+                                    color: scheme.onSurfaceVariant)))
+                        : RefreshIndicator(
+                            onRefresh: () async => _load(),
+                            child: ListView.builder(
+                              controller: _scroll,
+                              padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                              itemCount: filtered.length,
+                              itemBuilder: (context, i) => _WatchCard(
+                                item: filtered[i],
+                                onToggle: () => _toggle(filtered[i]),
+                                onRemove: () => _remove(filtered[i]),
+                              ),
+                            ),
+                          ),
+                  ),
+                ],
+              ),
+              if (_showTop)
+                Positioned(
+                  right: 16,
+                  bottom: 24,
+                  child: BackToTop(
+                    onTap: () => _scroll.animateTo(
+                        0,
+                        duration: const Duration(milliseconds: 400),
+                        curve: Curves.easeOut),
+                  ),
+                ),
+            ],
           );
         },
       ),
@@ -119,11 +155,15 @@ class _WatchlistPageState extends ConsumerState<WatchlistPage> {
   }
 }
 
+/// 统一卡：封面 + 标题/作者/题材 + 状态徽标（追踪于/保存于 N 天前）+
+/// 追踪切换 / 移除。点卡进详情（观测时序在详情页看）。
 class _WatchCard extends StatelessWidget {
   final WatchItem item;
+  final VoidCallback onToggle;
   final VoidCallback onRemove;
 
-  const _WatchCard({required this.item, required this.onRemove});
+  const _WatchCard(
+      {required this.item, required this.onToggle, required this.onRemove});
 
   @override
   Widget build(BuildContext context) {
@@ -140,6 +180,7 @@ class _WatchCard extends StatelessWidget {
           padding: const EdgeInsets.all(12),
           child: Row(
             children: [
+              // 无封面数据：书脊字占位（与发现流一致）
               Container(
                 width: 52,
                 height: 72,
@@ -173,34 +214,44 @@ class _WatchCard extends StatelessWidget {
                           fontSize: 11, color: scheme.onSurfaceVariant),
                     ),
                     const SizedBox(height: 5),
-                    Row(
-                      children: [
-                        _badge(context, '追踪 $when', fg: scheme.primary),
-                        if (item.note != null && item.note!.isNotEmpty) ...[
-                          const SizedBox(width: 4),
-                          Expanded(
-                            child: Text(item.note!,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                    fontSize: 10,
-                                    color: scheme.onSurfaceVariant)),
-                          ),
-                        ],
-                      ],
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 1),
+                      decoration: BoxDecoration(
+                          border: Border.all(
+                              color: (item.active
+                                      ? scheme.primary
+                                      : scheme.outline)
+                                  .withValues(alpha: .5)),
+                          borderRadius: BorderRadius.circular(999)),
+                      child: Text(
+                        item.active ? '追踪于 $when' : '保存于 $when',
+                        style: TextStyle(
+                            fontSize: 10,
+                            color: item.active
+                                ? scheme.primary
+                                : scheme.onSurfaceVariant),
+                      ),
                     ),
                   ],
                 ),
               ),
+              // 追踪切换（v6：激活 = 后台抓取，未激活 = 只存）
               IconButton(
-                icon: Icon(Icons.timeline, color: scheme.primary),
-                tooltip: '观测数据',
-                onPressed: () => context.push('/book/${item.nid}/data'),
+                icon: Icon(
+                    item.active
+                        ? Icons.visibility
+                        : Icons.visibility_outlined,
+                    color: item.active
+                        ? scheme.primary
+                        : scheme.onSurfaceVariant),
+                tooltip: item.active ? '停止追踪' : '追踪更新',
+                onPressed: onToggle,
               ),
               IconButton(
-                icon: Icon(Icons.visibility_off_outlined,
-                    color: scheme.onSurfaceVariant),
-                tooltip: '取消追踪',
+                icon: Icon(Icons.delete_outline,
+                    size: 18, color: scheme.onSurfaceVariant),
+                tooltip: '移出 watchlist',
                 onPressed: onRemove,
               ),
             ],
@@ -211,15 +262,39 @@ class _WatchCard extends StatelessWidget {
   }
 }
 
-Widget _badge(BuildContext context, String text, {Color? fg}) {
-  final scheme = Theme.of(context).colorScheme;
-  return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
-    decoration: BoxDecoration(
-      border: Border.all(color: scheme.outline.withValues(alpha: .5)),
-      borderRadius: BorderRadius.circular(999),
-    ),
-    child: Text(text,
-        style: TextStyle(fontSize: 10, color: fg ?? scheme.onSurfaceVariant)),
-  );
+class _EmptyState extends StatelessWidget {
+  final VoidCallback onBrowse;
+
+  const _EmptyState({required this.onBrowse});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.visibility_outlined,
+              size: 56, color: scheme.onSurfaceVariant.withValues(alpha: .5)),
+          const SizedBox(height: 12),
+          Text('Watchlist 还是空的',
+              style: TextStyle(
+                  fontFamily: 'serif',
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700)),
+          const SizedBox(height: 6),
+          Text('去首页找到下一本想读的书，点「加入 watchlist」保存',
+              style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+          const SizedBox(height: 16),
+          OutlinedButton(
+            onPressed: onBrowse,
+            style: OutlinedButton.styleFrom(
+                foregroundColor: scheme.primary,
+                side: BorderSide(color: scheme.primary)),
+            child: const Text('去逛逛'),
+          ),
+        ],
+      ),
+    );
+  }
 }

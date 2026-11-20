@@ -1,18 +1,22 @@
 # APP 设计文档 02：数据模型与种子构建
-> **2026-11-19 V3 更新**：`schema_version=3`、`books` 28 列（新增 `form`/`lqs`/`lqs_pctl`/`vel_pctl`），
-> 种子 18,750 本（47 授权）、`seed_version=20260503.19`（已取消新书发现渠道，见 09 附录 E.8；征文保底见 E.9；封面补全见 E.10；弃书规则+invalid 见 E.11/E.12；弃书质量豁免+对话判据 v2 见 E.13；同人字数判形态+短篇三天花板见 E.17；对话体时间下界+标题 IP 条款见 E.18；越短篇天花板的僵尸/假短篇归 invalid 见 E.19；中篇必须已完结、无豁免见 E.20；正文征文否决形态估计见 E.21）；下方表格中的 24 列/30,878 为 v2 历史快照。
+> **状态（随版本变化，数字仅供参考）**：`schema_version=4`（发书日历 `calendar_universe`，见 14）、
+> `books` 28 列；当前 `seed_version` / 书数列数见 `manifest.json`。收录与形态条款：
+> 取消新书发现渠道（09 附录 E.8）、征文保底 E.9、封面补全 E.10、弃书+invalid E.11/E.12、
+> 弃书质量豁免+对话判据 v2 E.13、同人字数判形态+短篇三天花板 E.17、对话体时间下界+标题 IP E.18、
+> 越天花板僵尸/假短篇归 invalid E.19、中篇必须完结 E.20、正文征文否决形态估计 E.21、
+> Web 死链剔除 E.25、App `categoryId` 正向判对话 E.28（形态口径见 `docs/form-definitions.md`）。
+> 文中具体计数/比例/体积为各版实测快照、仅供参考，随数据集变化；表格结构以 `schema.sql` 为准。
 
-> **表结构定案 v1.0**。所有体积/耗时为真实建库实测（`app/tools/seedbuild/build_seed.py`），
-> 不引用历史文档旧数字。上游约束见 01 §2；搜索口径见 04。
+> 上游约束见 01 §2；搜索口径见 04。
 
 ## 0. 结论
 
 | 项           | 定案                                                                                                                                                                                         |
 | ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 物理库       | `seed.db`（只读随包）+ `user.db`（可写持久），跨库只认 `nid`，禁 rowid                                                                                                                 |
-| seed.db      | `books` 24 列 + `book_tags` 2 列 + `seed_meta`，共 3 表 9 索引；唯一约束：`UNIQUE(cover_url)`、`book_tags` 主键 `(nid,tag)`、`deep_ranks` `UNIQUE(est_year,metric,nid)`（随下次种子重建生效）                                                                                                                         |
-| seed.db 体积 | SQLite 16.02 MB（519 B/本）/ gzip 6.67 MB；索引占 6.12 MB（38.2%）                                                                                                                           |
-| user.db      | 12 表：`observations` / `book_meta` / `covers` / `discovered` / `watchlist` / `novel_chapters` / `shelf`+`shelf_lists` / `annotations` / `search_history` / `prefs` / `user_stats` / `refresh_attempts`；观测 ≈59 B/行 |
+| seed.db      | v4：`books` 28 列 + `book_tags` + `deep_ranks` + `calendar_universe` + `seed_meta`，6 表 10 索引；唯一约束：`UNIQUE(cover_url)`、`book_tags` 主键 `(nid,tag)`、`deep_ranks` `UNIQUE(est_year,metric,nid)`；发书日历表见 14 |
+| seed.db 体积 | 随种子版本变化（现算见 `manifest.json`），早期实测约 519 B/本、索引占约 38%                                                                                                        |
+| user.db      | `observations` / `book_meta` / `covers` / `discovered` / `watchlist` / `watch_lists` / `novel_chapters` / `annotations` / `search_history` / `prefs` / `user_stats` / `refresh_attempts` / `browsing_history`；书架已并入 `watchlist`（激活=追踪 / 未激活=只存），原 `shelf`/`shelf_lists` 由 v6 迁移丢弃。实际表集合以 `userdb.go` 为准 |
 | 预计算       | 五列分位/比率随种子携带（+25 B/本）；`pr` 预计算使赞藏比榜 44.9ms→0.056ms（800×）                                                                                                        |
 | 不建         | `tags`/`authors`/`contests` 维度表；枚举码表；FTS5；分片；STRICT 表                                                                                                                    |
 | 字符串       | 全 `TEXT`，不用 `VARCHAR(n)`（`n` 被 SQLite 忽略，零约束零信息）；不加长度/CHECK 约束——CHECK 逐行求值使 10 万行写入 58→201ms，超长标题会整批回滚；合法性由 Go 侧常量 + 逐条降级保证 |
@@ -27,8 +31,9 @@
 
 ## 2. seed.db
 
-### 2.1 `books`（24 列）
+### 2.1 `books`（28 列）
 
+> 下表为结构说明，列序/类型以 `app/tools/seedbuild/schema.sql` 为准；括号内分布为某版快照、仅供参考。
 | #      | 列                                                                     | 类型       | 说明                                                                                                |
 | ------ | ---------------------------------------------------------------------- | ---------- | --------------------------------------------------------------------------------------------------- |
 | 1      | `nid`                                                                | INTEGER PK | SFACG 稳定 id，跨库唯一键                                                                           |
@@ -50,7 +55,9 @@
 | 17     | `est_conf`                                                           | TEXT       | exact/high/mid/low（exact=App API `addTime` 直接核实的锚点书；high/mid/low=锚点间隔 ≤90/≤365/更远）|
 | 18     | `tags`                                                               | TEXT       | 管道串，仅展示与兜底；查询走 `book_tags`                                                          |
 | 19–23 | `fav_pctl` / `click_pctl` / `praise_pctl` / `pr` / `pctl_pr` | REAL       | 世代内分位 + 赞藏比（`favs<10` 时 `pr`/`pctl_pr` NULL）                                       |
-| 24     | `is_licensed`                                                        | INTEGER    | 正版日轻 47 本；为 1 时五列分位全 NULL，不进 A 类榜与统计                                           |
+| 24     | `form`                                                               | TEXT       | 六值形态标签，见 `docs/form-definitions.md`；种子已无估计值                                   |
+| 25–27 | `lqs` / `lqs_pctl` / `vel_pctl`                                       | REAL       | 长度加权质量分、同代分位、更新速度分位；`lqs` 仅 long 档计分                                   |
+| 28     | `is_licensed`                                                        | INTEGER    | 正版日轻 47 本；为 1 时五列分位全 NULL，不进 A 类榜与统计                                           |
 
 类型决定：枚举存 TEXT（INTEGER 码 gzip 后只省 0.49 MB，不值码表+JOIN）；
 时间存 TEXT（字典序可直接比较，代价 12 B/本）；分位存连续 REAL（不预存六档，
@@ -64,7 +71,7 @@ CREATE TABLE book_tags(
   tag TEXT    NOT NULL,
   PRIMARY KEY(nid, tag)
 );
--- 111,828 行 / 105 种标签 / 中位 4 个每本，184 本无标签
+-- 行数/标签数随种子版本变化（现算见 manifest.json），某版快照 111,828 行 / 105 种标签
 ```
 
 管道串 `LIKE '%战斗%'` 是子串匹配、无法等值命中；JOIN 走 `idx_bt` 精确匹配。
@@ -90,10 +97,9 @@ CREATE TABLE book_tags(
 
 ### 2.3 `seed_meta`（key/value）
 
-`schema_version` / `seed_version` / `content_end=2026-05-03` / `built_at` /
-`book_count=30878` / `licensed_count=47` / `tag_count=105` / `tag_rows=111828` /
-`base_count=29433` / `short_added=1398` / `stats_universe=241758` /
-`gen_min=2007` / `gen_max=2025`。
+键集合（取值随版本变化，仅供参考）：`schema_version` / `seed_version` / `content_end` /
+`built_at` / `book_count` / `licensed_count` / `tag_count` / `tag_rows` /
+`stats_universe` / `gen_min` / `gen_max` / `calendar_universe_days` 等。
 
 不下发 `source_coverage` 单值：覆盖率 69.3% 是可访问上界（空洞混死亡/僵尸/存活，
 且约 10% 库内书查不到分类目录）。UI 基于「本地已有 / 站上可发现 / 已下架」三态说明，
@@ -154,10 +160,8 @@ CREATE TABLE discovered(
   source TEXT NOT NULL, observed_at INTEGER NOT NULL
 );  -- 收录 ≠ 进入统计：无定年无分位，不参与榜单，UI 标「官方目录，无统计数据」
 
--- 书架与分组
-CREATE TABLE shelf(nid INTEGER PRIMARY KEY, added_at INTEGER NOT NULL,
-                   list_id INTEGER, note TEXT);   -- list_id=0 默认书架
-CREATE TABLE shelf_lists(id INTEGER PRIMARY KEY, name TEXT NOT NULL, created_at INTEGER NOT NULL);
+-- watchlist 分组（v6 由 shelf_lists 改名而来，数据保留）
+CREATE TABLE watch_lists(id INTEGER PRIMARY KEY, name TEXT NOT NULL, created_at INTEGER NOT NULL);
 
 -- 标注摘抄 / 搜索历史 / 偏好 / 本机统计缓存
 CREATE TABLE annotations(id INTEGER PRIMARY KEY, nid INTEGER NOT NULL, chapter TEXT,
@@ -170,13 +174,17 @@ CREATE TABLE user_stats(nid INTEGER PRIMARY KEY, fav_delta_30d INTEGER,
                         click_delta_30d INTEGER,   -- 恒 NULL：跨书点击变化不做
                         obs_count INTEGER, first_seen INTEGER, last_seen INTEGER);
 
--- 观测列表（07 作者工作台）：shelf 是"想读"，watchlist 是"追踪数据"，语义不同
+-- watchlist（07 作者工作台；v6 起为统一列表）：本 app 无阅读功能，原「书架」
+-- 语义不成立——v6 迁移把 shelf 并入 watchlist 并 DROP shelf（数据迁为未激活条目）。
+-- poll_enabled=1 = 激活（追踪：后台抓取 + 观测时序，原「追踪列表」）；
+-- poll_enabled=0 = 未激活（只存，原「书架/收藏」）。list_id 继承书架分组（0 = 主列表）。
 CREATE TABLE watchlist(
   nid INTEGER PRIMARY KEY,
   role TEXT NOT NULL DEFAULT 'self',      -- self 本人 | peer 同期对照（定年差>2年软警告）
   added_at INTEGER NOT NULL,
-  poll_enabled INTEGER NOT NULL DEFAULT 1, poll_interval INTEGER NOT NULL DEFAULT 86400,  -- 最小 6h
-  last_poll_at INTEGER, note TEXT
+  poll_enabled INTEGER NOT NULL DEFAULT 1, poll_interval INTEGER NOT NULL DEFAULT 86400,  -- 最小 6h；0 = 未激活
+  last_poll_at INTEGER, note TEXT,
+  list_id INTEGER NOT NULL DEFAULT 0      -- v6：分组（0 = 主列表）
 );
 CREATE INDEX idx_watch_poll ON watchlist(poll_enabled, last_poll_at);
 
@@ -215,30 +223,33 @@ UI 必须区分 `src`（种子基线 vs 本地刷新时间）。`user_stats` 是
 
 ## 4. 搜索内存索引
 
-启动时读 30,878 条标题+作者（50,486 键）建内存索引：建索引 17.7ms、精确查 0.07µs
-（SQL 的 11 万倍）、前缀扫描 3.89ms（v1 可接受；v2 有序数组+二分，待实测定）。
+启动时读全量标题+作者建内存索引（具体条数随种子版本变化）；建索引毫秒级、精确查纳秒级、
+前缀扫描毫秒级（v1 实测；v2 有序数组+二分待实测定）。
 标题不走 SQL（`LIKE '%..%'` 8.99ms，`idx_title` 只快 2.6× 不值 1.20 MB）。不做 FTS5。
 
 ## 5. 种子构建流水线
 
 ```
-novels.csv (245,887 行，已剔正版日轻；含 108 本 E.14 月榜遗漏补充)
-  ① 定年（eras.estimate）→ ② 过滤 est_year∈[2007,2025] → 241,864 行
-  ③ 分位：全库 × est_year（不在种子池内算）→ ④ pr / pctl_pr
-  ⑤ 选种：favs Top20k ∪ 近1年上架 ∪ 近90天更新 ∪ 月榜归档 ∪ banner 全集
-  ⑥ 补短篇双组分位 Top2000 → ⑦ 补回正版 47 本（is_licensed=1，分位 NULL）
-  ⑧ 建表建索引 → ⑨ VACUUM + ANALYZE → seed.db.gz 随包
+dataset/out/books.jsonl (自有 15 列书目，含 108 本 E.14 月榜遗漏补充)
+  ① 清洗成分析口径（剔除 47 本正版日轻）→ ② 定年 eras.estimate → 过滤 est_year∈[2007,2025]
+  ③ 分位：全 universe × est_year（不在种子池内算）→ ④ pr / pctl_pr / lqs
+  ⑤ 选种（V3，质量锚，无时间渠道）：favs Top20k ∪ 月榜归档 ∪ banner 全集
+       ∪ 每个具名征文 ≥3 本保底；再剔除弃书/invalid/僵尸/Web 死链
+  ⑥ 补回正版 47 本（is_licensed=1，分位 NULL）→ ⑦ form / lqs 落列
+  ⑧ 建表建索引（含 calendar_universe） → ⑨ VACUUM + ANALYZE → seed.db.gz 随包
 ```
-
-边界：近 1 年 = `est_date >= 2025-05-03`，近 90 天 = `updated_at >= 2026-02-02`
-（差一天会少 37 本，构建器只认本文这套）。
 
 构建规则（不可违背）：
 
-1. **分位在全库算**（241,864 行参照系），种子池内重算会改分母、不可跨版本比较；
+1. **分位在全库算**（现算参照系为完整 universe），种子池内重算会改分母、不可跨版本比较；
 2. **定年构建期完成**，端上不插值；
-3. **种子只增不减**，不为删书写迁移逻辑；
+3. **无时间渠道**：新书结构性吃亏于累计收藏，专门给它开渠道不公平（09 附录 E.8）；
 4. **正版日轻只进检索不进统计**（nid 复用旧条目、定年不可信；A 类榜必须带 `is_licensed=0`）。
+
+种子准入断言 P1–P9（缺一即中止构建）：合格深榜书全覆盖、无外部锚的低质量噪声零入种、
+收藏覆盖回退在容差内、每个征文 ≥3 本、弃书仅经征文保底豁免入种、invalid 零入种、
+short 不越点击/收藏/点赞三天花板、连载中篇零入种、Web 死链零入种。
+具体数量随版本变化（现算见 `manifest.json`）。
 
 构建期自校验：行数==book_count、nid 唯一、title 重名阻断并列出 nid 对（站内唯一，
 重名必为改名/删书快照伪影，人工裁定保留行）、分位∈(0,1]、正版分位全 NULL、
@@ -247,11 +258,12 @@ novels.csv (245,887 行，已剔正版日轻；含 108 本 E.14 月榜遗漏补�
 
 ## 6. 版本策略
 
-| 版本               | 影响                                                                    |
-| ------------------ | ----------------------------------------------------------------------- |
-| `schema_version` | user.db 迁移（事务内，失败回滚；迁移前备份 `.bak`；向前兼容一个版本） |
-| `seed_version`   | seed.db 整文件替换，不迁移                                              |
-| `content_end`    | UI 显示的数据时点                                                       |
+| 版本               | 影响                                                                                      |
+| ------------------ | ----------------------------------------------------------------------------------------- |
+| `user_version`   | **user.db** 迁移（事务内，失败回滚；迁移前备份 `.bak`；向前兼容一个版本；v6 = 书架并入 watchlist） |
+| `schema_version` | **seed.db** 表结构版本（v4 = 发书日历 `calendar_universe`；随整文件替换生效）               |
+| `seed_version`   | seed.db 整文件替换，不迁移                                                                |
+| `content_end`    | UI 显示的数据时点                                                                         |
 
 已定结论：`contest`/`genre` 不建维度表；`discovered` 不预计算分位；历史月榜随种子携带
 （165 月×4 榜，原始 1.9 MB）；短篇不建独立分类体系（IP 随时间迁移会过期，用现有 tags 表达）；

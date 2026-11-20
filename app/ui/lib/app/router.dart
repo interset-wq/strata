@@ -17,9 +17,8 @@ import '../pages/search_page.dart';
 import '../pages/image_viewer_page.dart';
 import '../pages/random_pool_page.dart';
 import '../pages/pool_list_page.dart';
-import '../pages/watchlist_page.dart';
 import '../pages/settings_page.dart';
-import '../pages/shelf_page.dart';
+import '../pages/watchlist_page.dart';
 
 /// 底部 Tab 承载 5 个一级页（搜索已让位给发书日历，docs/14 P1）；
 /// 搜索是二级页（各页搜索框入口推入），详情页在 Shell 之外全屏推入。
@@ -53,9 +52,9 @@ final router = GoRouter(
               label: '日历',
             ),
             NavigationDestination(
-              icon: Icon(Icons.collections_bookmark_outlined),
-              selectedIcon: Icon(Icons.collections_bookmark),
-              label: '书架',
+              icon: Icon(Icons.visibility_outlined),
+              selectedIcon: Icon(Icons.visibility),
+              label: 'Watchlist',
             ),
             NavigationDestination(
               icon: Icon(Icons.settings_outlined),
@@ -76,7 +75,7 @@ final router = GoRouter(
           GoRoute(path: '/calendar', builder: (_, _) => const CalendarPage()),
         ]),
         StatefulShellBranch(routes: [
-          GoRoute(path: '/shelf', builder: (_, _) => const ShelfPage()),
+          GoRoute(path: '/watchlist', builder: (_, _) => const WatchlistPage()),
         ]),
         StatefulShellBranch(routes: [
           GoRoute(path: '/settings', builder: (_, _) => const SettingsPage()),
@@ -109,7 +108,6 @@ final router = GoRouter(
         return IpBooksPage(group: group, label: label);
       },
     ),
-    GoRoute(path: '/watchlist', builder: (_, _) => const WatchlistPage()),
     GoRoute(path: '/history', builder: (_, _) => const HistoryPage()),
     GoRoute(path: '/serial-random',
         builder: (_, _) => const RandomPoolPage(

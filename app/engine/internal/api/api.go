@@ -87,6 +87,7 @@ func New(s *store.Store) *gin.Engine {
 	group.GET("/books/:nid/observations", srv.observations)
 	group.GET("/watchlist", srv.watchList)
 	group.POST("/watchlist/:nid", srv.watchAdd)
+	group.PUT("/watchlist/:nid", srv.watchSetActive)
 	group.DELETE("/watchlist/:nid", srv.watchRemove)
 	group.GET("/rankings/favs", srv.rankingFavs)
 	group.GET("/rankings/board", srv.rankingBoard)
@@ -110,9 +111,6 @@ func New(s *store.Store) *gin.Engine {
 	group.GET("/genre-groups", srv.genreGroups)
 	group.GET("/ip-books", srv.ipBooks)
 	group.GET("/banner", srv.banner)
-	group.GET("/shelf", srv.shelfList)
-	group.PUT("/shelf", srv.shelfAdd)
-	group.DELETE("/shelf/:nid", srv.shelfRemove)
 	srv.startWatcher(context.Background())
 	return r
 }
@@ -693,18 +691,48 @@ func (s *Server) watchList(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"meta": gin.H{"pool": "user"}, "items": items})
 }
 
-// watchAdd tracks a book. Idempotent (INSERT OR IGNORE).
+// watchAdd puts a book on the watchlist (v6: the single user-interest
+// list). Body {active?: bool}: active=false (default) = save-only
+// entry (former bookshelf); active=true = tracked. Idempotent — an
+// existing entry keeps its state.
 func (s *Server) watchAdd(c *gin.Context) {
 	nid, err := strconv.ParseInt(c.Param("nid"), 10, 64)
 	if err != nil || nid <= 0 {
 		fail(c, http.StatusBadRequest, "invalid_argument", "nid must be a positive integer")
 		return
 	}
-	if err := s.store.WatchAdd(c.Request.Context(), nid, time.Now().Unix()); err != nil {
+	var body struct {
+		Active *bool `json:"active"`
+	}
+	_ = c.ShouldBindJSON(&body)
+	active := body.Active != nil && *body.Active
+	if err := s.store.WatchAdd(c.Request.Context(), nid, time.Now().Unix(), active); err != nil {
 		fail(c, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"meta": gin.H{"nid": nid, "added": true}})
+}
+
+// watchSetActive toggles tracking on a watchlist entry (v6):
+// body {active: bool}.
+func (s *Server) watchSetActive(c *gin.Context) {
+	nid, err := strconv.ParseInt(c.Param("nid"), 10, 64)
+	if err != nil || nid <= 0 {
+		fail(c, http.StatusBadRequest, "invalid_argument", "nid must be a positive integer")
+		return
+	}
+	var body struct {
+		Active bool `json:"active"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		fail(c, http.StatusBadRequest, "invalid_argument", "body must be {active: bool}")
+		return
+	}
+	if err := s.store.WatchSetActive(c.Request.Context(), nid, body.Active); err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"meta": gin.H{"nid": nid, "active": body.Active}})
 }
 
 // watchRemove drops a book from the watchlist.
@@ -1300,44 +1328,6 @@ func (s *Server) ipBooks(c *gin.Context) {
 			"ordering": "favs"},
 		"items": items,
 	})
-}
-
-// shelfList returns the local shelf joined with seed titles.
-func (s *Server) shelfList(c *gin.Context) {
-	items, err := s.store.ShelfList(c.Request.Context())
-	if err != nil {
-		fail(c, http.StatusInternalServerError, "internal", err.Error())
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"items": items})
-}
-
-func (s *Server) shelfAdd(c *gin.Context) {
-	var body struct {
-		NID int64 `json:"nid"`
-	}
-	if err := c.ShouldBindJSON(&body); err != nil || body.NID <= 0 {
-		fail(c, http.StatusBadRequest, "invalid_argument", "nid is required")
-		return
-	}
-	if err := s.store.ShelfAdd(c.Request.Context(), body.NID, time.Now().Unix()); err != nil {
-		fail(c, http.StatusInternalServerError, "internal", err.Error())
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"ok": true})
-}
-
-func (s *Server) shelfRemove(c *gin.Context) {
-	nid, err := strconv.ParseInt(c.Param("nid"), 10, 64)
-	if err != nil || nid <= 0 {
-		fail(c, http.StatusBadRequest, "invalid_argument", "nid must be a positive integer")
-		return
-	}
-	if err := s.store.ShelfRemove(c.Request.Context(), nid); err != nil {
-		fail(c, http.StatusInternalServerError, "internal", err.Error())
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
 var validForms = map[string]bool{

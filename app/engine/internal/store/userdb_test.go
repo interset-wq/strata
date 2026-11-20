@@ -6,45 +6,60 @@ import (
 	"time"
 )
 
-// user.db write paths (docs/02 §3): shelf, observation time series,
-// preferences, browsing footprint, covers, watchlist, and refresh-cooldown
-// stamping. Everything stays in the writable user DB; the bundled seed is
-// never touched.
+// user.db write paths (docs/02 §3): watchlist (v6: the single
+// user-interest list — the former bookshelf merged in as inactive
+// entries), observation time series, preferences, browsing footprint,
+// covers, and refresh-cooldown stamping. Everything stays in the
+// writable user DB; the bundled seed is never touched.
 
-func TestShelfAddListRemove(t *testing.T) {
+func TestWatchlistAddToggleRemove(t *testing.T) {
 	st := openTestStore(t)
 	ctx := context.Background()
-	if err := st.ShelfAdd(ctx, 1001, 100); err != nil {
+	// v6: one list — active=false is the former bookshelf entry
+	// (save-only), active=true is tracked.
+	if err := st.WatchAdd(ctx, 1001, 100, false); err != nil {
 		t.Fatal(err)
 	}
-	if err := st.ShelfAdd(ctx, 1002, 200); err != nil {
+	if err := st.WatchAdd(ctx, 1002, 200, true); err != nil {
 		t.Fatal(err)
 	}
 	// re-adding an existing book must be a no-op, not a duplicate row
-	if err := st.ShelfAdd(ctx, 1001, 999); err != nil {
+	if err := st.WatchAdd(ctx, 1001, 999, true); err != nil {
 		t.Fatal(err)
 	}
-	items, err := st.ShelfList(ctx)
+	items, err := st.WatchList(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(items) != 2 {
-		t.Fatalf("shelf size = %d, want 2", len(items))
+		t.Fatalf("watchlist size = %d, want 2", len(items))
 	}
-	var have = map[int64]bool{}
+	wantActive := map[int64]bool{1001: false, 1002: true}
 	for _, it := range items {
-		have[it.NID] = true
 		if it.Title == "" {
-			t.Fatalf("shelf item %d has empty title (seed join broken)", it.NID)
+			t.Fatalf("watchlist item %d has empty title (seed join broken)", it.NID)
+		}
+		if want, ok := wantActive[it.NID]; !ok || it.Active != want {
+			t.Fatalf("watchlist item %d active = %v, want %v", it.NID, it.Active, want)
 		}
 	}
-	if !have[1001] || !have[1002] {
-		t.Fatalf("shelf nids = %v, want 1001+1002", have)
-	}
-	if err := st.ShelfRemove(ctx, 1001); err != nil {
+	// toggling activation flips poll_enabled without touching the row
+	if err := st.WatchSetActive(ctx, 1001, true); err != nil {
 		t.Fatal(err)
 	}
-	items, err = st.ShelfList(ctx)
+	items, err = st.WatchList(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, it := range items {
+		if it.NID == 1001 && !it.Active {
+			t.Fatalf("1001 not active after toggle: %+v", items)
+		}
+	}
+	if err := st.WatchRemove(ctx, 1001); err != nil {
+		t.Fatal(err)
+	}
+	items, err = st.WatchList(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -169,11 +184,11 @@ func TestWatchlistCycle(t *testing.T) {
 	st := openTestStore(t)
 	ctx := context.Background()
 	now := time.Now().Unix()
-	if err := st.WatchAdd(ctx, 1004, now); err != nil {
+	if err := st.WatchAdd(ctx, 1004, now, true); err != nil {
 		t.Fatal(err)
 	}
 	// re-adding must stay one row
-	if err := st.WatchAdd(ctx, 1004, now+1); err != nil {
+	if err := st.WatchAdd(ctx, 1004, now+1, true); err != nil {
 		t.Fatal(err)
 	}
 	items, err := st.WatchList(ctx)

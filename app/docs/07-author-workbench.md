@@ -11,7 +11,7 @@
 
 | 结论 |
 | --- |
-| `watchlist` 独立于 `shelf`（"追踪数据"≠"想读"），`role` 区分本人作品/同期对照 |
+| v6 起 `watchlist` 统一原书架：`poll_enabled` 区分激活（追踪数据）/未激活（只存，原「想读」），`role` 区分本人作品/同期对照 |
 | 后台定期爬取只作用于观测列表（用户显式订阅、≤100 本、间隔 ≥6h）；全库轮转仍禁 |
 | 点击按通路分档：PC 版 ±500 只显绝对值；App API `viewTimes` 精确整数可做单书曲线；跨书变化榜不做 |
 | 评论可做变化观测（`op=getcomment` 精确整数）；"热力图"专指更新热力图 |
@@ -28,13 +28,17 @@ CREATE TABLE watchlist(
   added_at INTEGER NOT NULL,
   poll_enabled INTEGER NOT NULL DEFAULT 1,
   poll_interval INTEGER NOT NULL DEFAULT 86400,  -- 最小 21600（6h），档位 6h/24h/7d
-  last_poll_at INTEGER, note TEXT          -- 前台打开不更新 last_poll_at
+  last_poll_at INTEGER, note TEXT,          -- 前台打开不更新 last_poll_at
+  list_id INTEGER NOT NULL DEFAULT 0        -- v6 分组（0 = 主列表，原书架分组）
 );
 CREATE INDEX idx_watch_poll ON watchlist(poll_enabled, last_poll_at);
 CREATE INDEX idx_watch_role ON watchlist(role);
+-- watch_lists(id, name, created_at)：v6 由 shelf_lists 改名而来，数据保留
 ```
 
 - 加入：从详情/搜索/榜单均可，需选 role；重复加入只更新 `added_at`。
+- v6 起与原书架合并：`poll_enabled=0` 的未激活条目（只存、不后台抓取）即原书架数据，
+  user.db v5→v6 迁移自动迁入；激活切换 = `PUT /strata/watchlist/:nid {active}`。
 - 移除只删本行，**`observations` 历史保留**；暂停 `poll_enabled=0`，恢复不补跑缺口。
 - `role` 可改（UPDATE 一列），历史曲线连续。
 - 容量：上限 100 本（self ≤20、peer ≤80 建议值）；超限提示移除，不自动删。
@@ -135,7 +139,8 @@ App API 失效时相关图表自动隐藏（不显示空图或编造数据）；
 
 | 变更 | 表 |
 | --- | --- |
-| 新建 | `watchlist`（§1） |
+| 新建（v1） | `watchlist`（§1，作者追踪列表） |
+| v6 统一书架 | `watchlist` 加 `list_id`；`shelf` 并入且被 DROP、`shelf_lists` 改名 `watch_lists`（见 02 §3） |
 | 加列 | `observations.short_comments` / `long_comments`（v2 迁移，默认 NULL） |
 | 恢复写入 | `observations.clicks`（不改 schema，只改写入逻辑） |
 | 新建 | `novel_chapters`（章节快照；清理按"超出热力图回溯窗口 12 周"而非抓取时间） |

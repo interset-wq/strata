@@ -680,11 +680,30 @@ WHERE is_licensed = 0 AND COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) IS
 	return items, rows.Err()
 }
 
-// WatchAdd puts a book on the author's watchlist (Phase 5 tracking).
-func (s *Store) WatchAdd(ctx context.Context, nid int64, addedAt int64) error {
+// WatchAdd puts a book on the watchlist (v6: the single user-interest
+// list). active=true tracks (background polling, former watchlist);
+// active=false saves only (former bookshelf). Idempotent — an existing
+// entry keeps its state (INSERT OR IGNORE).
+func (s *Store) WatchAdd(ctx context.Context, nid int64, addedAt int64, active bool) error {
+	enabled := 0
+	if active {
+		enabled = 1
+	}
 	_, err := s.DB.ExecContext(ctx, `
-INSERT OR IGNORE INTO watchlist(nid, role, added_at) VALUES (?, 'self', ?)`,
-		nid, addedAt)
+INSERT OR IGNORE INTO watchlist(nid, role, added_at, poll_enabled) VALUES (?, 'self', ?, ?)`,
+		nid, addedAt, enabled)
+	return err
+}
+
+// WatchSetActive toggles tracking on a watchlist entry (v6): active
+// entries poll in the background, inactive ones are save-only.
+func (s *Store) WatchSetActive(ctx context.Context, nid int64, active bool) error {
+	enabled := 0
+	if active {
+		enabled = 1
+	}
+	_, err := s.DB.ExecContext(ctx,
+		`UPDATE watchlist SET poll_enabled = ? WHERE nid = ?`, enabled, nid)
 	return err
 }
 
@@ -704,6 +723,10 @@ type WatchItem struct {
 	AddedAt  int64   `json:"added_at"`
 	Role     string  `json:"role"`
 	Note     *string `json:"note"`
+	// Active = tracking on (poll_enabled). Since v6 the watchlist is the
+	// single user-interest list: active entries are tracked, inactive
+	// ones are save-only (the former bookshelf).
+	Active bool `json:"active"`
 }
 
 // WatchList joins the watchlist with seed metadata, newest first.
@@ -711,7 +734,7 @@ func (s *Store) WatchList(ctx context.Context) ([]WatchItem, error) {
 	rows, err := s.DB.QueryContext(ctx, `
 SELECT w.nid, b.title, b.author, b.genre,
        COALESCE(c.cover, NULLIF(b.cover_url, '')) AS cover_url,
-       w.added_at, w.role, w.note
+       w.added_at, w.role, w.note, w.poll_enabled
 FROM watchlist w JOIN seed.books b ON b.nid = w.nid
 LEFT JOIN covers c ON c.nid = w.nid
 ORDER BY w.added_at DESC`)
@@ -725,14 +748,16 @@ ORDER BY w.added_at DESC`)
 			it         WatchItem
 			gen, cover sql.NullString
 			note       sql.NullString
+			poll       int
 		)
 		if err := rows.Scan(&it.NID, &it.Title, &it.Author, &gen,
-			&cover, &it.AddedAt, &it.Role, &note); err != nil {
+			&cover, &it.AddedAt, &it.Role, &note, &poll); err != nil {
 			return nil, err
 		}
 		it.Genre = strPtr(gen)
 		it.CoverURL = strPtr(cover)
 		it.Note = strPtr(note)
+		it.Active = poll == 1
 		items = append(items, it)
 	}
 	return items, rows.Err()
@@ -1286,28 +1311,6 @@ FROM observations WHERE nid = ? ORDER BY observed_at DESC`, nid)
 	return items, rows.Err()
 }
 
-type ShelfItem struct {
-	NID    int64   `json:"nid"`
-	Title  string  `json:"title"`
-	Author string  `json:"author"`
-	Genre  *string `json:"genre"`
-	AddAt  int64   `json:"added_at"`
-}
-
-// ShelfAdd records a book into the local shelf (user.db only).
-func (s *Store) ShelfAdd(ctx context.Context, nid int64, addedAt int64) error {
-	_, err := s.DB.ExecContext(ctx, `
-INSERT OR IGNORE INTO shelf(nid, added_at) VALUES (?, ?)`, nid, addedAt)
-	return err
-}
-
-// ShelfRemove drops a book from the shelf.
-func (s *Store) ShelfRemove(ctx context.Context, nid int64) error {
-	_, err := s.DB.ExecContext(ctx, `DELETE FROM shelf WHERE nid = ?`, nid)
-	return err
-}
-
-// ShelfList joins the shelf with seed titles.
 // CalendarBook is one seed book on the release calendar (docs/14 P1):
 // est_date dating + conf tier. Display-only; the recommendation layer
 // never consumes calendar data.
@@ -1400,30 +1403,6 @@ func (s *Store) UniverseCountByDay(ctx context.Context, from, to string) (map[st
 		out[day] = n
 	}
 	return out, rows.Err()
-}
-
-func (s *Store) ShelfList(ctx context.Context) ([]ShelfItem, error) {
-	rows, err := s.DB.QueryContext(ctx, `
-SELECT s.nid, b.title, b.author, b.genre, s.added_at
-FROM shelf s JOIN seed.books b ON b.nid = s.nid
-ORDER BY s.added_at DESC`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []ShelfItem{}
-	for rows.Next() {
-		var (
-			it    ShelfItem
-			genre sql.NullString
-		)
-		if err := rows.Scan(&it.NID, &it.Title, &it.Author, &genre, &it.AddAt); err != nil {
-			return nil, err
-		}
-		it.Genre = strPtr(genre)
-		items = append(items, it)
-	}
-	return items, rows.Err()
 }
 
 // RetentionDays is the observation retention window (docs 02 §3.1:
