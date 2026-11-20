@@ -187,7 +187,7 @@ class _OfficialRankDetailPageState
           Expanded(
             child: detail.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => _ErrorRow(message: '$e'),
+              error: (e, _) => _ErrorRow(error: e),
               data: (d) => ListView(
                 padding: const EdgeInsets.all(12),
                 children: [
@@ -368,9 +368,17 @@ class _RankList extends StatelessWidget {
 }
 
 class _ErrorRow extends StatelessWidget {
-  final String message;
+  final Object? error;
 
-  const _ErrorRow({required this.message});
+  const _ErrorRow({required this.error});
+
+  String get _text {
+    final e = error;
+    if (e is StrataApiException && e.code == 'offline') {
+      return e.message;
+    }
+    return '抓取失败：$e（限速器排队或官方页面变动，稍后重试）';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -382,7 +390,7 @@ class _ErrorRow extends StatelessWidget {
               size: 18, color: Theme.of(context).colorScheme.error),
           const SizedBox(width: 8),
           Expanded(
-            child: Text('抓取失败：$message（离线或官方页面变动，联网后重进本页）',
+            child: Text(_text,
                 style: TextStyle(color: Theme.of(context).colorScheme.error)),
           ),
         ],

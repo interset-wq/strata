@@ -61,7 +61,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
   Widget _bookError(BuildContext context, Object e) {
     final scheme = Theme.of(context).colorScheme;
     if (!(e is StrataApiException && e.status == 404)) {
-      return Center(child: Text('加载失败：$e'));
+      return Center(child: Text('加载失败：${StrataApiException.userMessage(e)}'));
     }
     if (_collectError != null) {
       return Center(
@@ -103,7 +103,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
         err = '该书在站上不可读（${r.state}）';
       }
     } catch (ex) {
-      err = ex.toString();
+      err = StrataApiException.userMessage(ex);
     }
     if (!mounted) return;
     setState(() {

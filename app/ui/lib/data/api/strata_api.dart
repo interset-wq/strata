@@ -2,18 +2,55 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
+
 /// HTTP client for the embedded Go engine.
 /// Contract: app/docs/08-engine-api.md.
 class StrataApi {
   final HttpClient _client = HttpClient();
   final String base; // e.g. http://127.0.0.1:45851
 
+  // Offline pre-check for endpoints that proxy upstream fetches
+  // (search/remote, official-ranks/*, refresh, author-*): without it a
+  // device-side fetch hangs with no route, and the UI spinner never ends.
+  Connectivity? _connectivity;
+  DateTime _lastOnlineCheck = DateTime.fromMillisecondsSinceEpoch(0);
+  bool _cachedOnline = true;
+
   StrataApi(this.base);
+
+  /// Currently online (5s-cached local check; engine's localhost is always
+  /// reachable, so this only guards upstream-proxying endpoints).
+  Future<bool> isOnline() async {
+    final now = DateTime.now();
+    if (now.difference(_lastOnlineCheck) < const Duration(seconds: 5) &&
+        _connectivity != null) {
+      return _cachedOnline;
+    }
+    _connectivity ??= Connectivity();
+    final results = await _connectivity!.checkConnectivity();
+    _cachedOnline = results.any((r) => r != ConnectivityResult.none);
+    _lastOnlineCheck = now;
+    return _cachedOnline;
+  }
 
   Uri _uri(String path, [Map<String, String>? query]) =>
       Uri.parse('$base/strata$path').replace(queryParameters: query);
 
-  Future<dynamic> _get(String path, [Map<String, String>? query]) async {
+  Future<void> _ensureOnline({required bool internet}) async {
+    if (!internet) return;
+    if (!await isOnline()) {
+      throw StrataApiException(
+          status: 0, code: 'offline', message: '当前离线，请检查网络连接');
+    }
+  }
+
+  Future<dynamic> _get(
+    String path, [
+    Map<String, String>? query,
+    bool internet = false,
+  ]) async {
+    await _ensureOnline(internet: internet);
     final req = await _client.getUrl(_uri(path, query));
     final resp = await req.close();
     final body = await resp.transform(utf8.decoder).join();
@@ -100,7 +137,7 @@ class StrataApi {
     int rank = 0,
   }) async {
     final body = await _get('/official-ranks/monthly',
-        {'date': month, 'rank': '$rank'});
+        {'date': month, 'rank': '$rank'}, true);
     return (body['items'] as List)
         .map((e) => OfficialRankEntry.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -108,7 +145,7 @@ class StrataApi {
 
   /// PC 当期四榜（book.sfacg.com/Rank/）：月票带票数、打赏/热销无数值、粉丝榜读者侧。
   Future<List<OfficialPcBoard>> officialRanksPc() async {
-    final body = await _get('/official-ranks/pc');
+    final body = await _get('/official-ranks/pc', null, true);
     return (body['boards'] as List)
         .map((e) => OfficialPcBoard.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -118,7 +155,7 @@ class StrataApi {
   Future<List<OfficialRankEntry>> officialRanksMobile({
     required String slug,
   }) async {
-    final body = await _get('/official-ranks/mobile', {'board': slug});
+    final body = await _get('/official-ranks/mobile', {'board': slug}, true);
     return (body['items'] as List)
         .map((e) => OfficialRankEntry.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -199,7 +236,7 @@ class StrataApi {
   /// Triggers a mobile-page detail fetch (sync; global limiter serializes).
   /// state: alive | dead | zombie; written: observation appended.
   Future<RefreshResult> refresh(int nid) async {
-    final body = await _post('/books/$nid/refresh');
+    final body = await _post('/books/$nid/refresh', internet: true);
     return RefreshResult.fromJson(body);
   }
 
@@ -362,7 +399,7 @@ class StrataApi {
       'nid': '$nid',
       if (withIntro) 'with_intro': '1',
       if (fresh) 'fresh': '1',
-    }) as Map<String, dynamic>;
+    }, true) as Map<String, dynamic>;
     return AuthorProfile.fromJson(body);
   }
 
@@ -377,6 +414,7 @@ class StrataApi {
   Future<RemoteSearchResult> searchRemote(String q) async {
     final body = await _post(
       '/search/remote?q=${Uri.encodeComponent(q)}',
+      internet: true,
     ) as Map<String, dynamic>;
     return RemoteSearchResult.fromJson(body);
   }
@@ -461,7 +499,8 @@ class StrataApi {
         .toList();
   }
 
-  Future<dynamic> _post(String path) async {
+  Future<dynamic> _post(String path, {bool internet = false}) async {
+    await _ensureOnline(internet: internet);
     final req = await _client.openUrl('POST', _uri(path));
     final resp = await req.close();
     final text = await resp.transform(utf8.decoder).join();
@@ -589,6 +628,11 @@ class StrataApiException implements Exception {
 
   @override
   String toString() => 'StrataApiException($status, $code): $message';
+
+  /// User-facing error text: offline shows the plain message (the global
+  /// banner already explains the state); anything else keeps full detail.
+  static String userMessage(Object e) =>
+      e is StrataApiException && e.code == 'offline' ? e.message : e.toString();
 }
 
 class Healthz {

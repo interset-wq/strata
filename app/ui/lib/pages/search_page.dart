@@ -72,7 +72,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
       if (!mounted) return;
       setState(() {
         _remoteLoading = false;
-        _remoteError = e.toString();
+        _remoteError = StrataApiException.userMessage(e);
       });
     }
   }
@@ -106,7 +106,8 @@ class _SearchPageState extends ConsumerState<SearchPage> {
           ? _emptyState(context, scheme)
           : results.when(
               loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('搜索失败：$e')),
+              error: (e, _) =>
+                  Center(child: Text('搜索失败：${StrataApiException.userMessage(e)}')),
               data: (list) => _resultList(context, scheme, list),
             ),
     );

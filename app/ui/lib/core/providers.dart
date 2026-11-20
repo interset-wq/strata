@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart' show ThemeMode;
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +10,19 @@ import 'package:path_provider/path_provider.dart';
 
 import '../data/api/strata_api.dart';
 import 'ffi/engine_ffi.dart';
+
+/// Live network paths (connectivity_plus). Empty list or all-`none` =
+/// offline; seed browsing keeps working, upstream-proxying endpoints do not.
+final connectivityProvider =
+    StreamProvider<List<ConnectivityResult>>((ref) async* {
+  final connectivity = Connectivity();
+  yield await connectivity.checkConnectivity();
+  yield* connectivity.onConnectivityChanged;
+});
+
+/// True when at least one network path is active.
+bool isOnline(List<ConnectivityResult> results) =>
+    results.any((r) => r != ConnectivityResult.none);
 
 /// Thrown when the embedded engine cannot be started. The message is shown
 /// verbatim on the failure page (contract: no infinite retries).
