@@ -2,11 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../widgets/default_cover.dart';
-
 import '../core/providers.dart';
 import '../data/api/strata_api.dart';
-import '../widgets/metric_badge.dart';
+import '../widgets/book_row_card.dart';
 
 /// Classic 六榜（docs/12 展示列）：顶部横滑 tab 导航，平台累计值排序。
 const _boards = [
@@ -26,6 +24,7 @@ final _boardProvider = FutureProvider.autoDispose
 });
 
 /// 榜单页：顶部六榜 tab + 年份快速切换（demo 原下拉风格）。
+/// 无页面标题、无模式行；列表与其他页面共用统一行卡（BookRowCard）。
 /// 新书榜不显示年份行（新书定义即最新一代）。
 class RankingsPage extends ConsumerStatefulWidget {
   const RankingsPage({super.key});
@@ -76,7 +75,7 @@ class _RankingsPageState extends ConsumerState<RankingsPage>
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('榜单'),
+        title: const SizedBox.shrink(),
         actions: [
           IconButton(
               icon: const Icon(Icons.swap_vert),
@@ -85,19 +84,6 @@ class _RankingsPageState extends ConsumerState<RankingsPage>
       ),
       body: Column(
         children: [
-          // header tab：Classic 主线
-          Container(
-            height: 42,
-            decoration: BoxDecoration(
-                border: Border(
-                    bottom: BorderSide(color: scheme.outline.withValues(alpha: .3)))),
-            child: Row(
-              children: [
-                const SizedBox(width: 16),
-                _modeTab(context, 'Classic', true, null),
-              ],
-            ),
-          ),
           // 顶部六榜 tab（横滑）
           SizedBox(
             height: 44,
@@ -169,45 +155,6 @@ class _RankingsPageState extends ConsumerState<RankingsPage>
       ),
     );
   }
-
-  Widget _modeTab(BuildContext context, String label, bool active, String? note) {
-    final scheme = Theme.of(context).colorScheme;
-    return GestureDetector(
-      onTap: active ? null : null,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
-        decoration: BoxDecoration(
-            border: Border(
-                bottom: BorderSide(
-                    width: 2,
-                    color: active
-                        ? scheme.primary
-                        : Colors.transparent))),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(label,
-                style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: active ? FontWeight.w700 : FontWeight.w400,
-                    color: active ? scheme.primary : scheme.onSurfaceVariant)),
-            if (note != null) ...[
-              const SizedBox(width: 4),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                decoration: BoxDecoration(
-                    border: Border.all(color: scheme.outline.withValues(alpha: .4)),
-                    borderRadius: BorderRadius.circular(999)),
-                child: Text(note,
-                    style: TextStyle(
-                        fontSize: 9, color: scheme.onSurfaceVariant)),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 class _BoardList extends ConsumerWidget {
@@ -221,6 +168,7 @@ class _BoardList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final items = ref.watch(_boardProvider((kind, year, 0)));
+    final scheme = Theme.of(context).colorScheme;
     return items.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Padding(
@@ -238,105 +186,14 @@ class _BoardList extends ConsumerWidget {
                     child: Text('上滑加载更多 · 平台累计值，老书占优',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                            fontSize: 11, color: schemeOf(context).onSurfaceVariant)),
+                            fontSize: 11, color: scheme.onSurfaceVariant)),
                   );
                 }
-                return _BoardCard(item: list[i]);
+                return BookRowCard(item: list[i]);
               },
             ),
     );
   }
-}
-
-ColorScheme schemeOf(BuildContext context) => Theme.of(context).colorScheme;
-
-class _BoardCard extends StatelessWidget {
-  final RankItem item;
-
-  const _BoardCard({required this.item});
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = schemeOf(context);
-    final coverUrl = item.coverUrl;
-    final hasCover = coverUrl != null && coverUrl.isNotEmpty;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: InkWell(
-        onTap: () => context.push('/book/${item.nid}'),
-        borderRadius: BorderRadius.circular(10),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 大封面：有封面拼 CDN 前缀；无封面书脊字占位（官方式降级）
-            SizedBox(
-              width: 104,
-              height: 140,
-              child: hasCover
-                  ? ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: coverImage(coverUrl, item.nid),
-                    )
-                  : defaultCover(item.nid, radius: 10),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: SizedBox(
-                height: 140,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(item.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w600, height: 1.4)),
-                    const SizedBox(height: 6),
-                    Text(item.author,
-                        style: TextStyle(
-                            fontSize: 11.5, color: scheme.onSurfaceVariant)),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        if (item.genre != null)
-                          _solidBadge(context, item.genre!, scheme.primary),
-                        if (item.status != null) ...[
-                          const SizedBox(width: 4),
-                          _solidBadge(
-                              context,
-                              item.status!,
-                              item.status == '已完结'
-                                  ? scheme.secondary
-                                  : scheme.tertiary),
-                        ],
-                      ],
-                    ),
-                    const Spacer(),
-                    if (item.words != null)
-                      MetricBadge(
-                          icon: MetricIcons.words,
-                          text: '${_wan(item.words!)}+字',
-                          color: scheme.primary),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-Widget _solidBadge(BuildContext context, String text, Color bg) {
-  return Container(
-    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-    decoration: BoxDecoration(
-        color: bg, borderRadius: BorderRadius.circular(4)),
-    child: Text(text,
-        style: TextStyle(
-            fontSize: 10, color: Theme.of(context).colorScheme.onPrimary)),
-  );
 }
 
 class _BackToTop extends StatelessWidget {
@@ -346,7 +203,7 @@ class _BackToTop extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = schemeOf(context);
+    final scheme = Theme.of(context).colorScheme;
     return Material(
       color: scheme.surface,
       borderRadius: BorderRadius.circular(20),
@@ -362,9 +219,4 @@ class _BackToTop extends StatelessWidget {
       ),
     );
   }
-}
-
-String _wan(int n) {
-  if (n >= 10000) return '${(n / 10000).toStringAsFixed(0)}万';
-  return '$n';
 }
