@@ -662,14 +662,24 @@ func (s *Server) rankingBoard(c *gin.Context) {
 	if !ok {
 		return
 	}
-	items, err := s.store.BoardBooks(c.Request.Context(), kind, form, limit, offset)
+	year := 0
+	if raw := c.Query("year"); raw != "" {
+		var err error
+		if year, err = strconv.Atoi(raw); err != nil ||
+			year < s.store.Manifest.GenMin || year > s.store.Manifest.GenMax {
+			fail(c, http.StatusBadRequest, "invalid_argument",
+				"year must be between gen_min and gen_max")
+			return
+		}
+	}
+	items, err := s.store.BoardBooks(c.Request.Context(), kind, form, year, limit, offset)
 	if err != nil {
 		fail(c, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"meta": gin.H{"kind": kind, "pool": "seed", "ordering": "cumulative",
-			"form": form, "licensed_excluded": true},
+			"form": form, "year": year, "licensed_excluded": true},
 		"items": items,
 	})
 }

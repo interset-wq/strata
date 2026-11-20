@@ -582,7 +582,7 @@ func boardKindCol(kind string) (string, bool) {
 // BoardBooks is the Classic full-catalog board (docs/12 showcase): platform
 // cumulative values, no percentile math. Isolated from the recommendation
 // signal whitelist — display only.
-func (s *Store) BoardBooks(ctx context.Context, kind, form string, limit, offset int) ([]RankItem, error) {
+func (s *Store) BoardBooks(ctx context.Context, kind, form string, year, limit, offset int) ([]RankItem, error) {
 	col, ok := boardKindCol(kind)
 	if !ok {
 		return nil, nil
@@ -599,6 +599,10 @@ WHERE is_licensed = 0`
 	if form != "" {
 		q += " AND seed.books.form = ?"
 		args = append(args, form)
+	}
+	if year > 0 {
+		q += " AND seed.books.est_year = ?"
+		args = append(args, year)
 	}
 	if kind == "finish" {
 		q += " AND status = '已完结'"

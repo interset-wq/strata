@@ -76,6 +76,7 @@ class StrataApi {
   Future<List<RankItem>> rankingBoard({
     required String kind,
     String? form,
+    int year = 0,
     int limit = 50,
     int offset = 0,
   }) async {
@@ -83,6 +84,7 @@ class StrataApi {
       'kind': kind,
       'limit': '$limit',
       'form': ?form,
+      if (year > 0) 'year': '$year',
       if (offset > 0) 'offset': '$offset',
     });
     return (body['items'] as List)

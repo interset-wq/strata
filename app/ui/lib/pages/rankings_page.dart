@@ -8,7 +8,7 @@ import '../core/providers.dart';
 import '../data/api/strata_api.dart';
 import '../widgets/metric_badge.dart';
 
-/// Classic 六榜侧栏（官方式）：映射到平台累计值排序（docs/12 展示列）。
+/// Classic 六榜（docs/12 展示列）：顶部横滑 tab 导航，平台累计值排序。
 const _boards = [
   ('recommend', '推荐榜'),
   ('popular', '人气榜'),
@@ -19,13 +19,14 @@ const _boards = [
 ];
 
 final _boardProvider = FutureProvider.autoDispose
-    .family<List<RankItem>, (String, int)>((ref, arg) async {
+    .family<List<RankItem>, (String, int, int)>((ref, arg) async {
   final handle = await ref.watch(bootProvider.future);
-  return handle.api.rankingBoard(kind: arg.$1, limit: 50, offset: arg.$2);
+  return handle.api.rankingBoard(
+      kind: arg.$1, year: arg.$2, limit: 50, offset: arg.$3);
 });
 
-/// 榜单页（mockups 10 屏定稿）：Classic 主线榜单。
-/// 官方式左侧榜单侧栏、右侧大封面卡列表、back-to-top。
+/// 榜单页：顶部六榜 tab + 年份快速切换（demo 原下拉风格）。
+/// 新书榜不显示年份行（新书定义即最新一代）。
 class RankingsPage extends ConsumerStatefulWidget {
   const RankingsPage({super.key});
 
@@ -33,14 +34,22 @@ class RankingsPage extends ConsumerStatefulWidget {
   ConsumerState<RankingsPage> createState() => _RankingsPageState();
 }
 
-class _RankingsPageState extends ConsumerState<RankingsPage> {
+class _RankingsPageState extends ConsumerState<RankingsPage>
+    with SingleTickerProviderStateMixin {
   String _kind = 'recommend';
+  int _year = 2025;
+  late final TabController _tabs;
   final _scroll = ScrollController();
   bool _showTop = false;
 
   @override
   void initState() {
     super.initState();
+    _tabs = TabController(length: _boards.length, vsync: this);
+    _tabs.addListener(() {
+      final i = _tabs.index;
+      if (i >= 0 && _boards[i].$1 != _kind) setState(() => _kind = _boards[i].$1);
+    });
     _scroll.addListener(() {
       final show = _scroll.offset > 500;
       if (show != _showTop) setState(() => _showTop = show);
@@ -49,6 +58,7 @@ class _RankingsPageState extends ConsumerState<RankingsPage> {
 
   @override
   void dispose() {
+    _tabs.dispose();
     _scroll.dispose();
     super.dispose();
   }
@@ -56,6 +66,14 @@ class _RankingsPageState extends ConsumerState<RankingsPage> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final meta = ref.watch(metaProvider);
+    final genMax = meta.value?.manifest.genMax ?? 2025;
+    final genMin = meta.value?.manifest.genMin ?? 2007;
+    // meta 加载后校准默认年份
+    if (meta.value != null && _year > genMax) {
+      _year = genMax;
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: Text('榜单'),
@@ -80,61 +98,70 @@ class _RankingsPageState extends ConsumerState<RankingsPage> {
               ],
             ),
           ),
+          // 顶部六榜 tab（横滑）
+          SizedBox(
+            height: 44,
+            child: TabBar(
+              controller: _tabs,
+              isScrollable: true,
+              labelColor: scheme.primary,
+              unselectedLabelColor: scheme.onSurfaceVariant,
+              indicatorColor: scheme.primary,
+              dividerColor: scheme.outline.withValues(alpha: .3),
+              labelStyle:
+                  const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              unselectedLabelStyle: const TextStyle(fontSize: 14),
+              tabs: [
+                for (final (_, label) in _boards) Tab(text: label),
+              ],
+            ),
+          ),
+          // 年份快速切换（demo 原下拉风格）；新书榜不显示
+          if (_kind != 'new')
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+              child: Row(
+                children: [
+                  DropdownButton<int>(
+                    value: _year.clamp(genMin, genMax),
+                    underline: const SizedBox.shrink(),
+                    items: [
+                      for (int y = genMax; y >= genMin; y--)
+                        DropdownMenuItem(
+                            value: y,
+                            child: Text('$y',
+                                style: const TextStyle(fontSize: 13))),
+                    ],
+                    onChanged: (v) {
+                      if (v == null) return;
+                      setState(() => _year = v);
+                      if (_scroll.hasClients) _scroll.jumpTo(0);
+                    },
+                  ),
+                  const Spacer(),
+                  Text('按 $_year 定年（$genMin–$genMax）',
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: scheme.onSurfaceVariant.withValues(alpha: .7))),
+                ],
+              ),
+            ),
           Expanded(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Stack(
               children: [
-                // 左侧榜单侧栏：朱砂胶囊选中
-                SizedBox(
-                  width: 92,
-                  child: ListView(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    children: [
-                      for (final (kind, label) in _boards)
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
-                          child: GestureDetector(
-                            onTap: () => setState(() => _kind = kind),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 9),
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: _kind == kind
-                                    ? scheme.primary
-                                    : Colors.transparent,
-                                borderRadius: BorderRadius.circular(999),
-                              ),
-                              child: Text(label,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: _kind == kind
-                                        ? FontWeight.w700
-                                        : FontWeight.w400,
-                                    color: _kind == kind
-                                        ? scheme.onPrimary
-                                        : scheme.onSurfaceVariant,
-                                  )),
-                            ),
-                          ),
-                        ),
-                    ],
+                _BoardList(
+                    key: ValueKey('$_kind-$_year'),
+                    kind: _kind,
+                    year: _year,
+                    scroll: _scroll),
+                if (_showTop)
+                  Positioned(
+                    right: 10,
+                    bottom: 10,
+                    child: _BackToTop(onTap: () => _scroll.animateTo(0,
+                        duration: const Duration(milliseconds: 400),
+                        curve: Curves.easeOut)),
                   ),
-                ),
-                Expanded(
-                  child: Stack(
-                    children: [
-                      _BoardList(key: ValueKey(_kind), kind: _kind, scroll: _scroll),
-                      if (_showTop)
-                        Positioned(
-                          right: 10,
-                          bottom: 10,
-                          child: _BackToTop(onTap: () => _scroll.animateTo(0,
-                              duration: const Duration(milliseconds: 400),
-                              curve: Curves.easeOut)),
-                        ),
-                    ],
-                  ),
-                ),
               ],
             ),
           ),
@@ -185,34 +212,38 @@ class _RankingsPageState extends ConsumerState<RankingsPage> {
 
 class _BoardList extends ConsumerWidget {
   final String kind;
+  final int year;
   final ScrollController scroll;
 
-  const _BoardList({super.key, required this.kind, required this.scroll});
+  const _BoardList(
+      {super.key, required this.kind, required this.year, required this.scroll});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final items = ref.watch(_boardProvider((kind, 0)));
+    final items = ref.watch(_boardProvider((kind, year, 0)));
     return items.when(
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (e, _) => Padding(
           padding: const EdgeInsets.all(16), child: Text('加载失败：$e')),
-      data: (list) => ListView.builder(
-        controller: scroll,
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 60),
-        itemCount: list.length + 1,
-        itemBuilder: (context, i) {
-          if (i == list.length) {
-            return Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Text('上滑加载更多 · 平台累计值，老书占优',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                      fontSize: 11, color: schemeOf(context).onSurfaceVariant)),
-            );
-          }
-          return _BoardCard(item: list[i]);
-        },
-      ),
+      data: (list) => list.isEmpty
+          ? const Center(child: Text('该年份下无种子书目'))
+          : ListView.builder(
+              controller: scroll,
+              padding: const EdgeInsets.fromLTRB(14, 14, 14, 60),
+              itemCount: list.length + 1,
+              itemBuilder: (context, i) {
+                if (i == list.length) {
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: Text('上滑加载更多 · 平台累计值，老书占优',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                            fontSize: 11, color: schemeOf(context).onSurfaceVariant)),
+                  );
+                }
+                return _BoardCard(item: list[i]);
+              },
+            ),
     );
   }
 }
