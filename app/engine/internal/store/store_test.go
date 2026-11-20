@@ -317,3 +317,69 @@ func TestAuthorProfileRoundTrip(t *testing.T) {
 		t.Fatalf("upsert = %+v", got)
 	}
 }
+
+// TestSearch pins the L1 local search contract (docs/08): title/author
+// LIKE with wildcard escaping, favs DESC ordering, licensed included,
+// and the cover overlay column scanning without breaking on NULLs.
+func TestSearch(t *testing.T) {
+	st := openTestStore(t)
+	ctx := context.Background()
+
+	items, err := st.Search(ctx, "Long", 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 2 || items[0].NID != 1003 || items[1].NID != 1001 {
+		t.Fatalf("items = %+v", items)
+	}
+	if items[0].CoverURL != nil {
+		t.Fatalf("testseed has no covers, got %v", items[0].CoverURL)
+	}
+
+	items, err = st.Search(ctx, "author a", 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 1 || items[0].NID != 1001 {
+		t.Fatalf("author match = %+v", items)
+	}
+
+	// LIKE wildcards in the query are escaped, not interpreted.
+	items, err = st.Search(ctx, "%", 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 0 {
+		t.Fatalf("escaped %%: %+v", items)
+	}
+}
+
+// TestSearchHistory pins the search-history contract (docs/08
+// §search-history): every submit is stored, reads dedupe by keyword
+// with the most recent keyword first.
+func TestSearchHistory(t *testing.T) {
+	st := openTestStore(t)
+	ctx := context.Background()
+
+	words, err := st.SearchHistory(ctx, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(words) != 0 {
+		t.Fatalf("fresh history = %v", words)
+	}
+
+	for _, kw := range []string{"英雄", "重生", "英雄"} {
+		if err := st.AddSearchHistory(ctx, kw, 3); err != nil {
+			t.Fatal(err)
+		}
+	}
+	words, err = st.SearchHistory(ctx, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 英雄 was re-searched last (highest id), so it comes first.
+	if len(words) != 2 || words[0] != "英雄" || words[1] != "重生" {
+		t.Fatalf("history = %v", words)
+	}
+}

@@ -1,0 +1,520 @@
+
+
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "//www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="//www.w3.org/1999/xhtml">
+<head><title>
+	SF综合搜索
+</title><link href="//rs.sfacg.com/css/commonality.css" rel="stylesheet" type="text/css" /><link href="//rs.sfacg.com/css/comic.css" rel="stylesheet" type="text/css" />
+    <script type="text/javascript" src="//rs.sfacg.com/JS/jquery-1.7.2.min.js"></script>
+    <script type="text/javascript" src="//rs.sfacg.com/JS/jquery.bigautocomplete.js"></script>
+    <script type="text/javascript" src="/JS/common.js"></script>
+</head>
+<body>
+<table width="980" border="0" align="center" cellpadding="0" cellspacing="0">
+  <tr>
+    <td width="300"><img src="//rs.sfacg.com/images/sflogo.gif" width="271" height="89" /></td>
+    <td align="right"><table width="660" height="70" border="0" cellpadding="0" cellspacing="0">
+      <tr>
+        <td align="center"> </td>
+      </tr>
+    </table></td>
+  </tr>
+</table>
+<table width="980" border="0" align="center" cellpadding="0" cellspacing="0">
+  <tr>
+    <td height="63" valign="top" class="Menu_bg"><table width="100%" border="0" cellspacing="0" cellpadding="0">
+      <tr class="F14PX white_link1">
+        <td width="60" height="40" align="center" bgcolor="#FFAB00"><a href="//www.sfacg.com"><b>首 页</b></a></td>
+        <td width="60" align="center"><a href="https://manhua.sfacg.com/">漫 画</a></td>
+        <td width="80" align="center"><a href="//book.sfacg.com/">轻小说</a></td>
+        <td width="80" align="center"><a href="https://passport.sfacg.com/">我的SF</a></td>
+      </tr>
+    </table></td>
+  </tr>
+</table>
+<table width="980" border="0" align="center" cellpadding="1" cellspacing="1" bgcolor="#dfdfdf" class="space10px">
+  <tr>
+    <td bgcolor="#FFFFFF"><table width="100%" border="0" cellpadding="0" cellspacing="0" bgcolor="#f6f6f6">
+      <tr>
+        <td width="68%" height="36" style="padding-left: 8px;"><script src="/JS/SearchBox.js" type="text/javascript"></script><div id="searchlist" style="margin-left: 5px;float: left;"></div>
+          　<a href="#" class="Red_link1">帮助</a></td>
+        <td width="32%" align="center">
+		<table width="300" height="22" border="0" cellpadding="0" cellspacing="0">
+          <tr>
+            <td width="2" class="affiche_left"></td>
+            <td align="left" class="affiche_middle"></td>
+            <td width="2" class="affiche_right"></td>
+          </tr>
+        </table>
+		</td>
+      </tr>
+    </table></td>
+  </tr>
+</table>
+    <form method="post" action="./?Key=%u82f1%u96c4&amp;SS=0&amp;S=1" id="form1">
+<div class="aspNetHidden">
+<input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="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" />
+</div>
+
+<div class="aspNetHidden">
+
+	<input type="hidden" name="__VIEWSTATEGENERATOR" id="__VIEWSTATEGENERATOR" value="CA0B0334" />
+</div>
+    
+
+<table width="980" border="0" align="center" cellpadding="0" cellspacing="0">
+  <tr>
+    <td height="30" class="font_gray gray_link1">您当前的位置：<a href="http://www.sfacg.com">首页</a> &gt; <a href="/">SF搜索</a> &gt; <span class="font_red">搜索结果</span></td>
+  </tr>
+</table>
+<table width="980"  border="0" align="center" cellpadding="0" cellspacing="0">
+  <tr>
+    <td width="66%" height="19" class="Tab_bg"><table width="84" height="27" border="0" align="left" cellpadding="0" cellspacing="1" bgcolor="#FFFFFF" class="Tab2_frame Tab_space" id="Tab_0">
+      <tr>
+        <td align="center" class="Tab_middle3 block_place" id="Menu_0">漫画</td>
+      </tr>
+    </table>
+    <table width="84" height="27" border="0" align="left" cellpadding="0" cellspacing="1" bgcolor="#CCCCCC" class="Tab_space" id="Tab_1">
+      <tr>
+        <td align="center" bgcolor="#ededed" class="block_place" id="Menu_1"><a href="javascript:redirect('S',1);" class="Tab1">轻小说</a></td>
+      </tr>
+    </table></td>
+  </tr>
+</table>
+<script>initial();</script>
+<table width="980" border="0" align="center" cellpadding="0" cellspacing="0" style="margin-top: 1px;">
+  <tr>
+    <td height="30" align="center" bgcolor="#ededed"><h1 class="font_red"><b class="F14PX">英雄</b><span style="font-size: 12px;font-weight: normal;">(共搜索到29个结果)</span></h1></td>
+  </tr>
+</table>
+<table width="980" border="0" align="center" cellpadding="0" cellspacing="0" class="comic_cover Height_px22 font_gray">
+<tr>
+<td>
+<script language="javascript" src="http://comic.sfacg.com/AD/Inner/hysj2.js"></script>
+</td>
+</tr>
+</table>
+<table width="980" border="0" align="center" cellpadding="0" cellspacing="0" class="comic_cover Height_px22 font_gray space10px">
+  <tr>
+    <td>
+    
+	<ul style="width:100%">
+	<li class="Conjunction">
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2019/11/3d2f9821-16b5-4240-8086-1ff6928e2990.jpg" id="SearchResultList1___ResultList_Cover_0" border="0" alt="英雄再临(英雄？我早就不当了)" width="80" height="100" /></li>
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/48704" id="SearchResultList1___ResultList_LinkInfo_0" class="orange_link2">英雄再临(英雄？我早就不当了)</a></strong><br />
+	  综合信息： 无聊看看天/2024/3/25 20:57:58<br />      
+	  伴随着各种各样的危机与绝望而来的，是人类第一个真正意义上的超级英雄。
+在他的带动下，不断涌现出了大量的超级英雄。但是他在持续战斗了五年之后，却消失在了人们的视线之中。
+新书（长生？真是有够逆天）正在连载中。</li>
+	</ul>
+	<hr size="1" noshade="noshade" />
+	
+	<ul style="width:100%">
+	<li class="Conjunction">
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2018/11/248061f6-88d7-4989-bcf3-078cc115de0b.jpg" id="SearchResultList1___ResultList_Cover_1" border="0" alt="拜托请不要再找我当超级英雄了" width="80" height="100" /></li>
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/120384" id="SearchResultList1___ResultList_LinkInfo_1" class="orange_link2">拜托请不要再找我当超级英雄了</a></strong><br />
+	  综合信息： 拔娜娜/2021/2/21 0:02:19<br />      
+	  拥有着钢铁般的壮硕身躯，超越光的速度以及无法估算的力量，这位犹如光一般照亮世界，凭借着一己之力拯救了人类的超级英雄，却在三年后的某一天突然销声匿迹。
+这背后的原因究竟是什么……　　
+主角：糟糕……不过才使用了百分之一的力量，我好不容易练回来的胸大肌怎么又变得又白又软了啊！！！　　
+博士：虽然很不想告诉你，但如果你继续使用你的超能力的话……恐怕不出半年，你的身体就会完全变成一个女孩子吧。
+　　</li>
+	</ul>
+	<hr size="1" noshade="noshade" />
+	
+	<ul style="width:100%">
+	<li class="Conjunction">
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2021/03/0f472198-dbeb-48eb-9580-46cadb9cad64.jpg" id="SearchResultList1___ResultList_Cover_2" border="0" alt="我只是个路过的超级英雄" width="80" height="100" /></li>
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/208296" id="SearchResultList1___ResultList_LinkInfo_2" class="orange_link2">我只是个路过的超级英雄</a></strong><br />
+	  综合信息： 水耘公子/2023/2/28 23:29:04<br />      
+	  他除了帅，什么都没有。
+既然打不过，那就加入他。
+他除了帅，还有对象。
+既然打不过，那就继续加入他。
+反正已经很多了。</li>
+	</ul>
+	<hr size="1" noshade="noshade" />
+	
+	<ul style="width:100%">
+	<li class="Conjunction">
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2020/02/b584ab5c-a371-4940-b5c4-57a09b8e8b12.jpg" id="SearchResultList1___ResultList_Cover_3" border="0" alt="毁灭世界的我成了她的英雄" width="80" height="100" /></li>
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/78132" id="SearchResultList1___ResultList_LinkInfo_3" class="orange_link2">毁灭世界的我成了她的英雄</a></strong><br />
+	  综合信息： 丑而不陋/2018/9/12 21:37:30<br />      
+	  宇宙之心与地球擦肩而过之际，停滞了数以百万年的进化之路再次开启，世界的平衡再次被打破，为了对抗异变的恐怖怪物以及心怀不轨的野心家们，由超能力者们组建领导人类的世界政府不得不做出了一个重大的决定——释放出五年前进化之日被称之为“浩劫”的灭世少年。</li>
+	</ul>
+	<hr size="1" noshade="noshade" />
+	
+	<ul style="width:100%">
+	<li class="Conjunction">
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2019/09/c4b79c2c-526f-448b-a2cd-7960a5137421.jpg" id="SearchResultList1___ResultList_Cover_4" border="0" alt="复活的英雄是女孩" width="80" height="100" /></li>
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/111608" id="SearchResultList1___ResultList_LinkInfo_4" class="orange_link2">复活的英雄是女孩</a></strong><br />
+	  综合信息： printer22/2024/1/31 9:18:37<br />      
+	  为拯救世界而牺牲的最强灵能力者云飞剑从死亡中苏醒，却发现自己的灵魂被妹妹塞进了幼女外形的人偶里面。不仅如此，她还被强制带到满是问题儿童的女子宿舍生活！？波澜万丈的新人生开始了！</li>
+	</ul>
+	<hr size="1" noshade="noshade" />
+	
+	<ul style="width:100%">
+	<li class="Conjunction">
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2023/11/3f5f00af-e740-4418-bbeb-665475bf21aa.jpg" id="SearchResultList1___ResultList_Cover_5" border="0" alt="谁说光速退役的不算英雄" width="80" height="100" /></li>
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/651053" id="SearchResultList1___ResultList_LinkInfo_5" class="orange_link2">谁说光速退役的不算英雄</a></strong><br />
+	  综合信息： 合雪丶/2024/1/2 12:45:55<br />      
+	  　　当世界不再需要拯救的时候，骗所有人说力量耗尽，成功退役！
+
+　　退役后想过慢生活，想把拯救世界那几年浪费的青春都补回来。
+
+　　想恋爱。
+
+　　想吃火锅。
+
+　　想摸白丝。
+
+　　想养猫。
+
+　　想要会穿女仆裙的笨蛋御姐。
+
+　　想每天睡到自然醒。
+
+　　人活着就是为了和美少女亲亲抱抱贴贴贴贴贴的，把过去几年没贴到的全贴回来！
+
+　　………………
+
+　　可他们好像没打算放过我。
+
+　　觊觎我的...</li>
+	</ul>
+	<hr size="1" noshade="noshade" />
+	
+	<ul style="width:100%">
+	<li class="Conjunction">
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2021/09/76d0bb1f-ea9a-4107-9988-ccddd06014d9.jpg" id="SearchResultList1___ResultList_Cover_6" border="0" alt="差点成了英雄" width="80" height="100" /></li>
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/447547" id="SearchResultList1___ResultList_LinkInfo_6" class="orange_link2">差点成了英雄</a></strong><br />
+	  综合信息： 合雪丶/2021/9/21 14:20:46<br />      
+	              
+
+
+       你是否愿意为了心爱的人拯救全世界？</li>
+	</ul>
+	<hr size="1" noshade="noshade" />
+	
+	<ul style="width:100%">
+	<li class="Conjunction">
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2020/09/df267749-ceed-42f9-8fd3-964cc62c149e.jpg" id="SearchResultList1___ResultList_Cover_7" border="0" alt="身为反派的我居然有位英雄男友" width="80" height="100" /></li>
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/277050" id="SearchResultList1___ResultList_LinkInfo_7" class="orange_link2">身为反派的我居然有位英雄男友</a></strong><br />
+	  综合信息： 鱼鱼鱼干/2026/11/11 23:53:50<br />      
+	         成为反派boss之后的和美才发现，那个一直被视为“和平的象征”的NO.1英雄，好像，和自己的男友，有点像？？！
+   （ps：一个少女努力种田变强的故事。）</li>
+	</ul>
+	<hr size="1" noshade="noshade" />
+	
+	<ul style="width:100%">
+	<li class="Conjunction">
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2017/07/2c35902b-75ad-4a96-b1de-f3de0480362e.jpg" id="SearchResultList1___ResultList_Cover_8" border="0" alt="退役英雄的我现在正带着孩子" width="80" height="100" /></li>
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/53831" id="SearchResultList1___ResultList_LinkInfo_8" class="orange_link2">退役英雄的我现在正带着孩子</a></strong><br />
+	  综合信息： 卓瀚/2026/5/4 23:29:06<br />      
+	  年仅20岁便因为厌倦职业而选择退役的前任最强英雄，冰山性格的女英雄，两人为满足各自的家庭要求（抱孩子）而走到了一起。尴尬的表面婚姻却因为一个捡到的孩子而渐渐变得真实，作为英雄忽然养孩子什么的.....好像也不错。</li>
+	</ul>
+	<hr size="1" noshade="noshade" />
+	
+	<ul style="width:100%">
+	<li class="Conjunction">
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2023/08/558f5b7a-a6ab-4ae6-9ed3-d956e174f616.jpg" id="SearchResultList1___ResultList_Cover_9" border="0" alt="吟游诗人想要歌颂虚假英雄的史诗" width="80" height="100" /></li>
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/662248" id="SearchResultList1___ResultList_LinkInfo_9" class="orange_link2">吟游诗人想要歌颂虚假英雄的史诗</a></strong><br />
+	  综合信息： godineye/2024/5/7 18:13:37<br />      
+	    她曾经是富二代。父母双亡，继承千万家产。于是前往世界各地冒险，陨落之后转生异世界成为吟游诗人。
+  他曾经是被认为具备讨伐魔王实力的英雄级小队中的一员，却因为种种恶评被赶出了小队，剥夺冒险者的资格，过上穷困潦倒的生活。
+  “我本想吟唱不同的史诗——怎么全都是你一个人的故事啊！”卡萝受不了，她冲着男人怒吼。
+  男人摊开手：“抱歉，毕竟我是虚假的英雄。我有过很多马甲。”
+  这是转生成美少女的...</li>
+	</ul>
+	<hr size="1" noshade="noshade" />
+	
+	<ul style="width:100%">
+	<li class="Conjunction">
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2019/08/65dd543c-3aa2-4bdb-8a58-f66cdc9899d6.jpg" id="SearchResultList1___ResultList_Cover_10" border="0" alt="雾与血与虚伪的英雄史诗" width="80" height="100" /></li>
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/160460" id="SearchResultList1___ResultList_LinkInfo_10" class="orange_link2">雾与血与虚伪的英雄史诗</a></strong><br />
+	  综合信息： liuxk/2025/3/28 18:33:41<br />      
+	  写实系慢热异世界，靠谱感情线，大格局大铺垫，献给看腻主流快餐后想换口味的你！群747278760
+==
+曾几何时，我憧憬史诗中的英雄。
+不是被同伴环绕的正统英雄，而是独来独往的孤胆英雄。
+行于黑暗，以一己之力拯救所有人，不求回报赞美。
+但现在我明白了，这根本不算什么英雄，只不过是披着英雄外皮的、自负又孤僻的可怜人罢了。
+这种人即使谱写了属于自己的英雄史诗，这史诗也必然是虚伪的。
+而我也是其中一员。...</li>
+	</ul>
+	<hr size="1" noshade="noshade" />
+	
+	<ul style="width:100%">
+	<li class="Conjunction">
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2023/06/52185806-5336-4204-83bd-4dfe223c8fa6.jpg" id="SearchResultList1___ResultList_Cover_11" border="0" alt="从邪恶组织辞职之后开始英雄养成" width="80" height="100" /></li>
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/485894" id="SearchResultList1___ResultList_LinkInfo_11" class="orange_link2">从邪恶组织辞职之后开始英雄养成</a></strong><br />
+	  综合信息： 往返落体/2025/6/20 13:10:04<br />      
+	  多年以后，当叶加濑躺在出租屋的地板上，她会想起自己驾驶心爱的机器人被路过的英雄合力击败的那个下午。
+从此双塔市少了一个疯狂博士，多了一个天才发明家美少女。
+“好，开始实验吧！”</li>
+	</ul>
+	<hr size="1" noshade="noshade" />
+	
+	<ul style="width:100%">
+	<li class="Conjunction">
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2021/05/c7936dd8-a313-4ac2-8fa7-745ade1b348f.jpg" id="SearchResultList1___ResultList_Cover_12" border="0" alt="打工僵尸的我今天也要当英雄" width="80" height="100" /></li>
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/180994" id="SearchResultList1___ResultList_LinkInfo_12" class="orange_link2">打工僵尸的我今天也要当英雄</a></strong><br />
+	  综合信息： 朽翁菩提/2019/12/13 0:04:49<br />      
+	     我是一个僵尸，也是一个英雄，能变成胸大腿长颜值爆表的御姐英灵，也能变成傲娇暴躁的魔法萝莉，**也不是不行。
+
+   我只想默默的打工，然后混吃等死，但为什么身为僵尸的我却要担上拯救世界的重担以及收拢老婆的“美差”？
+
+    什么？你说我的老婆们都是魔头？魔头怎么了！照收不误！
+
+   Ps：《我所遗落到异界的邂逅之旅》百万字作品连载中</li>
+	</ul>
+	<hr size="1" noshade="noshade" />
+	
+	<ul style="width:100%">
+	<li class="Conjunction">
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2018/07/b9c066a1-b84f-4551-a1c5-c4374b5456e7.jpg" id="SearchResultList1___ResultList_Cover_13" border="0" alt="从满级开始的英雄生活" width="80" height="100" /></li>
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/124218" id="SearchResultList1___ResultList_LinkInfo_13" class="orange_link2">从满级开始的英雄生活</a></strong><br />
+	  综合信息： 一只水妖啊/2019/4/23 22:46:44<br />      
+	  嗯……只是去送弟弟妹妹上个幼儿园，无敌的我怎么就成为英雄了啊喂！
+
+（建了两年没有一个人的群：513211470，加群的少侠需要回答一个非常简单的问题哦）
+欠更五章!!!什么时候还完在加更吧
+只要胆子大，水妖不放假!另外没入群的小伙伴可以入一下群。</li>
+	</ul>
+	<hr size="1" noshade="noshade" />
+	
+	<ul style="width:100%">
+	<li class="Conjunction">
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/defaultNew.jpg" id="SearchResultList1___ResultList_Cover_14" border="0" alt="因为我是妹妹的英雄" width="80" height="100" /></li>
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/59634" id="SearchResultList1___ResultList_LinkInfo_14" class="orange_link2">因为我是妹妹的英雄</a></strong><br />
+	  综合信息： 流泪的天使/2018/5/31 0:38:37<br />      
+	  当十三岁的白茗回到家中时，自己的父母早已不见了踪影，留在家中的只有躺在床上奄奄一息的妹妹。为了拯救自己的妹妹，白茗不惜放弃自己的人生，答应了一位陌生人的要求——一辈子成为英雄。现在，这位被迫成为英雄的人正隐居在这个暗流涌动的世界中，作为一名死宅兼英雄而活着。</li>
+	</ul>
+	<hr size="1" noshade="noshade" />
+	
+	<ul style="width:100%">
+	<li class="Conjunction">
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2022/08/a901b22c-a4ed-4108-8f89-c77e8ed6d78a.jpg" id="SearchResultList1___ResultList_Cover_15" border="0" alt="转生为英雄的我变成了银发少女" width="80" height="100" /></li>
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/555935" id="SearchResultList1___ResultList_LinkInfo_15" class="orange_link2">转生为英雄的我变成了银发少女</a></strong><br />
+	  综合信息： 纯色绘花/2023/3/6 15:38:53<br />      
+	  “如果结局已经注定的话，那我们的故事究竟还有什么意义呢?”
+在稍有些遥远的梦里，她的询问一直环绕在我的耳边。
+银发的少女站在雨夜中呼喊，就如同在否认着自身的意义。
+待我再次醒来之后，世界已然发生改变。
+度过了漫长的黑暗，我已然成为了她，成为了这个世界的英雄。</li>
+	</ul>
+	<hr size="1" noshade="noshade" />
+	
+	<ul style="width:100%">
+	<li class="Conjunction">
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/defaultNew.jpg" id="SearchResultList1___ResultList_Cover_16" border="0" alt="身为超级英雄的我，被魔法召唤了" width="80" height="100" /></li>
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/41159" id="SearchResultList1___ResultList_LinkInfo_16" class="orange_link2">身为超级英雄的我，被魔法召唤了</a></strong><br />
+	  综合信息： 布鲁斯·韦恩/2017/7/20 22:05:57<br />      
+	  某天，身为普通高中生的蝉丸响被卷入一场来自异世界的召唤仪式，他被召唤到了一个〈剑与魔法〉风格的异世界。
+
+可与被召唤的同伴不一样，他因为只是被召唤仪式所波及，所以，并没有显现出能够拯救这个异世界的“勇者”的资质。
+
+但问题是……他的职业者介绍一栏里显示的职业竟然是“超级英雄〈superhero〉”！
+
+谁也不知道，蝉丸响一直对所有人隐瞒着一个秘密，他的真实身份其实是……</li>
+	</ul>
+	<hr size="1" noshade="noshade" />
+	
+	<ul style="width:100%">
+	<li class="Conjunction">
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2017/09/2de272cd-284d-4e97-abab-5b934c1de649.jpg" id="SearchResultList1___ResultList_Cover_17" border="0" alt="救世英雄的我有了个狐娘老婆" width="80" height="100" /></li>
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/98586" id="SearchResultList1___ResultList_LinkInfo_17" class="orange_link2">救世英雄的我有了个狐娘老婆</a></strong><br />
+	  综合信息： Doraemon泽/2018/8/31 10:54:06<br />      
+	  在冰冷的监狱里遇到了五年前救下的狐娘美少女，至此，在曾为最强英雄的他的心中就埋下了一颗种子。
+复仇？拯救？这都不是事！只要这狐娘归我了一切就没有任何问题！
+{最后，听说杀个编辑祭天可以让新书成绩火爆，那我也就勉强杀了那么一个吧！}</li>
+	</ul>
+	<hr size="1" noshade="noshade" />
+	
+	<ul style="width:100%">
+	<li class="Conjunction">
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/defaultNew.jpg" id="SearchResultList1___ResultList_Cover_18" border="0" alt="最强的我并非超级英雄" width="80" height="100" /></li>
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/103579" id="SearchResultList1___ResultList_LinkInfo_18" class="orange_link2">最强的我并非超级英雄</a></strong><br />
+	  综合信息： 我小手冰凉/2018/5/31 20:34:46<br />      
+	  超级英雄从来不是特权的借口，普通人的法律无法惩罚超级英雄所犯下的罪孽，但不并意味着超级英雄可以践踏一切……永远不要忘记，正义或许会迟到，但绝对不会缺席！</li>
+	</ul>
+	<hr size="1" noshade="noshade" />
+	
+	<ul style="width:100%">
+	<li class="Conjunction">
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2019/08/95acef37-263a-456d-b316-b689e847b932.jpg" id="SearchResultList1___ResultList_Cover_19" border="0" alt="我是年纪最小的超级英雄" width="80" height="100" /></li>
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/219053" id="SearchResultList1___ResultList_LinkInfo_19" class="orange_link2">我是年纪最小的超级英雄</a></strong><br />
+	  综合信息： 何以笑笑/2021/7/31 17:10:53<br />      
+	  重新介绍下，主角叶小阳，打怪兽的。</li>
+	</ul>
+	<hr size="1" noshade="noshade" />
+	
+	<ul style="width:100%">
+	<li class="Conjunction">
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2016/08/0dcf8f95-c1b4-411a-bc19-363da8dbc939.jpg" id="SearchResultList1___ResultList_Cover_20" border="0" alt="本该成为英雄的我却被骗去做教师" width="80" height="100" /></li>
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/54536" id="SearchResultList1___ResultList_LinkInfo_20" class="orange_link2">本该成为英雄的我却被骗去做教师</a></strong><br />
+	  综合信息： 黑色苍穹/2018/5/1 19:40:35<br />      
+	  “老师，为什么你要来做老师？”
+“我是被骗过来的。”格雷回答。
+“老师，为什么你白天是女性晚上是纯爷们？”
+“这也是被人骗的弄得！”格雷回答。
+“老师，你为什么穿黑丝？”
+“这也是被骗的！！！你们这群兔崽子给我闭嘴上课！”格雷拍着黑板咆哮道。</li>
+	</ul>
+	<hr size="1" noshade="noshade" />
+	
+	<ul style="width:100%">
+	<li class="Conjunction">
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2017/08/9f639e16-c201-49a3-b993-63558f94e6fa.jpg" id="SearchResultList1___ResultList_Cover_21" border="0" alt="爸爸能飞天遁地还曾是人类大英雄" width="80" height="100" /></li>
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/94129" id="SearchResultList1___ResultList_LinkInfo_21" class="orange_link2">爸爸能飞天遁地还曾是人类大英雄</a></strong><br />
+	  综合信息： 拉格朗日乘数法/2020/9/30 23:50:37<br />      
+	  最强异界勇者天晓想要隐姓埋名的生活，却意外遇到了一个能够单挑骷髅王的小萝莉！？我错了我从一开始就不该去做什么C级任务，我不去做就不会遇到夜雪，不遇到夜雪就不会收养她，不收养她就不会知道她有这！么！可！爱啊啊啊啊啊！！嗯？什么……夜雪是被我消灭的魔王转世！？？但是夜雪这么可爱！无所谓了啦！史上最奇怪的勇者爸爸和魔王女儿，一个关于爱与恨的异世界故事。</li>
+	</ul>
+	<hr size="1" noshade="noshade" />
+	
+	<ul style="width:100%">
+	<li class="Conjunction">
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2018/10/f8690c31-ddd0-414b-b72c-047ef966a15e.jpg" id="SearchResultList1___ResultList_Cover_22" border="0" alt="超级英雄才不是全民太太" width="80" height="100" /></li>
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/167237" id="SearchResultList1___ResultList_LinkInfo_22" class="orange_link2">超级英雄才不是全民太太</a></strong><br />
+	  综合信息： 阿莫茜琳/2021/11/22 1:15:51<br />      
+	  在超级英雄活跃的时代，有着一位人美声甜、温柔善良、善于照顾别人的超级英雄活跃着，他被人们当做梦中情人，也有不少的邪恶之人窥视他的美貌，对此他感觉十分的烦恼。
+“对不起，我是男人才不是你们的太太。”
+“我们是在进行生死战斗请不要对着我的衣服攻击。”
+“你们这些女人请不要反过来攻略我！”</li>
+	</ul>
+	<hr size="1" noshade="noshade" />
+	
+	<ul style="width:100%">
+	<li class="Conjunction">
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2017/04/056ed5a8-0c73-4907-afaf-d3cb613a4fb0.jpg" id="SearchResultList1___ResultList_Cover_23" border="0" alt="应召而来的英雄是我吗" width="80" height="100" /></li>
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/71670" id="SearchResultList1___ResultList_LinkInfo_23" class="orange_link2">应召而来的英雄是我吗</a></strong><br />
+	  综合信息： zcv37/2020/8/1 12:22:30<br />      
+	  本以为这是游戏穿越
+结果却超乎我的想象
+获得了游戏里的极品道具，但是却也患上了精神分裂
+每一个种族天赋都有着强大力量，但却也是前世的，或者平行世界的我，每个我，都有着不同的故事
+在这个世界，重新踏上我以前未完成的征程，追寻着过去那些，我的痕迹
+为什么我会来到这个世界？那些我虽然没有告诉我为什么
+但是我却在慢慢寻找着答案
+做自己的英雄，每个我，都有一个英雄的过往，英雄的梦
+群：255044579</li>
+	</ul>
+	<hr size="1" noshade="noshade" />
+	
+	<ul style="width:100%">
+	<li class="Conjunction">
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2020/05/3855bc7e-5cbd-4413-93bd-311aac8ae0c5.jpg" id="SearchResultList1___ResultList_Cover_24" border="0" alt="哥哥你是英雄吗" width="80" height="100" /></li>
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/284142" id="SearchResultList1___ResultList_LinkInfo_24" class="orange_link2">哥哥你是英雄吗</a></strong><br />
+	  综合信息： 青春的旋律/2022/8/19 1:46:41<br />      
+	  人类还没从超力量的惊喜中回过神来，怪物降临，让世界充斥杀戮！而在绝望之中，英雄诞生了！
+英雄从此成为了每个人的信仰，越来越多的能力者加入英雄的行列，英雄时代由此开幕！
+但凌迟却退出了这个时代，回家照顾妹妹去了。
+“其实我是有心理疾病，要是跟妹妹距离太远就会恐慌的心理疾病！”凌迟一脸认真。
+“诶别走啊！我说的是真的！”
+“那我给你找个心理医生！你这个变态妹控！”
+</li>
+	</ul>
+	<hr size="1" noshade="noshade" />
+	
+	<ul style="width:100%">
+	<li class="Conjunction">
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2019/02/d15fad84-8449-4baf-8d71-1f046a811235.jpg" id="SearchResultList1___ResultList_Cover_25" border="0" alt="最强英雄的外卖生活" width="80" height="100" /></li>
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/147596" id="SearchResultList1___ResultList_LinkInfo_25" class="orange_link2">最强英雄的外卖生活</a></strong><br />
+	  综合信息： 你咋不上天mmm/2019/9/2 18:17:00<br />      
+	  叶云：想当年，我可是一刀砍死过魔帝的存在
+叶琉璃：哦？是吗？别人现在可是在催单了，还不赶紧给我去送外卖！
+叶云：是是是，妹妹大人，我这就去。
+魔帝：今天，本帝就要统治人界！
+叶云：你妨碍到我送外卖了，给我死！
+魔帝卒
+
+
+新开了一个催更群，，欢迎大家进群玩耍
+这是一个英雄沦落为外卖小哥的故事，至于为什么会变成这样，你自己看下去啊。
+
+
+</li>
+	</ul>
+	<hr size="1" noshade="noshade" />
+	
+	<ul style="width:100%">
+	<li class="Conjunction">
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2022/11/6c565caf-4688-4d6c-9f98-0c31b12e8ad3.jpg" id="SearchResultList1___ResultList_Cover_26" border="0" alt="我的网恋对象是超级英雄" width="80" height="100" /></li>
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/605918" id="SearchResultList1___ResultList_LinkInfo_26" class="orange_link2">我的网恋对象是超级英雄</a></strong><br />
+	  综合信息： 闻溪wenxi/2024/3/5 23:40:48<br />      
+	  “楼主，你要老婆不要。”
+一次真心话大冒险，坟帖下，江漓在同伴目视下，颤抖的打出这行话。
+谁能想到，这个沉没几年的坟帖，楼主一秒复活，直接回道
+“我要！”
+江漓彻底沉默了，戏剧化的成为了别人网恋对象。
+“老婆大人，明天就是你的生日了，就算见到我，也不要太惊讶。”
+江漓摇摇头，盘算着啥时候结束这场孽缘。
+“神经病，我又没告诉你地址，你怎么见面。”
+若干年后，江漓挺着微鼓的肚子，恶狠狠的怒视着某人。</li>
+	</ul>
+	<hr size="1" noshade="noshade" />
+	
+	<ul style="width:100%">
+	<li class="Conjunction">
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2020/01/bd0de59f-8eda-43ad-bf69-d7ff8a97e120.jpg" id="SearchResultList1___ResultList_Cover_27" border="0" alt="这个幼师是最强英雄" width="80" height="100" /></li>
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/179607" id="SearchResultList1___ResultList_LinkInfo_27" class="orange_link2">这个幼师是最强英雄</a></strong><br />
+	  综合信息： 不甜的南瓜/2020/6/1 0:17:45<br />      
+	  十二年前，人类面临末日，他是世界最强的英雄，人类最后的底牌，梦幻中的完美英雄。
+但没有人知道他所做的一切，都只是为了一个人……
+十二年后和平被打破，人类的命运将陷入比末日更为危险的地步，然而……
+曾经最强的英雄现在却在当一名孤儿院教师?
+『封面来自网格，侵权联系删。』</li>
+	</ul>
+	<hr size="1" noshade="noshade" />
+	
+	<ul style="width:100%">
+	<li class="Conjunction">
+	<img src="//rs.sfacg.com/web/novel/images/NovelCover/big/2019/03/70b071a6-f911-4003-a65a-fe6c5b9e1fc0.jpg" id="SearchResultList1___ResultList_Cover_28" border="0" alt="到异世界还是避免不了成为英雄" width="80" height="100" /></li>
+	<li><strong class="F14PX"><a href="https://book.sfacg.com/Novel/139906" id="SearchResultList1___ResultList_LinkInfo_28" class="orange_link2">到异世界还是避免不了成为英雄</a></strong><br />
+	  综合信息： 话总说不清楚/2019/10/9 21:58:44<br />      
+	    “噗通~”这是月票掉进河里的声音。
+  河神:“诚实的读者啊，你掉的是这个位人妻指数爆表的御姐，还是这两位娇小可爱的兽娘萝莉。”
+  读者摇了摇头
+  河神:“诚实的读者啊，你的真诚打动了老朽，那老朽就将这些后宫都给你吧。”
+  读者：“喂！你个糟老头子坏的很，快把月票还给我！”
+
+  企鹅群聊号码：291676006
+  
+
+</li>
+	</ul>
+	<hr size="1" noshade="noshade" />
+	
+	</td>
+  </tr>
+</table>
+<table width="980" border="0" align="center" cellpadding="0" cellspacing="0">
+  <tr>
+    <td height="28" valign="top" bgcolor="#ededed"><ul class="nav pagebar" style="margin-right: 5px;">
+      
+    </ul></td>
+  </tr>
+</table>
+    </form>
+    <table width="980" height="36"  border="0" align="center" cellpadding="8" cellspacing="0" class="space10px">
+  <tr class="font_gray gray_link1">
+    <td bgcolor="#e3e3e3"></td>
+    <td align="right" bgcolor="#e3e3e3" class="font_Gray">[C] 2005－2008 SKY-FIRE.COM All Rights Reserved</td>
+  </tr>
+</table>
+<div id="TJ2" style="position:absolute; width:0; height:0; overflow: hidden;">
+<script src="//v.sfacg.com/stats/tj.js?v=20180329"></script>
+</div>
+	<script type="text/javascript">
+		$(function(){
+			var t = GetArgsFromHref(location.href,"S");
+			if(t=="")t="0";
+			$("#SKey").bigAutocomplete({width:604,url:"/ajax/GetRelateWord.ashx?a=1&t="+t,callback:function(data){
+			}});
+			
+		
+		})
+	</script>
+</body>
+</html>

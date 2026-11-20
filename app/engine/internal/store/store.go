@@ -1309,10 +1309,12 @@ func (s *Store) Search(ctx context.Context, q string, limit int) ([]SearchItem, 
 	const esc = `\\`
 	pattern := "%" + strings.NewReplacer("%", esc+"%", "_", esc+"_", "\\", esc+esc).Replace(q) + "%"
 	rows, err := s.DB.QueryContext(ctx, `
-SELECT nid, title, author, genre, est_year, favs
-FROM seed.books
-WHERE (title LIKE ? ESCAPE '\' OR author LIKE ? ESCAPE '\')
-ORDER BY favs DESC, seed.books.nid ASC
+SELECT b.nid, b.title, b.author, b.genre, b.est_year, b.favs,
+       COALESCE(c.cover, NULLIF(b.cover_url, '')) AS cover_url
+FROM seed.books b
+LEFT JOIN covers c ON c.nid = b.nid
+WHERE (b.title LIKE ? ESCAPE '\' OR b.author LIKE ? ESCAPE '\')
+ORDER BY b.favs DESC, b.nid ASC
 LIMIT ?`, pattern, pattern, limit)
 	if err != nil {
 		return nil, err
@@ -1321,19 +1323,121 @@ LIMIT ?`, pattern, pattern, limit)
 	items := make([]SearchItem, 0, limit)
 	for rows.Next() {
 		var (
-			item SearchItem
-			gen  sql.NullString
-			favs sql.NullInt64
+			item       SearchItem
+			gen, cover sql.NullString
+			favs       sql.NullInt64
 		)
 		if err := rows.Scan(&item.NID, &item.Title, &item.Author, &gen,
-			&item.EstYear, &favs); err != nil {
+			&item.EstYear, &favs, &cover); err != nil {
 			return nil, err
 		}
 		item.Genre = strPtr(gen)
 		item.Favs = intPtr(favs)
+		item.CoverURL = strPtr(cover)
 		items = append(items, item)
 	}
 	return items, rows.Err()
+}
+
+// AddSearchHistory records one local search (user.db search_history, the
+// v5 table — no migration needed). Every submit is kept with its hit
+// count; the retention pass trims the table to the newest 200 rows so
+// it stays bounded without a unique-key upsert.
+func (s *Store) AddSearchHistory(ctx context.Context, keyword string, hits int) error {
+	if _, err := s.DB.ExecContext(ctx,
+		`INSERT INTO search_history(keyword, at, hits) VALUES (?, ?, ?)`,
+		keyword, time.Now().Unix(), hits); err != nil {
+		return err
+	}
+	_, err := s.DB.ExecContext(ctx, `
+DELETE FROM search_history WHERE id NOT IN
+  (SELECT id FROM search_history ORDER BY at DESC, id DESC LIMIT 200)`)
+	return err
+}
+
+// SearchHistory returns recent distinct keywords, most recently used
+// first (search page empty state, docs/08 §search-history).
+func (s *Store) SearchHistory(ctx context.Context, limit int) ([]string, error) {
+	rows, err := s.DB.QueryContext(ctx, `
+SELECT keyword FROM (
+  SELECT keyword, MAX(at) AS last_at, MAX(id) AS last_id
+  FROM search_history GROUP BY keyword
+) ORDER BY last_at DESC, last_id DESC LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []string{}
+	for rows.Next() {
+		var kw string
+		if err := rows.Scan(&kw); err != nil {
+			return nil, err
+		}
+		out = append(out, kw)
+	}
+	return out, rows.Err()
+}
+
+// SeedNIDsIn returns the subset of nids present in the bundled seed
+// (official-search hits are marked in/out of the local library).
+func (s *Store) SeedNIDsIn(ctx context.Context, nids []int64) (map[int64]bool, error) {
+	out := make(map[int64]bool, len(nids))
+	if len(nids) == 0 {
+		return out, nil
+	}
+	args := make([]any, len(nids))
+	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(nids)), ",")
+	for i, n := range nids {
+		args[i] = n
+	}
+	rows, err := s.DB.QueryContext(ctx,
+		"SELECT nid FROM seed.books WHERE nid IN ("+placeholders+")", args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var nid int64
+		if err := rows.Scan(&nid); err != nil {
+			return nil, err
+		}
+		out[nid] = true
+	}
+	return out, rows.Err()
+}
+
+// DiscoveredHit is one official-search hit to write back to user.db
+// discovered (converted from crawl.SearchHit at the api layer — the
+// store does not import the crawl package).
+type DiscoveredHit struct {
+	NID      int64
+	Title    string
+	Author   string
+	CoverURL string
+	Summary  string
+}
+
+// UpsertDiscoveredSearch writes official-search hits that are outside
+// the bundled seed (docs/08 §search-remote: the discovery-loop entry).
+// Re-hits refresh observed_at; only the fields the search page carries
+// are stored (genre/words/favs stay NULL until a detail fetch).
+func (s *Store) UpsertDiscoveredSearch(ctx context.Context, hits []DiscoveredHit, observedAt int64) error {
+	for _, h := range hits {
+		if _, err := s.DB.ExecContext(ctx, `
+INSERT INTO discovered(nid, title, author, cover_url, summary, source, observed_at)
+VALUES (?, ?, ?, ?, ?, 'search', ?)
+ON CONFLICT(nid) DO UPDATE SET
+  title = excluded.title,
+  author = excluded.author,
+  cover_url = excluded.cover_url,
+  summary = excluded.summary,
+  source = 'search',
+  observed_at = excluded.observed_at`,
+			h.NID, h.Title, h.Author, h.CoverURL, h.Summary, observedAt); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // RankingNew is the new-work ranking: last two generations (est_year >=
@@ -1372,12 +1476,13 @@ LIMIT ?`, s.Manifest.GenMax-1, limit)
 }
 
 type SearchItem struct {
-	NID     int64   `json:"nid"`
-	Title   string  `json:"title"`
-	Author  string  `json:"author"`
-	Genre   *string `json:"genre"`
-	EstYear int     `json:"est_year"`
-	Favs    *int64  `json:"favs"`
+	NID      int64   `json:"nid"`
+	Title    string  `json:"title"`
+	Author   string  `json:"author"`
+	Genre    *string `json:"genre"`
+	EstYear  int     `json:"est_year"`
+	Favs     *int64  `json:"favs"`
+	CoverURL *string `json:"cover_url"`
 }
 
 // InsertObservation appends an alive-state observation (docs/05 §5.1: the

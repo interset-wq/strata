@@ -97,6 +97,8 @@ func New(s *store.Store) *gin.Engine {
 	group.GET("/rankings/short", srv.rankingShort)
 	group.GET("/rankings/new", srv.rankingNew)
 	group.GET("/search", srv.search)
+	group.GET("/search-history", srv.searchHistory)
+	group.POST("/search/remote", srv.searchRemote)
 	group.GET("/random", srv.random)
 	group.GET("/licensed", srv.licensed)
 	group.GET("/moe-goddess", srv.moeGoddess)
@@ -805,6 +807,9 @@ func (s *Server) search(c *gin.Context) {
 		fail(c, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
+	// History write is best-effort: a busy user.db must not fail the
+	// search itself (docs/08 §search-history).
+	_ = s.store.AddSearchHistory(c.Request.Context(), q, len(items))
 	c.JSON(http.StatusOK, gin.H{
 		"meta": gin.H{
 			"kind":        "search",
@@ -815,6 +820,90 @@ func (s *Server) search(c *gin.Context) {
 			"content_end": s.store.Manifest.ContentEnd,
 		},
 		"items": items,
+	})
+}
+
+// searchHistory serves the recent local-search keywords for the search
+// page empty state (docs/08 §search-history): distinct keywords, most
+// recently used first, up to 50 (default 10).
+func (s *Server) searchHistory(c *gin.Context) {
+	limit := 10
+	if raw := c.Query("limit"); raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil && n > 0 && n <= 50 {
+			limit = n
+		}
+	}
+	words, err := s.store.SearchHistory(c.Request.Context(), limit)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"items": words})
+}
+
+// searchRemote runs the official HTML search (docs/08 §search-remote):
+// a 30-row hard cap with silent rate limiting, so the UI triggers it
+// manually and crawl enforces a 6-second self-cooldown. Seed hits are
+// marked in_seed; out-of-seed hits go to user.db discovered (the
+// discovery-loop entry). The throttled verdict is served as a flag,
+// never faked as empty results.
+func (s *Server) searchRemote(c *gin.Context) {
+	q := c.Query("q")
+	if q == "" {
+		fail(c, http.StatusBadRequest, "invalid_argument", "q is required")
+		return
+	}
+	fetchStart := time.Now().Unix()
+	res, err := crawl.FetchSearch(c.Request.Context(), s.client, s.limiter, q, true)
+	if err != nil {
+		if errors.Is(err, crawl.ErrSearchTooSoon) {
+			fail(c, http.StatusTooManyRequests, "too_soon", err.Error())
+			return
+		}
+		fail(c, http.StatusBadGateway, "fetch_error", err.Error())
+		return
+	}
+	if res.Throttled {
+		c.JSON(http.StatusOK, gin.H{
+			"meta":  gin.H{"kind": "search-remote", "q": q, "rate_limited": true},
+			"items": []gin.H{},
+		})
+		return
+	}
+	nids := make([]int64, len(res.Items))
+	for i, h := range res.Items {
+		nids[i] = h.NID
+	}
+	inSeed, err := s.store.SeedNIDsIn(c.Request.Context(), nids)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	out := make([]gin.H, len(res.Items))
+	var outside []store.DiscoveredHit
+	for i, h := range res.Items {
+		seed := inSeed[h.NID]
+		out[i] = gin.H{
+			"nid": h.NID, "title": h.Title, "author": h.Author,
+			"updated_at": h.UpdatedAt, "cover_url": h.CoverURL,
+			"summary": h.Summary, "in_seed": seed,
+		}
+		if !seed {
+			outside = append(outside, store.DiscoveredHit{
+				NID: h.NID, Title: h.Title, Author: h.Author,
+				CoverURL: h.CoverURL, Summary: h.Summary,
+			})
+		}
+	}
+	// Discovery write-back is best-effort (docs/08 §search-remote).
+	if len(outside) > 0 {
+		_ = s.store.UpsertDiscoveredSearch(c.Request.Context(), outside, fetchStart)
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"meta": gin.H{"kind": "search-remote", "q": q,
+			"rate_limited": false, "declared": res.Declared,
+			"content_end": s.store.Manifest.ContentEnd},
+		"items": out,
 	})
 }
 
