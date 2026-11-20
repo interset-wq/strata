@@ -14,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"strata/engine/internal/crawl"
+	"strata/engine/internal/eras"
 	"strata/engine/internal/store"
 )
 
@@ -276,6 +277,17 @@ func (s *Server) book(c *gin.Context) {
 			"add_time":   meta.AddTime,
 			"point":      meta.Point,
 		}
+		// nid dating for discovered books (docs/metrics-definitions §1.1):
+		// interpolated from the embedded anchor table — the same
+		// algorithm as the analysis pipeline, golden-tested against it.
+		// Extrapolated nids (beyond the newest anchor) come out low-tier.
+		er := eras.Estimate(nid)
+		book["est_year"] = er.EstYear
+		book["est_date"] = er.EstDate
+		book["est_conf"] = er.Confidence
+		eff["est_year"] = er.EstYear
+		eff["est_date"] = er.EstDate
+		eff["est_conf"] = er.Confidence
 		c.JSON(http.StatusOK, gin.H{
 			"source":    "local",
 			"data_end":  s.store.Manifest.ContentEnd,
