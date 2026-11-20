@@ -213,13 +213,20 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(it.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge
-                            ?.copyWith(fontSize: 13.5)),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(it.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleLarge
+                                  ?.copyWith(fontSize: 13.5)),
+                        ),
+                        if (!it.inSeed) _badge(context, '新书'),
+                      ],
+                    ),
                     const SizedBox(height: 3),
                     InkWell(
                       // 作者入口：点作者名重搜（与作者页同语义入口）。

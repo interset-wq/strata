@@ -352,6 +352,21 @@ func TestSearch(t *testing.T) {
 	if len(items) != 0 {
 		t.Fatalf("escaped %%: %+v", items)
 	}
+
+	// Auto-collected out-of-seed books (discovered) are searchable too,
+	// flagged in_seed=false (docs/08 §search-remote discovery loop).
+	if _, err := st.DB.ExecContext(ctx, `
+INSERT INTO discovered(nid, title, author, cover_url, source, observed_at)
+VALUES (5555, 'Newly Found', 'Author Z', NULL, 'search', 1700000000)`); err != nil {
+		t.Fatal(err)
+	}
+	items, err = st.Search(ctx, "Newly Found", 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 1 || items[0].NID != 5555 || items[0].InSeed {
+		t.Fatalf("discovered hit = %+v", items)
+	}
 }
 
 // TestSearchHistory pins the search-history contract (docs/08

@@ -1309,13 +1309,21 @@ func (s *Store) Search(ctx context.Context, q string, limit int) ([]SearchItem, 
 	const esc = `\\`
 	pattern := "%" + strings.NewReplacer("%", esc+"%", "_", esc+"_", "\\", esc+esc).Replace(q) + "%"
 	rows, err := s.DB.QueryContext(ctx, `
-SELECT b.nid, b.title, b.author, b.genre, b.est_year, b.favs,
-       COALESCE(c.cover, NULLIF(b.cover_url, '')) AS cover_url
-FROM seed.books b
-LEFT JOIN covers c ON c.nid = b.nid
-WHERE (b.title LIKE ? ESCAPE '\' OR b.author LIKE ? ESCAPE '\')
-ORDER BY b.favs DESC, b.nid ASC
-LIMIT ?`, pattern, pattern, limit)
+SELECT nid, title, author, genre, est_year, favs, cover_url, in_seed FROM (
+  SELECT b.nid AS nid, b.title AS title, b.author AS author, b.genre AS genre,
+         b.est_year AS est_year, b.favs AS favs,
+         COALESCE(c.cover, NULLIF(b.cover_url, '')) AS cover_url,
+         1 AS in_seed
+  FROM seed.books b
+  LEFT JOIN covers c ON c.nid = b.nid
+  WHERE (b.title LIKE ? ESCAPE '\' OR b.author LIKE ? ESCAPE '\')
+  UNION ALL
+  SELECT d.nid, d.title, d.author, d.genre, NULL, d.favs, d.cover_url, 0
+  FROM discovered d
+  WHERE (d.title LIKE ? ESCAPE '\' OR d.author LIKE ? ESCAPE '\')
+)
+ORDER BY favs DESC, nid ASC
+LIMIT ?`, pattern, pattern, pattern, pattern, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -1323,17 +1331,22 @@ LIMIT ?`, pattern, pattern, limit)
 	items := make([]SearchItem, 0, limit)
 	for rows.Next() {
 		var (
-			item       SearchItem
-			gen, cover sql.NullString
-			favs       sql.NullInt64
+			item                 SearchItem
+			gen, cover           sql.NullString
+			estYear, favs        sql.NullInt64
+			inSeed               int
 		)
 		if err := rows.Scan(&item.NID, &item.Title, &item.Author, &gen,
-			&item.EstYear, &favs, &cover); err != nil {
+			&estYear, &favs, &cover, &inSeed); err != nil {
 			return nil, err
 		}
 		item.Genre = strPtr(gen)
+		if estYear.Valid {
+			item.EstYear = int(estYear.Int64)
+		}
 		item.Favs = intPtr(favs)
 		item.CoverURL = strPtr(cover)
+		item.InSeed = inSeed != 0
 		items = append(items, item)
 	}
 	return items, rows.Err()
@@ -1483,6 +1496,10 @@ type SearchItem struct {
 	EstYear  int     `json:"est_year"`
 	Favs     *int64  `json:"favs"`
 	CoverURL *string `json:"cover_url"`
+	// InSeed = the row comes from the bundled seed rather than the
+	// discovery overlay (auto-collected official-search hits). False
+	// rows carry no est_year/favs until a detail fetch.
+	InSeed bool `json:"in_seed"`
 }
 
 // InsertObservation appends an alive-state observation (docs/05 §5.1: the

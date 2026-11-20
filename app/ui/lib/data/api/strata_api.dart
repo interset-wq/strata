@@ -750,6 +750,8 @@ class SearchItem {
   final int estYear;
   final int? favs;
   final String? coverUrl;
+  /// false = 自动收录的库外书（discovered 覆盖层），est_year/favs 为空。
+  final bool inSeed;
 
   SearchItem.fromJson(Map<String, dynamic> m)
       : nid = m['nid'] as int,
@@ -758,7 +760,8 @@ class SearchItem {
         genre = m['genre'] as String?,
         estYear = m['est_year'] as int,
         favs = m['favs'] as int?,
-        coverUrl = m['cover_url'] as String?;
+        coverUrl = m['cover_url'] as String?,
+        inSeed = m['in_seed'] as bool? ?? true;
 }
 
 /// 官方搜索结果行（docs/08 §search-remote）：[inSeed] = 内置库命中；
