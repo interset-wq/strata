@@ -78,6 +78,7 @@ class _RankingsPageState extends ConsumerState<RankingsPage>
         title: TabBar(
           controller: _tabs,
           isScrollable: true,
+          tabAlignment: TabAlignment.start,
           labelColor: scheme.primary,
           unselectedLabelColor: scheme.onSurfaceVariant,
           indicatorColor: scheme.primary,
