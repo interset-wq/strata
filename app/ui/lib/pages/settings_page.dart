@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../core/providers.dart';
 import '../data/api/strata_api.dart';
@@ -26,6 +27,15 @@ class SettingsPage extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.bookmark_added_outlined),
+              title: const Text('收录的书'),
+              subtitle: const Text('搜索全站自动收录的新书'),
+              onTap: () => context.push('/collected'),
+            ),
+          ),
+          const SizedBox(height: 16),
           Text('外观', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
           Card(

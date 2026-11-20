@@ -28,6 +28,7 @@ class _AuthorPageState extends ConsumerState<AuthorPage> {
   bool _booksLoading = false;
   bool _booksDone = false;
   bool _booksFailed = false;
+  bool _newestFirst = true;
 
   static const int _pageSize = 20;
   final ScrollController _scroll = ScrollController();
@@ -84,6 +85,7 @@ class _AuthorPageState extends ConsumerState<AuthorPage> {
         author: widget.author,
         limit: _pageSize,
         offset: _books.length,
+        order: _newestFirst ? 'newest' : 'oldest',
       );
       if (!mounted) return;
       setState(() {
@@ -96,11 +98,31 @@ class _AuthorPageState extends ConsumerState<AuthorPage> {
     }
   }
 
+  /// 排序切换（docs/08 §author-books order 参数）：清空重新分页加载。
+  void _toggleOrder() {
+    setState(() {
+      _newestFirst = !_newestFirst;
+      _books.clear();
+      _booksDone = false;
+      _booksFailed = false;
+    });
+    _loadMore();
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: Text(widget.author)),
+      appBar: AppBar(
+        title: Text(widget.author),
+        actions: [
+          IconButton(
+            icon: Icon(_newestFirst ? Icons.south : Icons.north),
+            tooltip: _newestFirst ? '当前最新在前，点按最早在前' : '当前最早在前，点按最新在前',
+            onPressed: _toggleOrder,
+          ),
+        ],
+      ),
       floatingActionButton: _showTop
           ? BackToTop(onTap: () => _scroll.animateTo(
                 0,
@@ -139,8 +161,45 @@ class _AuthorPageState extends ConsumerState<AuthorPage> {
             child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
           );
         }
-        return _bookRow(context, _books[i], scheme);
+        final b = _books[i];
+        // est_year 分组头：同年首行前插入（0 年 = 回填沉底书，不分组）。
+        final showYear = b.estYear != 0 &&
+            (i == 0 || _books[i - 1].estYear != b.estYear);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (showYear) _yearHeader(context, scheme, b.estYear),
+            _bookRow(context, b, scheme),
+          ],
+        );
       },
+    );
+  }
+
+  Widget _yearHeader(BuildContext context, ColorScheme scheme, int year) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 12, 4, 6),
+      child: Row(
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration:
+                BoxDecoration(color: scheme.primary, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: 8),
+          Text('$year',
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: scheme.primary)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Divider(
+                height: 1, color: scheme.outline.withValues(alpha: .4)),
+          ),
+        ],
+      ),
     );
   }
 
@@ -243,7 +302,6 @@ class _AuthorPageState extends ConsumerState<AuthorPage> {
                     const SizedBox(height: 4),
                     Text(
                       [
-                        if (b.estYear != 0) '${b.estYear} 代',
                         if (b.estDate != null && b.estDate!.isNotEmpty)
                           b.estDate!,
                         if (b.status != null) b.status!,

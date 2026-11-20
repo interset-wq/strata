@@ -16,8 +16,7 @@ class StrataApi {
   Future<dynamic> _get(String path, [Map<String, String>? query]) async {
     final req = await _client.getUrl(_uri(path, query));
     final resp = await req.close();
-    final body =
-        await resp.transform(utf8.decoder).join();
+    final body = await resp.transform(utf8.decoder).join();
     if (resp.statusCode != 200) {
       String code = 'internal';
       String message = body;
@@ -40,14 +39,17 @@ class StrataApi {
   Future<Healthz> healthz() async =>
       Healthz.fromJson(await _get('/healthz') as Map<String, dynamic>);
 
-  Future<Meta> meta() async => Meta.fromJson(await _get('/meta') as Map<String, dynamic>);
+  Future<Meta> meta() async =>
+      Meta.fromJson(await _get('/meta') as Map<String, dynamic>);
 
   Future<EngineSettings> settings() async =>
       EngineSettings.fromJson(await _get('/settings') as Map<String, dynamic>);
 
   Future<EngineSettings> setDetailRateLimitEnabled(bool enabled) async =>
-      EngineSettings.fromJson(await _putBody(
-          '/settings', {'detail_rate_limit_enabled': enabled}) as Map<String, dynamic>);
+      EngineSettings.fromJson(
+        await _putBody('/settings', {'detail_rate_limit_enabled': enabled})
+            as Map<String, dynamic>,
+      );
 
   Future<BookDetail> book(int nid) async =>
       BookDetail.fromJson(await _get('/books/$nid') as Map<String, dynamic>);
@@ -71,11 +73,12 @@ class StrataApi {
         .toList();
   }
 
-  Future<List<RankItem>> rankingBoard(
-      {required String kind,
-      String? form,
-      int limit = 50,
-      int offset = 0}) async {
+  Future<List<RankItem>> rankingBoard({
+    required String kind,
+    String? form,
+    int limit = 50,
+    int offset = 0,
+  }) async {
     final body = await _get('/rankings/board', {
       'kind': kind,
       'limit': '$limit',
@@ -94,6 +97,7 @@ class StrataApi {
     String? status,
     String? contest,
     String? form,
+    String? wordsBand,
     int? year,
     String? order,
     int limit = 50,
@@ -105,6 +109,7 @@ class StrataApi {
       'status': ?status,
       'contest': ?contest,
       'form': ?form,
+      'words-band': ?wordsBand,
       if (year != null) 'year': '$year',
       'order': ?order,
       if (offset > 0) 'offset': '$offset',
@@ -114,8 +119,11 @@ class StrataApi {
         .toList();
   }
 
-  Future<DiscoverPage> discover(
-      {String? cursor, String? form, int limit = 20}) async {
+  Future<DiscoverPage> discover({
+    String? cursor,
+    String? form,
+    int limit = 20,
+  }) async {
     final body = await _get('/discover', {
       'limit': '$limit',
       'form': ?form,
@@ -148,10 +156,7 @@ class StrataApi {
   }
 
   Future<List<SearchItem>> search(String q, {int limit = 50}) async {
-    final body = await _get('/search', {
-      'q': q,
-      'limit': '$limit',
-    });
+    final body = await _get('/search', {'q': q, 'limit': '$limit'});
     return (body['items'] as List)
         .map((e) => SearchItem.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -193,8 +198,11 @@ class StrataApi {
     await _delete('/watchlist/$nid');
   }
 
-  Future<List<RankItem>> randomBooks(
-      {int limit = 8, String? status, String? form}) async {
+  Future<List<RankItem>> randomBooks({
+    int limit = 8,
+    String? status,
+    String? form,
+  }) async {
     final body = await _get('/random', {
       'limit': '$limit',
       'status': ?status,
@@ -234,16 +242,13 @@ class StrataApi {
 
   /// 每日 banner：日期种子对整个 banner 池（含 is_licensed）等概率抽取。
   /// form 非空时只在该形态的 featured 池内洗牌。
-  Future<List<FeaturedItem>> banners(
-      {required int seed,
-      int limit = 6,
-      int offset = 0,
-      String? form}) async {
-    final params = {
-      'seed': '$seed',
-      'limit': '$limit',
-      'offset': '$offset',
-    };
+  Future<List<FeaturedItem>> banners({
+    required int seed,
+    int limit = 6,
+    int offset = 0,
+    String? form,
+  }) async {
+    final params = {'seed': '$seed', 'limit': '$limit', 'offset': '$offset'};
     if (form != null) params['form'] = form;
     final body = await _get('/banner', params);
     return (body['items'] as List)
@@ -253,10 +258,16 @@ class StrataApi {
 
   /// 大图精选 gallery：featured=1 全池分页，默认按收藏降序，
   /// order='asc' 倒序；nid 作 tie-breaker，分页稳定。
-  Future<List<FeaturedItem>> featuredAll(
-      {int limit = 10, int offset = 0, String order = 'desc'}) async {
-    final body = await _get('/featured-all',
-        {'limit': '$limit', 'offset': '$offset', 'order': order});
+  Future<List<FeaturedItem>> featuredAll({
+    int limit = 10,
+    int offset = 0,
+    String order = 'desc',
+  }) async {
+    final body = await _get('/featured-all', {
+      'limit': '$limit',
+      'offset': '$offset',
+      'order': order,
+    });
     return (body['items'] as List)
         .map((e) => FeaturedItem.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -264,10 +275,16 @@ class StrataApi {
 
   /// 对话/短篇轮播：form 池中有封面书的收藏 Top-100 头部池，按日期
   /// 种子每日轮换（与 banner 同款哈希）。
-  Future<List<RankItem>> coverCarousel(
-      {required int seed, int limit = 6, String form = 'dialogue'}) async {
-    final body = await _get('/cover-carousel',
-        {'limit': '$limit', 'form': form, 'seed': '$seed'});
+  Future<List<RankItem>> coverCarousel({
+    required int seed,
+    int limit = 6,
+    String form = 'dialogue',
+  }) async {
+    final body = await _get('/cover-carousel', {
+      'limit': '$limit',
+      'form': form,
+      'seed': '$seed',
+    });
     return (body['items'] as List)
         .map((e) => RankItem.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -283,9 +300,14 @@ class StrataApi {
     required String author,
     int limit = 20,
     int offset = 0,
+    String order = 'newest',
   }) async {
-    final body = await _get('/author-books',
-        {'author': author, 'limit': '$limit', 'offset': '$offset'});
+    final body = await _get('/author-books', {
+      'author': author,
+      'limit': '$limit',
+      'offset': '$offset',
+      'order': order,
+    });
     return (body['items'] as List)
         .map((e) => RankItem.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -320,9 +342,22 @@ class StrataApi {
   /// 6 秒内重复触发返回 429（抛异常）；限流不抛——rateLimited=true。
   Future<RemoteSearchResult> searchRemote(String q) async {
     final body = await _post(
-            '/search/remote?q=${Uri.encodeComponent(q)}')
-        as Map<String, dynamic>;
+      '/search/remote?q=${Uri.encodeComponent(q)}',
+    ) as Map<String, dynamic>;
     return RemoteSearchResult.fromJson(body);
+  }
+
+  /// 移除一条自动收录（用户手动删除，仅 user.db）。
+  Future<void> deleteDiscovered(int nid) async {
+    await _delete('/discovered/$nid');
+  }
+
+  /// 自动收录的库外书列表（收录管理页，docs/08 §discovered）。
+  Future<List<DiscoveredItem>> discovered({int limit = 200}) async {
+    final body = await _get('/discovered', {'limit': '$limit'});
+    return (body['items'] as List)
+        .map((e) => DiscoveredItem.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   Future<CalendarResponse> calendar({
@@ -330,8 +365,11 @@ class StrataApi {
     required String anchor,
     int perCell = 3,
   }) async {
-    final body = await _get(
-        '/calendar', {'granularity': granularity, 'anchor': anchor, 'per_cell': '$perCell'});
+    final body = await _get('/calendar', {
+      'granularity': granularity,
+      'anchor': anchor,
+      'per_cell': '$perCell',
+    });
     return CalendarResponse.fromJson(body as Map<String, dynamic>);
   }
 
@@ -374,12 +412,16 @@ class StrataApi {
 
   /// 一个 IP 入口的列表：group 是征文名（精确匹配）或 'other'
   /// （收藏数前 2 名征文之外的长尾）；组内收藏降序。
-  Future<List<RankItem>> ipBooks(
-      {String form = 'ip_collab',
-      required String group,
-      int limit = 100}) async {
-    final body = await _get(
-        '/ip-books', {'limit': '$limit', 'form': form, 'group': group});
+  Future<List<RankItem>> ipBooks({
+    String form = 'ip_collab',
+    required String group,
+    int limit = 100,
+  }) async {
+    final body = await _get('/ip-books', {
+      'limit': '$limit',
+      'form': form,
+      'group': group,
+    });
     return (body['items'] as List)
         .map((e) => RankItem.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -391,7 +433,10 @@ class StrataApi {
     final text = await resp.transform(utf8.decoder).join();
     if (resp.statusCode != 200) {
       throw StrataApiException(
-          status: resp.statusCode, code: 'internal', message: text);
+        status: resp.statusCode,
+        code: 'internal',
+        message: text,
+      );
     }
     return jsonDecode(text);
   }
@@ -404,7 +449,10 @@ class StrataApi {
     final text = await resp.transform(utf8.decoder).join();
     if (resp.statusCode != 200) {
       throw StrataApiException(
-          status: resp.statusCode, code: 'internal', message: text);
+        status: resp.statusCode,
+        code: 'internal',
+        message: text,
+      );
     }
     return jsonDecode(text);
   }
@@ -417,7 +465,10 @@ class StrataApi {
     final text = await resp.transform(utf8.decoder).join();
     if (resp.statusCode != 200) {
       throw StrataApiException(
-          status: resp.statusCode, code: 'internal', message: text);
+        status: resp.statusCode,
+        code: 'internal',
+        message: text,
+      );
     }
     return jsonDecode(text);
   }
@@ -428,7 +479,10 @@ class StrataApi {
     await resp.transform(utf8.decoder).drain();
     if (resp.statusCode != 200) {
       throw StrataApiException(
-          status: resp.statusCode, code: 'internal', message: 'delete failed');
+        status: resp.statusCode,
+        code: 'internal',
+        message: 'delete failed',
+      );
     }
   }
 
@@ -440,12 +494,15 @@ class EngineSettings {
   final bool detailRateLimitEnabled;
   final int windowSeconds;
 
-  EngineSettings({required this.detailRateLimitEnabled, required this.windowSeconds});
+  EngineSettings({
+    required this.detailRateLimitEnabled,
+    required this.windowSeconds,
+  });
 
   factory EngineSettings.fromJson(Map<String, dynamic> j) => EngineSettings(
-        detailRateLimitEnabled: j['detail_rate_limit_enabled'] as bool? ?? true,
-        windowSeconds: j['detail_refresh_window_seconds'] as int? ?? 86400,
-      );
+    detailRateLimitEnabled: j['detail_rate_limit_enabled'] as bool? ?? true,
+    windowSeconds: j['detail_refresh_window_seconds'] as int? ?? 86400,
+  );
 }
 
 /// 浏览足迹：纯本地 user.db 数据。
@@ -455,10 +512,10 @@ class HistoryData {
   HistoryData({required this.items});
 
   factory HistoryData.fromJson(Map<String, dynamic> j) => HistoryData(
-        items: (j['items'] as List)
-            .map((e) => HistoryEntry.fromJson(e as Map<String, dynamic>))
-            .toList(),
-      );
+    items: (j['items'] as List)
+        .map((e) => HistoryEntry.fromJson(e as Map<String, dynamic>))
+        .toList(),
+  );
 }
 
 class HistoryEntry {
@@ -477,12 +534,12 @@ class HistoryEntry {
   });
 
   factory HistoryEntry.fromJson(Map<String, dynamic> j) => HistoryEntry(
-        nid: j['nid'] as int,
-        title: j['title'] as String? ?? '',
-        author: j['author'] as String? ?? '',
-        genre: j['genre'] as String?,
-        viewedAt: j['viewed_at'] as int? ?? 0,
-      );
+    nid: j['nid'] as int,
+    title: j['title'] as String? ?? '',
+    author: j['author'] as String? ?? '',
+    genre: j['genre'] as String?,
+    viewedAt: j['viewed_at'] as int? ?? 0,
+  );
 }
 
 class StrataApiException implements Exception {
@@ -510,13 +567,13 @@ class Healthz {
   final int genMax;
 
   Healthz.fromJson(Map<String, dynamic> m)
-      : schemaVersion = m['schema_version'] as int,
-        seedVersion = m['seed_version'] as String,
-        bookCount = m['book_count'] as int,
-        licensedCount = m['licensed_count'] as int,
-        contentEnd = m['content_end'] as String,
-        genMin = m['gen_min'] as int,
-        genMax = m['gen_max'] as int;
+    : schemaVersion = m['schema_version'] as int,
+      seedVersion = m['seed_version'] as String,
+      bookCount = m['book_count'] as int,
+      licensedCount = m['licensed_count'] as int,
+      contentEnd = m['content_end'] as String,
+      genMin = m['gen_min'] as int,
+      genMax = m['gen_max'] as int;
 }
 
 class Meta {
@@ -524,10 +581,10 @@ class Meta {
   final Map<String, String> seedMeta;
 
   Meta.fromJson(Map<String, dynamic> m)
-      : manifest = Manifest.fromJson(
-            m['manifest'] as Map<String, dynamic>),
-        seedMeta = (m['seed_meta'] as Map<String, dynamic>)
-            .map((k, v) => MapEntry(k, '$v'));
+    : manifest = Manifest.fromJson(m['manifest'] as Map<String, dynamic>),
+      seedMeta = (m['seed_meta'] as Map<String, dynamic>).map(
+        (k, v) => MapEntry(k, '$v'),
+      );
 }
 
 class Manifest {
@@ -543,16 +600,16 @@ class Manifest {
   final int genMax;
 
   Manifest.fromJson(Map<String, dynamic> m)
-      : schemaVersion = m['schema_version'] as int,
-        seedVersion = m['seed_version'] as String,
-        contentEnd = m['content_end'] as String,
-        builtAt = m['built_at'] as String,
-        bookCount = m['book_count'] as int,
-        licensedCount = m['licensed_count'] as int,
-        tagCount = m['tag_count'] as int,
-        tagRows = m['tag_rows'] as int,
-        genMin = m['gen_min'] as int,
-        genMax = m['gen_max'] as int;
+    : schemaVersion = m['schema_version'] as int,
+      seedVersion = m['seed_version'] as String,
+      contentEnd = m['content_end'] as String,
+      builtAt = m['built_at'] as String,
+      bookCount = m['book_count'] as int,
+      licensedCount = m['licensed_count'] as int,
+      tagCount = m['tag_count'] as int,
+      tagRows = m['tag_rows'] as int,
+      genMin = m['gen_min'] as int,
+      genMax = m['gen_max'] as int;
 }
 
 class CalendarItem {
@@ -566,14 +623,14 @@ class CalendarItem {
   final String estConf; // exact|high|mid|low（docs/14 §1.3 精度分档）
 
   CalendarItem.fromJson(Map<String, dynamic> m)
-      : nid = m['nid'] as int,
-        title = m['title'] as String,
-        author = m['author'] as String,
-        genre = m['genre'] as String?,
-        favs = m['favs'] as int,
-        coverUrl = m['cover_url'] as String?,
-        estDate = m['est_date'] as String,
-        estConf = m['est_conf'] as String? ?? 'mid';
+    : nid = m['nid'] as int,
+      title = m['title'] as String,
+      author = m['author'] as String,
+      genre = m['genre'] as String?,
+      favs = m['favs'] as int,
+      coverUrl = m['cover_url'] as String?,
+      estDate = m['est_date'] as String,
+      estConf = m['est_conf'] as String? ?? 'mid';
 }
 
 class CalendarDay {
@@ -583,12 +640,12 @@ class CalendarDay {
   final List<CalendarItem> items; // 仅 day/week；month 视图为空
 
   CalendarDay.fromJson(Map<String, dynamic> m)
-      : date = m['date'] as String,
-        total = m['total'] as int,
-        universe = (m['universe'] as num?)?.toInt() ?? 0,
-        items = ((m['items'] as List?) ?? const [])
-            .map((e) => CalendarItem.fromJson(e as Map<String, dynamic>))
-            .toList();
+    : date = m['date'] as String,
+      total = m['total'] as int,
+      universe = (m['universe'] as num?)?.toInt() ?? 0,
+      items = ((m['items'] as List?) ?? const [])
+          .map((e) => CalendarItem.fromJson(e as Map<String, dynamic>))
+          .toList();
 }
 
 class CalendarResponse {
@@ -597,11 +654,11 @@ class CalendarResponse {
   final List<CalendarDay> cells;
 
   CalendarResponse.fromJson(Map<String, dynamic> m)
-      : granularity = m['granularity'] as String,
-        anchor = m['anchor'] as String,
-        cells = (m['cells'] as List)
-            .map((e) => CalendarDay.fromJson(e as Map<String, dynamic>))
-            .toList();
+    : granularity = m['granularity'] as String,
+      anchor = m['anchor'] as String,
+      cells = (m['cells'] as List)
+          .map((e) => CalendarDay.fromJson(e as Map<String, dynamic>))
+          .toList();
 }
 
 class RankItem {
@@ -621,29 +678,30 @@ class RankItem {
   final int? praises;
   final String form;
   final List<String> tags;
+
   /// 定年日期（YYYY-MM-DD）：作者页时间轴用（est_date）；旧端点不返回此字段。
   final String? estDate;
 
   RankItem.fromJson(Map<String, dynamic> m)
-      : rank = m['rank'] as int,
-        nid = m['nid'] as int,
-        title = m['title'] as String,
-        author = m['author'] as String,
-        genre = m['genre'] as String?,
-        estYear = m['est_year'] as int,
-        favs = m['favs'] as int,
-        favPctl = (m['fav_pctl'] as num?)?.toDouble() ?? 0,
-        contest = m['contest'] as String?,
-        coverUrl = m['cover_url'] as String?,
-        status = m['status'] as String?,
-        words = m['words'] as int?,
-        clicks = m['clicks'] as int?,
-        praises = (m['praises'] as num?)?.toInt(),
-        form = m['form'] as String? ?? '',
-        estDate = m['est_date'] as String?,
-        tags = ((m['tags'] as List?) ?? const [])
-            .map((e) => e.toString())
-            .toList();
+    : rank = m['rank'] as int,
+      nid = m['nid'] as int,
+      title = m['title'] as String,
+      author = m['author'] as String,
+      genre = m['genre'] as String?,
+      estYear = m['est_year'] as int,
+      favs = m['favs'] as int,
+      favPctl = (m['fav_pctl'] as num?)?.toDouble() ?? 0,
+      contest = m['contest'] as String?,
+      coverUrl = m['cover_url'] as String?,
+      status = m['status'] as String?,
+      words = m['words'] as int?,
+      clicks = m['clicks'] as int?,
+      praises = (m['praises'] as num?)?.toInt(),
+      form = m['form'] as String? ?? '',
+      estDate = m['est_date'] as String?,
+      tags = ((m['tags'] as List?) ?? const [])
+          .map((e) => e.toString())
+          .toList();
 }
 
 /// 移动版详情页作者区（book_Author）的作品集条目。
@@ -652,8 +710,8 @@ class AuthorWork {
   final String title;
 
   AuthorWork.fromJson(Map<String, dynamic> m)
-      : nid = m['nid'] as int,
-        title = m['title'] as String;
+    : nid = m['nid'] as int,
+      title = m['title'] as String;
 }
 
 /// 作者资料（按需抓取 + user.db 缓存，docs/author-profile-on-demand §3）。
@@ -670,16 +728,16 @@ class AuthorProfile {
   final String source; // 'cache' | 'live'
 
   AuthorProfile.fromJson(Map<String, dynamic> m)
-      : nid = m['nid'] as int,
-        authorName = m['author_name'] as String? ?? '',
-        authorIntro = m['author_intro'] as String?,
-        authorAvatar = m['author_avatar'] as String?,
-        works = ((m['works'] as List?) ?? const [])
-            .map((e) => AuthorWork.fromJson(e as Map<String, dynamic>))
-            .toList(),
-        verdict = m['verdict'] as String? ?? 'error',
-        observedAt = m['observed_at'] as int? ?? 0,
-        source = m['source'] as String? ?? 'live';
+    : nid = m['nid'] as int,
+      authorName = m['author_name'] as String? ?? '',
+      authorIntro = m['author_intro'] as String?,
+      authorAvatar = m['author_avatar'] as String?,
+      works = ((m['works'] as List?) ?? const [])
+          .map((e) => AuthorWork.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      verdict = m['verdict'] as String? ?? 'error',
+      observedAt = m['observed_at'] as int? ?? 0,
+      source = m['source'] as String? ?? 'live';
 }
 
 class WatchItem {
@@ -691,19 +749,20 @@ class WatchItem {
   final int addedAt;
   final String role;
   final String? note;
+
   /// v6 统一列表：true = 追踪中（后台抓取），false = 只存（原书架条目）。
   final bool active;
 
   WatchItem.fromJson(Map<String, dynamic> m)
-      : nid = m['nid'] as int,
-        title = m['title'] as String,
-        author = m['author'] as String,
-        genre = m['genre'] as String?,
-        coverUrl = m['cover_url'] as String?,
-        addedAt = m['added_at'] as int,
-        role = m['role'] as String? ?? 'self',
-        note = m['note'] as String?,
-        active = m['active'] as bool? ?? false;
+    : nid = m['nid'] as int,
+      title = m['title'] as String,
+      author = m['author'] as String,
+      genre = m['genre'] as String?,
+      coverUrl = m['cover_url'] as String?,
+      addedAt = m['added_at'] as int,
+      role = m['role'] as String? ?? 'self',
+      note = m['note'] as String?,
+      active = m['active'] as bool? ?? false;
 }
 
 class DiscoverPage {
@@ -711,10 +770,10 @@ class DiscoverPage {
   final String? nextCursor;
 
   DiscoverPage.fromJson(Map<String, dynamic> m)
-      : items = (m['items'] as List)
-            .map((e) => RankItem.fromJson(e as Map<String, dynamic>))
-            .toList(),
-        nextCursor = m['next_cursor'] as String?;
+    : items = (m['items'] as List)
+          .map((e) => RankItem.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      nextCursor = m['next_cursor'] as String?;
 
   bool get hasMore => nextCursor != null && nextCursor!.isNotEmpty;
 }
@@ -731,15 +790,15 @@ class ShortItem {
   final String? coverUrl;
 
   ShortItem.fromJson(Map<String, dynamic> m)
-      : rank = m['rank'] as int,
-        nid = m['nid'] as int,
-        title = m['title'] as String,
-        author = m['author'] as String,
-        genre = m['genre'] as String?,
-        estYear = m['est_year'] as int,
-        favs = m['favs'] as int,
-        words = m['words'] as int?,
-        coverUrl = m['cover_url'] as String?;
+    : rank = m['rank'] as int,
+      nid = m['nid'] as int,
+      title = m['title'] as String,
+      author = m['author'] as String,
+      genre = m['genre'] as String?,
+      estYear = m['est_year'] as int,
+      favs = m['favs'] as int,
+      words = m['words'] as int?,
+      coverUrl = m['cover_url'] as String?;
 }
 
 class SearchItem {
@@ -750,18 +809,19 @@ class SearchItem {
   final int estYear;
   final int? favs;
   final String? coverUrl;
+
   /// false = 自动收录的库外书（discovered 覆盖层），est_year/favs 为空。
   final bool inSeed;
 
   SearchItem.fromJson(Map<String, dynamic> m)
-      : nid = m['nid'] as int,
-        title = m['title'] as String,
-        author = m['author'] as String,
-        genre = m['genre'] as String?,
-        estYear = m['est_year'] as int,
-        favs = m['favs'] as int?,
-        coverUrl = m['cover_url'] as String?,
-        inSeed = m['in_seed'] as bool? ?? true;
+    : nid = m['nid'] as int,
+      title = m['title'] as String,
+      author = m['author'] as String,
+      genre = m['genre'] as String?,
+      estYear = m['est_year'] as int,
+      favs = m['favs'] as int?,
+      coverUrl = m['cover_url'] as String?,
+      inSeed = m['in_seed'] as bool? ?? true;
 }
 
 /// 官方搜索结果行（docs/08 §search-remote）：[inSeed] = 内置库命中；
@@ -776,13 +836,13 @@ class RemoteSearchItem {
   final bool inSeed;
 
   RemoteSearchItem.fromJson(Map<String, dynamic> m)
-      : nid = m['nid'] as int,
-        title = m['title'] as String,
-        author = m['author'] as String? ?? '',
-        updatedAt = m['updated_at'] as String?,
-        coverUrl = m['cover_url'] as String?,
-        summary = m['summary'] as String?,
-        inSeed = m['in_seed'] as bool? ?? false;
+    : nid = m['nid'] as int,
+      title = m['title'] as String,
+      author = m['author'] as String? ?? '',
+      updatedAt = m['updated_at'] as String?,
+      coverUrl = m['cover_url'] as String?,
+      summary = m['summary'] as String?,
+      inSeed = m['in_seed'] as bool? ?? false;
 }
 
 /// 官方搜索响应：[rateLimited] = 静默限流（HTTP 200 但指纹翻转，
@@ -793,11 +853,11 @@ class RemoteSearchResult {
   final List<RemoteSearchItem> items;
 
   RemoteSearchResult.fromJson(Map<String, dynamic> m)
-      : rateLimited = m['meta']?['rate_limited'] as bool? ?? false,
-        declared = m['meta']?['declared'] as int? ?? 0,
-        items = ((m['items'] as List?) ?? const [])
-            .map((e) => RemoteSearchItem.fromJson(e as Map<String, dynamic>))
-            .toList();
+    : rateLimited = m['meta']?['rate_limited'] as bool? ?? false,
+      declared = m['meta']?['declared'] as int? ?? 0,
+      items = ((m['items'] as List?) ?? const [])
+          .map((e) => RemoteSearchItem.fromJson(e as Map<String, dynamic>))
+          .toList();
 }
 
 /// contest（征文）→ 联动 IP 展示名（崩坏3征文 → 崩坏3，
@@ -835,7 +895,9 @@ class IpGroup {
   const IpGroup({required this.contest, required this.count});
 
   factory IpGroup.fromJson(Map<String, dynamic> j) => IpGroup(
-      contest: j['contest'] as String, count: (j['count'] as num).toInt());
+    contest: j['contest'] as String,
+    count: (j['count'] as num).toInt(),
+  );
 
   /// 展示名：由 contest 推导（崩坏3征文 → 崩坏3）。
   String get label => contestIpLabel(contest) ?? contest;
@@ -858,7 +920,9 @@ class YearGroup {
   const YearGroup({required this.year, required this.count});
 
   factory YearGroup.fromJson(Map<String, dynamic> j) => YearGroup(
-      year: (j['year'] as num).toInt(), count: (j['count'] as num).toInt());
+    year: (j['year'] as num).toInt(),
+    count: (j['count'] as num).toInt(),
+  );
 }
 
 class YearGroupsResult {
@@ -876,7 +940,9 @@ class GenreGroup {
   const GenreGroup({required this.genre, required this.count});
 
   factory GenreGroup.fromJson(Map<String, dynamic> j) => GenreGroup(
-      genre: j['genre'] as String, count: (j['count'] as num).toInt());
+    genre: j['genre'] as String,
+    count: (j['count'] as num).toInt(),
+  );
 }
 
 class GenreGroupsResult {
@@ -894,11 +960,11 @@ class FeaturedItem {
   final int? favs;
 
   FeaturedItem.fromJson(Map<String, dynamic> m)
-      : nid = m['nid'] as int,
-        title = m['title'] as String,
-        author = m['author'] as String,
-        coverUrl = m['cover_url'] as String?,
-        favs = m['favs'] as int?;
+    : nid = m['nid'] as int,
+      title = m['title'] as String,
+      author = m['author'] as String,
+      coverUrl = m['cover_url'] as String?,
+      favs = m['favs'] as int?;
 }
 
 class RefreshResult {
@@ -912,6 +978,26 @@ class RefreshResult {
         detail = m['detail'] as Map<String, dynamic>?;
 }
 
+/// 自动收录的库外书一行（user.db discovered，docs/08 §discovered）。
+class DiscoveredItem {
+  final int nid;
+  final String title;
+  final String? author;
+  final String? coverUrl;
+  final String? summary;
+  final String source;
+  final int observedAt;
+
+  DiscoveredItem.fromJson(Map<String, dynamic> m)
+      : nid = m['nid'] as int,
+        title = m['title'] as String,
+        author = m['author'] as String?,
+        coverUrl = m['cover_url'] as String?,
+        summary = m['summary'] as String?,
+        source = m['source'] as String? ?? 'search',
+        observedAt = m['observed_at'] as int? ?? 0;
+}
+
 class ObservationRow {
   final int observedAt;
   final int? favs;
@@ -921,12 +1007,12 @@ class ObservationRow {
   final String? updatedAt;
 
   ObservationRow.fromJson(Map<String, dynamic> m)
-      : observedAt = m['observed_at'] as int,
-        favs = m['favs'] as int?,
-        praises = m['praises'] as int?,
-        words = m['words'] as int?,
-        status = m['status'] as String?,
-        updatedAt = m['updated_at'] as String?;
+    : observedAt = m['observed_at'] as int,
+      favs = m['favs'] as int?,
+      praises = m['praises'] as int?,
+      words = m['words'] as int?,
+      status = m['status'] as String?,
+      updatedAt = m['updated_at'] as String?;
 }
 
 class BookDetail {
@@ -937,9 +1023,9 @@ class BookDetail {
   final Map<String, dynamic>? effective;
 
   BookDetail.fromJson(Map<String, dynamic> m)
-      : source = m['source'] as String,
-        dataEnd = m['data_end'] as String,
-        book = m['book'] as Map<String, dynamic>,
-        tags = (m['tags'] as List).cast<String>(),
-        effective = m['effective'] as Map<String, dynamic>?;
+    : source = m['source'] as String,
+      dataEnd = m['data_end'] as String,
+      book = m['book'] as Map<String, dynamic>,
+      tags = (m['tags'] as List).cast<String>(),
+      effective = m['effective'] as Map<String, dynamic>?;
 }
