@@ -18,9 +18,10 @@
 ## 0. 一句话结论
 
 **18 个业务字段 = 1 个主键 + 11 个同义可刷新（含 `bgBanner` → `featured` 布尔化）+ 1 个旁证
-（`addTime`）+ 4 个新维度（`authorId`/`categoryId`/`isSensitive`/`allowDown`）+ 1 个禁用
-（`point` 是废弃占位分）。App 不返回 `praises`/`contest`/`tags`，因此赞藏比 `pr`
-与分位列无法靠这次刷新重建——这是「用 API 翻新快照」的硬边界。**
+（`addTime`）+ 2 个新维度（`authorId`/`categoryId`）+ 3 个无用（`point` 废弃占位分、
+`isSensitive` 敏感内容强制下架故本库不会命中、`allowDown` 全站书籍恒禁止下载）。
+App 不返回 `praises`/`contest`/`tags`，因此赞藏比 `pr` 与分位列无法靠这次刷新重建——
+这是「用 API 翻新快照」的硬边界。**
 
 ---
 
@@ -44,12 +45,12 @@
 | `signStatus` | `price_type` | **同义** | VIP→VIP 3,572、普通→免费 100,090、签约→签约 6,660；漂移 48 本 | ✅ 可，映射表见 §2 |
 | `typeId` | `genre` | **同义**（id↔文本） | 21→魔幻 88,528、22→玄幻 25,852；1 条 tid=9 异常 | ✅ 可 |
 | `categoryId` | — | **新维度** | 0=非同人 97,806、1=同人 10,249（**9.3%**，含 sysTags）、**3=2,275、4=40（含义未确认，不得按 0/1 用）** | 🆕 建议新增列（只取 0/1） |
-| `isSensitive` | — | **新维度** | 敏感标记，**14,755 本（12.9%）为 true**；不是废弃字段 | 🆕 已写进引擎 user.db |
-| `allowDown` | — | **新维度（历史遗留）** | 是否允许下载，**62,111 本（54.3%）为 true**，有实际取值 | 🆕 已写进引擎 user.db |
+| `isSensitive` | — | **🗑 无用字段** | 敏感标记内容会被**强制下架**，能进入本库的书不会被命中；对本库无判别力 | ❌ 不采集、不入库、不使用 |
+| `allowDown` | — | **🗑 无用字段（历史遗留）** | 所有书籍本身就**禁止下载**，无论该字段取何值结论都不变，无实际意义 | ❌ 不采集、不入库、不使用 |
 | `novelCover` | `cover_url` | **同义**（URL↔相对路径） | 去前缀后 **92.68%** 一致（CSV 有封面的 53,628 本），7.32% 为半年间换图；**配对里 CSV 缺封面的 56,742 本 API 全有** | ✅ 可，须剥离 URL 前缀（§2） |
 | `bgBanner` | `featured` | **同义**（非空→`=1`） | 横幅图 URL，仅 **0.31%**（351 本）非空；形如 `…/beitouNew/cut/{nid}.jpg?TOKEN`。**URL 主体可由 nid 拼 CDN 前缀得到，故本项目只存布尔** `featured=1`（报告 01：其封面时间戳偏差中位 +338 天） | ✅ 可，非空即置 `featured=1` |
 
-**汇总**：1 主键 + 11 同义 + 1 旁证 + 4 新维度 + 1 禁用（`point`）。
+**汇总**：1 主键 + 11 同义 + 1 旁证 + 2 新维度 + 3 无用（`point`/`isSensitive`/`allowDown`）。
 
 ---
 
@@ -141,7 +142,9 @@
 - **一次请求物尽其用（已实施 2026-11-18）**：`cover_queue.py` 的成功记录已在结果 jsonl
   附 `snapshot`（`markCount`/`viewTimes`/`charCount`/`lastUpdateTime`/`isFinish`/`signStatus`/
   `typeId`/`categoryId`/`addTime`/`authorId`/`bgBanner`/`isSensitive`/`allowDown` 共 15 字段），
-  **`point` 在分析侧采集层直接丢弃**（废弃占位分）；`export --snapshots PATH` 另导快照。
+  **`point` 在分析侧采集层直接丢弃**（废弃占位分）；`isSensitive`/`allowDown` 虽出现在原始
+  快照里，但按上表为无用字段（敏感内容强制下架、全站书籍禁止下载），**不入库、不作为维度使用**；
+  `export --snapshots PATH` 另导快照。
   快照只落盘、不覆盖 `books`（§4 约束）。引擎侧另把包括 `point` 在内的字段写进 user.db
   的 `book_meta`（展示用），两者不冲突——**分析口径与 app 本地库是两套存储**。
 - **格式**：写回 `cover_url` 必须剥离 URL 前缀；`bgBanner` 非空 → `featured=1`（URL 主体可由 nid 拼 CDN 前缀得到，故只存布尔）。

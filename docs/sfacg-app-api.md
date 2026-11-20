@@ -152,10 +152,10 @@ resp = requests.get("https://api.sfacg.com/novels/730611",
 | `signStatus`     | str   | `price_type`         | `VIP` 等签约状态                                                                 |
 | `typeId`         | int   | `genre`              | 类型 id（见 §2.1）                                                                |
 | `categoryId`     | int   | —                     | 0 非同人 / 1 同人                                                                  |
-| `isSensitive`    | bool  | —                     | 敏感标记                                                                           |
+| `isSensitive`    | bool  | —                     | 敏感标记（无用：敏感内容会被强制下架，本库书不会命中）                     |
 | `novelCover`     | str   | `cover_url`          | 封面 URL（**含 `YYYY/MM/` 目录 → 仍是运营时间，见报告 01 §封面时间戳**） |
 | `bgBanner`       | str   | `featured`           | 横幅图 URL（`…/beitouNew/cut/{nid}.jpg?TOKEN`），仅 0.31% 非空；URL 主体可按 nid 拼 CDN 前缀得到，故只存布尔——非空即 `featured=1` |
-| `allowDown`      | bool  | —                     | 历史遗留字段                                                                       |
+| `allowDown`      | bool  | —                     | 历史遗留字段（无用：全站书籍禁止下载，取值不改变结论）                     |
 | `point`          | float | —                     | 历史遗留字段                                                                       |
 
 **作者身份（2026-11-18 实测，见 `dataset/README.md` §5）**：
