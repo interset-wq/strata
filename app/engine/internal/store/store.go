@@ -1702,6 +1702,14 @@ ORDER BY h.viewed_at DESC LIMIT ?`, limit)
 // licensed works included — banners are display-layer) with the date as the
 // random seed. Same seed → same set, every day a different draw, and every
 // banner stays reachable because the shuffle is a uniform reorder.
+// The seed must enter the hash with a coefficient whose residue mod M
+// is a large fraction of the 1,000,003-bucket key space: the cut point
+// then moves ~half the circle per day, so consecutive days draw the
+// opposite arc — genuinely different top-k. The old additive seed
+// (nid*a + day, B=1) advanced one bucket per day, so top-k never
+// changed (user-reported 2026-11-20: today == yesterday); B=996940
+// (≡ -3063) was no better for small pools. B = 500001 (half circle).
+// Pure arithmetic: this SQLite build predates the ^ operator.
 // BannerPick returns a seeded deterministic segment of the featured=1
 // pool: the whole pool is shuffled by (nid, seed), then rows [offset,
 // offset+limit) are taken. Sharing one seed across calls with different
@@ -1722,7 +1730,7 @@ WHERE featured = 1`
 		args = append(args, form)
 	}
 	query += `
-ORDER BY (seed.books.nid*2654435761 + ?) % 1000003, seed.books.nid
+ORDER BY (seed.books.nid*2654435761 + ?*500001) % 1000003, seed.books.nid
 LIMIT ? OFFSET ?`
 	args = append(args, seed, limit, offset)
 	rows, err := s.DB.QueryContext(ctx, query, args...)

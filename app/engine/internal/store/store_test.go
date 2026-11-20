@@ -124,3 +124,48 @@ func TestSeedMeta(t *testing.T) {
 		t.Fatalf("meta = %v", meta)
 	}
 }
+
+// TestBannerPickDailySeedChangesOrder pins the 2026-11-20 fix: with the
+// old additive hash (nid*a + day) the day advanced the cut point by one
+// bucket in the 1,000,003-bucket space, so consecutive days returned the
+// identical top-k (user reported today == yesterday). The XOR hash must
+// reorder the pool on consecutive days and stay deterministic per seed.
+func TestBannerPickDailySeedChangesOrder(t *testing.T) {
+	st := openTestStore(t)
+	ctx := context.Background()
+
+	a, err := st.BannerPick(ctx, 20261119, 0, 100, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(a) < 2 {
+		t.Fatalf("featured pool too small: %d", len(a))
+	}
+	b, err := st.BannerPick(ctx, 20261120, 0, 100, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sameNidOrder(a, b) {
+		t.Fatalf("consecutive-day orders identical: %+v", a)
+	}
+	// Determinism: the same seed returns the same order.
+	c, err := st.BannerPick(ctx, 20261119, 0, 100, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !sameNidOrder(a, c) {
+		t.Fatalf("same seed, different order: %+v vs %+v", a, c)
+	}
+}
+
+func sameNidOrder(a, b []FeaturedBook) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i].NID != b[i].NID {
+			return false
+		}
+	}
+	return true
+}
