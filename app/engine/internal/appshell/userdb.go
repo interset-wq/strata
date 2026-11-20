@@ -9,8 +9,9 @@ import (
 
 // userSchemaVersion: v7 adds author_profiles (on-demand author data,
 // docs/author-profile-on-demand §4) — purely additive, created by the
-// idempotent DDL replay in EnsureUserDB.
-const userSchemaVersion = 7
+// idempotent DDL replay in EnsureUserDB. v8 adds the works cache
+// column to author_profiles (official works list replays on cache hits).
+const userSchemaVersion = 8
 
 // userSchemaV5 is the v5-era full user.db DDL: additive across
 // versions (v1 → v5), replayed idempotently on every schema pass — a
@@ -169,7 +170,8 @@ CREATE TABLE IF NOT EXISTS author_profiles(
   author_avatar TEXT,
   verdict       TEXT NOT NULL,
   source_nid    INTEGER,
-  observed_at   INTEGER NOT NULL
+  observed_at   INTEGER NOT NULL,
+  works         TEXT
 );
 `
 
@@ -202,10 +204,50 @@ func EnsureUserDB(path string) error {
 	if err := migrateV5toV6(db); err != nil {
 		return fmt.Errorf("migrate v5→v6: %w", err)
 	}
+	if err := migrateV7toV8(db); err != nil {
+		return fmt.Errorf("migrate v7→v8: %w", err)
+	}
 	if _, err := db.Exec(fmt.Sprintf("PRAGMA user_version=%d", userSchemaVersion)); err != nil {
 		return err
 	}
 	return nil
+}
+
+// migrateV7toV8 adds the works cache column to author_profiles (docs/08
+// §author-profile: the official works list is part of the snapshot and
+// replays on cache hits). Idempotent: the column check tolerates replays.
+func migrateV7toV8(db *sql.DB) error {
+	rows, err := db.Query("PRAGMA table_info(author_profiles)")
+	if err != nil {
+		return err
+	}
+	hasWorks := false
+	for rows.Next() {
+		var (
+			cid       int
+			name      string
+			typ       string
+			notNull   int
+			dfltValue any
+			pk        int
+		)
+		if err := rows.Scan(&cid, &name, &typ, &notNull, &dfltValue, &pk); err != nil {
+			rows.Close()
+			return err
+		}
+		if name == "works" {
+			hasWorks = true
+		}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if hasWorks {
+		return nil
+	}
+	_, err = db.Exec("ALTER TABLE author_profiles ADD COLUMN works TEXT")
+	return err
 }
 
 // migrateV5toV6 folds the legacy bookshelf into the watchlist

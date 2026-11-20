@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -1535,12 +1536,20 @@ func (s *Server) authorProfile(c *gin.Context) {
 				ttl = int64(authorProfileDeadTTL)
 			}
 			if now-p.ObservedAt < ttl {
+				// works cache (v8): replay the official list stored at fetch
+				// time instead of an always-empty array.
+				worksResp := []crawl.AuthorWork{}
+				if p.Works != nil && *p.Works != "" {
+					if err := json.Unmarshal([]byte(*p.Works), &worksResp); err != nil {
+						worksResp = []crawl.AuthorWork{}
+					}
+				}
 				c.JSON(http.StatusOK, gin.H{
 					"nid":           p.SourceNID,
 					"author_name":   p.AuthorName,
 					"author_intro":  p.AuthorIntro,
 					"author_avatar": p.AuthorAvatar,
-					"works":         []crawl.AuthorWork{},
+					"works":         worksResp,
 					"verdict":       p.Verdict,
 					"observed_at":   p.ObservedAt,
 					"source":        "cache",
@@ -1609,10 +1618,17 @@ func (s *Server) authorProfile(c *gin.Context) {
 		avatarPtr = &avatar
 	}
 	if match {
+		// works cache (v8): persist the official works list so cache
+		// hits replay it (docs/08 §author-profile).
+		var worksJSON *string
+		if b, err := json.Marshal(works); err == nil {
+			s := string(b)
+			worksJSON = &s
+		}
 		_ = s.store.SaveAuthorProfile(c.Request.Context(), &store.AuthorProfile{
 			AuthorKey: key, AuthorName: name, AuthorIntro: intro,
 			AuthorAvatar: avatarPtr, Verdict: verdict,
-			SourceNID: nid, ObservedAt: fetchStart,
+			SourceNID: nid, ObservedAt: fetchStart, Works: worksJSON,
 		})
 	}
 	c.JSON(http.StatusOK, gin.H{

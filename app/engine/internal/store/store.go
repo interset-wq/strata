@@ -999,6 +999,9 @@ type AuthorProfile struct {
 	Verdict      string
 	SourceNID    int64
 	ObservedAt   int64
+	// Works is the cached official works list as a JSON array (v8);
+	// nil when never fetched or the verdict carries no works.
+	Works *string
 }
 
 // GetAuthorProfile returns the cached row, or nil when the author was
@@ -1007,11 +1010,12 @@ func (s *Store) GetAuthorProfile(ctx context.Context, key string) (*AuthorProfil
 	var (
 		p             AuthorProfile
 		intro, avatar sql.NullString
+		works         sql.NullString
 	)
 	err := s.DB.QueryRowContext(ctx, `
-SELECT author_name, author_intro, author_avatar, verdict, source_nid, observed_at
+SELECT author_name, author_intro, author_avatar, verdict, source_nid, observed_at, works
 FROM author_profiles WHERE author_key = ?`, key).
-		Scan(&p.AuthorName, &intro, &avatar, &p.Verdict, &p.SourceNID, &p.ObservedAt)
+		Scan(&p.AuthorName, &intro, &avatar, &p.Verdict, &p.SourceNID, &p.ObservedAt, &works)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -1020,6 +1024,7 @@ FROM author_profiles WHERE author_key = ?`, key).
 	}
 	p.AuthorKey = key
 	p.AuthorIntro = strPtr(intro)
+	p.Works = strPtr(works)
 	p.AuthorAvatar = strPtr(avatar)
 	return &p, nil
 }
@@ -1028,17 +1033,18 @@ FROM author_profiles WHERE author_key = ?`, key).
 func (s *Store) SaveAuthorProfile(ctx context.Context, p *AuthorProfile) error {
 	_, err := s.DB.ExecContext(ctx, `
 INSERT INTO author_profiles(author_key, author_name, author_intro, author_avatar,
-                             verdict, source_nid, observed_at)
-VALUES (?, ?, ?, ?, ?, ?, ?)
+                             verdict, source_nid, observed_at, works)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(author_key) DO UPDATE SET
   author_name = excluded.author_name,
   author_intro = excluded.author_intro,
   author_avatar = excluded.author_avatar,
   verdict = excluded.verdict,
   source_nid = excluded.source_nid,
-  observed_at = excluded.observed_at`,
+  observed_at = excluded.observed_at,
+  works = excluded.works`,
 		p.AuthorKey, p.AuthorName, p.AuthorIntro, p.AuthorAvatar,
-		p.Verdict, p.SourceNID, p.ObservedAt)
+		p.Verdict, p.SourceNID, p.ObservedAt, p.Works)
 	return err
 }
 

@@ -314,6 +314,23 @@ func TestAuthorProfileRoundTrip(t *testing.T) {
 		t.Fatalf("avatar = %v", got.AuthorAvatar)
 	}
 
+	// v8 works cache: the official works list round-trips (docs/08
+	// §author-profile — cache hits replay it instead of an empty array).
+	worksJSON := `[{"nid":1003,"title":"Long C"}]`
+	if err := st.SaveAuthorProfile(ctx, &AuthorProfile{
+		AuthorKey: "author c", AuthorName: "Author C", Verdict: "ok",
+		SourceNID: 1003, ObservedAt: 1700000002, Works: &worksJSON,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	got2, err := st.GetAuthorProfile(ctx, "author c")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got2 == nil || got2.Works == nil || *got2.Works != worksJSON {
+		t.Fatalf("works = %v", got2.Works)
+	}
+
 	// Upsert: a second save replaces the row; cleared fields go NULL.
 	if err := st.SaveAuthorProfile(ctx, &AuthorProfile{
 		AuthorKey: "author c", AuthorName: "Author C",
