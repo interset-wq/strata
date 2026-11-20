@@ -1077,10 +1077,10 @@ class OfficialRankEntry {
   final int value;
 
   OfficialRankEntry.fromJson(Map<String, dynamic> m)
-    : nid = m['nid'] as int,
-      rank = m['rank'] as int,
-      title = m['title'] as String,
-      author = m['author'] as String,
+    : nid = m['nid'] as int? ?? 0,
+      rank = m['rank'] as int? ?? 0,
+      title = m['title'] as String? ?? '',
+      author = m['author'] as String? ?? '',
       genre = m['genre'] as String?,
       coverUrl = m['cover_url'] as String?,
       value = m['value'] as int? ?? 0;

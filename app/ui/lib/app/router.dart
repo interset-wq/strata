@@ -96,6 +96,11 @@ final router = GoRouter(
               GoRoute(
                 path: '/official-ranks',
                 builder: (_, _) => const OfficialRanksPage()),
+              GoRoute(
+                path: '/official-ranks/:board',
+                builder: (_, st) =>
+                    OfficialRankDetailPage(board: st.pathParameters['board']!),
+              ),
           ],
         ),
       ],
