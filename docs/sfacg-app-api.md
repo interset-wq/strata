@@ -122,7 +122,8 @@ resp = requests.get("https://api.sfacg.com/novels/730611",
 `−1` 全部、`9` 爱情、`21` 魔幻、`22` 玄幻、`23` 古风、`24` 科幻、`25` 校园、`26` 都市、
 `27` 游戏、`29` 悬疑
 
-`categoryId`：`−1` 全部、`0` 非同人文、`1` 同人文（含类型为同人文或系统标签含「同人」）。
+`categoryId`（查询参数）：`−1` 全部、`0` 常规、`1` 对话小说、`3` 短篇、`4` 沉浸式互动小说。
+这是**产品线/形态**过滤、不是题材（与 `tid` 正交）；枚举语义经实测定案，见 `api-field-mapping.md` §3.4。
 
 > **对比 PC 端**：`op=novelbytype` 需 POST + Referer，42,568 页枚举出 255,408 个目录槽位。
 > App 端 `/novels` 结构化得多，但**两者的枚举边界是否一致尚未验证**——不要混用结论。
@@ -136,6 +137,7 @@ resp = requests.get("https://api.sfacg.com/novels/730611",
 > **字段与本项目数据列的实测对应关系见 [`api-field-mapping.md`](./api-field-mapping.md)**
 > （约 11 万本配对的快照现算，数字仅供参考、随版本变化；含一致率、值映射、写回约束）。下表「本项目对应」列已按该分析修正
 > `point`（废弃占位分）误映射；`bgBanner` 非空即 `featured=1`（URL 主体可由 nid 拼 CDN 前缀得到，故只存布尔）。
+> `categoryId` 语义经实测定为形态标记（0/1/3/4 = 常规/对话/短篇/互动），见 `api-field-mapping.md` §3.4。
 
 | App 字段           | 类型  | 本项目对应             | 说明                                                                               |
 | ------------------ | ----- | ---------------------- | ---------------------------------------------------------------------------------- |
@@ -151,7 +153,7 @@ resp = requests.get("https://api.sfacg.com/novels/730611",
 | `isFinish`       | bool  | `status`             | 是否完结                                                                           |
 | `signStatus`     | str   | `price_type`         | `VIP` 等签约状态                                                                 |
 | `typeId`         | int   | `genre`              | 类型 id（见 §2.1）                                                                |
-| `categoryId`     | int   | —                     | 0 非同人 / 1 同人                                                                  |
+| `categoryId`     | int   | 形态标记              | **0 常规 / 1 对话小说 / 3 短篇 / 4 沉浸式互动小说**——是产品线/形态，**不是**题材、与 `typeId/genre` 不同义；实证见 `api-field-mapping.md` §3.4 |
 | `isSensitive`    | bool  | —                     | 敏感标记（无用：敏感内容会被强制下架，本库书不会命中）                     |
 | `novelCover`     | str   | `cover_url`          | 封面 URL（**含 `YYYY/MM/` 目录 → 仍是运营时间，见报告 01 §封面时间戳**） |
 | `bgBanner`       | str   | `featured`           | 横幅图 URL（`…/beitouNew/cut/{nid}.jpg?TOKEN`），仅 0.31% 非空；URL 主体可按 nid 拼 CDN 前缀得到，故只存布尔——非空即 `featured=1` |
