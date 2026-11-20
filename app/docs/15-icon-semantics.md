@@ -65,6 +65,7 @@
 | 语义 | icon | 使用处 |
 | --- | --- | --- |
 | 图片不可用 | `Icons.image_not_supported_outlined` | 大图精选卡片 / 全屏查看器：banner cut 图 404 时的占位容器（不做封面兜底——3:4 封面塞 16:9 容器会被裁成一条） |
+| 头像不可用 | `Icons.person` | 作者页头部 CircleAvatar：无网络头像或加载失败时的占位（outlined，onSurfaceVariant；展示层 outlined 规范 4） |
 
 ## 动作
 
@@ -89,3 +90,4 @@
 - 本地搜索结果（收藏 badge）
 - 详情页观测历史（收藏/赞/字数）、观测数据 chips（收藏/推荐/字数）
 - 榜单字数榜（字数 badge）
+- 作者页（头像占位 `Icons.person`；书目行为简单文本行，暂无 MetricBadge 语义）

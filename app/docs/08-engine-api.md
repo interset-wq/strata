@@ -353,6 +353,46 @@ HTML 基线，响应不带 `source` 字段——调用方无需区分。**独立
 
 只写 `user.db`；与种子的关联**只用 `nid`**（rowid 每次种子发布都会重排）。
 
+### GET /strata/author-books?author=&limit=&offset=（**已实现**）
+
+作者页时间轴的作品列表（`docs/author-profile-on-demand` §1）：**纯本地**，无网络。
+`author` 必填（显示名精确匹配——seed 作者名为规范字符串）；`limit` 默认 20；
+`offset` 非负整数。排序 `est_date DESC`（定年 0001 回填书沉底，nid 升序）。
+未知作者返回空列表，不是错误。items 为标准 RankItem，**额外带 `est_date`
+（YYYY-MM-DD，时间轴用；旧端点不返回此字段，RankItem 侧为可选字段）**。
+
+```json
+{ "meta": { "pool": "seed", "ordering": "est_date_desc", "author": "无聊看看天" },
+  "items": [ { "nid": 48704, "title": "英雄再临(英雄？我早就不当了)",
+               "author": "无聊看看天", "est_year": 2010,
+               "est_date": "2010-06-12", "favs": 7881, ... } ] }
+```
+
+### GET /strata/author-profile?author=&nid=&with_intro=&fresh=（**已实现**）
+
+作者资料按需抓取 + user.db 缓存（作者页头部；`docs/author-profile-on-demand`
+§1–§4，**不预采、不随种子内置**）。`author` + `nid`（该作者任意一本书，作
+源书）必填；`with_intro=1` 才追加一次 PC 请求取简介（移动版无简介）；
+`fresh=1` 绕过缓存。身份守卫：源书作者与 `author` 必须 casefold 相等（空格
+敏感），否则返回但不缓存——错误的书不能污染资料。
+
+响应（扁平）：
+
+```json
+{ "nid": 48704, "author_name": "无聊看看天", "author_intro": "……" ,
+  "author_avatar": "https://rss.sfacg.com/……", "works": [ { "nid": 48704, "title": "……" } ],
+  "verdict": "ok", "observed_at": 1763570000, "source": "live" }
+```
+
+- `verdict`：`ok` | `dead`（源书下架，移动版三态判定）| `error`（抓取失败无
+  数据）。UI 降级：error 时头部回退本地作者名，书目列表照常。
+- `author_intro` 为 null/空是**正常值**（作者没写）——UI 不得伪造、不得拿
+  书简介顶替。
+- 缓存：`user.db author_profiles`（schema v7，键 = casefold 显示名），ok 行
+  7 天 / dead 行 1 天 TTL；缓存命中时 `source=cache` 且 `works` 为空（作品
+  列表走 `/author-books`）。只写 user.db，不碰 seed.db。
+- 抓取走全局限速器（foreground 槽），与详情页刷新共享配额。
+
 ## FFI 启动契约（Phase 1）
 
 `c-shared` 库导出三个符号：
