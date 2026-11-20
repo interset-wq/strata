@@ -57,7 +57,7 @@ ASSETS = REPO / "app" / "assets"
 SCHEMA = Path(__file__).resolve().parent / "schema.sql"
 DATASET = REPO / "dataset" / "out" / "books.jsonl"
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 SEED_VERSION = "20260503.23"
 CONTENT_END = pd.Timestamp("2026-05-03")
 GEN_MIN, GEN_MAX = 2007, 2025
@@ -286,6 +286,23 @@ def build_frames() -> tuple[pd.DataFrame, dict]:
     if len(universe) != EXPECT_UNIVERSE:
         raise SystemExit(f"stats universe {len(universe)} != {EXPECT_UNIVERSE}")
 
+    # Calendar universe table (v4, app/docs/14): estimated whole-platform
+    # releases per day. Source = full dataset INCLUDING licensed; display
+    # range = founding year GEN_MIN .. GEN_MAX (content right-censored at
+    # CONTENT_END). The bundled seed is a clickable subset of this table;
+    # the engine fills zero days for the UI.
+    cal_days = pd.to_datetime(df["est_date"]).dt.strftime("%Y-%m-%d")
+    cal_range = cal_days.between(f"{GEN_MIN}-01-01", f"{GEN_MAX}-12-31")
+    cal = (cal_days[cal_range]
+           .value_counts()
+           .sort_index()
+           .reset_index(name="universe_count"))
+    cal.columns = ["day", "universe_count"]
+    calendar_universe = cal.reset_index(drop=True)
+    if len(calendar_universe) < 1000:
+        raise SystemExit(
+            f"calendar universe days {len(calendar_universe)} looks wrong")
+
     # Build-time percentiles: full analysis universe, grouped by generation.
     for src, dst in [("favs", "fav_pctl"), ("clicks", "click_pctl"),
                      ("praises", "praise_pctl")]:
@@ -386,6 +403,7 @@ def build_frames() -> tuple[pd.DataFrame, dict]:
         "tally": tally,
         "genre_fixes": fixes,
         "deep_ranks": deep,
+        "calendar_universe": calendar_universe,
     }
     return seed, meta
 
@@ -429,6 +447,12 @@ def write_db(seed: pd.DataFrame, meta: dict, db_path: Path) -> dict:
                  for row in deep.itertuples(index=False, name=None)],
             )
             conn.executemany(
+                "INSERT INTO calendar_universe(day, universe_count) VALUES(?, ?)",
+                [(day, int(count))
+                 for day, count in meta["calendar_universe"]
+                                    .itertuples(index=False, name=None)],
+            )
+            conn.executemany(
                 "INSERT INTO seed_meta(key, value) VALUES(?, ?)",
                 [
                     ("schema_version", str(SCHEMA_VERSION)),
@@ -451,6 +475,8 @@ def write_db(seed: pd.DataFrame, meta: dict, db_path: Path) -> dict:
                     ("deep_rank_rows", str(len(meta["deep_ranks"]))),
                     ("deep_seed_hit", str(int(meta["deep_ranks"]["nid"]
                                               .isin(set(seed["nid"])).sum()))),
+                    ("calendar_universe_days",
+                     str(len(meta["calendar_universe"]))),
                 ],
             )
         conn.execute("VACUUM")

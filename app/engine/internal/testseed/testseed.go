@@ -36,6 +36,7 @@ CREATE TABLE deep_ranks(
   PRIMARY KEY(est_year, metric, rank_no)
 );
 CREATE TABLE seed_meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
+CREATE TABLE calendar_universe(day TEXT PRIMARY KEY, universe_count INTEGER NOT NULL);
 `
 
 type book struct {
@@ -135,6 +136,16 @@ VALUES(?,?,?,?, '免费', ?, NULL, ?, 1000, ?, 10, ?, NULL, '2026-04-01T00:00:00
 	// 1003 carries a low-confidence est_date to pin the docs/14 conf
 	// rule: low rows never enter the day/week views, only the month view.
 	if _, err := db.Exec(`UPDATE books SET est_date='2011-01-05', est_conf='low' WHERE nid = 1003`); err != nil {
+		db.Close()
+		return nil, err
+	}
+	// calendar_universe (seed schema v4): estimated whole-platform
+	// releases per day. Deliberately differs from the bundled counts —
+	// the bundled seed is a clickable subset, and the universe counts
+	// licensed and low-confidence dates too.
+	if _, err := db.Exec(`INSERT INTO calendar_universe(day, universe_count) VALUES
+	('2008-01-01', 7), ('2010-01-01', 5), ('2011-01-05', 2),
+	('2014-01-01', 4), ('2014-01-02', 1), ('2025-01-01', 9)`); err != nil {
 		db.Close()
 		return nil, err
 	}

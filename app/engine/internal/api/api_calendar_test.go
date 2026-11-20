@@ -27,6 +27,9 @@ func TestCalendarDay(t *testing.T) {
 	if len(items) != 3 || items[0].(map[string]any)["nid"].(float64) != 1001 {
 		t.Fatalf("items must be favs-desc: %+v", items)
 	}
+	if cell["universe"].(float64) != 5 {
+		t.Fatalf("universe = %v, want 5", cell["universe"])
+	}
 }
 
 func TestCalendarConfRule(t *testing.T) {
@@ -37,6 +40,9 @@ func TestCalendarConfRule(t *testing.T) {
 	if code != http.StatusOK || cell["total"].(float64) != 0 {
 		t.Fatalf("low book leaked into day view: %+v", cell)
 	}
+	if cell["universe"].(float64) != 2 {
+		t.Fatalf("universe must count the low-conf date regardless of conf: %+v", cell)
+	}
 	// …but present in the month view, which is totals-only.
 	code, body = reqJSON(t, "GET", srv.URL+"/strata/calendar?granularity=month&anchor=2011-01-15", "")
 	cells := body["cells"].([]any)
@@ -46,6 +52,9 @@ func TestCalendarConfRule(t *testing.T) {
 	jan5 := cells[4].(map[string]any)
 	if jan5["total"].(float64) != 1 {
 		t.Fatalf("month view must include the low book: %+v", jan5)
+	}
+	if jan5["universe"].(float64) != 2 {
+		t.Fatalf("month cell universe = %v, want 2", jan5["universe"])
 	}
 	if _, hasItems := jan5["items"]; hasItems {
 		t.Fatalf("month cells must carry totals only: %+v", jan5)
@@ -67,11 +76,17 @@ func TestCalendarWeekAndLicensed(t *testing.T) {
 	if wed["total"].(float64) != 2 {
 		t.Fatalf("2014-01-01 total = %v, want 2", wed)
 	}
+	if wed["universe"].(float64) != 4 {
+		t.Fatalf("2014-01-01 universe = %v, want 4", wed)
+	}
 	// licensed book 2001 (2008-01-01) must not appear
 	code, body = reqJSON(t, "GET", srv.URL+"/strata/calendar?granularity=day&anchor=2008-01-01", "")
 	cell := body["cells"].([]any)[0].(map[string]any)
 	if code != http.StatusOK || cell["total"].(float64) != 0 {
 		t.Fatalf("licensed book leaked into the calendar: %+v", cell)
+	}
+	if cell["universe"].(float64) != 7 {
+		t.Fatalf("universe must include licensed releases: %+v", cell)
 	}
 }
 

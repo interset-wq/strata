@@ -538,12 +538,14 @@ class CalendarItem {
 
 class CalendarDay {
   final String date; // YYYY-MM-DD
-  final int total;
+  final int total; // 内置库（可点击子集）
+  final int universe; // 全平台估计（calendar_universe，seed v4）；0 = 无记录
   final List<CalendarItem> items; // 仅 day/week；month 视图为空
 
   CalendarDay.fromJson(Map<String, dynamic> m)
       : date = m['date'] as String,
         total = m['total'] as int,
+        universe = (m['universe'] as num?)?.toInt() ?? 0,
         items = ((m['items'] as List?) ?? const [])
             .map((e) => CalendarItem.fromJson(e as Map<String, dynamic>))
             .toList();

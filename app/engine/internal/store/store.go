@@ -1328,7 +1328,11 @@ type CalendarBook struct {
 type CalendarDay struct {
 	Date  string         `json:"date"`
 	Total int            `json:"total"`
-	Items []CalendarBook `json:"items,omitempty"`
+	// Universe is the estimated whole-platform release count for this
+	// date (calendar_universe, seed schema v4, app/docs/14) — the bundled
+	// seed (Total) is a clickable subset of it. 0 = no row in the table.
+	Universe int            `json:"universe"`
+	Items    []CalendarBook `json:"items,omitempty"`
 }
 
 // BooksByDateRange returns seed books whose est_date falls in
@@ -1373,6 +1377,29 @@ ORDER BY est_date ASC, favs DESC, nid ASC`
 		}
 	}
 	return days, rows.Err()
+}
+
+// UniverseCountByDay returns the estimated whole-platform releases per
+// date (calendar_universe, seed schema v4) over [from, to]. Days without
+// a book are absent from the map; callers fill zeros.
+func (s *Store) UniverseCountByDay(ctx context.Context, from, to string) (map[string]int, error) {
+	rows, err := s.DB.QueryContext(ctx,
+		`SELECT day, universe_count FROM calendar_universe WHERE day >= ? AND day <= ?`,
+		from, to)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make(map[string]int)
+	for rows.Next() {
+		var day string
+		var n int
+		if err := rows.Scan(&day, &n); err != nil {
+			return nil, err
+		}
+		out[day] = n
+	}
+	return out, rows.Err()
 }
 
 func (s *Store) ShelfList(ctx context.Context) ([]ShelfItem, error) {

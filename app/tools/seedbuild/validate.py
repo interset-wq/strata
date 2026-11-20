@@ -8,8 +8,9 @@ from pathlib import Path
 
 import pandas as pd
 
-SCHEMA_VERSION = 3
-EXPECTED_TABLES = {"books", "book_tags", "seed_meta", "deep_ranks"}
+SCHEMA_VERSION = 4
+EXPECTED_TABLES = {"books", "book_tags", "seed_meta", "deep_ranks",
+                   "calendar_universe"}
 EXPECTED_INDEXES = {
     "idx_bt", "idx_updated", "idx_author", "idx_year_favpctl",
     "idx_year_clickpctl", "idx_genre_favs", "idx_favs", "idx_pr", "idx_shortfav",

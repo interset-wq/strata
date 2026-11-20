@@ -4,11 +4,16 @@
 > 借鉴评估。原则：**只用已有数据在展示层长出新视图，不新增任何 HTTP 请求**。
 > 双模式契约见 12；观测成熟度红线见 05 §5；定年口径见 `docs/metrics-definitions.md` §1.1。
 >
-> **实现状态（2026-11-19）**：发书日历已上线——引擎 `GET /strata/calendar`
-> （granularity=day|week|month，周一起算周，low 档只入月视图，右删失 =
+> **实现状态（2026-11-20）**：发书日历已上线——引擎 `GET /strata/calendar`
+> （granularity=day|week|month，周一起算周，内置库 low 档只入月视图，右删失 =
 > manifest genMin..genMax），Flutter 日历 tab（底部导航第 3 位，替换搜索——
-> 搜索入口在各 form tab 页内，不再占导航位）。增长榜多窗口（P2）待观测
-> 数据积累后做；观测时序桶分层（P3）悬置不变。
+> 搜索入口在各 form tab 页内，不再占导航位）。
+> **双计数（2026-11-20）**：每个日期格展示两层——`~N` 全平台估计新书 +
+> `N 内置`可点击内置库子集。全平台估计 = 对全量 `books.jsonl` 库（248,338 本，
+> 覆盖率 100%，281 个 nid 轴锚点，内插中位误差 2 天）逐本跑 `eras.estimate`，
+> 按天预聚合写入种子 `calendar_universe` 表（seed schema v4，仅构建侧）；
+> 内置库是其可点击子集，两层同源、只差 admitted 过滤。增长榜多窗口（P2）
+> 待观测数据积累后做；观测时序桶分层（P3）悬置不变。
 
 ## 0. 结论
 

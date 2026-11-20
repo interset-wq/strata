@@ -1044,6 +1044,12 @@ func (s *Server) calendar(c *gin.Context) {
 		fail(c, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
+	universe, err := s.store.UniverseCountByDay(
+		c.Request.Context(), from.Format("2006-01-02"), to.Format("2006-01-02"))
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
 	cellMap := make(map[string]store.CalendarDay, len(days))
 	for _, d := range days {
 		cellMap[d.Date] = d
@@ -1055,9 +1061,10 @@ func (s *Server) calendar(c *gin.Context) {
 			if gran == "month" {
 				cell.Items = nil // month grid shows totals only
 			}
+			cell.Universe = universe[key]
 			cells = append(cells, cell)
 		} else {
-			cells = append(cells, store.CalendarDay{Date: key, Total: 0})
+			cells = append(cells, store.CalendarDay{Date: key, Universe: universe[key]})
 		}
 	}
 	c.JSON(http.StatusOK, gin.H{
