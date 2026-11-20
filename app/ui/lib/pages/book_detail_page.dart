@@ -70,7 +70,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
           IconButton(
             icon:
                 Icon(onWatch ? Icons.bookmark : Icons.bookmark_add_outlined),
-            tooltip: onWatch ? '移出 watchlist' : '加入 watchlist',
+            tooltip: onWatch ? '取消关注' : '关注此书',
             onPressed: onWatch ? _removeWatch : _addWatch,
           ),
         ],
@@ -218,12 +218,12 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                       ? OutlinedButton.icon(
                           onPressed: _removeWatch,
                           icon: const Icon(Icons.bookmark),
-                          label: const Text('在 watchlist'),
+                          label: const Text('已关注'),
                         )
                       : OutlinedButton.icon(
                           onPressed: _addWatch,
                           icon: const Icon(Icons.bookmark_add_outlined),
-                          label: const Text('加入 watchlist'),
+                          label: const Text('关注此书'),
                         ),
                 ],
               ),

@@ -16,8 +16,8 @@
 
 | 语义 | icon（Flutter） | 使用处 |
 | --- | --- | --- |
-| 加入 watchlist | `Icons.bookmark_add_outlined` | 详情页加入按钮 / 底部动作行「加入 watchlist」；已加入态用实心 `Icons.bookmark` |
-| 追踪 watch | `Icons.visibility` | 详情页追踪切换（未追踪时线性 `Icons.visibility_outlined`）、watchlist 页追踪切换 |
+| 关注（加入列表） | `Icons.bookmark_add_outlined` | 详情页「关注此书」按钮 / 底部动作行；已关注态用实心 `Icons.bookmark` |
+| 追踪（激活后台抓取） | `Icons.visibility` | 详情页追踪切换（未追踪时线性 `Icons.visibility_outlined`）、关注页追踪切换 |
 | 换一批/换一换 | `Icons.refresh` | 随机池入口（首页）、随机连载页「换一批」、下拉刷新手势 |
 | 返回 | `Icons.arrow_back` | 二级页 AppBar |
 | 回到顶部 | `Icons.arrow_upward` | 长页右下角 BackToTop（滚动 >500px 出现） |
@@ -58,7 +58,7 @@
 | 语义 | icon | 使用处 |
 | --- | --- | --- |
 | 发书日历 | `Icons.event_available_outlined` | 底部 Tab Bar 第 3 位（2026-11-19 替换搜索——搜索入口在各 form tab 页内）；选中态用实心 `Icons.event_available`（规范 4：filled = 已激活） |
-| Watchlist | `Icons.visibility_outlined` | 底部 Tab Bar 第 4 位（2026-11-20 由「书架」改名——app 无阅读功能、书架语义不成立，书架并入 watchlist 为未激活条目）；选中态用实心 `Icons.visibility`（规范 4） |
+| 关注 | `Icons.bookmark_outline` | 底部 Tab Bar 第 4 位（2026-11-20 由「书架」改名——app 无阅读功能、书架语义不成立，书架并入 watchlist 为未激活条目；icon 与详情页关注按钮同语义同 icon）；选中态用实心 `Icons.bookmark`（规范 4） |
 
 ## 状态占位
 

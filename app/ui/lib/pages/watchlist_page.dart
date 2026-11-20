@@ -8,8 +8,8 @@ import '../core/providers.dart';
 import '../data/api/strata_api.dart';
 import '../widgets/back_to_top.dart';
 
-/// Watchlist 页（v6 统一列表，原「书架」条目 = 未激活）：官方式筛选 chips
-/// 行、统一卡（激活/未激活徽标 + 追踪切换 + 移除）、空态引导。
+/// 关注页（watchlist，v6 统一列表，原「书架」条目 = 未激活）：官方式筛选
+/// chips 行、统一卡（激活/未激活徽标 + 追踪切换 + 移除）、空态引导。
 /// 数据 = 本地 watchlist（user.db.watchlist JOIN seed.books）。
 /// 观测时序在详情页看（docs/07）。
 class WatchlistPage extends ConsumerStatefulWidget {
@@ -61,7 +61,7 @@ class _WatchlistPageState extends ConsumerState<WatchlistPage> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('Watchlist')),
+      appBar: AppBar(title: const Text('我的关注')),
       body: FutureBuilder<List<WatchItem>>(
         future: _items,
         builder: (context, snap) {
@@ -251,7 +251,7 @@ class _WatchCard extends StatelessWidget {
               IconButton(
                 icon: Icon(Icons.delete_outline,
                     size: 18, color: scheme.onSurfaceVariant),
-                tooltip: '移出 watchlist',
+                tooltip: '取消关注',
                 onPressed: onRemove,
               ),
             ],
@@ -274,16 +274,16 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.visibility_outlined,
+          Icon(Icons.bookmark_outline,
               size: 56, color: scheme.onSurfaceVariant.withValues(alpha: .5)),
           const SizedBox(height: 12),
-          Text('Watchlist 还是空的',
+          Text('还没有关注的书',
               style: TextStyle(
                   fontFamily: 'serif',
                   fontSize: 17,
                   fontWeight: FontWeight.w700)),
           const SizedBox(height: 6),
-          Text('去首页找到下一本想读的书，点「加入 watchlist」保存',
+          Text('去首页找到下一本想读的书，点「关注此书」保存',
               style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
           const SizedBox(height: 16),
           OutlinedButton(

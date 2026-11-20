@@ -52,9 +52,9 @@ final router = GoRouter(
               label: '日历',
             ),
             NavigationDestination(
-              icon: Icon(Icons.visibility_outlined),
-              selectedIcon: Icon(Icons.visibility),
-              label: 'Watchlist',
+              icon: Icon(Icons.bookmark_outline),
+              selectedIcon: Icon(Icons.bookmark),
+              label: '关注',
             ),
             NavigationDestination(
               icon: Icon(Icons.settings_outlined),
