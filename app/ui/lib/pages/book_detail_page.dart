@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../widgets/default_cover.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -148,9 +149,24 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                         Text(s(eff['title'] ?? b['title']) ?? '',
                             style: Theme.of(context).textTheme.headlineSmall),
                         const SizedBox(height: 6),
-                        Text(s(eff['author'] ?? b['author']) ?? '',
-                            style: TextStyle(
-                                fontSize: 12, color: scheme.onSurfaceVariant)),
+                        InkWell(
+                          // 作者入口（docs/author-profile-on-demand）：
+                          // 时间轴列表页由作者规划 UI，数据已就绪。
+                          onTap: () {
+                            final a = s(eff['author'] ?? b['author']);
+                            if (a != null && a.isNotEmpty) {
+                              context.push(
+                                  '/author?author=${Uri.encodeComponent(a)}&nid=${widget.nid}');
+                            }
+                          },
+                          child: Text(s(eff['author'] ?? b['author']) ?? '',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  color: scheme.onSurfaceVariant,
+                                  decoration: TextDecoration.underline,
+                                  decorationColor:
+                                      scheme.onSurfaceVariant.withValues(alpha: .4))),
+                        ),
                         const SizedBox(height: 8),
                         Wrap(
                           spacing: 6,

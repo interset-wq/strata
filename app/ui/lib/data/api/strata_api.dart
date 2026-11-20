@@ -277,6 +277,39 @@ class StrataApi {
   /// granularity=day|week|month（周一起算周）；anchor=YYYY-MM-DD。
   /// month 视图只有 total（格太小不放卡片）；day/week 另带 per_cell 条
   /// 收藏序条目。est_conf=low 的书只进 month 视图（引擎侧过滤）。
+  /// 作者作品列表（作者页时间轴，docs/author-profile-on-demand §1）：
+  /// 该作者的内置库书目，est_date DESC（定年 0001 回填书沉底）。纯本地。
+  Future<List<RankItem>> authorBooks({
+    required String author,
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    final body = await _get('/author-books',
+        {'author': author, 'limit': '$limit', 'offset': '$offset'});
+    return (body['items'] as List)
+        .map((e) => RankItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// 作者资料（按需抓取 + user.db 缓存，docs/author-profile-on-demand §1-3）：
+  /// 头像/名/作品集来自移动版详情页（[nid] 是该作者任意一本书），
+  /// 简介仅 [withIntro] 时追加 PC 请求；[fresh] 绕过 7 天缓存。
+  /// 网络/引擎错误抛异常；源书下架不抛——返回 verdict='dead' 的资料对象。
+  Future<AuthorProfile> authorProfile({
+    required String author,
+    required int nid,
+    bool withIntro = true,
+    bool fresh = false,
+  }) async {
+    final body = await _get('/author-profile', {
+      'author': author,
+      'nid': '$nid',
+      if (withIntro) 'with_intro': '1',
+      if (fresh) 'fresh': '1',
+    }) as Map<String, dynamic>;
+    return AuthorProfile.fromJson(body);
+  }
+
   Future<CalendarResponse> calendar({
     required String granularity,
     required String anchor,
@@ -573,6 +606,8 @@ class RankItem {
   final int? praises;
   final String form;
   final List<String> tags;
+  /// 定年日期（YYYY-MM-DD）：作者页时间轴用（est_date）；旧端点不返回此字段。
+  final String? estDate;
 
   RankItem.fromJson(Map<String, dynamic> m)
       : rank = m['rank'] as int,
@@ -590,9 +625,46 @@ class RankItem {
         clicks = m['clicks'] as int?,
         praises = (m['praises'] as num?)?.toInt(),
         form = m['form'] as String? ?? '',
+        estDate = m['est_date'] as String?,
         tags = ((m['tags'] as List?) ?? const [])
             .map((e) => e.toString())
             .toList();
+}
+
+/// 移动版详情页作者区（book_Author）的作品集条目。
+class AuthorWork {
+  final int nid;
+  final String title;
+
+  AuthorWork.fromJson(Map<String, dynamic> m)
+      : nid = m['nid'] as int,
+        title = m['title'] as String;
+}
+
+/// 作者资料（按需抓取 + user.db 缓存，docs/author-profile-on-demand §3）。
+/// 快照数据：[authorIntro] 可为空（作者没写——正常值，勿伪造）；
+/// [verdict] = 'ok' | 'dead'（源书已下架）| 'error'（抓取失败），供 UI 降级。
+class AuthorProfile {
+  final int nid;
+  final String authorName;
+  final String? authorIntro;
+  final String? authorAvatar;
+  final List<AuthorWork> works;
+  final String verdict;
+  final int observedAt;
+  final String source; // 'cache' | 'live'
+
+  AuthorProfile.fromJson(Map<String, dynamic> m)
+      : nid = m['nid'] as int,
+        authorName = m['author_name'] as String? ?? '',
+        authorIntro = m['author_intro'] as String?,
+        authorAvatar = m['author_avatar'] as String?,
+        works = ((m['works'] as List?) ?? const [])
+            .map((e) => AuthorWork.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        verdict = m['verdict'] as String? ?? 'error',
+        observedAt = m['observed_at'] as int? ?? 0,
+        source = m['source'] as String? ?? 'live';
 }
 
 class WatchItem {

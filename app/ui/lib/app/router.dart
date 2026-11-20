@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../pages/author_page.dart';
 import '../pages/book_data_page.dart';
 import '../pages/book_detail_page.dart';
 import '../pages/boot_page.dart';
@@ -89,6 +90,15 @@ final router = GoRouter(
       ),
     ),
     // 搜索是二级页：入口在首页搜索胶囊与各 form tab 搜索框，不再占底部导航位。
+    // 作者页（docs/author-profile-on-demand）：二级全屏，从详情页作者名推入。
+    // 当前为数据就绪版（资料头部 + 书目列表），时间轴 UI 待作者规划后改版。
+    GoRoute(
+      path: '/author',
+      builder: (_, state) => AuthorPage(
+        author: state.uri.queryParameters['author'] ?? '',
+        bookNid: int.tryParse(state.uri.queryParameters['nid'] ?? '') ?? 0,
+      ),
+    ),
     GoRoute(path: '/search', builder: (_, _) => const SearchPage()),
     GoRoute(
       path: '/browse',
