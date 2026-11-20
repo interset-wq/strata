@@ -744,10 +744,15 @@ type WatchItem struct {
 // WatchList joins the watchlist with seed metadata, newest first.
 func (s *Store) WatchList(ctx context.Context) ([]WatchItem, error) {
 	rows, err := s.DB.QueryContext(ctx, `
-SELECT w.nid, b.title, b.author, b.genre,
+SELECT w.nid,
+       COALESCE(b.title, d.title, '') AS title,
+       COALESCE(b.author, d.author, '') AS author,
+       COALESCE(b.genre, d.genre),
        COALESCE(c.cover, NULLIF(b.cover_url, '')) AS cover_url,
        w.added_at, w.role, w.note, w.poll_enabled
-FROM watchlist w JOIN seed.books b ON b.nid = w.nid
+FROM watchlist w
+LEFT JOIN seed.books b ON b.nid = w.nid
+LEFT JOIN discovered d ON d.nid = w.nid
 LEFT JOIN covers c ON c.nid = w.nid
 ORDER BY w.added_at DESC`)
 	if err != nil {

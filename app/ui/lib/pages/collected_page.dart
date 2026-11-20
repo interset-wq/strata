@@ -19,6 +19,8 @@ class CollectedPage extends ConsumerStatefulWidget {
 class _CollectedPageState extends ConsumerState<CollectedPage> {
   List<DiscoveredItem>? _items;
   bool _failed = false;
+  // nid -> tracking on（关注状态映射，docs/12：watchlist 单一列表）。
+  Map<int, bool> _watching = {};
 
   @override
   void initState() {
@@ -30,9 +32,34 @@ class _CollectedPageState extends ConsumerState<CollectedPage> {
     try {
       final h = await ref.read(bootProvider.future);
       final list = await h.api.discovered();
-      if (mounted) setState(() { _items = list; _failed = false; });
+      final wl = await h.api.watchList();
+      if (mounted) {
+        setState(() {
+          _items = list;
+          _failed = false;
+          _watching = {for (final w in wl) w.nid: w.active};
+        });
+      }
     } catch (_) {
       if (mounted) setState(() => _failed = true);
+    }
+  }
+
+  /// 一键追踪切换：active = 订阅式后台抓取开（每 tick 由 watchlist
+  /// worker 轮询，docs/06）；inactive = 仅保存。
+  Future<void> _toggleWatch(DiscoveredItem it) async {
+    final h = await ref.read(bootProvider.future);
+    final active = !(_watching[it.nid] ?? false);
+    try {
+      if (_watching.containsKey(it.nid)) {
+        await h.api.watchSetActive(it.nid, active);
+      } else {
+        await h.api.watchAdd(it.nid, active: active);
+      }
+      if (!mounted) return;
+      setState(() => _watching[it.nid] = active);
+    } catch (_) {
+      // 切换失败保持原状（网络/引擎忙），不打断列表。
     }
   }
 
@@ -143,6 +170,13 @@ class _CollectedPageState extends ConsumerState<CollectedPage> {
                     ),
                   ],
                 ),
+              ),
+              IconButton(
+                icon: Icon(_watching[it.nid] ?? false
+                    ? Icons.visibility
+                    : Icons.visibility_outlined),
+                tooltip: (_watching[it.nid] ?? false) ? '停止追踪' : '追踪更新',
+                onPressed: () => _toggleWatch(it),
               ),
             ],
           ),

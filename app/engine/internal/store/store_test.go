@@ -407,3 +407,37 @@ func TestSearchHistory(t *testing.T) {
 		t.Fatalf("history = %v", words)
 	}
 }
+
+// TestWatchListCoversDiscovered pins the discovery-loop integration
+// (docs/08 §discovered): an auto-collected out-of-seed book put on the
+// watchlist still shows up in the list (LEFT JOIN, discovered supplies
+// the metadata the seed has no row for) and keeps tracking on.
+func TestWatchListCoversDiscovered(t *testing.T) {
+	st := openTestStore(t)
+	ctx := context.Background()
+
+	if _, err := st.DB.ExecContext(ctx, `
+INSERT INTO discovered(nid, title, author, cover_url, source, observed_at)
+VALUES (5555, 'Newly Found', 'Author Z', NULL, 'search', 1700000000)`); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.WatchAdd(ctx, 5555, 1700000001, true); err != nil {
+		t.Fatal(err)
+	}
+	items, err := st.WatchList(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, it := range items {
+		if it.NID == 5555 {
+			found = true
+			if it.Title != "Newly Found" {
+				t.Fatalf("title = %q", it.Title)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("discovered nid 5555 missing from watchlist: %+v", items)
+	}
+}
