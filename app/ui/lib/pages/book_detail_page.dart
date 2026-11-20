@@ -95,10 +95,12 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
     String? err;
     try {
       final h = await ref.read(bootProvider.future);
-      final r = await h.api.refresh(widget.nid) as Map<String, dynamic>;
-      final state = r['state'];
-      if (state != null && state != 'alive') {
-        err = '该书在站上不可读（$state）';
+      final r = await h.api.refresh(widget.nid);
+      // rate_limited = 24h 冷却窗（含失败占用）——明确提示，不误报。
+      if (r.state == 'rate_limited') {
+        err = '已进入刷新冷却（24 小时），稍后再试';
+      } else if (r.state != 'alive') {
+        err = '该书在站上不可读（${r.state}）';
       }
     } catch (ex) {
       err = ex.toString();
