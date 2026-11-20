@@ -306,7 +306,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
               ? child
               : ActionChip(
                   label: child,
-                  onPressed: _remoteError != null ? _searchRemote : null,
+                  onPressed: _remoteLoading ? null : _searchRemote,
                   avatar: _remoteError != null
                       ? null
                       : Icon(Icons.travel_explore,
