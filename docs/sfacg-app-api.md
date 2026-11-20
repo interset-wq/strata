@@ -135,7 +135,7 @@ resp = requests.get("https://api.sfacg.com/novels/730611",
 
 > **字段与本项目数据列的实测对应关系见 [`api-field-mapping.md`](./api-field-mapping.md)**
 > （约 11 万本配对的快照现算，数字仅供参考、随版本变化；含一致率、值映射、写回约束）。下表「本项目对应」列已按该分析修正
-> `point`（废弃占位分）与 `bgBanner`（横幅图 URL ≠ 运营位标记 `featured`）两处误映射。
+> `point`（废弃占位分）误映射；`bgBanner` 非空即 `featured=1`（URL 主体可由 nid 拼 CDN 前缀得到，故只存布尔）。
 
 | App 字段           | 类型  | 本项目对应             | 说明                                                                               |
 | ------------------ | ----- | ---------------------- | ---------------------------------------------------------------------------------- |
@@ -154,7 +154,7 @@ resp = requests.get("https://api.sfacg.com/novels/730611",
 | `categoryId`     | int   | —                     | 0 非同人 / 1 同人                                                                  |
 | `isSensitive`    | bool  | —                     | 敏感标记                                                                           |
 | `novelCover`     | str   | `cover_url`          | 封面 URL（**含 `YYYY/MM/` 目录 → 仍是运营时间，见报告 01 §封面时间戳**） |
-| `bgBanner`       | str   | **无**                 | 横幅图 URL（`…/beitouNew/cut/{nid}.jpg?TOKEN`），仅 0.31% 非空；可按 nid 拼 URL，但**不是** `featured`（运营位标记），不入库 |
+| `bgBanner`       | str   | `featured`           | 横幅图 URL（`…/beitouNew/cut/{nid}.jpg?TOKEN`），仅 0.31% 非空；URL 主体可按 nid 拼 CDN 前缀得到，故只存布尔——非空即 `featured=1` |
 | `allowDown`      | bool  | —                     | 历史遗留字段                                                                       |
 | `point`          | float | —                     | 历史遗留字段                                                                       |
 

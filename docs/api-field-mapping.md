@@ -17,9 +17,9 @@
 
 ## 0. 一句话结论
 
-**18 个业务字段 = 1 个主键 + 10 个同义可刷新 + 1 个旁证（`addTime`）+ 4 个新维度
-（`authorId`/`categoryId`/`isSensitive`/`allowDown`）+ 2 个不可当同义（`point` 是废弃占位分、
-`bgBanner` 是横幅图 URL）。App 不返回 `praises`/`contest`/`tags`/运营标记，因此赞藏比 `pr`
+**18 个业务字段 = 1 个主键 + 11 个同义可刷新（含 `bgBanner` → `featured` 布尔化）+ 1 个旁证
+（`addTime`）+ 4 个新维度（`authorId`/`categoryId`/`isSensitive`/`allowDown`）+ 1 个禁用
+（`point` 是废弃占位分）。App 不返回 `praises`/`contest`/`tags`，因此赞藏比 `pr`
 与分位列无法靠这次刷新重建——这是「用 API 翻新快照」的硬边界。**
 
 ---
@@ -47,9 +47,9 @@
 | `isSensitive` | — | **新维度** | 敏感标记，**14,755 本（12.9%）为 true**；不是废弃字段 | 🆕 已写进引擎 user.db |
 | `allowDown` | — | **新维度（历史遗留）** | 是否允许下载，**62,111 本（54.3%）为 true**，有实际取值 | 🆕 已写进引擎 user.db |
 | `novelCover` | `cover_url` | **同义**（URL↔相对路径） | 去前缀后 **92.68%** 一致（CSV 有封面的 53,628 本），7.32% 为半年间换图；**配对里 CSV 缺封面的 56,742 本 API 全有** | ✅ 可，须剥离 URL 前缀（§2） |
-| `bgBanner` | ~~`featured`~~ → **无** | **❌ 不同义** | 横幅图 URL，仅 **0.31%**（351 本）非空；形如 `…/beitouNew/cut/{nid}.jpg?TOKEN`，可由 nid 拼主体但 token 会变；`featured` 是运营位标记（报告 01：封面时间戳偏差中位 +338 天） | ❌ 不入库、不覆盖 `featured` |
+| `bgBanner` | `featured` | **同义**（非空→`=1`） | 横幅图 URL，仅 **0.31%**（351 本）非空；形如 `…/beitouNew/cut/{nid}.jpg?TOKEN`。**URL 主体可由 nid 拼 CDN 前缀得到，故本项目只存布尔** `featured=1`（报告 01：其封面时间戳偏差中位 +338 天） | ✅ 可，非空即置 `featured=1` |
 
-**汇总**：1 主键 + 10 同义 + 1 旁证 + 4 新维度 + 2 禁用。
+**汇总**：1 主键 + 11 同义 + 1 旁证 + 4 新维度 + 1 禁用（`point`）。
 
 ---
 
@@ -62,11 +62,11 @@
 | `typeId` → `genre` | 21 魔幻 / 22 玄幻 / 23 古风 / 24 科幻 / 25 校园 / 26 都市 / 27 游戏 / 28 同人 / 29 悬疑 | 与 CSV 九类一一对应；样本只含前两类 |
 | `novelCover` → `cover_url` | 剥离前缀 `https://rss.sfacg.com/web/novel/images/NovelCover/Big/` | CSV 存相对路径（如 `2025/12/uuid.jpg`），API 返回完整 URL；不剥离会 0% 匹配 |
 | `categoryId` → 新列 | 1=同人（含 sysTags），0=非同人 | 只接受 0/1；样本里另有 3/4 共 2,315 本，语义未确认，先置 NULL |
-| `bgBanner` → 无 | **不写任何列** | 横幅图可由 nid 拼 URL，但带 token；`featured` 是构建期运营标记，两者不是一回事 |
+| `bgBanner` → `featured` | 非空 → `=1` | URL 主体 `…/beitouNew/cut/{nid}.jpg` 可由 nid 拼 CDN 前缀得到，故只存布尔、不存 URL（token 会变）；呼应报告 01 的运营时间结论 |
 
 ---
 
-## 3. 三组「看着像、不能用」的字段
+## 3. 两组「看着像、不能用」的字段 + 一组「同义但只存布尔」
 
 ### 3.1 `point` ≠ `pr`（最易误用）
 
@@ -77,12 +77,13 @@
   2019 年前老书才残留大量 9.x/10.0（2018 年前 10.0 占 32.2%）。无区分度。
 - App **不返回 `praises`**，所以刷新 `favs` 后 `pr` 的分子仍是旧值，`pr` 会失真（见 §4）。
 
-### 3.2 `bgBanner` ≠ `featured`
+### 3.2 `bgBanner` 就是 `featured`（同义，只存布尔）
 
-- `featured` 是运营位标记（`=1` 表示封面曾用于 banner，见报告 01），不是横幅图本身。
-- `bgBanner` 只有 0.31% 非空，且是图片 URL：`https://rss.sfacg.com/web/novel/images/images/beitouNew/cut/{nid}.jpg?TOKEN`。
-  **可以通过 nid 拼出 URL 主体**（这是它唯一有用的性质），但 token 会变，且它与
-  `featured` 的取值毫无对应关系——不能互相覆盖，也不需要入库。
+- `featured=1` 表示封面曾用于 banner（报告 01）；它与 App 的 `bgBanner` 非空**是同一件事**，
+  上一版写「❌ 不同义、不入库」是误判，已按维护者口径改回。
+- `bgBanner` 只有 0.31% 非空，形如 `https://rss.sfacg.com/web/novel/images/images/beitouNew/cut/{nid}.jpg?TOKEN`。
+  **URL 主体 `…/beitouNew/cut/{nid}.jpg` 可由 nid 拼 CDN 前缀直接得到**，token 部分会变、无保存价值；
+  因此本项目只存一个布尔 `featured`（非空→`=1`），而不是整条 URL——这正是用布尔而非字符串表示的原因。
 
 ### 3.3 `addTime` 不作定年替换
 
@@ -126,7 +127,7 @@
 | `contest` 征文 | PC 详情页 / 比赛页 | ❌ 无 |
 | `tags` 标签 | PC 详情页 | ⚠️ 需 `expand=tags,sysTags,intro` 另取（非本 18 字段） |
 | `praises` 赞数 | PC 详情页 | ❌ 无 → `pr` 无法刷新 |
-| `featured` 运营位 | 构建期运营标记 | ❌ 无 |
+| `featured` 运营位 | App `bgBanner` 非空（同义） | ✅ 可，`bgBanner` 非空 → `featured=1` |
 | `est_year/est_date/est_conf` | `lib/eras.py` 定年 | ❌ 不适用（本地推导，`addTime` 仅旁证） |
 | `fav_pctl/click_pctl/praise_pctl/pr/pctl_pr` | 构建期全库分位 | ❌ 需全量重建 |
 | `is_licensed` | 授权名单 | ❌ 本地名单判定 |
@@ -143,7 +144,7 @@
   **`point` 在分析侧采集层直接丢弃**（废弃占位分）；`export --snapshots PATH` 另导快照。
   快照只落盘、不覆盖 `books`（§4 约束）。引擎侧另把包括 `point` 在内的字段写进 user.db
   的 `book_meta`（展示用），两者不冲突——**分析口径与 app 本地库是两套存储**。
-- **格式**：写回 `cover_url` 必须剥离 URL 前缀；`bgBanner` 不要写进 `featured`。
+- **格式**：写回 `cover_url` 必须剥离 URL 前缀；`bgBanner` 非空 → `featured=1`（URL 主体可由 nid 拼 CDN 前缀得到，故只存布尔）。
 - 样本局限（只两类）不影响字段对应关系，但**九类全量刷新前需确认 `typeId` 映射无遗漏**。
 
 ---
