@@ -169,3 +169,64 @@ func sameNidOrder(a, b []FeaturedBook) bool {
 	}
 	return true
 }
+
+// TestCoverCarouselDailyRotation pins the 2026-11-20 change: the
+// composed-banner carousel draws from the form's favs head pool with the
+// BannerPick date hash, so consecutive days differ and the same seed
+// stays deterministic.
+func TestCoverCarouselDailyRotation(t *testing.T) {
+	st := openTestStore(t)
+	ctx := context.Background()
+	// The testseed carries no user.db covers; add observed covers so the
+	// long-form head pool (1001, 1003) is non-empty.
+	head := []struct {
+		nid int64
+		url string
+	}{{1001, "cover-1001"}, {1003, "cover-1003"}}
+	for _, h := range head {
+		if _, err := st.DB.ExecContext(ctx,
+			`INSERT INTO covers (nid, cover, fetched_at) VALUES (?, ?, ?)`,
+			h.nid, h.url, 1); err != nil {
+			t.Fatal(err)
+		}
+	}
+	a, err := st.CoverCarousel(ctx, "long", 100, 20261119)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(a) != 2 {
+		t.Fatalf("head pool = %d, want 2", len(a))
+	}
+	b, err := st.CoverCarousel(ctx, "long", 100, 20261120)
+	if err != nil {
+		t.Fatal(err)
+	}
+	same := len(a) == len(b)
+	if same {
+		for i := range a {
+			if a[i].NID != b[i].NID {
+				same = false
+				break
+			}
+		}
+	}
+	if same {
+		t.Fatalf("consecutive-day orders identical: %+v", a)
+	}
+	c, err := st.CoverCarousel(ctx, "long", 100, 20261119)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sameAgain := len(a) == len(c)
+	if sameAgain {
+		for i := range a {
+			if a[i].NID != c[i].NID {
+				sameAgain = false
+				break
+			}
+		}
+	}
+	if !sameAgain {
+		t.Fatalf("same seed, different order: %+v vs %+v", a, c)
+	}
+}

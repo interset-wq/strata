@@ -1102,6 +1102,21 @@ func (s *Server) calendar(c *gin.Context) {
 	})
 }
 
+// daySeed resolves the daily random seed shared by the banner and
+// cover-carousel endpoints: the server date (YYYYMMDD) by default,
+// client-overridable via ?seed= for deterministic caching and tests.
+func daySeed(c *gin.Context) int64 {
+	seed := time.Now().Format("20060102")
+	if raw := c.Query("seed"); raw != "" {
+		seed = raw
+	}
+	var day int64
+	for _, ch := range seed {
+		day = day*10 + int64(ch-'0')
+	}
+	return day
+}
+
 // banner picks the daily banner set: a uniform deterministic shuffle of the
 // whole banner pool (seed featured=1, licensed included) keyed by a date
 // seed so every day draws a different, cacheable set. An optional form
@@ -1115,14 +1130,7 @@ func (s *Server) banner(c *gin.Context) {
 	if !ok {
 		return
 	}
-	seed := time.Now().Format("20060102")
-	if raw := c.Query("seed"); raw != "" {
-		seed = raw
-	}
-	var day int64
-	for _, ch := range seed {
-		day = day*10 + int64(ch-'0')
-	}
+	day := daySeed(c)
 	offset := 0
 	if raw := c.Query("offset"); raw != "" {
 		o, err := strconv.Atoi(raw)
@@ -1198,10 +1206,12 @@ func (s *Server) featuredAll(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"items": items})
 }
 
-// coverCarousel serves the 对话 tab's composed banners: cover-bearing
-// books of one form by favs DESC (static — long-tail pool). The client
-// draws a paper-and-ink banner from each cover; cover-less books never
-// appear, so the pool filter guarantees a drawable result.
+// coverCarousel serves the 对话/短篇 tabs' composed banners: one form's
+// cover-bearing favs head pool (top 100), drawn with the daily date seed
+// (same hash as /banner) so consecutive days show different books while
+// staying within the head. The client draws a paper-and-ink banner from
+// each cover; cover-less books never appear, so the pool filter
+// guarantees a drawable result.
 func (s *Server) coverCarousel(c *gin.Context) {
 	limit, ok := parseLimit(c)
 	if !ok {
@@ -1213,14 +1223,15 @@ func (s *Server) coverCarousel(c *gin.Context) {
 			"form must be invalid|short|medium|long|dialogue|ip_collab")
 		return
 	}
-	items, err := s.store.CoverCarousel(c.Request.Context(), form, limit)
+	items, err := s.store.CoverCarousel(c.Request.Context(), form, limit,
+		daySeed(c))
 	if err != nil {
 		fail(c, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"meta": gin.H{"pool": "seed", "ordering": "favs", "form": form,
-			"cover_required": true},
+		"meta": gin.H{"pool": "seed", "ordering": "daily", "form": form,
+			"head_pool": 100, "cover_required": true},
 		"items": items,
 	})
 }

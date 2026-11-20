@@ -911,12 +911,16 @@ func (s *Store) MoeGoddessBooks(ctx context.Context, limit int) ([]RankItem, err
 			"WHERE tag LIKE '____萌神')")
 }
 
-// CoverCarousel returns the top-fav cover-bearing books of one form: the
-// 对话 tab has no featured custom art, so the client composes paper-and-ink
-// banners from cover + text. Cover-less books are excluded up front; the
-// order is static favs DESC (the dialogue pool is a stable long tail).
+// CoverCarousel returns one form's cover-bearing head pool, drawn with
+// the daily date hash: the pool is the top 100 by favs among cover-
+// bearing books of the form (quality floor — the dialogue long tail is
+// mostly mediocre, user-confirmed 2026-11-19), and the displayed slice
+// rotates daily with the same hash as BannerPick (B=500001 ≈ half the
+// 1,000,003-bucket key space), so consecutive days show different books
+// while staying within the head. Cover-less books are excluded up front,
+// so the client always gets a drawable result.
 func (s *Store) CoverCarousel(ctx context.Context, form string,
-	limit int) ([]RankItem, error) {
+	limit int, seed int64) ([]RankItem, error) {
 	query := `
 SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
        seed.books.est_year, seed.books.status, seed.books.words, seed.books.clicks,
@@ -924,12 +928,17 @@ SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
        COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url
 FROM seed.books
 LEFT JOIN covers c ON c.nid = seed.books.nid
-WHERE seed.books.form = ?
-  AND COALESCE(c.cover, seed.books.cover_url) IS NOT NULL
-  AND COALESCE(c.cover, seed.books.cover_url) != ''
-ORDER BY seed.books.favs DESC, seed.books.nid ASC
+WHERE seed.books.nid IN (
+  SELECT b.nid FROM seed.books b
+  LEFT JOIN covers c2 ON c2.nid = b.nid
+  WHERE b.form = ?
+    AND COALESCE(c2.cover, b.cover_url) IS NOT NULL
+    AND COALESCE(c2.cover, b.cover_url) != ''
+  ORDER BY b.favs DESC, b.nid ASC
+  LIMIT 100)
+ORDER BY (seed.books.nid*2654435761 + ?*500001) % 1000003, seed.books.nid
 LIMIT ?`
-	rows, err := s.DB.QueryContext(ctx, query, form, limit)
+	rows, err := s.DB.QueryContext(ctx, query, form, seed, limit)
 	return s.scanRankItems(ctx, rows, err)
 }
 

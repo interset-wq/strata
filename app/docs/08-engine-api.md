@@ -151,13 +151,15 @@ contest 聚合端点：`form` 必填，池按征文（`contest`，非空）`GROU
 （收藏数前 2 名征文之外的长尾，引擎内部算 top-2）。组内 `favs DESC,
 nid ASC`，分页同 `/rankings/classic`。未知征文名返回空列表不报错。
 
-### GET /strata/cover-carousel?form=&limit=（**已实现**）
+### GET /strata/cover-carousel?form=&limit=&seed=（**已实现**）
 
-对话 tab 合成轮播源：`form` 必填（同 `/banner` 的枚举校验），池 = 该 form
-**且有封面**（covers 观测或 seed `cover_url` 非空）的书，`favs DESC, nid ASC`
-静态序（dialogue 是长尾形态，不随日期重掷）。引擎只保证 URL 存在，不保证
-CDN 可达——封面 404 时 UI 回退纸底占位（docs/15 占位语义）。items 为
-RankItem（`cover_url` 必填非空）。
+对话/短篇 tab 合成轮播源：`form` 必填（同 `/banner` 的枚举校验），`seed` 同
+`/banner` 语义（默认服务端日期，客户端可覆盖做确定性缓存/测试）。池 = 该
+form **且有封面**（covers 观测或 seed `cover_url` 非空）的书按
+`favs DESC, nid ASC` 取 Top-100（头部池，质量底），再按 `/banner` 同款
+哈希（B=500001 半圈切点）每日抽取——每天换书、但始终在头部内。引擎只
+保证 URL 存在，不保证 CDN 可达——封面 404 时 UI 回退纸底占位（docs/15
+占位语义）。items 为 RankItem（`cover_url` 必填非空）。
 
 ### GET /strata/year-groups?form=（**已实现**）
 

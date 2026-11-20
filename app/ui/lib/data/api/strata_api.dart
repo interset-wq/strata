@@ -262,12 +262,12 @@ class StrataApi {
         .toList();
   }
 
-  /// 对话轮播：form 池中有封面的书（收藏降序固定序，不随日期变）。
-  /// dialogue 池没有 featured 定制图，端上用封面合成纸墨 banner。
+  /// 对话/短篇轮播：form 池中有封面书的收藏 Top-100 头部池，按日期
+  /// 种子每日轮换（与 banner 同款哈希）。
   Future<List<RankItem>> coverCarousel(
-      {int limit = 6, String form = 'dialogue'}) async {
-    final body =
-        await _get('/cover-carousel', {'limit': '$limit', 'form': form});
+      {required int seed, int limit = 6, String form = 'dialogue'}) async {
+    final body = await _get('/cover-carousel',
+        {'limit': '$limit', 'form': form, 'seed': '$seed'});
     return (body['items'] as List)
         .map((e) => RankItem.fromJson(e as Map<String, dynamic>))
         .toList();

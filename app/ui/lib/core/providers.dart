@@ -79,13 +79,17 @@ final bannerProvider = FutureProvider.autoDispose
 const bannerCarouselCount = 6;
 const largeImageCount = 6;
 
-/// 对话 tab 轮播：dialogue 池中有封面的书（收藏降序固定序，不随日期变）。
-/// dialogue/short 形态没有 featured 定制图，端上用封面实时合成纸墨 banner
-/// （重纸纱 + 衬线书名 + 指标行），见 widgets/cover_banner.dart。按 form 分池。
+/// 对话/短篇 tab 轮播：该 form 有封面书的收藏 Top-100 头部池，按日期
+/// 种子每日轮换（与长篇 banner 同款哈希）。没有 featured 定制图的形态
+/// 端上用封面实时合成纸墨 banner（重纸纱 + 衬线书名 + 指标行），见
+/// widgets/cover_banner.dart。按 form 分池。
 final coverCarouselProvider =
     FutureProvider.family<List<RankItem>, String>((ref, form) async {
   final handle = await ref.watch(bootProvider.future);
-  return handle.api.coverCarousel(form: form, limit: bannerCarouselCount);
+  final now = DateTime.now();
+  final seed = now.year * 10000 + now.month * 100 + now.day;
+  return handle.api
+      .coverCarousel(seed: seed, form: form, limit: bannerCarouselCount);
 });
 
 /// 发书日历查询参数（family 键）：粒度 + 锚点日 + 每格条目上限。
