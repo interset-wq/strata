@@ -25,6 +25,10 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
 
   bool refreshing = false;
   bool _footprintLogged = false;
+  // 库外书（官方搜索「新书」）自动收录状态，docs/08 §search-remote。
+  bool _collectTried = false;
+  bool _collecting = false;
+  String? _collectError;
   String? refreshMessage;
   Color? refreshColor;
   // v6 统一 watchlist：onWatch = 在列表里，tracking = 激活（后台抓取）。
@@ -50,6 +54,61 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
         }
       }
     }).onError((Object _, StackTrace _) {});
+  }
+
+  /// 库外书（官方搜索「新书」）自动收录：seed 无此行时自动触发一次
+  /// 按需抓取并重载；失败显示明确文案，不无限重试（docs/08 §search-remote）。
+  Widget _bookError(BuildContext context, Object e) {
+    final scheme = Theme.of(context).colorScheme;
+    if (!(e is StrataApiException && e.status == 404)) {
+      return Center(child: Text('加载失败：$e'));
+    }
+    if (_collectError != null) {
+      return Center(
+        child: Text('收录失败：$_collectError',
+            style: TextStyle(color: scheme.onSurfaceVariant)),
+      );
+    }
+    if (_collecting) {
+      return const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 12),
+            Text('正在收录这本书…'),
+          ],
+        ),
+      );
+    }
+    if (_collectTried) {
+      // 抓取跑过但 user.db 仍无数据（站上不可读/已下架）。
+      return const Center(child: Text('收录未返回数据，该书可能已下架'));
+    }
+    _collectTried = true;
+    _collecting = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _collect());
+    return const Center(child: CircularProgressIndicator());
+  }
+
+  Future<void> _collect() async {
+    String? err;
+    try {
+      final h = await ref.read(bootProvider.future);
+      final r = await h.api.refresh(widget.nid) as Map<String, dynamic>;
+      final state = r['state'];
+      if (state != null && state != 'alive') {
+        err = '该书在站上不可读（$state）';
+      }
+    } catch (ex) {
+      err = ex.toString();
+    }
+    if (!mounted) return;
+    setState(() {
+      _collecting = false;
+      _collectError = err;
+    });
+    if (err == null) ref.invalidate(bookProvider(widget.nid));
   }
 
   @override
@@ -78,7 +137,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
       ),
       body: detail.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('加载失败：$e')),
+        error: (e, _) => _bookError(context, e),
         data: (d) {
           // 打开即记一次浏览足迹（fire-and-forget，纯本地 user.db）。
           if (!_footprintLogged) {

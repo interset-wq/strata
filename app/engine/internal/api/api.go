@@ -226,7 +226,67 @@ func (s *Server) book(c *gin.Context) {
 	}
 	detail, err := s.store.Book(c.Request.Context(), nid)
 	if errors.Is(err, store.ErrNotFound) {
-		fail(c, http.StatusNotFound, "not_found", "book not in seed")
+		// Out-of-seed books (official-search discovery loop, docs/08
+		// §search-remote): once a detail fetch has landed data in
+		// user.db, serve the overlay view instead of 404. Seed-only
+		// fields (est dating, form, percentiles) do not exist for
+		// books outside the seed and stay absent.
+		meta, merr := s.store.BookMeta(c.Request.Context(), nid)
+		if merr != nil || meta == nil {
+			fail(c, http.StatusNotFound, "not_found", "book not in seed")
+			return
+		}
+		cover, _ := s.store.Cover(c.Request.Context(), nid)
+		if cover == "" && meta.CoverURL != nil {
+			cover = *meta.CoverURL
+		}
+		refresh, rerr := s.detailRefreshInfo(c.Request.Context(), nid, time.Now())
+		if rerr != nil {
+			fail(c, http.StatusInternalServerError, "internal", rerr.Error())
+			return
+		}
+		book := gin.H{
+			"nid":        nid,
+			"title":      meta.Title,
+			"author":     meta.Author,
+			"genre":      meta.Genre,
+			"price_type": meta.PriceType,
+			"status":     meta.Status,
+			"words":      meta.Words,
+			"clicks":     meta.Clicks,
+			"favs":       meta.Favs,
+			"praises":    meta.Praises,
+			"cover_url":  meta.CoverURL,
+			"updated_at": meta.UpdatedAt,
+			"summary":    meta.Summary,
+		}
+		eff := gin.H{
+			"title":      meta.Title,
+			"author":     meta.Author,
+			"genre":      meta.Genre,
+			"price_type": meta.PriceType,
+			"status":     meta.Status,
+			"cover_url":  meta.CoverURL,
+			"summary":    meta.Summary,
+			"words":      meta.Words,
+			"clicks":     meta.Clicks,
+			"favs":       meta.Favs,
+			"praises":    meta.Praises,
+			"updated_at": meta.UpdatedAt,
+			"add_time":   meta.AddTime,
+			"point":      meta.Point,
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"source":    "local",
+			"data_end":  s.store.Manifest.ContentEnd,
+			"book":      book,
+			"tags":      []string{},
+			"local":     nil,
+			"meta":      meta,
+			"effective": eff,
+			"cover":     cover,
+			"refresh":   refresh,
+		})
 		return
 	}
 	if err != nil {
