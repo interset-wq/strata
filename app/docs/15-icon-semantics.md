@@ -73,6 +73,7 @@
 | --- | --- | --- |
 | 切换排序方向 | `Icons.swap_vert` | 大图精选 gallery AppBar：收藏降序/升序切换（tooltip 显示目标方向） |
 | 打开年月选择器 | `Icons.expand_more` | 日历标题行：标题尾小箭头，点标题打开二维年月选择器（BottomSheet） |
+| 站内全搜 | `Icons.travel_explore` | 搜索页「搜全站」按钮（官方搜索手动触发，L1 结果段尾部；docs/08 §search-remote） |
 
 ## 使用规范
 
@@ -91,3 +92,4 @@
 - 详情页观测历史（收藏/赞/字数）、观测数据 chips（收藏/推荐/字数）
 - 榜单字数榜（字数 badge）
 - 作者页（头像占位 `Icons.person`；书目行为简单文本行，暂无 MetricBadge 语义）
+- 搜索页（收藏 badge、`Icons.travel_explore` 全搜按钮、历史 chips 无 icon）

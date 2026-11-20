@@ -261,23 +261,53 @@ form 过滤即池本身）。
 
 ## 草案（Phase 3/4 实现，未落地前 UI 不得依赖）
 
-### GET /strata/search?q=&limit=
+### GET /strata/search?q=&limit=（**已实现**）
 
-L1 本地搜索（**已实现**）：种子库内 `title`/`author` LIKE 匹配（v1 无 FTS5）。
-`q` 必填（非空），`limit` 同分页规则。
+L1 本地搜索：种子库内 `title`/`author` LIKE 匹配（v1 无 FTS5）。
+`q` 必填（非空），`limit` 同分页规则。**每次成功搜索自动写入搜索历史**
+（best-effort，写失败不影响搜索本身）。
 
 ```json
 {
   "meta": { "kind": "search", "pool": "seed", "q": "…", "limit": 50,
             "includes": "licensed", "content_end": "…" },
   "items": [ { "nid": 123, "title": "…", "author": "…", "genre": "…",
-               "est_year": 2019, "favs": 12345 } ]
+               "est_year": 2019, "favs": 12345, "cover_url": "…" } ]
 }
 ```
 
 **授权书可被搜索**（`includes:"licensed"`），只是不参与榜单与统计。
-按 `favs DESC` 排序。官方搜索 L2（30 条硬上限 + 静默限流识别）走 Phase 4，
-端点预留 `POST /strata/search/remote`，响应附 `rate_limited: bool`。
+按 `favs DESC` 排序。items 带 `cover_url`（观测覆盖层优先，与列表同口径）。
+
+### GET /strata/search-history?limit=（**已实现**）
+
+最近本地搜索关键词（搜索页空态 chips）：按关键词去重、最近使用优先，
+`limit` 默认 10 上限 50，响应 `{ "items": ["英雄", …] }`。存储在 user.db
+`search_history`（v5 表，无迁移），保留最近 200 行。
+
+### POST /strata/search/remote?q=（**已实现**）
+
+官方 HTML 搜索（docs/sfacg-endpoints §2.1，原 Phase 4 预留契约落地）：
+`GET s.sfacg.com/?Key={q}&SS=0&S=1`，**30 条硬上限、无翻页**——`declared`
+就是截断后的数字，不是真实总量。含简介（27/29 命中）与封面，是三个官方
+搜索接口里信息最全的（JSON 搜索是其子集，故不用）。
+
+- **静默限流**：HTTP 200 + 指纹翻转（搜索框标签变「请输入关键字」，正常
+  页面不含该串），连续 ~17 次触发、持续数分钟。响应 `meta.rate_limited=true`、
+  `items` 空——UI 明确提示，绝不伪造空结果。
+- **6 秒自冷却**：引擎内强制（`ErrSearchTooSoon` → 429 `too_soon`）；
+  手动触发 + 冷却让用户操作基本不可能碰到限流。
+- 结果标注 `in_seed`（内置库命中）；**库外命中写 user.db `discovered`**
+  （source='search'，重命中刷新 observed_at——观测闭环入口）。
+- 库外书详情为按需抓取视图（种子无该行）。
+
+```json
+{ "meta": { "kind": "search-remote", "q": "…", "rate_limited": false,
+            "declared": 29, "content_end": "…" },
+  "items": [ { "nid": 123, "title": "…", "author": "…",
+               "updated_at": "2024/3/25 20:57:58", "cover_url": "https://…",
+               "summary": "…", "in_seed": false } ] }
+```
 
 ### GET /strata/rankings/new?limit=
 
