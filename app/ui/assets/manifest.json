@@ -1,29 +1,29 @@
 {
   "schema_version": 4,
-  "seed_version": "20260503.23",
+  "seed_version": "20260503.24",
   "content_end": "2026-05-03",
-  "built_at": "2026-11-20T00:38:29+00:00",
-  "book_count": 18656,
+  "built_at": "2026-11-20T01:34:42+00:00",
+  "book_count": 18897,
   "licensed_count": 47,
   "tag_count": 102,
-  "tag_rows": 61571,
+  "tag_rows": 62377,
   "gen_min": 2007,
   "gen_max": 2025,
   "counts": {
     "stats_universe": 241864,
     "baseline_v0": 30832,
-    "admitted_v3": 18609,
+    "admitted_v3": 18850,
     "licensed_added": 47,
-    "seed": 18656,
+    "seed": 18897,
     "deep_rank_rows": 14621,
-    "lqs_scored_universe": 11796
+    "lqs_scored_universe": 11784
   },
   "admission_detail": {
     "top_favs": 20000,
     "monthly": 1661,
     "featured": 620,
     "short": 2000,
-    "time_excluded": 9313,
+    "time_excluded": 9306,
     "time_gated_diagnostic": 4159,
     "time_cut_diagnostic": 4886,
     "deep": 7835,
@@ -83,21 +83,21 @@
       }
     },
     "abandoned": {
-      "total": 134587,
+      "total": 131452,
       "in_seed": 1,
       "exempt_pctl_098": 31
     },
     "invalid": {
-      "total": 23906,
+      "total": 21137,
       "in_seed": 0
     }
   },
-  "favs_coverage": 0.966277,
+  "favs_coverage": 0.96474,
   "postconditions": [
     {
       "name": "P1 合格深榜书全部在种子内",
       "pass": true,
-      "detail": "4,521 本合格深榜书，缺 0"
+      "detail": "4,543 本合格深榜书，缺 0"
     },
     {
       "name": "P2 favs<5 且字数<1万必须有外部锚",
@@ -107,7 +107,7 @@
     {
       "name": "P3 收藏覆盖回退 ≤ 时间渠道放弃量（合格书口径）",
       "pass": true,
-      "detail": "新 96.63% vs V0 96.64%，差 -0.01pp（容差 0.2pp）"
+      "detail": "新 96.47% vs V0 96.49%，差 -0.02pp（容差 0.2pp）"
     },
     {
       "name": "P4 每个征文至少 3 本",
@@ -117,12 +117,12 @@
     {
       "name": "P5 弃书仅经征文保底豁免入种",
       "pass": true,
-      "detail": "弃书 134,587 本（另有同代 pctl≥0.98 豁免 31 本经质量锚入种），种子内 1 本（均须来自征文保底），越界 0 本"
+      "detail": "弃书 131,452 本（另有同代 pctl≥0.98 豁免 31 本经质量锚入种），种子内 1 本（均须来自征文保底），越界 0 本"
     },
     {
       "name": "P6 invalid（僵尸/假短篇）零入种",
       "pass": true,
-      "detail": "invalid 23,906 本，入种 0 本"
+      "detail": "invalid 21,137 本，入种 0 本"
     },
     {
       "name": "P7 short 层不越短篇三条天花板",
@@ -132,7 +132,7 @@
     {
       "name": "P8 连载中篇零入种（中篇必须已完结）",
       "pass": true,
-      "detail": "连载中篇 22,119 本，入种 0 本"
+      "detail": "连载中篇 21,904 本，入种 0 本"
     },
     {
       "name": "P9 Web 死链零入种（详情页「小说不存在」）",
@@ -151,13 +151,13 @@
   "files": {
     "db": {
       "name": "seed.db",
-      "bytes": 15712256,
-      "sha256": "c873817cb123afb2d25afa986f69f0259e9c5137a3dec3372cfc92b412e7cc3c"
+      "bytes": 15892480,
+      "sha256": "89e3aa3f503d7ab8faaab156faa21d4ee237002ab2da2610cb171b0a5923895e"
     },
     "gz": {
       "name": "seed.db.gz",
-      "bytes": 6925222,
-      "sha256": "be98c58e6a4956e7c17955fb3df04a8cd1c7dcded3070246f1d50c09f17d4d6d"
+      "bytes": 7000555,
+      "sha256": "299e8a92ebd4da9c4d92010857b2f80e6ba8d840310a76deec6eaab1ee1f7a5b"
     }
   }
 }
