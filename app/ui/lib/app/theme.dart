@@ -87,6 +87,8 @@ class StrataTheme {
       chipTheme: ChipThemeData(
         backgroundColor:
             isLight ? StrataTokens.lightSurface : StrataTokens.darkSurface,
+        selectedColor:
+            isLight ? StrataTokens.lightCinnabar : StrataTokens.darkCinnabar,
         side: BorderSide(
           color: isLight ? StrataTokens.lightHairline : StrataTokens.darkHairline,
         ),
@@ -94,6 +96,11 @@ class StrataTheme {
         labelStyle: TextStyle(
           fontSize: 12,
           color: isLight ? StrataTokens.lightInk2 : StrataTokens.darkInk2,
+        ),
+        secondaryLabelStyle: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: Color(0xFFFFF8F0),
         ),
       ),
       dividerTheme: DividerThemeData(

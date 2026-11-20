@@ -70,6 +70,7 @@
 | 语义 | icon | 使用处 |
 | --- | --- | --- |
 | 切换排序方向 | `Icons.swap_vert` | 大图精选 gallery AppBar：收藏降序/升序切换（tooltip 显示目标方向） |
+| 打开年月选择器 | `Icons.expand_more` | 日历标题行：标题尾小箭头，点标题打开二维年月选择器（BottomSheet） |
 
 ## 使用规范
 

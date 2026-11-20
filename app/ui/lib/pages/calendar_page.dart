@@ -110,6 +110,33 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
     });
   }
 
+  // ── 年月快速跳转：标题点击打开二维选择器（年横滑行 × 月 4×3 网格）。
+  // 点年即时切换（保留月，sheet 不关，可继续点月）；点月跳转并关闭。
+  // 右删失边界直接由年范围表达（genMin..genMax），无需禁用态。
+
+  void _jumpTo(int y, int m) {
+    setState(() => _focus = DateTime(y, m, 1));
+  }
+
+  Future<void> _showYearMonthPicker() async {
+    final scheme = Theme.of(context).colorScheme;
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: scheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _YearMonthSheet(
+        minYear: _genMin,
+        maxYear: _genMax,
+        initialYear: _focus.year,
+        initialMonth: _focus.month,
+        onYear: (y) => _jumpTo(y, _focus.month),
+        onMonth: (m) => _jumpTo(_focus.year, m),
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -215,13 +242,30 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                     onPressed: _canPrev ? () => _shift(-1) : null,
                   ),
                   Expanded(
-                    child: Text(
-                      _title(),
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          fontFamily: StrataTokens.serif),
+                    child: InkWell(
+                      onTap: _showYearMonthPicker,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              _title(),
+                              style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  fontFamily: StrataTokens.serif),
+                            ),
+                            const SizedBox(width: 4),
+                            Icon(
+                              Icons.expand_more,
+                              size: 18,
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
                   IconButton(
@@ -667,6 +711,111 @@ class _ConfBadge extends StatelessWidget {
         style: TextStyle(
             fontSize: 10,
             color: exact ? scheme.primary : scheme.onSurfaceVariant),
+      ),
+    );
+  }
+}
+
+/// 二维年月选择器（BottomSheet）：点年即时切换（保留月，sheet 不关，可继续
+/// 点月）；点月跳转并关闭。年范围 = 右删失边界（genMin..genMax），无需禁用态。
+class _YearMonthSheet extends StatefulWidget {
+  final int minYear;
+  final int maxYear;
+  final int initialYear;
+  final int initialMonth;
+  final ValueChanged<int> onYear;
+  final ValueChanged<int> onMonth;
+
+  const _YearMonthSheet({
+    required this.minYear,
+    required this.maxYear,
+    required this.initialYear,
+    required this.initialMonth,
+    required this.onYear,
+    required this.onMonth,
+  });
+
+  @override
+  State<_YearMonthSheet> createState() => _YearMonthSheetState();
+}
+
+class _YearMonthSheetState extends State<_YearMonthSheet> {
+  late int _year = widget.initialYear;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Text(
+                  '选择年月',
+                  style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      fontFamily: StrataTokens.serif),
+                ),
+                const Spacer(),
+                Text(
+                  '点年即时切换 · 点月跳转',
+                  style: TextStyle(
+                      fontSize: 11, color: scheme.onSurfaceVariant),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 40,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    for (int y = widget.minYear; y <= widget.maxYear; y++)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: FilterChip(
+                          label: Text('$y'),
+                          selected: _year == y,
+                          showCheckmark: false,
+                          onSelected: (_) {
+                            setState(() => _year = y);
+                            widget.onYear(y);
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            GridView.count(
+              crossAxisCount: 4,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+              childAspectRatio: 2.6,
+              children: [
+                for (int m = 1; m <= 12; m++)
+                  FilterChip(
+                    label: Text('$m月'),
+                    selected: widget.initialMonth == m,
+                    showCheckmark: false,
+                    onSelected: (_) {
+                      widget.onMonth(m);
+                      Navigator.of(context).pop();
+                    },
+                  ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
