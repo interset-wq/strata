@@ -369,7 +369,7 @@ WHERE est_year = ? AND is_licensed = 0 AND fav_pctl IS NOT NULL`
 // status and contest pages. It intentionally sorts by absolute favs, not by
 // same-generation percentiles: Classic mode mirrors novly's cumulative view
 // and has no quantitative layer.
-func (s *Store) ClassicBooks(ctx context.Context, genre, status, contest, form string,
+func (s *Store) ClassicBooks(ctx context.Context, genre, status, contest, form, wordsBand string,
 	year, limit, offset int, order string) ([]RankItem, error) {
 	query := `
 SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
@@ -399,6 +399,17 @@ WHERE seed.books.is_licensed = 0`
 	if form != "" {
 		query += " AND seed.books.form = ?"
 		args = append(args, form)
+	}
+	switch wordsBand {
+	case "":
+	case "short":
+		query += " AND seed.books.words <= 50000"
+	case "medium":
+		query += " AND seed.books.words > 50000 AND seed.books.words <= 150000"
+	case "long":
+		query += " AND seed.books.words > 150000"
+	default:
+		return nil, fmt.Errorf("unsupported words band %q", wordsBand)
 	}
 	if year > 0 {
 		query += " AND seed.books.est_year = ?"
@@ -918,7 +929,13 @@ func (s *Store) MoeGoddessBooks(ctx context.Context, limit int) ([]RankItem, err
 // (docs/author-profile-on-demand §1: the works list is read from the
 // local db). Seed author display names are canonical strings, so an
 // exact match is the identity check.
-func (s *Store) AuthorBooks(ctx context.Context, author string, limit, offset int) ([]RankItem, error) {
+func (s *Store) AuthorBooks(ctx context.Context, author string, limit, offset int, newestFirst bool) ([]RankItem, error) {
+	// Backfilled books (est_date NULL/'' — the 0001 sentinel) stay at the
+	// bottom in either direction.
+	order := "ORDER BY CASE WHEN seed.books.est_date IS NULL OR seed.books.est_date = '' THEN 1 ELSE 0 END, seed.books.est_date DESC, seed.books.nid ASC"
+	if !newestFirst {
+		order = "ORDER BY CASE WHEN seed.books.est_date IS NULL OR seed.books.est_date = '' THEN 1 ELSE 0 END, seed.books.est_date ASC, seed.books.nid DESC"
+	}
 	query := `
 SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
        seed.books.est_year, seed.books.status, seed.books.words, seed.books.clicks,
@@ -928,7 +945,7 @@ SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
 FROM seed.books
 LEFT JOIN covers c ON c.nid = seed.books.nid
 WHERE seed.books.author = ?
-ORDER BY seed.books.est_date DESC, seed.books.nid ASC
+` + order + `
 LIMIT ? OFFSET ?`
 	rows, err := s.DB.QueryContext(ctx, query, author, limit, offset)
 	if err != nil {
@@ -1331,10 +1348,10 @@ LIMIT ?`, pattern, pattern, pattern, pattern, limit)
 	items := make([]SearchItem, 0, limit)
 	for rows.Next() {
 		var (
-			item                 SearchItem
-			gen, cover           sql.NullString
-			estYear, favs        sql.NullInt64
-			inSeed               int
+			item          SearchItem
+			gen, cover    sql.NullString
+			estYear, favs sql.NullInt64
+			inSeed        int
 		)
 		if err := rows.Scan(&item.NID, &item.Title, &item.Author, &gen,
 			&estYear, &favs, &cover, &inSeed); err != nil {
@@ -1451,6 +1468,53 @@ ON CONFLICT(nid) DO UPDATE SET
 		}
 	}
 	return nil
+}
+
+// DiscoveredItem is one auto-collected out-of-seed book row (user.db
+// discovered — the official-search discovery-loop overlay).
+type DiscoveredItem struct {
+	NID        int64   `json:"nid"`
+	Title      string  `json:"title"`
+	Author     *string `json:"author"`
+	CoverURL   *string `json:"cover_url"`
+	Summary    *string `json:"summary"`
+	Source     string  `json:"source"`
+	ObservedAt int64   `json:"observed_at"`
+}
+
+// ListDiscovered returns auto-collected books, most recently collected
+// first (docs/08 §discovered).
+func (s *Store) ListDiscovered(ctx context.Context, limit, offset int) ([]DiscoveredItem, error) {
+	rows, err := s.DB.QueryContext(ctx, `
+SELECT nid, title, author, cover_url, summary, source, observed_at
+FROM discovered
+ORDER BY observed_at DESC, nid ASC
+LIMIT ? OFFSET ?`, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []DiscoveredItem{}
+	for rows.Next() {
+		var (
+			it     DiscoveredItem
+			author sql.NullString
+		)
+		if err := rows.Scan(&it.NID, &it.Title, &author, &it.CoverURL,
+			&it.Summary, &it.Source, &it.ObservedAt); err != nil {
+			return nil, err
+		}
+		it.Author = strPtr(author)
+		items = append(items, it)
+	}
+	return items, rows.Err()
+}
+
+// DeleteDiscovered removes one auto-collected book (user tap on the
+// discovery list). The bundled seed is untouched by design.
+func (s *Store) DeleteDiscovered(ctx context.Context, nid int64) error {
+	_, err := s.DB.ExecContext(ctx, `DELETE FROM discovered WHERE nid = ?`, nid)
+	return err
 }
 
 // RankingNew is the new-work ranking: last two generations (est_year >=

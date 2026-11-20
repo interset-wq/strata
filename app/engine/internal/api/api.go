@@ -100,6 +100,8 @@ func New(s *store.Store) *gin.Engine {
 	group.GET("/search", srv.search)
 	group.GET("/search-history", srv.searchHistory)
 	group.POST("/search/remote", srv.searchRemote)
+	group.GET("/discovered", srv.discoveredList)
+	group.DELETE("/discovered/:nid", srv.discoveredDelete)
 	group.GET("/random", srv.random)
 	group.GET("/licensed", srv.licensed)
 	group.GET("/moe-goddess", srv.moeGoddess)
@@ -692,6 +694,13 @@ func (s *Server) rankingClassic(c *gin.Context) {
 	if !ok {
 		return
 	}
+	wordsBand := c.Query("words-band")
+	if wordsBand != "" && wordsBand != "short" &&
+		wordsBand != "medium" && wordsBand != "long" {
+		fail(c, http.StatusBadRequest, "invalid_argument",
+			"words-band must be \"short\", \"medium\" or \"long\"")
+		return
+	}
 	year := 0
 	if raw := c.Query("year"); raw != "" {
 		var err error
@@ -708,7 +717,8 @@ func (s *Server) rankingClassic(c *gin.Context) {
 		return
 	}
 	items, err := s.store.ClassicBooks(c.Request.Context(),
-		c.Query("genre"), c.Query("status"), c.Query("contest"), form, year, limit, offset, order)
+		c.Query("genre"), c.Query("status"), c.Query("contest"), form, wordsBand,
+		year, limit, offset, order)
 	if err != nil {
 		fail(c, http.StatusInternalServerError, "internal", err.Error())
 		return
@@ -977,6 +987,49 @@ func (s *Server) searchRemote(c *gin.Context) {
 			"content_end": s.store.Manifest.ContentEnd},
 		"items": out,
 	})
+}
+
+// discoveredList serves the auto-collected out-of-seed books
+// (docs/08 §discovered): most recently collected first, paged.
+func (s *Server) discoveredList(c *gin.Context) {
+	limit, ok := parseLimit(c)
+	if !ok {
+		return
+	}
+	offset := 0
+	if raw := c.Query("offset"); raw != "" {
+		o, err := strconv.Atoi(raw)
+		if err != nil || o < 0 {
+			fail(c, http.StatusBadRequest, "invalid_argument",
+				"offset must be a non-negative integer")
+			return
+		}
+		offset = o
+	}
+	items, err := s.store.ListDiscovered(c.Request.Context(), limit, offset)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"meta":  gin.H{"kind": "discovered", "pool": "user"},
+		"items": items,
+	})
+}
+
+// discoveredDelete removes one auto-collected book (user tap on the
+// discovery list). user.db only — the bundled seed is untouched.
+func (s *Server) discoveredDelete(c *gin.Context) {
+	nid, err := strconv.ParseInt(c.Param("nid"), 10, 64)
+	if err != nil || nid <= 0 {
+		fail(c, http.StatusBadRequest, "invalid_argument", "nid must be a positive integer")
+		return
+	}
+	if err := s.store.DeleteDiscovered(c.Request.Context(), nid); err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"deleted": nid})
 }
 
 // bookRefresh fetches the mobile detail page and classifies the result
@@ -1422,13 +1475,24 @@ func (s *Server) authorBooks(c *gin.Context) {
 		}
 		offset = o
 	}
-	items, err := s.store.AuthorBooks(c.Request.Context(), author, limit, offset)
+	newestFirst := true
+	if o := c.Query("order"); o == "oldest" {
+		newestFirst = false
+	} else if o != "" && o != "newest" {
+		fail(c, http.StatusBadRequest, "invalid_argument", "order must be newest|oldest")
+		return
+	}
+	items, err := s.store.AuthorBooks(c.Request.Context(), author, limit, offset, newestFirst)
 	if err != nil {
 		fail(c, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
+	ordering := "est_date_desc"
+	if !newestFirst {
+		ordering = "est_date_asc"
+	}
 	c.JSON(http.StatusOK, gin.H{
-		"meta":  gin.H{"pool": "seed", "ordering": "est_date_desc", "author": author},
+		"meta":  gin.H{"pool": "seed", "ordering": ordering, "author": author},
 		"items": items,
 	})
 }

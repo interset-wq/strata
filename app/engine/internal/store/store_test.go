@@ -238,7 +238,7 @@ func TestAuthorBooks(t *testing.T) {
 	st := openTestStore(t)
 	ctx := context.Background()
 
-	items, err := st.AuthorBooks(ctx, "Author C", 20, 0)
+	items, err := st.AuthorBooks(ctx, "Author C", 20, 0, true)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -255,7 +255,16 @@ func TestAuthorBooks(t *testing.T) {
 		t.Fatalf("est_date[1] = %v", items[1].EstDate)
 	}
 
-	none, err := st.AuthorBooks(ctx, "Nobody", 20, 0)
+	// Ascending flips the order (timeline sort toggle, docs/08).
+	asc, err := st.AuthorBooks(ctx, "Author C", 20, 0, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(asc) != 2 || asc[0].NID != 1004 || asc[1].NID != 1003 {
+		t.Fatalf("asc items = %+v", asc)
+	}
+
+	none, err := st.AuthorBooks(ctx, "Nobody", 20, 0, true)
 	if err != nil {
 		t.Fatal(err)
 	}
