@@ -35,6 +35,16 @@ class SettingsPage extends ConsumerWidget {
               onTap: () => context.push('/collected'),
             ),
           ),
+          const SizedBox(height: 8),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.leaderboard_outlined),
+              title: const Text('官方榜单（demo）'),
+              subtitle: const Text(
+                  'SFACG 官方三来源榜单：历史月榜库 / PC 四榜 / 移动五榜'),
+              onTap: () => context.push('/official-ranks'),
+            ),
+          ),
           const SizedBox(height: 16),
           Text('外观', style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -49,6 +50,10 @@ type Server struct {
 
 	// Background watchlist poll worker (Phase 5): started once in New.
 	watcherStarted bool
+
+	// TTL cache + in-flight coalescing for the official board endpoints
+	// (monthly-granularity data; one fetch per key serves repeated taps).
+	ranksCache *officialRanksState
 }
 
 const (
@@ -78,6 +83,13 @@ func New(s *store.Store) *gin.Engine {
 		limiter: crawl.NewLimiter(crawl.DefaultInterval),
 		client:  client,
 		appAPI:  os.Getenv("STRATA_APP_API") == "1",
+		ranksCache: &officialRanksState{
+			entries:  map[string]struct {
+				loadedAt time.Time
+				body     []byte
+			}{},
+			inflight: map[string]chan []byte{},
+		},
 	}
 	group := r.Group("/strata")
 	group.GET("/healthz", srv.healthz)
@@ -101,6 +113,9 @@ func New(s *store.Store) *gin.Engine {
 	group.GET("/search", srv.search)
 	group.GET("/search-history", srv.searchHistory)
 	group.POST("/search/remote", srv.searchRemote)
+	group.GET("/official-ranks/monthly", srv.officialRanksMonthly)
+	group.GET("/official-ranks/pc", srv.officialRanksPc)
+	group.GET("/official-ranks/mobile", srv.officialRanksMobile)
 	group.GET("/discovered", srv.discoveredList)
 	group.DELETE("/discovered/:nid", srv.discoveredDelete)
 	group.GET("/random", srv.random)
@@ -536,10 +551,6 @@ func (s *Server) rankingNew(c *gin.Context) {
 	})
 }
 
-// rankingDeep serves the D2 full-universe generation boards. Unlike
-// /rankings/favs (which reads the curated seed pool), the candidate universe
-// here is the 241,758-row statistical frame, so early generations really do
-// have a Top200 board. See app/docs/10-deep-ranks.md.
 // random samples the seed uniformly at random for the home shuffle grid.
 func (s *Server) random(c *gin.Context) {
 	limit, ok := parseLimit(c)
@@ -846,6 +857,10 @@ func (s *Server) watchRemove(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"meta": gin.H{"nid": nid, "removed": true}})
 }
 
+// rankingDeep serves the D2 full-universe generation boards. Unlike
+// /rankings/favs (which reads the curated seed pool), the candidate universe
+// here is the 241,758-row statistical frame, so early generations really do
+// have a Top200 board. See app/docs/10-deep-ranks.md.
 func (s *Server) rankingDeep(c *gin.Context) {
 	rawYear := c.Query("year")
 	year, err := strconv.Atoi(rawYear)
@@ -1788,4 +1803,216 @@ func fail(c *gin.Context, status int, code, message string) {
 	c.AbortWithStatusJSON(status, gin.H{
 		"error": gin.H{"code": code, "message": message},
 	})
+}
+
+// ---------------------------------------------------------------------------
+// Official SFACG boards (demo page; facts: docs/sfacg-live-ranks.md).
+// All three fetchers go through the shared limiter, foreground priority.
+// Board data is monthly granularity, so responses are cached per key
+// (24h TTL) and concurrent taps on the same key are coalesced into one
+// upstream request; a user-triggered tap that hits a full limiter queue
+// waits (bounded retry) instead of failing — the drop-on-overflow rule
+// stays for background jobs only.
+// ---------------------------------------------------------------------------
+
+// officialRanksTTL covers current-period boards (monthly granularity, 24h);
+// officialRanksHistoricalTTL covers past months — that data never changes,
+// so one fetch per session is enough.
+const (
+	officialRanksTTL            = 24 * time.Hour
+	officialRanksHistoricalTTL  = 365 * 24 * time.Hour
+)
+
+type officialRanksState struct {
+	mu      sync.Mutex
+	entries map[string]struct {
+		loadedAt time.Time
+		body     []byte
+	}
+	inflight map[string]chan []byte
+}
+
+var reOfficialMonth = regexp.MustCompile(`^\d{4}-(0[1-9]|1[0-2])$`)
+
+var officialRanksMonthlyMeta = map[int]struct{ kind, note string }{
+	0: {"月票榜", "月票票数榜——站内唯一公开的付费强度信号；免费书可入榜；按月清零"},
+	2: {"新书榜", "官方月度新书榜（top 10）"},
+	3: {"热销榜", "当期点券消耗（订阅额）排序；免费书结构性不可入榜"},
+	4: {"对话月票榜", "对话产品线月票票数榜（2017-07 起）"},
+}
+
+var officialRanksMobileMeta = map[string]struct{ kind, note string }{
+	"original": {"人气榜", "官方移动端人气榜 top 20（无数值，算法未公开）"},
+	"bm":       {"收藏榜", "官方移动端收藏榜 top 20（无数值）"},
+	"new":      {"新书榜", "官方移动端新书榜 top 20（无数值）"},
+	"jp":       {"日轻榜", "日系轻小说池榜单 top 20（无数值）"},
+	"sale":     {"热销榜", "官方移动端热销榜 top 20（无数值）"},
+}
+
+// officialRanksMonthly serves one board of one month from the historical
+// monthly library (MonthlyBoy.ashx, 2013-03 onward, any month).
+func (s *Server) officialRanksMonthly(c *gin.Context) {
+	month := c.Query("date")
+	if !reOfficialMonth.MatchString(month) {
+		fail(c, http.StatusBadRequest, "invalid_argument", "date must be YYYY-MM")
+		return
+	}
+	rank := 0
+	if raw := c.Query("rank"); raw != "" {
+		var err error
+		if rank, err = strconv.Atoi(raw); err != nil {
+			fail(c, http.StatusBadRequest, "invalid_argument", "rank must be an integer")
+			return
+		}
+	}
+	meta, ok := officialRanksMonthlyMeta[rank]
+	if !ok {
+		fail(c, http.StatusBadRequest, "invalid_argument", "rank must be 0|2|3|4")
+		return
+	}
+	// Past months never change → cache for the session; the current month
+	// is still filling in → 24h.
+	ttl := officialRanksTTL
+	now := time.Now()
+	if month < fmt.Sprintf("%04d-%02d", now.Year(), int(now.Month())) {
+		ttl = officialRanksHistoricalTTL
+	}
+	body, err := s.officialRanksServed(c.Request.Context(),
+		"monthly:"+month+":"+strconv.Itoa(rank), ttl, func() ([]byte, error) {
+			items, ferr := crawl.FetchMonthlyRanks(c.Request.Context(), s.client,
+				s.limiter, month, rank, true)
+			if ferr != nil {
+				return nil, ferr
+			}
+			return json.Marshal(gin.H{
+				"meta": gin.H{
+					"source": "MonthlyBoy.ashx", "month": month, "rank": rank,
+					"kind": meta.kind, "note": meta.note, "first_month": "2013-03",
+				},
+				"items": items,
+			})
+		})
+	if err != nil {
+		fail(c, http.StatusBadGateway, "upstream", err.Error())
+		return
+	}
+	c.Data(http.StatusOK, "application/json; charset=utf-8", body)
+}
+
+// officialRanksServed returns the cached (or coalesced) response body for
+// key; on a cache miss it runs fetch — which still goes through the
+// limiter — and absorbs transient queue-full drops with a bounded 2s
+// retry so a user-triggered tap queues instead of 502-ing.
+func (s *Server) officialRanksServed(ctx context.Context, key string,
+	ttl time.Duration, fetch func() ([]byte, error)) ([]byte, error) {
+	st := s.ranksCache
+	st.mu.Lock()
+	if e, ok := st.entries[key]; ok && time.Since(e.loadedAt) < ttl {
+		st.mu.Unlock()
+		return e.body, nil
+	}
+	if ch, ok := st.inflight[key]; ok {
+		st.mu.Unlock()
+		select {
+		case b := <-ch:
+			return b, nil
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+	ch := make(chan []byte, 1)
+	st.inflight[key] = ch
+	st.mu.Unlock()
+
+	var (
+		body []byte
+		err  error
+	)
+	for attempt := 0; ; attempt++ {
+		body, err = fetch()
+		if err == nil || !errors.Is(err, crawl.ErrQueueFull) {
+			break
+		}
+		if attempt >= 8 {
+			break
+		}
+		select {
+		case <-ctx.Done():
+			err = ctx.Err()
+			break
+		case <-time.After(2 * time.Second):
+		}
+	}
+
+	st.mu.Lock()
+	delete(st.inflight, key)
+	if err == nil {
+		st.entries[key] = struct {
+			loadedAt time.Time
+			body     []byte
+		}{loadedAt: time.Now(), body: body}
+	}
+	st.mu.Unlock()
+
+	if err != nil {
+		return nil, err
+	}
+	ch <- body
+	return body, nil
+}
+
+// officialRanksPc serves the four current-month boards of the PC Rank page
+// (月票 with 票数 / 打赏 / 热销 are book boards; 粉丝 is reader-side).
+func (s *Server) officialRanksPc(c *gin.Context) {
+	body, err := s.officialRanksServed(c.Request.Context(),
+		"pc:current", officialRanksTTL, func() ([]byte, error) {
+			boards, ferr := crawl.FetchPcRanks(c.Request.Context(),
+				s.client, s.limiter, true)
+			if ferr != nil {
+				return nil, ferr
+			}
+			return json.Marshal(gin.H{
+				"meta": gin.H{
+					"source": "book.sfacg.com/Rank/",
+					"note":   "PC 当期四榜：月票（带票数）/ 打赏 / 热销为书榜，粉丝榜为读者侧（消费火券，当期月榜）",
+				},
+				"boards": boards,
+			})
+		})
+	if err != nil {
+		fail(c, http.StatusBadGateway, "upstream", err.Error())
+		return
+	}
+	c.Data(http.StatusOK, "application/json; charset=utf-8", body)
+}
+
+// officialRanksMobile serves one mobile board by slug (original/bm/new/jp/sale).
+func (s *Server) officialRanksMobile(c *gin.Context) {
+	slug := c.Query("board")
+	meta, ok := officialRanksMobileMeta[slug]
+	if !ok {
+		fail(c, http.StatusBadRequest, "invalid_argument",
+			"board must be original|bm|new|jp|sale")
+		return
+	}
+	body, err := s.officialRanksServed(c.Request.Context(),
+		"mobile:"+slug, officialRanksTTL, func() ([]byte, error) {
+			items, ferr := crawl.FetchMobileRank(c.Request.Context(),
+				s.client, s.limiter, slug, true)
+			if ferr != nil {
+				return nil, ferr
+			}
+			return json.Marshal(gin.H{
+				"meta": gin.H{
+					"source": "m.sfacg.com/rank/" + slug + ".html",
+					"board":  slug, "kind": meta.kind, "note": meta.note,
+				},
+				"items": items,
+			})
+		})
+	if err != nil {
+		fail(c, http.StatusBadGateway, "upstream", err.Error())
+		return
+	}
+	c.Data(http.StatusOK, "application/json; charset=utf-8", body)
 }

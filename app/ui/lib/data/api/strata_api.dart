@@ -92,6 +92,38 @@ class StrataApi {
         .toList();
   }
 
+  // --- 官方榜单（demo 页；docs/sfacg-live-ranks.md 三来源） ---
+
+  /// 历史月榜库（MonthlyBoy.ashx，2013-03 起任意月份）；rank: 0 月票/2 新书/3 热销/4 对话月票。
+  Future<List<OfficialRankEntry>> officialRanksMonthly({
+    required String month,
+    int rank = 0,
+  }) async {
+    final body = await _get('/official-ranks/monthly',
+        {'date': month, 'rank': '$rank'});
+    return (body['items'] as List)
+        .map((e) => OfficialRankEntry.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// PC 当期四榜（book.sfacg.com/Rank/）：月票带票数、打赏/热销无数值、粉丝榜读者侧。
+  Future<List<OfficialPcBoard>> officialRanksPc() async {
+    final body = await _get('/official-ranks/pc');
+    return (body['boards'] as List)
+        .map((e) => OfficialPcBoard.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// 移动五榜之一（m.sfacg.com/rank/{slug}.html）；slug: original/bm/new/jp/sale。
+  Future<List<OfficialRankEntry>> officialRanksMobile({
+    required String slug,
+  }) async {
+    final body = await _get('/official-ranks/mobile', {'board': slug});
+    return (body['items'] as List)
+        .map((e) => OfficialRankEntry.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   /// Classic category/status/contest list: absolute favs order by default,
   /// or same-generation favorite percentile (order='pct', 优质短篇口径).
   Future<List<RankItem>> rankingClassic({
@@ -1030,4 +1062,38 @@ class BookDetail {
       book = m['book'] as Map<String, dynamic>,
       tags = (m['tags'] as List).cast<String>(),
       effective = m['effective'] as Map<String, dynamic>?;
+}
+
+/// 官方榜单一行（三来源共用，docs/sfacg-live-ranks.md）。
+/// nid 为 0 = 读者侧行（PC 粉丝榜，只有用户名）；
+/// value 承载月票/火券（来源公布数值时）。
+class OfficialRankEntry {
+  final int nid;
+  final int rank;
+  final String title;
+  final String author;
+  final String? genre;
+  final String? coverUrl;
+  final int value;
+
+  OfficialRankEntry.fromJson(Map<String, dynamic> m)
+    : nid = m['nid'] as int,
+      rank = m['rank'] as int,
+      title = m['title'] as String,
+      author = m['author'] as String,
+      genre = m['genre'] as String?,
+      coverUrl = m['cover_url'] as String?,
+      value = m['value'] as int? ?? 0;
+}
+
+/// PC Rank 页的一个榜单（book.sfacg.com/Rank/ 共四榜）。
+class OfficialPcBoard {
+  final String name;
+  final List<OfficialRankEntry> entries;
+
+  OfficialPcBoard.fromJson(Map<String, dynamic> m)
+    : name = m['name'] as String,
+      entries = (m['entries'] as List)
+          .map((e) => OfficialRankEntry.fromJson(e as Map<String, dynamic>))
+          .toList();
 }

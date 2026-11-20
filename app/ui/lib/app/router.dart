@@ -20,6 +20,7 @@ import '../pages/random_pool_page.dart';
 import '../pages/pool_list_page.dart';
 import '../pages/settings_page.dart';
 import '../pages/collected_page.dart';
+import '../pages/official_ranks_page.dart';
 import '../pages/watchlist_page.dart';
 
 /// 底部 Tab 承载 5 个一级页（搜索已让位给发书日历，docs/14 P1）；
@@ -92,6 +93,9 @@ final router = GoRouter(
             GoRoute(
                 path: '/collected',
                 builder: (_, _) => const CollectedPage()),
+              GoRoute(
+                path: '/official-ranks',
+                builder: (_, _) => const OfficialRanksPage()),
           ],
         ),
       ],
