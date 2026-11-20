@@ -18,6 +18,7 @@ class ClassicListPage extends ConsumerStatefulWidget {
   final int? year;
   final String? contest;
   final String? genre;
+  final String? wordsBand; // 'short' | 'medium' | 'long'（对话 tab 篇幅轴）
   final String order; // 'favs' | 'pct'
   final bool yearSwitchable;
   final bool contestSwitchable;
@@ -30,6 +31,7 @@ class ClassicListPage extends ConsumerStatefulWidget {
     this.year,
     this.contest,
     this.genre,
+    this.wordsBand,
     this.order = 'favs',
     this.yearSwitchable = false,
     this.contestSwitchable = false,
@@ -62,8 +64,7 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
     _loadMore();
     _scroll.addListener(() {
       // 距底 400px 预取下一页。
-      if (_scroll.position.pixels >=
-          _scroll.position.maxScrollExtent - 400) {
+      if (_scroll.position.pixels >= _scroll.position.maxScrollExtent - 400) {
         _loadMore();
       }
       final show = _scroll.offset > 500;
@@ -91,6 +92,7 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
         year: _currentYear,
         contest: _currentContest,
         genre: _currentGenre,
+        wordsBand: widget.wordsBand,
         order: widget.order == 'favs' ? null : widget.order,
         limit: 20,
         offset: _items.length,
@@ -182,8 +184,7 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
               break;
             }
           }
-          label =
-              cnt == null ? '$_currentYear' : '$_currentYear · $cnt 本';
+          label = cnt == null ? '$_currentYear' : '$_currentYear · $cnt 本';
         }
         return Padding(
           padding: const EdgeInsets.fromLTRB(16, 2, 16, 6),
@@ -191,28 +192,34 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
             borderRadius: BorderRadius.circular(12),
             onTap: () => _openYearSheet(context, r),
             child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
                 color: scheme.surface,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                    color: scheme.outline.withValues(alpha: .4)),
+                border: Border.all(color: scheme.outline.withValues(alpha: .4)),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.calendar_month,
-                      size: 18, color: scheme.onSurfaceVariant),
+                  Icon(
+                    Icons.calendar_month,
+                    size: 18,
+                    color: scheme.onSurfaceVariant,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       label,
                       style: const TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w600),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                  Icon(Icons.expand_more,
-                      size: 18, color: scheme.onSurfaceVariant),
+                  Icon(
+                    Icons.expand_more,
+                    size: 18,
+                    color: scheme.onSurfaceVariant,
+                  ),
                 ],
               ),
             ),
@@ -237,7 +244,8 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
             borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           padding: EdgeInsets.only(
-              bottom: MediaQuery.of(ctx).viewInsets.bottom),
+            bottom: MediaQuery.of(ctx).viewInsets.bottom,
+          ),
           child: Column(
             children: [
               const SizedBox(height: 12),
@@ -253,7 +261,9 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
               Text(
                 '选择年份',
                 style: const TextStyle(
-                    fontSize: 15, fontWeight: FontWeight.w700),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
               const SizedBox(height: 6),
               Expanded(
@@ -271,7 +281,9 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
                       },
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 20, vertical: 13),
+                          horizontal: 20,
+                          vertical: 13,
+                        ),
                         color: selected
                             ? scheme.primary.withValues(alpha: .08)
                             : null,
@@ -284,19 +296,23 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
                                 fontWeight: selected
                                     ? FontWeight.w700
                                     : FontWeight.w500,
-                                color: selected
-                                    ? scheme.primary
-                                    : null,
+                                color: selected ? scheme.primary : null,
                               ),
                             ),
                             const Spacer(),
-                            Text('$count 本',
-                                style: TextStyle(
-                                    fontSize: 12,
-                                    color: scheme.onSurfaceVariant)),
+                            Text(
+                              '$count 本',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
                             if (selected)
-                              Icon(Icons.check,
-                                  size: 18, color: scheme.primary),
+                              Icon(
+                                Icons.check,
+                                size: 18,
+                                color: scheme.primary,
+                              ),
                           ],
                         ),
                       ),
@@ -348,7 +364,9 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
               child: Text(
                 '征文赛道',
                 style: const TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.w700),
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
             Padding(
@@ -365,7 +383,8 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide(
-                        color: scheme.outline.withValues(alpha: .4)),
+                      color: scheme.outline.withValues(alpha: .4),
+                    ),
                   ),
                 ),
               ),
@@ -374,30 +393,37 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
             Expanded(
               child: res.when(
                 loading: () => const Center(
-                    child: CircularProgressIndicator(strokeWidth: 2)),
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
                 error: (e, _) => Center(
-                    child: Text('加载失败：$e',
-                        style:
-                            TextStyle(fontSize: 12, color: scheme.error))),
+                  child: Text(
+                    '加载失败：$e',
+                    style: TextStyle(fontSize: 12, color: scheme.error),
+                  ),
+                ),
                 data: (r) {
                   final groups = _drawerQuery.isEmpty
                       ? r.groups
                       : r.groups
-                          .where((g) =>
-                              g.contest.contains(_drawerQuery) ||
-                              g.label.contains(_drawerQuery))
-                          .toList();
+                            .where(
+                              (g) =>
+                                  g.contest.contains(_drawerQuery) ||
+                                  g.label.contains(_drawerQuery),
+                            )
+                            .toList();
                   return ListView.builder(
                     itemCount: groups.length,
                     itemBuilder: (c, i) {
                       final g = groups[i];
                       final selected = g.contest == _currentContest;
                       return ListTile(
-                        leading: Icon(Icons.emoji_events,
-                            size: 18,
-                            color: selected
-                                ? scheme.primary
-                                : scheme.onSurfaceVariant),
+                        leading: Icon(
+                          Icons.emoji_events,
+                          size: 18,
+                          color: selected
+                              ? scheme.primary
+                              : scheme.onSurfaceVariant,
+                        ),
                         title: Text(
                           g.label,
                           maxLines: 1,
@@ -410,10 +436,13 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
                             color: selected ? scheme.primary : null,
                           ),
                         ),
-                        trailing: Text('${g.count} 本',
-                            style: TextStyle(
-                                fontSize: 12,
-                                color: scheme.onSurfaceVariant)),
+                        trailing: Text(
+                          '${g.count} 本',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
                         onTap: () {
                           Navigator.pop(context);
                           _selectContest(g.contest);
@@ -443,21 +472,23 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
           spacing: 8,
           runSpacing: 8,
           children: [
-          FilterChip(
-            label: const Text('全部题材', style: TextStyle(fontSize: 12)),
-            selected: _currentGenre == null,
-            onSelected: (_) => _selectGenre(null),
-            selectedColor: scheme.primary.withValues(alpha: .15),
-          ),
-          for (final g in r.groups)
             FilterChip(
-              label: Text('${g.genre}  ${g.count} 本',
-                  style: const TextStyle(fontSize: 12)),
-              selected: _currentGenre == g.genre,
-              onSelected: (_) => _selectGenre(g.genre),
+              label: const Text('全部题材', style: TextStyle(fontSize: 12)),
+              selected: _currentGenre == null,
+              onSelected: (_) => _selectGenre(null),
               selectedColor: scheme.primary.withValues(alpha: .15),
             ),
-        ],
+            for (final g in r.groups)
+              FilterChip(
+                label: Text(
+                  '${g.genre}  ${g.count} 本',
+                  style: const TextStyle(fontSize: 12),
+                ),
+                selected: _currentGenre == g.genre,
+                onSelected: (_) => _selectGenre(g.genre),
+                selectedColor: scheme.primary.withValues(alpha: .15),
+              ),
+          ],
         ),
       ),
     );
@@ -513,9 +544,7 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
     if (_items.isEmpty) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 48),
-        child: Center(
-          child: Text('该口径下暂无作品', style: TextStyle(fontSize: 12)),
-        ),
+        child: Center(child: Text('该口径下暂无作品', style: TextStyle(fontSize: 12))),
       );
     }
     if (_done) {

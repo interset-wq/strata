@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:strata/core/providers.dart';
 import 'package:strata/data/api/strata_api.dart';
 import 'package:strata/widgets/book_row_tile.dart';
 import 'package:strata/widgets/default_cover.dart';
@@ -17,13 +18,17 @@ void main() {
     });
 
     test('// 协议相对 → 补 https:（官方 app 观测值形态）', () {
-      expect(coverImageUrl('//rss.sfacg.com/a.jpg'),
-          'https://rss.sfacg.com/a.jpg');
+      expect(
+        coverImageUrl('//rss.sfacg.com/a.jpg'),
+        'https://rss.sfacg.com/a.jpg',
+      );
     });
 
     test('seed 相对路径 → 拼 CDN 前缀', () {
-      expect(coverImageUrl('2025/12/xx.jpg'),
-          'https://rss.sfacg.com/web/novel/images/NovelCover/Big/2025/12/xx.jpg');
+      expect(
+        coverImageUrl('2025/12/xx.jpg'),
+        'https://rss.sfacg.com/web/novel/images/NovelCover/Big/2025/12/xx.jpg',
+      );
     });
   });
 
@@ -110,6 +115,20 @@ void main() {
       expect(it.words, isNull);
       expect(it.praises, isNull);
       expect(it.tags, isEmpty);
+    });
+  });
+
+  group('carousel form（首页轮播形态映射）', () {
+    test('短篇沿用 IP 的固定 featured 池', () {
+      expect(carouselFormFor('short'), 'ip_collab');
+      expect(carouselIsFixed('short'), isTrue);
+    });
+
+    test('中篇/IP 固定，长篇/对话仍按日洗牌', () {
+      expect(carouselIsFixed('medium'), isTrue);
+      expect(carouselIsFixed('ip_collab'), isTrue);
+      expect(carouselIsFixed('long'), isFalse);
+      expect(carouselIsFixed('dialogue'), isFalse);
     });
   });
 }

@@ -73,25 +73,15 @@ class _HomePageState extends ConsumerState<HomePage> {
   bool _ipDone = false;
   String? _ipError;
 
-  // 中篇 tab（小池，words 5万–15万，池规模随种子版本变化）：页内浏览体验——单行题材 chips +
-  // 页内无限列表（照搬 IP tab "随便看看"分区模式）。双轴双行 chips
-  // 可用性差（用户 2026-11-19 定），简化为题材单轴；年份/优质轴砍掉。
-  // 与三个已有 tab 的体验刻意区分：长篇=分区首页、短篇=入口门户、
-  // IP=入口行+列表、中篇=页内浏览器（docs/16）。
-  String? _mediumGenre;
-  List<RankItem> _mediumItems = const [];
-  bool _mediumLoading = false;
-  bool _mediumDone = false;
-  String? _mediumError;
+  // 中篇 tab（小池，words 5万–15万，池规模随种子版本变化）：入口网格
+  // 门户（总榜/年份/比赛/题材/优质/随机）。原页内单列表信息量低
+  // （用户 2026-11-19 反馈），榜单落点复用 ClassicListPage，随机走
+  // /medium-random。与长篇=分区首页、短篇=入口列表、对话=篇幅+榜单
+  // 3×3、IP=入口行+列表刻意区分（docs/16）。
 
-  // 对话 tab（无完结条款：完结+连载混合，E.22 口径，池规模随种子版本变化）：
-  // 页内浏览体验与中篇同构（单行题材 chips + 页内无限列表，docs/16）；
+  // 对话 tab（大类，无完结条款，E.22 口径）：字数从 3 万到上百万，
+  // 单一收藏榜会被长篇占满。入口网格按短/中/长篇幅 + 榜单分流；
   // 轮播用封面合成纸墨 banner（无 featured 定制图池）。
-  String? _dialogueGenre;
-  List<RankItem> _dialogueItems = const [];
-  bool _dialogueLoading = false;
-  bool _dialogueDone = false;
-  String? _dialogueError;
 
   @override
   void initState() {
@@ -103,10 +93,6 @@ class _HomePageState extends ConsumerState<HomePage> {
           _scroll.offset >= _scroll.position.maxScrollExtent - 300) {
         if (_form == 'ip_collab') {
           _loadIpMore();
-        } else if (_form == 'medium') {
-          _loadMediumMore();
-        } else if (_form == 'dialogue') {
-          _loadDialogueMore();
         }
       }
     });
@@ -148,95 +134,6 @@ class _HomePageState extends ConsumerState<HomePage> {
     }
   }
 
-  // 中篇 tab 页内列表下一页：classic 端点 form=medium + 题材轴
-  // （收藏降序；年份/优质轴随双行 chips 砍掉）。
-  Future<void> _loadMediumMore() async {
-    if (_mediumLoading || _mediumDone) return;
-    setState(() {
-      _mediumLoading = true;
-      _mediumError = null;
-    });
-    try {
-      final handle = await ref.read(bootProvider.future);
-      final page = await handle.api.rankingClassic(
-        form: 'medium',
-        genre: _mediumGenre,
-        limit: 20,
-        offset: _mediumItems.length,
-      );
-      if (!mounted) return;
-      setState(() {
-        _mediumItems = [..._mediumItems, ...page];
-        _mediumDone = page.length < 20;
-        _mediumLoading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _mediumError = '$e';
-        _mediumLoading = false;
-      });
-    }
-  }
-
-  // 中篇题材切换：重置列表原地重载（不回顶——列表就在 chip 行下方，
-  // 重置后滚动位置自然回到列表头部附近，用户仍看得见新列表）。
-  void _setMediumGenre(String? g) {
-    if (g == _mediumGenre) return;
-    setState(() {
-      _mediumGenre = g;
-      _mediumItems = const [];
-      _mediumDone = false;
-      _mediumError = null;
-      _mediumLoading = false;
-    });
-    _loadMediumMore();
-  }
-
-  // 对话 tab 页内列表下一页：classic 端点 form=dialogue + 题材轴
-  // （收藏降序；对话池无完结条款，不按 status 过滤，E.22）。
-  Future<void> _loadDialogueMore() async {
-    if (_dialogueLoading || _dialogueDone) return;
-    setState(() {
-      _dialogueLoading = true;
-      _dialogueError = null;
-    });
-    try {
-      final handle = await ref.read(bootProvider.future);
-      final page = await handle.api.rankingClassic(
-        form: 'dialogue',
-        genre: _dialogueGenre,
-        limit: 20,
-        offset: _dialogueItems.length,
-      );
-      if (!mounted) return;
-      setState(() {
-        _dialogueItems = [..._dialogueItems, ...page];
-        _dialogueDone = page.length < 20;
-        _dialogueLoading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _dialogueError = '$e';
-        _dialogueLoading = false;
-      });
-    }
-  }
-
-  // 对话题材切换：重置列表原地重载（同中篇，不回顶）。
-  void _setDialogueGenre(String? g) {
-    if (g == _dialogueGenre) return;
-    setState(() {
-      _dialogueGenre = g;
-      _dialogueItems = const [];
-      _dialogueDone = false;
-      _dialogueError = null;
-      _dialogueLoading = false;
-    });
-    _loadDialogueMore();
-  }
-
   @override
   Widget build(BuildContext context) {
     final banners = ref.watch(bannerProvider(_form));
@@ -253,297 +150,304 @@ class _HomePageState extends ConsumerState<HomePage> {
           ref.invalidate(genreGroupsProvider);
           await ref.read(bannerProvider(_form).future);
         },
-        child: SafeArea(
-          bottom: false,
-          child: banners.when(
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (e, _) => Center(child: Text('加载失败：$e')),
-            data: (items) {
-              void selectForm(int i) {
+        child: SafeArea(bottom: false, child: _buildBody(context, banners)),
+      ),
+    );
+  }
+
+  // 页面骨架不等待轮播：banner 只在自己的槽位里 loading，切 form 标签
+  // 不会把整页替换成全屏 spinner（用户 2026-11-20 反馈）。
+  Widget _buildBody(
+    BuildContext context,
+    AsyncValue<List<FeaturedItem>> banners,
+  ) {
+    void selectForm(int i) {
+      final next = _formValues[i];
+      if (next == _form) return;
+      setState(() => _form = next);
+    }
+
+    // 短篇 tab（docs/form-definitions §4）：收录资格（完结条款 +
+    // 质量豁免 + 征文保底）由种子层实施，池本身已干净。布局对齐
+    // 其他页面：纸墨合成轮播（无 featured）+ 短篇专属五格入口
+    // （年份/比赛/题材/优质/随机——长篇的 showcase 与随机池对
+    // ≤5万字池无数据）。单列表已取消（用户 2026-11-19 定）。
+    if (_form == 'short') {
+      return Stack(
+        children: [
+          ListView(
+            controller: _scroll,
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            children: [
+              _formTabs(context, onSelect: selectForm),
+              _searchRow(context),
+              // 纸墨合成轮播（无 featured 定制图，封面合成）+
+              // 短篇专属五格入口。
+              _coverBannerCarousel('short'),
+              const SizedBox(height: 8),
+              _shortEntryGrid(context),
+            ],
+          ),
+          if (_showTop)
+            Positioned(
+              right: 16,
+              bottom: 24,
+              child: BackToTop(
+                onTap: () => _scroll.animateTo(
+                  0,
+                  duration: const Duration(milliseconds: 400),
+                  curve: Curves.easeOut,
+                ),
+              ),
+            ),
+        ],
+      );
+    }
+    // IP tab 书少（54 本），不需要多个分区：轮播 + IP 入口行 +
+    // “随便看看”（全池列表，上滑加载更多），无 showcase 分区。
+    if (_form == 'ip_collab') {
+      if (_ipItems.isEmpty && !_ipLoading) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _loadIpMore());
+      }
+      return Stack(
+        children: [
+          ListView(
+            controller: _scroll,
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            children: [
+              _formTabs(context, onSelect: selectForm),
+              _searchRow(context),
+              _featuredCarousel(context, banners),
+              const SizedBox(height: 8),
+              const IpEntryRow(),
+              _sectionTitle(context, '随便看看'),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  children: [
+                    for (final it in _ipItems)
+                      BookRowTile(
+                        item: it,
+                        ipLabel: contestIpLabel(it.contest),
+                      ),
+                    if (_ipError != null)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 24),
+                        child: Center(
+                          child: TextButton(
+                            onPressed: _loadIpMore,
+                            child: const Text('加载失败，点按重试'),
+                          ),
+                        ),
+                      )
+                    else if (_ipLoading)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 24),
+                        child: Center(
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                      )
+                    else if (_ipDone && _ipItems.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(0, 8, 0, 24),
+                        child: Center(
+                          child: Text(
+                            '— 共 ${_ipItems.length} 本 —',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (_showTop)
+            Positioned(
+              right: 16,
+              bottom: 24,
+              child: BackToTop(
+                onTap: () => _scroll.animateTo(
+                  0,
+                  duration: const Duration(milliseconds: 400),
+                  curve: Curves.easeOut,
+                ),
+              ),
+            ),
+        ],
+      );
+    }
+    // 对话 tab（大类）：纸墨轮播 + 3×3 入口网格。篇幅轴放在
+    // 网格首位，避免单一收藏榜被长篇占满（用户 2026-11-20）。
+    if (_form == 'dialogue') {
+      return Stack(
+        children: [
+          ListView(
+            controller: _scroll,
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            children: [
+              _formTabs(context, onSelect: selectForm),
+              _searchRow(context),
+              _coverBannerCarousel('dialogue'),
+              const SizedBox(height: 8),
+              _portalGrid(
+                context,
+                _dialogueEntryGridEntries(),
+                crossAxisCount: 3,
+              ),
+            ],
+          ),
+          if (_showTop)
+            Positioned(
+              right: 16,
+              bottom: 24,
+              child: BackToTop(
+                onTap: () => _scroll.animateTo(
+                  0,
+                  duration: const Duration(milliseconds: 400),
+                  curve: Curves.easeOut,
+                ),
+              ),
+            ),
+        ],
+      );
+    }
+    // 中篇 tab（小池）：固定轮播 + 2×3 入口网格（总榜/年份/
+    // 比赛/题材/优质/随机）。原页内单列表信息量低（用户
+    // 2026-11-19 反馈）；与长篇=分区首页、短篇=入口列表、
+    // IP=入口行+列表刻意区分（docs/16）。
+    if (_form == 'medium') {
+      return Stack(
+        children: [
+          ListView(
+            controller: _scroll,
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            children: [
+              _formTabs(context, onSelect: selectForm),
+              _searchRow(context),
+              // 中篇 featured 池很小：固定收藏序轮播，不做每日随机。
+              _featuredCarousel(context, banners),
+              const SizedBox(height: 8),
+              _mediumEntryGrid(context),
+            ],
+          ),
+          if (_showTop)
+            Positioned(
+              right: 16,
+              bottom: 24,
+              child: BackToTop(
+                onTap: () => _scroll.animateTo(
+                  0,
+                  duration: const Duration(milliseconds: 400),
+                  curve: Curves.easeOut,
+                ),
+              ),
+            ),
+        ],
+      );
+    }
+    return Stack(
+      children: [
+        ListView(
+          controller: _scroll,
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          children: [
+            _formTabs(
+              context,
+              onSelect: (i) {
                 final next = _formValues[i];
                 if (next == _form) return;
                 setState(() => _form = next);
-              }
+              },
+            ),
+            _searchRow(context),
+            // 通用布局只服务长篇 tab（对话/中篇/短篇/IP 各有
+            // 独立分支）：featured 池有定制 banner 图。
+            _featuredCarousel(context, banners),
+            const SizedBox(height: 8),
+            _entryGrid(context),
+            _sectionTitle(
+              context,
+              '连载发现',
+              onMore: () => context.push('/serial-random'),
+            ),
+            _ShowcaseSection(provider: serialShowcaseProvider(_form)),
+            _sectionTitle(
+              context,
+              '完结精选',
+              onMore: () => context.push('/finished-random'),
+            ),
+            _ShowcaseSection(provider: finishedShowcaseProvider(_form)),
+            _entryCards(context),
+            _sectionTitle(
+              context,
+              '随便看看',
+              onMore: () => context.push('/browse-random'),
+            ),
+            _ShowcaseSection(provider: browseShowcaseProvider(_form)),
+            _sectionTitle(
+              context,
+              '大图精选',
+              onMore: () => context.push('/featured-gallery'),
+            ),
+            const _LargeImageSection(),
+          ],
+        ),
+        if (_showTop)
+          Positioned(
+            right: 16,
+            bottom: 24,
+            child: BackToTop(
+              onTap: () => _scroll.animateTo(
+                0,
+                duration: const Duration(milliseconds: 400),
+                curve: Curves.easeOut,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
 
-              // 短篇 tab（docs/form-definitions §4）：收录资格（完结条款 +
-              // 质量豁免 + 征文保底）由种子层实施，池本身已干净。布局对齐
-              // 其他页面：纸墨合成轮播（无 featured）+ 短篇专属五格入口
-              // （年份/比赛/题材/优质/随机——长篇的 showcase 与随机池对
-              // ≤5万字池无数据）。单列表已取消（用户 2026-11-19 定）。
-              if (_form == 'short') {
-                return Stack(
-                  children: [
-                    ListView(
-                      controller: _scroll,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      children: [
-                        _formTabs(context, onSelect: selectForm),
-                        _searchRow(context),
-                        // 纸墨合成轮播（无 featured 定制图，封面合成）+
-                        // 短篇专属五格入口。
-                        _coverBannerCarousel('short'),
-                        const SizedBox(height: 8),
-                        _shortEntryGrid(context),
-                      ],
-                    ),
-                    if (_showTop)
-                      Positioned(
-                        right: 16,
-                        bottom: 24,
-                        child: BackToTop(
-                          onTap: () => _scroll.animateTo(
-                            0,
-                            duration: const Duration(milliseconds: 400),
-                            curve: Curves.easeOut,
-                          ),
-                        ),
-                      ),
-                  ],
-                );
-              }
-              // IP tab 书少（54 本），不需要多个分区：轮播 + IP 入口行 +
-              // “随便看看”（全池列表，上滑加载更多），无 showcase 分区。
-              if (_form == 'ip_collab') {
-                if (_ipItems.isEmpty && !_ipLoading) {
-                  WidgetsBinding.instance.addPostFrameCallback(
-                    (_) => _loadIpMore(),
-                  );
-                }
-                return Stack(
-                  children: [
-                    ListView(
-                      controller: _scroll,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      children: [
-                        _formTabs(context, onSelect: selectForm),
-                        _searchRow(context),
-                        BannerCarousel(
-                          items: items,
-                          onTap: (it) => context.push('/book/${it.nid}'),
-                        ),
-                        const SizedBox(height: 8),
-                        const IpEntryRow(),
-                        _sectionTitle(context, '随便看看'),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: Column(
-                            children: [
-                              for (final it in _ipItems)
-                                BookRowTile(
-                                  item: it,
-                                  ipLabel: contestIpLabel(it.contest),
-                                ),
-                              if (_ipError != null)
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 24,
-                                  ),
-                                  child: Center(
-                                    child: TextButton(
-                                      onPressed: _loadIpMore,
-                                      child: const Text('加载失败，点按重试'),
-                                    ),
-                                  ),
-                                )
-                              else if (_ipLoading)
-                                const Padding(
-                                  padding: EdgeInsets.symmetric(vertical: 24),
-                                  child: Center(
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  ),
-                                )
-                              else if (_ipDone && _ipItems.isNotEmpty)
-                                Padding(
-                                  padding: const EdgeInsets.fromLTRB(
-                                    0,
-                                    8,
-                                    0,
-                                    24,
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      '— 共 ${_ipItems.length} 本 —',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .onSurfaceVariant,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (_showTop)
-                      Positioned(
-                        right: 16,
-                        bottom: 24,
-                        child: BackToTop(
-                          onTap: () => _scroll.animateTo(
-                            0,
-                            duration: const Duration(milliseconds: 400),
-                            curve: Curves.easeOut,
-                          ),
-                        ),
-                      ),
-                  ],
-                );
-              }
-              // 对话 tab（无完结条款）：页内浏览体验（纸墨轮播 + 单行题材
-              // chips + 页内无限列表），与中篇同构（docs/16）。
-              if (_form == 'dialogue') {
-                if (_dialogueItems.isEmpty && !_dialogueLoading) {
-                  WidgetsBinding.instance.addPostFrameCallback(
-                    (_) => _loadDialogueMore(),
-                  );
-                }
-                return Stack(
-                  children: [
-                    ListView(
-                      controller: _scroll,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      children: [
-                        _formTabs(context, onSelect: selectForm),
-                        _searchRow(context),
-                        _coverBannerCarousel('dialogue'),
-                        const SizedBox(height: 4),
-                        _dialogueGenreChips(context),
-                        const SizedBox(height: 4),
-                        _dialogueListSection(context),
-                      ],
-                    ),
-                    if (_showTop)
-                      Positioned(
-                        right: 16,
-                        bottom: 24,
-                        child: BackToTop(
-                          onTap: () => _scroll.animateTo(
-                            0,
-                            duration: const Duration(milliseconds: 400),
-                            curve: Curves.easeOut,
-                          ),
-                        ),
-                      ),
-                  ],
-                );
-              }
-              // 中篇 tab（小池）：页内浏览体验（单行题材 chips + 页内
-              // 无限列表），与长篇（分区首页）/短篇（入口门户）/IP
-              // （入口行+列表）刻意区分，见 docs/16。年份/赛道轴砍掉
-              // （双轴双行 chips 可用性差，用户 2026-11-19 定）。
-              if (_form == 'medium') {
-                if (_mediumItems.isEmpty && !_mediumLoading) {
-                  WidgetsBinding.instance.addPostFrameCallback(
-                    (_) => _loadMediumMore(),
-                  );
-                }
-                return Stack(
-                  children: [
-                    ListView(
-                      controller: _scroll,
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      children: [
-                        _formTabs(context, onSelect: selectForm),
-                        _searchRow(context),
-                        // 中篇 featured 池 3 本：固定序收藏降序轮播
-                        // （bannerProvider('medium')，不做每日随机）。
-                        BannerCarousel(
-                          items: items,
-                          onTap: (it) => context.push('/book/${it.nid}'),
-                        ),
-                        const SizedBox(height: 4),
-                        _mediumGenreChips(context),
-                        const SizedBox(height: 4),
-                        _mediumListSection(context),
-                      ],
-                    ),
-                    if (_showTop)
-                      Positioned(
-                        right: 16,
-                        bottom: 24,
-                        child: BackToTop(
-                          onTap: () => _scroll.animateTo(
-                            0,
-                            duration: const Duration(milliseconds: 400),
-                            curve: Curves.easeOut,
-                          ),
-                        ),
-                      ),
-                  ],
-                );
-              }
-              return Stack(
-                children: [
-                  ListView(
-                    controller: _scroll,
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    children: [
-                      _formTabs(
-                        context,
-                        onSelect: (i) {
-                          final next = _formValues[i];
-                          if (next == _form) return;
-                          setState(() => _form = next);
-                        },
-                      ),
-                      _searchRow(context),
-                      // 通用布局只服务长篇 tab（对话/中篇/短篇/IP 各有
-                      // 独立分支）：featured 池有定制 banner 图。
-                      BannerCarousel(
-                        items: items,
-                        onTap: (it) => context.push('/book/${it.nid}'),
-                      ),
-                      const SizedBox(height: 8),
-                      _entryGrid(context),
-                      _sectionTitle(
-                        context,
-                        '连载发现',
-                        onMore: () => context.push('/serial-random'),
-                      ),
-                      _ShowcaseSection(provider: serialShowcaseProvider(_form)),
-                      _sectionTitle(
-                        context,
-                        '完结精选',
-                        onMore: () => context.push('/finished-random'),
-                      ),
-                      _ShowcaseSection(
-                        provider: finishedShowcaseProvider(_form),
-                      ),
-                      _entryCards(context),
-                      _sectionTitle(
-                        context,
-                        '随便看看',
-                        onMore: () => context.push('/browse-random'),
-                      ),
-                      _ShowcaseSection(provider: browseShowcaseProvider(_form)),
-                      _sectionTitle(
-                        context,
-                        '大图精选',
-                        onMore: () => context.push('/featured-gallery'),
-                      ),
-                      const _LargeImageSection(),
-                    ],
-                  ),
-                  if (_showTop)
-                    Positioned(
-                      right: 16,
-                      bottom: 24,
-                      child: BackToTop(
-                        onTap: () => _scroll.animateTo(
-                          0,
-                          duration: const Duration(milliseconds: 400),
-                          curve: Curves.easeOut,
-                        ),
-                      ),
-                    ),
-                ],
-              );
-            },
+  Widget _featuredCarousel(
+    BuildContext context,
+    AsyncValue<List<FeaturedItem>> banners,
+  ) {
+    final scheme = Theme.of(context).colorScheme;
+    return banners.when(
+      data: (items) => BannerCarousel(
+        items: items,
+        onTap: (it) => context.push('/book/${it.nid}'),
+      ),
+      loading: () => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: AspectRatio(
+          aspectRatio: 2.2,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: scheme.primary.withValues(alpha: .08),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Center(
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ),
+        ),
+      ),
+      error: (e, _) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: SizedBox(
+          height: 150,
+          child: Center(
+            child: TextButton(
+              onPressed: () => ref.invalidate(bannerProvider(_form)),
+              child: const Text('轮播加载失败，点按重试'),
+            ),
           ),
         ),
       ),
@@ -893,171 +797,157 @@ class _HomePageState extends ConsumerState<HomePage> {
   // 原五格宫格只有一行高、页面只占半屏，改纵向列表（用户 2026-11-19 定）：
   // 每行图标 + 标题 + 描述 + 箭头，撑满页面。icon 登记见 docs/15
   // （比赛/题材复用全局宫格语义）。
-  // 中篇 tab 单行题材 chips（横向滚动，FilterChip 单选）：全部题材 +
-  // 9 题材。原双轴双行 chips（题材行×年份行+优质互斥）可用性差
-  // （用户 2026-11-19 定），简化为题材单轴。
-  // 对话 tab 单行题材 chips（横向滚动，FilterChip 单选）：全部题材 +
-  // 9 题材（同人占 75%，小题材最少 21 本仍可浏览）。
-  Widget _dialogueGenreChips(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final genres = ref.watch(genreGroupsProvider('dialogue'));
-    return genres.when(
-      loading: () => const SizedBox(height: 46),
-      error: (e, _) => const SizedBox(height: 46),
-      data: (r) => SizedBox(
-        height: 46,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          itemCount: r.groups.length + 1,
-          separatorBuilder: (_, _) => const SizedBox(width: 8),
-          itemBuilder: (_, i) {
-            final name = i == 0 ? null : r.groups[i - 1].genre;
-            return FilterChip(
-              label: Text(name ?? '全部题材',
-                  style: const TextStyle(fontSize: 12)),
-              selected: _dialogueGenre == name,
-              onSelected: (_) => _setDialogueGenre(name),
-              showCheckmark: false,
-              selectedColor: scheme.primary.withValues(alpha: .15),
-            );
-          },
-        ),
+  // 中篇 tab 入口网格（2×3）：总榜/年份/比赛/题材/优质/随机。
+  // 入口只做导航，轴切换留在 ClassicListPage 页内（docs/16）。
+  Widget _mediumEntryGrid(BuildContext context) {
+    final entries = <(IconData, String, String, String)>[
+      (
+        Icons.format_list_numbered,
+        '中篇总榜',
+        '全部中篇 · 收藏降序',
+        '/classic-list?title=${Uri.encodeComponent('中篇总榜')}&form=medium',
       ),
-    );
+      (
+        Icons.calendar_month,
+        '年份榜',
+        '按出生年份筛选',
+        '/classic-list?title=${Uri.encodeComponent('年份榜')}'
+            '&form=medium&year-switchable=1',
+      ),
+      (
+        Icons.emoji_events,
+        '比赛榜',
+        '按征文赛道筛选',
+        '/classic-list?title=${Uri.encodeComponent('比赛榜')}'
+            '&form=medium&contest-switchable=1',
+      ),
+      (
+        Icons.category,
+        '题材榜',
+        '按题材标签筛选',
+        '/classic-list?title=${Uri.encodeComponent('题材榜')}'
+            '&form=medium&genre-switchable=1',
+      ),
+      (
+        Icons.star,
+        '优质中篇',
+        '同代分位头部',
+        '/classic-list?title=${Uri.encodeComponent('优质中篇')}'
+            '&form=medium&order=pct',
+      ),
+      (Icons.shuffle, '随机中篇', '随机 100 本', '/medium-random'),
+    ];
+    return _portalGrid(context, entries, crossAxisCount: 2);
   }
 
-  // 对话 tab 页内列表（与中篇同构）：BookRowTile + 失败重试 / 加载
-  // spinner / 空态 / "共 N 本"收尾。
-  Widget _dialogueListSection(BuildContext context) {
+  // 对话 tab 入口网格（3×3）：篇幅优先，再是榜单轴。
+  List<(IconData, String, String, String)> _dialogueEntryGridEntries() {
+    String listPath(String title, String extra) =>
+        '/classic-list?title=${Uri.encodeComponent(title)}&form=dialogue$extra';
+    return [
+      (Icons.format_list_numbered, '对话总榜', '全部对话 · 收藏降序', listPath('对话总榜', '')),
+      (Icons.short_text, '短对话', '≤5 万字', listPath('短对话', '&words-band=short')),
+      (
+        Icons.menu_book,
+        '中对话',
+        '5–15 万字',
+        listPath('中对话', '&words-band=medium'),
+      ),
+      (
+        Icons.auto_stories,
+        '长对话',
+        '>15 万字',
+        listPath('长对话', '&words-band=long'),
+      ),
+      (
+        Icons.calendar_month,
+        '年份榜',
+        '按出生年份筛选',
+        listPath('年份榜', '&year-switchable=1'),
+      ),
+      (
+        Icons.emoji_events,
+        '比赛榜',
+        '按征文赛道筛选',
+        listPath('比赛榜', '&contest-switchable=1'),
+      ),
+      (
+        Icons.category,
+        '题材榜',
+        '按题材标签筛选',
+        listPath('题材榜', '&genre-switchable=1'),
+      ),
+      (Icons.star, '优质对话', '同代分位头部', listPath('优质对话', '&order=pct')),
+      (Icons.shuffle, '随机对话', '随机 100 本', '/dialogue-random'),
+    ];
+  }
+
+  Widget _portalGrid(
+    BuildContext context,
+    List<(IconData, String, String, String)> entries, {
+    required int crossAxisCount,
+  }) {
     final scheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        children: [
-          for (final it in _dialogueItems) BookRowTile(item: it),
-          if (_dialogueError != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24),
-              child: Center(
-                child: TextButton(
-                  onPressed: _loadDialogueMore,
-                  child: const Text('加载失败，点按重试'),
-                ),
-              ),
-            )
-          else if (_dialogueLoading)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
-              child: Center(
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            )
-          else if (_dialogueDone && _dialogueItems.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24),
-              child: Center(
-                child: Text(
-                  '该题材下暂无对话作品',
-                  style: TextStyle(
-                      fontSize: 12, color: scheme.onSurfaceVariant),
-                ),
-              ),
-            )
-          else if (_dialogueDone && _dialogueItems.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(0, 8, 0, 24),
-              child: Center(
-                child: Text(
-                  '— 共 ${_dialogueItems.length} 本 —',
-                  style: TextStyle(
-                      fontSize: 11, color: scheme.onSurfaceVariant),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _mediumGenreChips(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final genres = ref.watch(genreGroupsProvider('medium'));
-    return genres.when(
-      loading: () => const SizedBox(height: 46),
-      error: (e, _) => const SizedBox(height: 46),
-      data: (r) => SizedBox(
-        height: 46,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          itemCount: r.groups.length + 1,
-          separatorBuilder: (_, _) => const SizedBox(width: 8),
-          itemBuilder: (_, i) {
-            final name = i == 0 ? null : r.groups[i - 1].genre;
-            return FilterChip(
-              label: Text(name ?? '全部题材',
-                  style: const TextStyle(fontSize: 12)),
-              selected: _mediumGenre == name,
-              onSelected: (_) => _setMediumGenre(name),
-              showCheckmark: false,
-              selectedColor: scheme.primary.withValues(alpha: .15),
-            );
-          },
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: GridView.builder(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        itemCount: entries.length,
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: crossAxisCount,
+          mainAxisSpacing: 10,
+          crossAxisSpacing: 10,
+          childAspectRatio: crossAxisCount >= 3 ? 0.82 : 1.2,
         ),
-      ),
-    );
-  }
-
-  // 中篇 tab 页内列表（照搬 IP tab "随便看看"分区模式）：BookRowTile +
-  // 失败重试 / 加载 spinner / 空态（双轴组合可能为空）/ "共 N 本"收尾。
-  Widget _mediumListSection(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        children: [
-          for (final it in _mediumItems) BookRowTile(item: it),
-          if (_mediumError != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24),
-              child: Center(
-                child: TextButton(
-                  onPressed: _loadMediumMore,
-                  child: const Text('加载失败，点按重试'),
-                ),
+        itemBuilder: (context, i) {
+          final (icon, title, desc, path) = entries[i];
+          return InkWell(
+            borderRadius: BorderRadius.circular(14),
+            onTap: () => context.push(path),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: scheme.surface,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: scheme.outline.withValues(alpha: .3)),
               ),
-            )
-          else if (_mediumLoading)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 24),
-              child: Center(
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            )
-          else if (_mediumDone && _mediumItems.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24),
-              child: Center(
-                child: Text(
-                  '该组合下暂无中篇作品',
-                  style: TextStyle(
-                      fontSize: 12, color: scheme.onSurfaceVariant),
-                ),
-              ),
-            )
-          else if (_mediumDone && _mediumItems.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(0, 8, 0, 24),
-              child: Center(
-                child: Text(
-                  '— 共 ${_mediumItems.length} 本 —',
-                  style: TextStyle(
-                      fontSize: 11, color: scheme.onSurfaceVariant),
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: scheme.primary.withValues(alpha: .12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    alignment: Alignment.center,
+                    child: Icon(icon, size: 19, color: scheme.primary),
+                  ),
+                  const Spacer(),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    desc,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
               ),
             ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -1087,7 +977,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         Icons.star,
         '优质短篇',
         '同代分位头部',
-        '/classic-list?title=${Uri.encodeComponent('优质短篇')}&form=short&order=pct'
+        '/classic-list?title=${Uri.encodeComponent('优质短篇')}&form=short&order=pct',
       ),
       (Icons.shuffle, '随机短篇', '随机 100 本', '/short-random'),
     ];
@@ -1102,13 +992,16 @@ class _HomePageState extends ConsumerState<HomePage> {
                 borderRadius: BorderRadius.circular(12),
                 onTap: () => context.push(path),
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: scheme.surface,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                        color: scheme.outline.withValues(alpha: .3)),
+                      color: scheme.outline.withValues(alpha: .3),
+                    ),
                   ),
                   child: Row(
                     children: [
@@ -1130,20 +1023,26 @@ class _HomePageState extends ConsumerState<HomePage> {
                             Text(
                               title,
                               style: const TextStyle(
-                                  fontSize: 14, fontWeight: FontWeight.w600),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                             const SizedBox(height: 2),
                             Text(
                               desc,
                               style: TextStyle(
-                                  fontSize: 11,
-                                  color: scheme.onSurfaceVariant),
+                                fontSize: 11,
+                                color: scheme.onSurfaceVariant,
+                              ),
                             ),
                           ],
                         ),
                       ),
-                      Icon(Icons.chevron_right,
-                          size: 18, color: scheme.onSurfaceVariant),
+                      Icon(
+                        Icons.chevron_right,
+                        size: 18,
+                        color: scheme.onSurfaceVariant,
+                      ),
                     ],
                   ),
                 ),

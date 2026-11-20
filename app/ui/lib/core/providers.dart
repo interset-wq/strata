@@ -41,8 +41,11 @@ final bootProvider = FutureProvider<EngineHandle>((ref) async {
   final dataDir = Directory('${docs.path}/data');
   await dataDir.create(recursive: true);
 
-  final result =
-      await startAndWaitHealthy(EngineFfi(), assetsDir, dataDir.path);
+  final result = await startAndWaitHealthy(
+    EngineFfi(),
+    assetsDir,
+    dataDir.path,
+  );
   if (!result.ok) {
     throw EngineBootException(result.error ?? 'engine failed to start');
   }
@@ -59,21 +62,32 @@ final metaProvider = FutureProvider<Meta>((ref) async {
   return handle.api.meta();
 });
 
-/// 首页轮播：中篇/IP 的 featured 池很小（含授权书也常不足 6 本），固定按
-/// 收藏展示、不做每日随机；短篇自身没有 featured，沿用 IP 的固定轮播。
-/// 长篇/对话仍用日期种子在各自形态内洗牌。
-final bannerProvider = FutureProvider.autoDispose
-    .family<List<FeaturedItem>, String>((ref, form) async {
+/// 短篇没有自己的 featured 池，轮播沿用 IP 的固定池。
+String carouselFormFor(String form) => form == 'short' ? 'ip_collab' : form;
+
+/// 中篇/IP 的 featured 池很小（含授权书也常不足 6 本），固定收藏序、
+/// 不做每日随机；长篇/对话仍用日期种子在各自形态内洗牌。
+bool carouselIsFixed(String form) {
+  final carouselForm = carouselFormFor(form);
+  return carouselForm == 'medium' || carouselForm == 'ip_collab';
+}
+
+final bannerProvider = FutureProvider.family<List<FeaturedItem>, String>((
+  ref,
+  form,
+) async {
   final handle = await ref.watch(bootProvider.future);
-  final carouselForm = form == 'short' ? 'ip_collab' : form;
-  if (carouselForm == 'medium' || carouselForm == 'ip_collab') {
-    return handle.api
-        .featured(limit: bannerCarouselCount, form: carouselForm);
+  final carouselForm = carouselFormFor(form);
+  if (carouselIsFixed(form)) {
+    return handle.api.featured(limit: bannerCarouselCount, form: carouselForm);
   }
   final now = DateTime.now();
   final seed = now.year * 10000 + now.month * 100 + now.day;
   return handle.api.banners(
-      seed: seed, limit: bannerCarouselCount, form: carouselForm);
+    seed: seed,
+    limit: bannerCarouselCount,
+    form: carouselForm,
+  );
 });
 
 const bannerCarouselCount = 6;
@@ -83,13 +97,18 @@ const largeImageCount = 6;
 /// 种子每日轮换（与长篇 banner 同款哈希）。没有 featured 定制图的形态
 /// 端上用封面实时合成纸墨 banner（重纸纱 + 衬线书名 + 指标行），见
 /// widgets/cover_banner.dart。按 form 分池。
-final coverCarouselProvider =
-    FutureProvider.family<List<RankItem>, String>((ref, form) async {
+final coverCarouselProvider = FutureProvider.family<List<RankItem>, String>((
+  ref,
+  form,
+) async {
   final handle = await ref.watch(bootProvider.future);
   final now = DateTime.now();
   final seed = now.year * 10000 + now.month * 100 + now.day;
-  return handle.api
-      .coverCarousel(seed: seed, form: form, limit: bannerCarouselCount);
+  return handle.api.coverCarousel(
+    seed: seed,
+    form: form,
+    limit: bannerCarouselCount,
+  );
 });
 
 /// 发书日历查询参数（family 键）：粒度 + 锚点日 + 每格条目上限。
@@ -117,12 +136,16 @@ class CalendarQuery {
 
 /// 发书日历（docs/14 P1）：seed 书按 est_date 聚合成日期格。
 /// month 视图只有 total；day/week 另带 per_cell 条收藏序条目。
-final calendarProvider =
-    FutureProvider.family<CalendarResponse, CalendarQuery>((ref, q) async {
-  final handle = await ref.watch(bootProvider.future);
-  return handle.api.calendar(
-      granularity: q.granularity, anchor: q.anchor, perCell: q.perCell);
-});
+final calendarProvider = FutureProvider.family<CalendarResponse, CalendarQuery>(
+  (ref, q) async {
+    final handle = await ref.watch(bootProvider.future);
+    return handle.api.calendar(
+      granularity: q.granularity,
+      anchor: q.anchor,
+      perCell: q.perCell,
+    );
+  },
+);
 
 /// IP tab 入口行：ip_collab 池按征文（contest）聚合（count DESC）。
 /// 端上取前 2 组作命名 IP 入口，其余折成“其他”。
@@ -134,22 +157,28 @@ final ipGroupsProvider = FutureProvider<IpGroupsResult>((ref) async {
 /// 赛道聚合（contest，count DESC）by form：榜单页轴切换的数据源
 /// （短篇比赛榜 Drawer，form 可复用于其他形态）。
 /// 与列表同源（不按 status 过滤，见 docs/form-definitions §4）。
-final contestGroupsProvider =
-    FutureProvider.family<IpGroupsResult, String>((ref, form) async {
+final contestGroupsProvider = FutureProvider.family<IpGroupsResult, String>((
+  ref,
+  form,
+) async {
   final handle = await ref.watch(bootProvider.future);
   return handle.api.ipGroups(form: form);
 });
 
 /// 年份聚合（est_year DESC）by form：榜单页年份 bottom sheet / chip 行。
-final yearGroupsProvider =
-    FutureProvider.family<YearGroupsResult, String>((ref, form) async {
+final yearGroupsProvider = FutureProvider.family<YearGroupsResult, String>((
+  ref,
+  form,
+) async {
   final handle = await ref.watch(bootProvider.future);
   return handle.api.yearGroups(form: form);
 });
 
 /// 题材聚合（count DESC）by form：榜单页题材 chip / 中篇 tab 题材行。
-final genreGroupsProvider =
-    FutureProvider.family<GenreGroupsResult, String>((ref, form) async {
+final genreGroupsProvider = FutureProvider.family<GenreGroupsResult, String>((
+  ref,
+  form,
+) async {
   final handle = await ref.watch(bootProvider.future);
   return handle.api.genreGroups(form: form);
 });
@@ -161,11 +190,16 @@ final largeImageProvider = FutureProvider<List<FeaturedItem>>((ref) async {
   final now = DateTime.now();
   final seed = now.year * 10000 + now.month * 100 + now.day;
   return handle.api.banners(
-      seed: seed, limit: largeImageCount, offset: bannerCarouselCount);
+    seed: seed,
+    limit: largeImageCount,
+    offset: bannerCarouselCount,
+  );
 });
 
 /// 图片全屏查看器的当前图集（首页大图精选打开查看器前写入）。
-final imageViewerProvider = StateProvider<List<FeaturedItem>>((ref) => const []);
+final imageViewerProvider = StateProvider<List<FeaturedItem>>(
+  (ref) => const [],
+);
 
 /// 外观主题：默认跟随系统（设置页可切浅色/深色）。
 final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.system);
@@ -173,15 +207,16 @@ final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.system);
 typedef YearGenre = ({int year, String? genre});
 
 /// 分位榜（可选题材过滤）。
-final favsRankingProvider =
-    FutureProvider.family<List<RankItem>, YearGenre>((ref, arg) async {
+final favsRankingProvider = FutureProvider.family<List<RankItem>, YearGenre>((
+  ref,
+  arg,
+) async {
   final handle = await ref.watch(bootProvider.future);
   return handle.api.rankingFavs(year: arg.year, genre: arg.genre);
 });
 
 /// 题材榜：分位榜 + genre 必选，二者共用同一端点。
-final shortRankingProvider =
-    FutureProvider<List<ShortItem>>((ref) async {
+final shortRankingProvider = FutureProvider<List<ShortItem>>((ref) async {
   final handle = await ref.watch(bootProvider.future);
   return handle.api.rankingShort();
 });
@@ -191,8 +226,10 @@ final newRankingProvider = FutureProvider<List<RankItem>>((ref) async {
   return handle.api.rankingNew();
 });
 
-final searchProvider =
-    FutureProvider.family<List<SearchItem>, String>((ref, q) async {
+final searchProvider = FutureProvider.family<List<SearchItem>, String>((
+  ref,
+  q,
+) async {
   final handle = await ref.watch(bootProvider.future);
   return handle.api.search(q);
 });
