@@ -52,7 +52,7 @@ var books = []book{
 	{nid: 1001, title: "Long A", author: "Author A", genre: "魔幻", status: "连载中", words: 120000, favs: 500, pctl: 0.9, featured: 1, year: 2010},
 	{nid: 1002, title: "Short B", author: "Author B", genre: "都市", status: "已完结", words: 30000, favs: 100, pctl: 0.5, year: 2010},
 	{nid: 1003, title: "Long C", author: "Author C", genre: "科幻", status: "连载中", words: 200000, favs: 900, pctl: 0.99, featured: 1, year: 2011},
-	{nid: 1004, title: "Short D", author: "Author D", genre: "魔幻", status: "已完结", words: 40000, favs: 50, pctl: 0.6, year: 2010},
+	{nid: 1004, title: "Short D", author: "Author C", genre: "魔幻", status: "已完结", words: 40000, favs: 50, pctl: 0.6, year: 2010},
 	{nid: 2001, title: "Licensed", author: "天闻角川", genre: "魔幻", status: "已完结", words: 90000, favs: 99999, pctl: nil, licensed: 1, year: 2008},
 	{nid: 1005, title: "New E", author: "Author E", genre: "都市", status: "连载中", words: 150000, favs: 300, pctl: 0.95, year: 2025},
 	{nid: 1006, title: "IP F", author: "Author F", genre: "都市", status: "连载中", words: 80000, favs: 700, pctl: 0.8, featured: 1, year: 2012},

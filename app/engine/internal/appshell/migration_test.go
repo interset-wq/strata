@@ -50,9 +50,11 @@ func TestUserDBUpgradesOldVersion(t *testing.T) {
 		t.Fatal(err)
 	}
 	// v5 had 13 tables; v6 drops shelf (folded into watchlist) and
-	// renames shelf_lists to watch_lists (count-neutral).
-	if tables != 12 {
-		t.Fatalf("tables = %d, want 12", tables)
+	// renames shelf_lists to watch_lists (count-neutral); v7 adds
+	// author_profiles (on-demand author data, docs/author-profile-
+	// on-demand §4).
+	if tables != 13 {
+		t.Fatalf("tables = %d, want 13", tables)
 	}
 }
 

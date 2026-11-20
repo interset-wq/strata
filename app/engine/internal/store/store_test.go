@@ -230,3 +230,90 @@ func TestCoverCarouselDailyRotation(t *testing.T) {
 		t.Fatalf("same seed, different order: %+v vs %+v", a, c)
 	}
 }
+
+// TestAuthorBooks pins the author-page timeline query (docs/author-
+// profile-on-demand §1): one author's seed books in est_date DESC order
+// with the timeline field filled; unknown authors yield an empty list.
+func TestAuthorBooks(t *testing.T) {
+	st := openTestStore(t)
+	ctx := context.Background()
+
+	items, err := st.AuthorBooks(ctx, "Author C", 20, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 2 || items[0].NID != 1003 || items[1].NID != 1004 {
+		t.Fatalf("items = %+v", items)
+	}
+	// 1003's est_date is '2011-01-05' in the testseed (low-conf docs/14
+	// fixture); 1004 keeps the build default '2010-01-01'. DESC: 1003
+	// first.
+	if items[0].EstDate == nil || *items[0].EstDate != "2011-01-05" {
+		t.Fatalf("est_date[0] = %v", items[0].EstDate)
+	}
+	if items[1].EstDate == nil || *items[1].EstDate != "2010-01-01" {
+		t.Fatalf("est_date[1] = %v", items[1].EstDate)
+	}
+
+	none, err := st.AuthorBooks(ctx, "Nobody", 20, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(none) != 0 {
+		t.Fatalf("unknown author: %+v", none)
+	}
+}
+
+// TestAuthorProfileRoundTrip pins the v7 author_profiles cache
+// (docs/author-profile-on-demand §4): absent → nil, save → get, upsert
+// replaces (NULL intro/avatar survive the round trip).
+func TestAuthorProfileRoundTrip(t *testing.T) {
+	st := openTestStore(t)
+	ctx := context.Background()
+
+	got, err := st.GetAuthorProfile(ctx, "author c")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != nil {
+		t.Fatalf("absent profile = %+v", got)
+	}
+
+	intro := "新人作者"
+	avatar := "https://x/a.jpg"
+	if err := st.SaveAuthorProfile(ctx, &AuthorProfile{
+		AuthorKey: "author c", AuthorName: "Author C",
+		AuthorIntro: &intro, AuthorAvatar: &avatar,
+		Verdict: "ok", SourceNID: 1003, ObservedAt: 1700000000,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	got, err = st.GetAuthorProfile(ctx, "author c")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got == nil {
+		t.Fatal("nil after save")
+	}
+	if got.AuthorName != "Author C" || got.Verdict != "ok" || got.SourceNID != 1003 {
+		t.Fatalf("profile = %+v", got)
+	}
+	if got.AuthorIntro == nil || *got.AuthorIntro != "新人作者" {
+		t.Fatalf("intro = %v", got.AuthorIntro)
+	}
+	if got.AuthorAvatar == nil || *got.AuthorAvatar != "https://x/a.jpg" {
+		t.Fatalf("avatar = %v", got.AuthorAvatar)
+	}
+
+	// Upsert: a second save replaces the row; cleared fields go NULL.
+	if err := st.SaveAuthorProfile(ctx, &AuthorProfile{
+		AuthorKey: "author c", AuthorName: "Author C",
+		Verdict: "dead", SourceNID: 1004, ObservedAt: 1700000100,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	got, _ = st.GetAuthorProfile(ctx, "author c")
+	if got == nil || got.Verdict != "dead" || got.AuthorIntro != nil {
+		t.Fatalf("upsert = %+v", got)
+	}
+}

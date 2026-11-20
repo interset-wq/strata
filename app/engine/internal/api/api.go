@@ -111,6 +111,8 @@ func New(s *store.Store) *gin.Engine {
 	group.GET("/genre-groups", srv.genreGroups)
 	group.GET("/ip-books", srv.ipBooks)
 	group.GET("/banner", srv.banner)
+	group.GET("/author-books", srv.authorBooks)
+	group.GET("/author-profile", srv.authorProfile)
 	srv.startWatcher(context.Background())
 	return r
 }
@@ -1049,7 +1051,7 @@ func (s *Server) calendar(c *gin.Context) {
 		from, to = t, t
 		anchorLabel = t.Format("2006-01-02")
 	case "week":
-		monday := t.AddDate(0, 0, -((int(t.Weekday())+6)%7))
+		monday := t.AddDate(0, 0, -((int(t.Weekday()) + 6) % 7))
 		from, to = monday, monday.AddDate(0, 0, 6)
 		anchorLabel = monday.Format("2006-01-02")
 	case "month":
@@ -1233,6 +1235,165 @@ func (s *Server) coverCarousel(c *gin.Context) {
 		"meta": gin.H{"pool": "seed", "ordering": "daily", "form": form,
 			"head_pool": 100, "cover_required": true},
 		"items": items,
+	})
+}
+
+// authorBooks lists one author's seed books in timeline order for the
+// author page (docs/author-profile-on-demand): local data only, no
+// network. Unknown authors return an empty list, not an error.
+func (s *Server) authorBooks(c *gin.Context) {
+	author := c.Query("author")
+	if author == "" {
+		fail(c, http.StatusBadRequest, "invalid_argument", "author is required")
+		return
+	}
+	limit, ok := parseLimit(c)
+	if !ok {
+		return
+	}
+	offset := 0
+	if raw := c.Query("offset"); raw != "" {
+		o, err := strconv.Atoi(raw)
+		if err != nil || o < 0 {
+			fail(c, http.StatusBadRequest, "invalid_argument",
+				"offset must be a non-negative integer")
+			return
+		}
+		offset = o
+	}
+	items, err := s.store.AuthorBooks(c.Request.Context(), author, limit, offset)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"meta":  gin.H{"pool": "seed", "ordering": "est_date_desc", "author": author},
+		"items": items,
+	})
+}
+
+// authorProfileOKTTL / authorProfileDeadTTL: cache lifetimes for the
+// on-demand author profile (docs/author-profile-on-demand §4). Intro
+// and avatar are slow-changing snapshot values, so a week is plenty
+// for ok rows; dead rows (source book delisted) re-probe after a day
+// in case of restoration.
+const (
+	authorProfileOKTTL   = 7 * 24 * 3600
+	authorProfileDeadTTL = 24 * 3600
+)
+
+// authorProfile serves the author page header (docs/author-profile-on-
+// demand §1-3): on-demand, never pre-fetched. One mobile detail fetch
+// (avatar/name/works, on the book the page already shows) plus one PC
+// fetch for the intro only when with_intro=1. A user.db cache
+// (author_profiles, v7) short-circuits repeat opens within the TTL;
+// fresh=1 bypasses it. The fetched book's author must match the
+// requested author (casefold, space-sensitive) or the result is served
+// but not cached — a wrong book can't poison the profile.
+func (s *Server) authorProfile(c *gin.Context) {
+	author := c.Query("author")
+	nid, nerr := strconv.ParseInt(c.Query("nid"), 10, 64)
+	if author == "" || nerr != nil || nid <= 0 {
+		fail(c, http.StatusBadRequest, "invalid_argument",
+			"author and a positive nid are required")
+		return
+	}
+	withIntro := c.Query("with_intro") == "1"
+	fresh := c.Query("fresh") == "1"
+	key := strings.ToLower(author)
+	now := time.Now().Unix()
+
+	if !fresh {
+		if p, err := s.store.GetAuthorProfile(c.Request.Context(), key); err == nil && p != nil {
+			ttl := int64(authorProfileOKTTL)
+			if p.Verdict == "dead" {
+				ttl = int64(authorProfileDeadTTL)
+			}
+			if now-p.ObservedAt < ttl {
+				c.JSON(http.StatusOK, gin.H{
+					"nid":           p.SourceNID,
+					"author_name":   p.AuthorName,
+					"author_intro":  p.AuthorIntro,
+					"author_avatar": p.AuthorAvatar,
+					"works":         []crawl.AuthorWork{},
+					"verdict":       p.Verdict,
+					"observed_at":   p.ObservedAt,
+					"source":        "cache",
+				})
+				return
+			}
+		}
+	}
+
+	state, d, fetchStart, err := crawl.FetchDetail(c.Request.Context(), s.client, s.limiter, nid, true)
+	if err != nil {
+		fail(c, http.StatusBadGateway, "fetch_error", err.Error())
+		return
+	}
+	if state == crawl.DetailDead {
+		_ = s.store.SaveAuthorProfile(c.Request.Context(), &store.AuthorProfile{
+			AuthorKey: key, AuthorName: "", Verdict: "dead",
+			SourceNID: nid, ObservedAt: fetchStart,
+		})
+		c.JSON(http.StatusOK, gin.H{
+			"nid": nid, "author_name": "", "author_intro": nil,
+			"author_avatar": "", "works": []crawl.AuthorWork{},
+			"verdict": "dead", "observed_at": fetchStart, "source": "live",
+		})
+		return
+	}
+
+	name, avatar := "", ""
+	works := []crawl.AuthorWork{}
+	if state == crawl.DetailAlive && d != nil {
+		name = d.AuthorName
+		if name == "" {
+			name = d.Author
+		}
+		avatar = d.AuthorAvatar
+		works = d.AuthorWorks
+		if works == nil {
+			works = []crawl.AuthorWork{}
+		}
+	}
+	if strings.Contains(avatar, "common/0.gif") {
+		avatar = ""
+	}
+	var intro *string
+	if withIntro && name != "" {
+		if box, _, perr := crawl.FetchAuthorBox(c.Request.Context(), s.client, s.limiter, nid, true); perr == nil && box != nil {
+			if box.Intro != "" {
+				v := box.Intro
+				intro = &v
+			}
+			if box.Avatar != "" && !strings.Contains(box.Avatar, "common/0.gif") {
+				avatar = box.Avatar
+			}
+		}
+	}
+
+	// Identity guard: the fetched book must be by the requested author
+	// (casefold, space-sensitive), otherwise serve but do not cache.
+	match := name == "" || strings.ToLower(name) == key
+	verdict := "ok"
+	if name == "" && avatar == "" && len(works) == 0 {
+		verdict = "error"
+	}
+	var avatarPtr *string
+	if avatar != "" {
+		avatarPtr = &avatar
+	}
+	if match {
+		_ = s.store.SaveAuthorProfile(c.Request.Context(), &store.AuthorProfile{
+			AuthorKey: key, AuthorName: name, AuthorIntro: intro,
+			AuthorAvatar: avatarPtr, Verdict: verdict,
+			SourceNID: nid, ObservedAt: fetchStart,
+		})
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"nid": nid, "author_name": name, "author_intro": intro,
+		"author_avatar": avatar, "works": works,
+		"verdict": verdict, "observed_at": fetchStart, "source": "live",
 	})
 }
 

@@ -7,7 +7,10 @@ import (
 	"path/filepath"
 )
 
-const userSchemaVersion = 6
+// userSchemaVersion: v7 adds author_profiles (on-demand author data,
+// docs/author-profile-on-demand §4) — purely additive, created by the
+// idempotent DDL replay in EnsureUserDB.
+const userSchemaVersion = 7
 
 // userSchemaV5 is the v5-era full user.db DDL: additive across
 // versions (v1 → v5), replayed idempotently on every schema pass — a
@@ -153,6 +156,21 @@ CREATE TABLE IF NOT EXISTS browsing_history(
   viewed_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_history_viewed ON browsing_history(viewed_at DESC);
+
+-- On-demand author profile (v7): fetched from one of the author's book
+-- detail pages when the author page opens (docs/author-profile-on-demand).
+-- A snapshot, never seed data — intro and avatar change with the author.
+-- Keyed by the casefolded display name (project identity convention:
+-- case-insensitive, space-sensitive).
+CREATE TABLE IF NOT EXISTS author_profiles(
+  author_key    TEXT PRIMARY KEY,
+  author_name   TEXT NOT NULL,
+  author_intro  TEXT,
+  author_avatar TEXT,
+  verdict       TEXT NOT NULL,
+  source_nid    INTEGER,
+  observed_at   INTEGER NOT NULL
+);
 `
 
 func UserDBPath(dataDir string) string {

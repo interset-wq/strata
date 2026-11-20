@@ -2,6 +2,7 @@ package crawl
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -33,6 +34,21 @@ func TestParseDetailFixtures(t *testing.T) {
 			}
 			if d.Title == "" || d.Author == "" || d.Favs <= 0 || d.Words <= 0 {
 				t.Errorf("%s: incomplete detail %+v", c.file, d)
+			}
+			// Author section (book_Author, docs/author-profile-on-demand
+			// §2.1): avatar + display name + 作品集 links, all from the
+			// same archived page — no second request.
+			if d.AuthorName != "无聊看看天" {
+				t.Errorf("%s: author_name = %q", c.file, d.AuthorName)
+			}
+			if d.AuthorAvatar == "" || !strings.Contains(d.AuthorAvatar, "avatars") {
+				t.Errorf("%s: author_avatar = %q", c.file, d.AuthorAvatar)
+			}
+			if len(d.AuthorWorks) != 6 {
+				t.Errorf("%s: author_works = %d, want 6: %+v",
+					c.file, len(d.AuthorWorks), d.AuthorWorks)
+			} else if d.AuthorWorks[0].NID != 48704 || d.AuthorWorks[5].NID != 52614 {
+				t.Errorf("%s: author_works order = %+v", c.file, d.AuthorWorks)
 			}
 		case DetailDead:
 			if d != nil {

@@ -46,26 +46,44 @@ type Detail struct {
 	Words     int64  `json:"words"`
 	Status    string `json:"status"`
 	UpdatedAt string `json:"updated_at"`
+
+	// Author section (book_Author): snapshot data for the author page
+	// (docs/author-profile-on-demand §2.1). Absent on some pages — all
+	// three stay zero-valued, the page then renders from the seed.
+	AuthorAvatar string       `json:"author_avatar,omitempty"`
+	AuthorName   string       `json:"author_name,omitempty"`
+	AuthorWorks  []AuthorWork `json:"author_works,omitempty"`
+}
+
+// AuthorWork is one entry of the mobile page's 作品集 (book_Author):
+// a same-author book by nid + title.
+type AuthorWork struct {
+	NID   int64  `json:"nid"`
+	Title string `json:"title"`
 }
 
 var (
-	reErrorPage = regexp.MustCompile(`出错啦`)
-	reCatalog   = regexp.MustCompile(`book_Catalog"\s*>`)
-	reCatalogA  = regexp.MustCompile(`<a\s`)
-	reInteract  = regexp.MustCompile(`book_interact`)
-	reSmall     = regexp.MustCompile(`<small>\s*(-?[\d,]+)\s*</small>`)
-	reWords     = regexp.MustCompile(`book_info3">[^<]*?([\d,]+)字`)
-	reStatus    = regexp.MustCompile(`(已完结|连载中)`)
-	reUpdated   = regexp.MustCompile(`\b(\d{2})-(\d{2})-(\d{2}) (\d{2}):(\d{2})\b`)
-	reTitle     = regexp.MustCompile(`(?s)class="book_newtitle"[^>]*>(.*?)</span>`)
-	reInfo2     = regexp.MustCompile(`(?s)class="book_info2"[^>]*>(.*?)</div>`)
-	reInfo2Span = regexp.MustCompile(`(?s)<span[^>]*>(.*?)</span>`)
-	reInfo3     = regexp.MustCompile(`(?s)class="book_info3"[^>]*>(.*?)</span>`)
-	reInfo3AW   = regexp.MustCompile(`(?s)^\s*(.*?)\s*/\s*([\d,]+)\s*字`)
-	reInfoCover = regexp.MustCompile(`(?s)<ul[^>]*class="book_info"[^>]*>.*?<img[^>]+src=['"]([^'"]+)['"]`)
-	reProfile   = regexp.MustCompile(`(?s)<ul class="book_profile">(.*?)</ul>`)
-	reSummary   = regexp.MustCompile(`(?s)<li[^>]*class="book_bk_qs1"[^>]*>(.*?)</li>`)
-	reTag       = regexp.MustCompile(`(?s)<[^>]+>`)
+	reErrorPage   = regexp.MustCompile(`出错啦`)
+	reCatalog     = regexp.MustCompile(`book_Catalog"\s*>`)
+	reCatalogA    = regexp.MustCompile(`<a\s`)
+	reInteract    = regexp.MustCompile(`book_interact`)
+	reSmall       = regexp.MustCompile(`<small>\s*(-?[\d,]+)\s*</small>`)
+	reWords       = regexp.MustCompile(`book_info3">[^<]*?([\d,]+)字`)
+	reStatus      = regexp.MustCompile(`(已完结|连载中)`)
+	reUpdated     = regexp.MustCompile(`\b(\d{2})-(\d{2})-(\d{2}) (\d{2}):(\d{2})\b`)
+	reTitle       = regexp.MustCompile(`(?s)class="book_newtitle"[^>]*>(.*?)</span>`)
+	reInfo2       = regexp.MustCompile(`(?s)class="book_info2"[^>]*>(.*?)</div>`)
+	reInfo2Span   = regexp.MustCompile(`(?s)<span[^>]*>(.*?)</span>`)
+	reInfo3       = regexp.MustCompile(`(?s)class="book_info3"[^>]*>(.*?)</span>`)
+	reInfo3AW     = regexp.MustCompile(`(?s)^\s*(.*?)\s*/\s*([\d,]+)\s*字`)
+	reInfoCover   = regexp.MustCompile(`(?s)<ul[^>]*class="book_info"[^>]*>.*?<img[^>]+src=['"]([^'"]+)['"]`)
+	reProfile     = regexp.MustCompile(`(?s)<ul class="book_profile">(.*?)</ul>`)
+	reSummary     = regexp.MustCompile(`(?s)<li[^>]*class="book_bk_qs1"[^>]*>(.*?)</li>`)
+	reTag         = regexp.MustCompile(`(?s)<[^>]+>`)
+	reAuthorBlock = regexp.MustCompile(`(?s)<ul class="book_Author">(.*?)</ul>`)
+	reAuthorImg   = regexp.MustCompile(`(?s)<img[^>]+src=['"]([^'"]+)['"]`)
+	reAuthorName  = regexp.MustCompile(`(?s)<li[^>]*>(?:\s*<img[^>]*>)?(?:<[^>]+>|\s)*([^<]+)</li>`)
+	reWorkLink    = regexp.MustCompile(`(?s)href="[^"]*?/b/(\d+)/?"[^>]*>(?:\s*<span[^>]*>)?([^<]+)\s*(?:</span>)?\s*</a>`)
 )
 
 // detailGenres is the nine-way genre vocabulary used by seed.books.
@@ -170,6 +188,26 @@ func ParseDetail(html string) (DetailState, *Detail) {
 	if m := reProfile.FindStringSubmatch(html); m != nil {
 		if sm := reSummary.FindStringSubmatch(m[1]); sm != nil {
 			d.Summary = cleanText(sm[1])
+		}
+	}
+
+	// Author section (book_Author, docs/author-profile-on-demand §2.1):
+	// avatar + display name + 作品集 links. The second li also carries the
+	// site's fixed 请勿转载 boilerplate — only /b/{nid}/ links count as
+	// works.
+	if m := reAuthorBlock.FindStringSubmatch(html); m != nil {
+		block := m[1]
+		if img := reAuthorImg.FindStringSubmatch(block); img != nil {
+			d.AuthorAvatar = normalizeURL(img[1])
+		}
+		if nm := reAuthorName.FindStringSubmatch(block); nm != nil {
+			d.AuthorName = cleanText(nm[1])
+		}
+		for _, w := range reWorkLink.FindAllStringSubmatch(block, -1) {
+			if nid, err := parseNum(w[1]); err == nil {
+				d.AuthorWorks = append(d.AuthorWorks,
+					AuthorWork{NID: nid, Title: cleanText(w[2])})
+			}
 		}
 	}
 

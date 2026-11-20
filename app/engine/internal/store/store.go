@@ -293,6 +293,7 @@ type RankItem struct {
 	Author   string   `json:"author"`
 	Genre    *string  `json:"genre"`
 	EstYear  int      `json:"est_year"`
+	EstDate  *string  `json:"est_date,omitempty"`
 	Favs     *int64   `json:"favs"`
 	FavPctl  float64  `json:"fav_pctl"`
 	Contest  *string  `json:"contest"`
@@ -911,6 +912,114 @@ func (s *Store) MoeGoddessBooks(ctx context.Context, limit int) ([]RankItem, err
 			"WHERE tag LIKE '____萌神')")
 }
 
+// AuthorBooks lists one author's seed books in timeline order (est_date
+// DESC; manual-early backfill rows with est_date '0001-01-01' sink to
+// the bottom) for the author page. Local seed data only — no network
+// (docs/author-profile-on-demand §1: the works list is read from the
+// local db). Seed author display names are canonical strings, so an
+// exact match is the identity check.
+func (s *Store) AuthorBooks(ctx context.Context, author string, limit, offset int) ([]RankItem, error) {
+	query := `
+SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
+       seed.books.est_year, seed.books.status, seed.books.words, seed.books.clicks,
+       seed.books.favs, seed.books.praises, seed.books.form,
+       COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url,
+       seed.books.est_date
+FROM seed.books
+LEFT JOIN covers c ON c.nid = seed.books.nid
+WHERE seed.books.author = ?
+ORDER BY seed.books.est_date DESC, seed.books.nid ASC
+LIMIT ? OFFSET ?`
+	rows, err := s.DB.QueryContext(ctx, query, author, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []RankItem{}
+	for rows.Next() {
+		var (
+			item               RankItem
+			edate              sql.NullString
+			gen, status, cover sql.NullString
+			words, clicks, favs,
+			praises sql.NullInt64
+		)
+		if err := rows.Scan(&item.NID, &item.Title, &item.Author, &gen,
+			&item.EstYear, &status, &words, &clicks, &favs, &praises, &item.Form, &cover, &edate); err != nil {
+			return nil, err
+		}
+		item.Genre = strPtr(gen)
+		item.Status = strPtr(status)
+		item.Words = intPtr(words)
+		item.Clicks = intPtr(clicks)
+		item.Favs = intPtr(favs)
+		item.Praises = intPtr(praises)
+		item.CoverURL = strPtr(cover)
+		item.EstDate = strPtr(edate)
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	s.attachTags(ctx, items)
+	return items, nil
+}
+
+// AuthorProfile is one cached on-demand author data row (user.db
+// author_profiles, v7; docs/author-profile-on-demand §3-4). A snapshot:
+// intro and avatar change with the author, so the row carries the fetch
+// time (observed_at) and the source book (source_nid).
+type AuthorProfile struct {
+	AuthorKey    string
+	AuthorName   string
+	AuthorIntro  *string
+	AuthorAvatar *string
+	Verdict      string
+	SourceNID    int64
+	ObservedAt   int64
+}
+
+// GetAuthorProfile returns the cached row, or nil when the author was
+// never fetched (or the row was evicted).
+func (s *Store) GetAuthorProfile(ctx context.Context, key string) (*AuthorProfile, error) {
+	var (
+		p             AuthorProfile
+		intro, avatar sql.NullString
+	)
+	err := s.DB.QueryRowContext(ctx, `
+SELECT author_name, author_intro, author_avatar, verdict, source_nid, observed_at
+FROM author_profiles WHERE author_key = ?`, key).
+		Scan(&p.AuthorName, &intro, &avatar, &p.Verdict, &p.SourceNID, &p.ObservedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	p.AuthorKey = key
+	p.AuthorIntro = strPtr(intro)
+	p.AuthorAvatar = strPtr(avatar)
+	return &p, nil
+}
+
+// SaveAuthorProfile upserts one cached profile.
+func (s *Store) SaveAuthorProfile(ctx context.Context, p *AuthorProfile) error {
+	_, err := s.DB.ExecContext(ctx, `
+INSERT INTO author_profiles(author_key, author_name, author_intro, author_avatar,
+                             verdict, source_nid, observed_at)
+VALUES (?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(author_key) DO UPDATE SET
+  author_name = excluded.author_name,
+  author_intro = excluded.author_intro,
+  author_avatar = excluded.author_avatar,
+  verdict = excluded.verdict,
+  source_nid = excluded.source_nid,
+  observed_at = excluded.observed_at`,
+		p.AuthorKey, p.AuthorName, p.AuthorIntro, p.AuthorAvatar,
+		p.Verdict, p.SourceNID, p.ObservedAt)
+	return err
+}
+
 // CoverCarousel returns one form's cover-bearing head pool, drawn with
 // the daily date hash: the pool is the top 100 by favs among cover-
 // bearing books of the form (quality floor — the dialogue long tail is
@@ -1338,8 +1447,8 @@ type CalendarBook struct {
 // the favourites-top books and is set only for day/week granularity;
 // the month view keeps totals only (its cells are too small for cards).
 type CalendarDay struct {
-	Date  string         `json:"date"`
-	Total int            `json:"total"`
+	Date  string `json:"date"`
+	Total int    `json:"total"`
 	// Universe is the estimated whole-platform release count for this
 	// date (calendar_universe, seed schema v4, app/docs/14) — the bundled
 	// seed (Total) is a clickable subset of it. 0 = no row in the table.
