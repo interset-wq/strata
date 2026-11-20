@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../core/providers.dart';
 import '../data/api/strata_api.dart';
@@ -75,33 +74,24 @@ class _RankingsPageState extends ConsumerState<RankingsPage>
 
     return Scaffold(
       appBar: AppBar(
-        title: const SizedBox.shrink(),
-        actions: [
-          IconButton(
-              icon: const Icon(Icons.swap_vert),
-              onPressed: () => context.push('/discover')),
-        ],
+        toolbarHeight: 44,
+        title: TabBar(
+          controller: _tabs,
+          isScrollable: true,
+          labelColor: scheme.primary,
+          unselectedLabelColor: scheme.onSurfaceVariant,
+          indicatorColor: scheme.primary,
+          dividerColor: Colors.transparent,
+          labelStyle:
+              const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          unselectedLabelStyle: const TextStyle(fontSize: 14),
+          tabs: [
+            for (final (_, label) in _boards) Tab(text: label),
+          ],
+        ),
       ),
       body: Column(
         children: [
-          // 顶部六榜 tab（横滑）
-          SizedBox(
-            height: 44,
-            child: TabBar(
-              controller: _tabs,
-              isScrollable: true,
-              labelColor: scheme.primary,
-              unselectedLabelColor: scheme.onSurfaceVariant,
-              indicatorColor: scheme.primary,
-              dividerColor: scheme.outline.withValues(alpha: .3),
-              labelStyle:
-                  const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-              unselectedLabelStyle: const TextStyle(fontSize: 14),
-              tabs: [
-                for (final (_, label) in _boards) Tab(text: label),
-              ],
-            ),
-          ),
           // 年份快速切换（demo 原下拉风格）；新书榜不显示
           if (_kind != 'new')
             Padding(
