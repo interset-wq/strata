@@ -383,13 +383,15 @@ HTML 基线，响应不带 `source` 字段——调用方无需区分。**独立
 
 只写 `user.db`；与种子的关联**只用 `nid`**（rowid 每次种子发布都会重排）。
 
-### GET /strata/author-books?author=&limit=&offset=（**已实现**）
+### GET /strata/author-books?author=&limit=&offset=&order=（**已实现**）
 
 作者页时间轴的作品列表（`docs/author-profile-on-demand` §1）：**纯本地**，无网络。
 `author` 必填（显示名精确匹配——seed 作者名为规范字符串）；`limit` 默认 20；
-`offset` 非负整数。排序 `est_date DESC`（定年 0001 回填书沉底，nid 升序）。
-未知作者返回空列表，不是错误。items 为标准 RankItem，**额外带 `est_date`
-（YYYY-MM-DD，时间轴用；旧端点不返回此字段，RankItem 侧为可选字段）**。
+`offset` 非负整数；`order` = `newest`（默认，`est_date DESC`）| `oldest`
+（`est_date ASC`，作者页排序按钮切换）。两个方向定年 0001 回填书都沉底，
+nid 同向跟随。未知作者返回空列表，不是错误。items 为标准 RankItem，**额外带
+`est_date`（YYYY-MM-DD，时间轴用；旧端点不返回此字段，RankItem 侧为可选
+字段）**；meta.ordering 回显实际排序（`est_date_desc` / `est_date_asc`）。
 
 ```json
 { "meta": { "pool": "seed", "ordering": "est_date_desc", "author": "无聊看看天" },
@@ -397,6 +399,15 @@ HTML 基线，响应不带 `source` 字段——调用方无需区分。**独立
                "author": "无聊看看天", "est_year": 2010,
                "est_date": "2010-06-12", "favs": 7881, ... } ] }
 ```
+
+### GET /strata/discovered?limit=&offset= 与 DELETE /strata/discovered/:nid（**已实现**）
+
+自动收录的库外书列表（收录管理页，观测闭环入口）：user.db `discovered` 表，
+按 `observed_at DESC` 分页。行含 nid/title/author/cover_url/summary/source
+（`'search'`）/observed_at。**库外书在种子表无行，est_year/genre 为空**——
+定年由详情页 overlay 响应实时给出（内置 nid 锚点表，见 `/books/:nid`）。
+`DELETE /discovered/:nid` 移除一条收录（收录管理页滑动删除），只删 user.db
+行、响应 `{ "deleted": nid }`，种子库不可变。
 
 ### GET /strata/author-profile?author=&nid=&with_intro=&fresh=（**已实现**）
 
