@@ -451,7 +451,9 @@ items:[{rank,nid,title,author,cover_url,value?}]}`——月票/对话月票带
 
 PC 当期四榜（book.sfacg.com/Rank/）一页返回：`{meta, boards:[{name,
 entries:[…]}]}`，顺序 月度月票榜（带票数）/ 月度打赏榜 / 月度热销榜 /
-粉丝榜（读者侧，消费火券，条目**无 nid**，`nid=0`）。
+粉丝榜（读者侧，消费火券，条目**无 nid**，`nid=0`）。粉丝榜实为用户
+充值榜，对产品无意义，App 不展示（端点保真、展示层裁剪，同移动四榜
+口径；2026-11-21 用户判定）。
 
 ### GET /strata/official-ranks/mobile?board=original|bm|new|jp|sale（**已实现**）
 

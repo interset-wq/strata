@@ -15,7 +15,7 @@ import '../widgets/default_cover.dart';
 /// 网格结构与详情页分离，便于后续由 demo 改造为正式榜单页。
 
 /// 榜单格定义：id 同时是路由参数。
-/// m0/m2/m3/m4 = 月榜库 rank 0/2/3/4；pc0..pc3 = PC 页第 1..4 个板；sale = 移动热销榜。
+/// m0/m2/m3/m4 = 月榜库 rank 0/2/3/4；pc0..pc2 = PC 页前三板（粉丝榜为用户充值榜，不展示）；sale = 移动热销榜。
 const _boardGroups = [
   (
     '历史月榜库（2013-03 至今）',
@@ -29,13 +29,13 @@ const _boardGroups = [
     ],
   ),
   (
-    'PC 当期四榜',
-    'book.sfacg.com/Rank/——当期月榜一页四榜',
+    'PC 当期榜',
+    'book.sfacg.com/Rank/——一页四榜，App 展示三榜（粉丝榜实为用户充值榜，'
+        '2026-11-21 判定无意义，不展示）',
     [
       ('pc0', '月度月票榜', '带月票票数'),
       ('pc1', '月度打赏榜', '当期打赏（无数值）'),
       ('pc2', '月度热销榜', '当期点券消耗（无数值）'),
-      ('pc3', '粉丝榜', '读者侧（消费火券，无书 nid）'),
     ],
   ),
   (
@@ -107,13 +107,9 @@ final _boardDetailProvider = FutureProvider.autoDispose
     final b = boards[int.parse(board[2])];
     return _BoardDetail(
       title: b.name,
-      note: b.name == '粉丝榜'
-          ? '读者侧当期月榜（消费火券）——不是书榜'
-          : _boardNote(board),
+      note: _boardNote(board),
       items: b.entries,
-      valueLabel: b.name == '月度月票榜'
-          ? '月票'
-          : (b.name == '粉丝榜' ? '火券' : null),
+      valueLabel: b.name == '月度月票榜' ? '月票' : null,
     );
   }
   if (board == 'sale') {
