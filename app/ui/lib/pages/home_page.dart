@@ -11,7 +11,6 @@ import '../widgets/back_to_top.dart';
 import '../widgets/cover_banner.dart';
 import '../widgets/default_cover.dart';
 import '../widgets/book_row_tile.dart';
-import 'browse_page.dart';
 
 /// Classic 排行行卡数据（board 端点），kind: finish / popular。
 final boardProvider = FutureProvider.autoDispose.family<List<RankItem>, String>(
@@ -767,22 +766,25 @@ class _HomePageState extends ConsumerState<HomePage> {
   );
 
   // 二级页面分流宫格：底部 Tab 之外的目的地都从这里进。
+  // 第四格是经典榜单（与短篇/中篇/对话 tab 首位同构：四段切换 +
+  // 逆序，总榜=其中收藏段；用户 2026-11-21：原短篇入口让位）。
   Widget _entryGrid(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final entries = [
-      (Icons.category, '分类', BrowseMode.category),
-      (Icons.update, '状态', BrowseMode.status),
-      (Icons.emoji_events, '比赛', BrowseMode.contest),
-      (Icons.article, '短篇', BrowseMode.short),
+      (Icons.category, '分类', '/browse?mode=category'),
+      (Icons.update, '状态', '/browse?mode=status'),
+      (Icons.emoji_events, '比赛', '/browse?mode=contest'),
+      (Icons.leaderboard, '经典榜单',
+          '/classic-list?title=经典榜单&form=long&metric-switchable=1'),
     ];
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
-          for (final (icon, label, mode) in entries)
+          for (final (icon, label, path) in entries)
             Expanded(
               child: InkWell(
-                onTap: () => context.push('/browse?mode=${mode.name}'),
+                onTap: () => context.push(path),
                 borderRadius: BorderRadius.circular(12),
                 child: Column(
                   children: [
