@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -116,6 +117,7 @@ func New(s *store.Store) *gin.Engine {
 	group.GET("/official-ranks/monthly", srv.officialRanksMonthly)
 	group.GET("/official-ranks/pc", srv.officialRanksPc)
 	group.GET("/official-ranks/mobile", srv.officialRanksMobile)
+	group.GET("/official-ranks/sale-set", srv.officialRanksSaleSet)
 	group.GET("/discovered", srv.discoveredList)
 	group.DELETE("/discovered/:nid", srv.discoveredDelete)
 	group.GET("/random", srv.random)
@@ -1911,6 +1913,19 @@ func (s *Server) officialRanksServed(ctx context.Context, key string,
 		st.mu.Unlock()
 		return e.body, nil
 	}
+	st.mu.Unlock()
+	// user.db cache (v9): survives process restarts, so a cold start does
+	// not re-fetch every official board from upstream.
+	if body, ok, gerr := s.store.OfficialRanksGet(ctx, key, ttl); gerr == nil && ok {
+		st.mu.Lock()
+		st.entries[key] = struct {
+			loadedAt time.Time
+			body     []byte
+		}{loadedAt: time.Now(), body: body}
+		st.mu.Unlock()
+		return body, nil
+	}
+	st.mu.Lock()
 	if ch, ok := st.inflight[key]; ok {
 		st.mu.Unlock()
 		select {
@@ -1953,6 +1968,12 @@ func (s *Server) officialRanksServed(ctx context.Context, key string,
 		}{loadedAt: time.Now(), body: body}
 	}
 	st.mu.Unlock()
+
+	if err == nil {
+		// Best-effort persistence (v9): a write failure only means the next
+		// cold start re-fetches; the in-memory cache still serves this run.
+		_ = s.store.OfficialRanksPut(ctx, key, body)
+	}
 
 	if err != nil {
 		return nil, err
@@ -2015,4 +2036,54 @@ func (s *Server) officialRanksMobile(c *gin.Context) {
 		return
 	}
 	c.Data(http.StatusOK, "application/json; charset=utf-8", body)
+}
+
+// officialRanksSaleSet serves the passive "官方热销" signal: the nids
+// currently on a cached 热销 board — 月榜库当期 rank=3, PC 月度热销榜,
+// 移动热销榜. It NEVER fetches: an empty or expired cache yields an empty
+// set, so the endpoint is offline-safe and costs nothing to poll. Boards
+// only enter the set after the user (or the rankings page) has loaded them
+// at least once.
+func (s *Server) officialRanksSaleSet(c *gin.Context) {
+	now := time.Now()
+	month := fmt.Sprintf("%04d-%02d", now.Year(), int(now.Month()))
+	ids := map[int64]struct{}{}
+	for _, key := range []string{
+		"monthly:" + month + ":3", // 月榜库 当期热销榜
+		"pc:current",              // PC 月度热销榜（boards 里只取热销）
+		"mobile:sale",             // 移动热销榜
+	} {
+		body, ok, err := s.store.OfficialRanksGet(c.Request.Context(), key, officialRanksTTL)
+		if err != nil || !ok {
+			continue
+		}
+		var doc struct {
+			Items  []crawl.RankEntry `json:"items"`
+			Boards []crawl.PcBoard   `json:"boards"`
+		}
+		if err := json.Unmarshal(body, &doc); err != nil {
+			continue
+		}
+		for _, it := range doc.Items {
+			if it.NID > 0 {
+				ids[it.NID] = struct{}{}
+			}
+		}
+		for _, b := range doc.Boards {
+			if !strings.Contains(b.Name, "热销") {
+				continue
+			}
+			for _, it := range b.Entries {
+				if it.NID > 0 {
+					ids[it.NID] = struct{}{}
+				}
+			}
+		}
+	}
+	out := make([]int64, 0, len(ids))
+	for id := range ids {
+		out = append(out, id)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	c.JSON(http.StatusOK, gin.H{"nids": out})
 }

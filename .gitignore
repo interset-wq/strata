@@ -73,3 +73,8 @@ Thumbs.db
 
 # generated seed archive (rebuild with app/tools/seedbuild/build_seed.py)
 app/assets/seed.db.gz
+
+# c-shared build artifacts (NDK cross-compile; the APK bundle copy is
+# ignored per app/ui/.gitignore)
+app/engine/libstrata.so
+app/engine/libstrata.h

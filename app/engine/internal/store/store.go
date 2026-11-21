@@ -1961,6 +1961,38 @@ ON CONFLICT(key) DO UPDATE SET value=excluded.value`, key, value)
 	return err
 }
 
+// OfficialRanksGet returns the cached official-ranks response body when it
+// is still within [ttl]; ok=false on a miss or expiry. The table survives
+// process restarts (the in-memory cache does not) — v9.
+func (s *Store) OfficialRanksGet(ctx context.Context, key string, ttl time.Duration) ([]byte, bool, error) {
+	var (
+		body      string
+		fetchedAt int64
+	)
+	err := s.DB.QueryRowContext(ctx,
+		`SELECT body, fetched_at FROM official_ranks_cache WHERE key = ?`, key).
+		Scan(&body, &fetchedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	if time.Now().Unix()-fetchedAt > int64(ttl.Seconds()) {
+		return nil, false, nil
+	}
+	return []byte(body), true, nil
+}
+
+// OfficialRanksPut stores one fetched official-ranks response body (v9).
+func (s *Store) OfficialRanksPut(ctx context.Context, key string, body []byte) error {
+	_, err := s.DB.ExecContext(ctx, `
+INSERT INTO official_ranks_cache(key, fetched_at, body) VALUES (?, ?, ?)
+ON CONFLICT(key) DO UPDATE SET fetched_at=excluded.fetched_at,
+    body=excluded.body`, key, time.Now().Unix(), body)
+	return err
+}
+
 // UpsertCover stores an App API novelCover under the nid. Covers are
 // book attributes (not observations) and live only in user.db.
 func (s *Store) UpsertCover(ctx context.Context, nid int64, cover string, fetchedAt int64) error {

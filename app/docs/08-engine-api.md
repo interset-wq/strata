@@ -434,6 +434,38 @@ nid 同向跟随。未知作者返回空列表，不是错误。items 为标准 
   列表走 `/author-books`）。只写 user.db，不碰 seed.db。
 - 抓取走全局限速器（foreground 槽），与详情页刷新共享配额。
 
+## 官方榜单（docs/sfacg-live-ranks.md 三来源；入口 = 榜单页「官方榜单」卡）
+
+四个端点均为 `GET`，响应为完整榜单 JSON；抓取走全局限速器（foreground
+槽），TTL 缓存两层：进程内存 + `user.db official_ranks_cache`（schema
+v9，重启不丢；当期 24h / 历史月 365d）。失败 → 502 `upstream`。
+
+### GET /strata/official-ranks/monthly?date=YYYY-MM&rank=0|2|3|4（**已实现**）
+
+历史月榜库（MonthlyBoy.ashx，2013-03 起任意月）。rank：0 月票 / 2 新书 /
+3 热销 / 4 对话月票（2017-07 起）。响应 `{meta:{month,rank,kind,note,…},
+items:[{rank,nid,title,author,cover_url,value?}]}`——月票/对话月票带
+`value`（票数），其余无数值。
+
+### GET /strata/official-ranks/pc（**已实现**）
+
+PC 当期四榜（book.sfacg.com/Rank/）一页返回：`{meta, boards:[{name,
+entries:[…]}]}`，顺序 月度月票榜（带票数）/ 月度打赏榜 / 月度热销榜 /
+粉丝榜（读者侧，消费火券，条目**无 nid**，`nid=0`）。
+
+### GET /strata/official-ranks/mobile?board=original|bm|new|jp|sale（**已实现**）
+
+移动当期榜（m.sfacg.com/rank/）。**注意：仅 `sale`（热销榜）有效**——与
+手机 App「畅销榜」几乎一致（数据滞后 ≤3 天）；其余四榜数据落后 >3 年
+（2026-11-20 实测判定过时），App 内不展示，端点保留仅供数据对照。
+
+### GET /strata/official-ranks/sale-set（**已实现**）
+
+被动「官方热销」信号：当前在已缓存热销榜上（月榜库当期 rank=3 ∪ PC
+月度热销 ∪ 移动热销）的 nid 升序数组 `{nids:[…]}`。**从不为它发起
+抓取**——缓存未命中/过期/离线一律空集，UI 据此静默降级（详情页「官方
+热销」徽标不显示）。
+
 ## FFI 启动契约（Phase 1）
 
 `c-shared` 库导出三个符号：

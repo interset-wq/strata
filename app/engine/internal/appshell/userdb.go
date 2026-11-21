@@ -11,7 +11,7 @@ import (
 // docs/author-profile-on-demand §4) — purely additive, created by the
 // idempotent DDL replay in EnsureUserDB. v8 adds the works cache
 // column to author_profiles (official works list replays on cache hits).
-const userSchemaVersion = 8
+const userSchemaVersion = 9
 
 // userSchemaV5 is the v5-era full user.db DDL: additive across
 // versions (v1 → v5), replayed idempotently on every schema pass — a
@@ -172,6 +172,18 @@ CREATE TABLE IF NOT EXISTS author_profiles(
   source_nid    INTEGER,
   observed_at   INTEGER NOT NULL,
   works         TEXT
+);
+
+-- Official-ranks response cache (v9): the engine's in-memory official-ranks
+-- cache dies with the process; this table survives restarts so the demo-free
+-- official boards don't re-fetch upstream on every cold start. Keyed by the
+-- same key the API layer uses (monthly:YYYY-MM:rank / pc:current /
+-- mobile:slug); TTL is enforced at read time (24h current period, 365d
+-- historical — the historical bodies never change).
+CREATE TABLE IF NOT EXISTS official_ranks_cache(
+  key        TEXT PRIMARY KEY,
+  fetched_at INTEGER NOT NULL,
+  body       TEXT NOT NULL
 );
 `
 
