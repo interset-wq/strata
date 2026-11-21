@@ -53,6 +53,7 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
   String? _currentGenre; // 题材轴（chip 行切换）
   String _drawerQuery = ''; // drawer 搜索词（本地过滤 38 组）
   String _currentOrder = 'favs'; // 指标轴（经典榜单四榜切换）
+  bool _ascending = false; // 逆序（升序）态
   List<RankItem> _items = [];
   bool _loading = false;
   bool _done = false;
@@ -101,6 +102,7 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
         genre: _currentGenre,
         wordsBand: widget.wordsBand,
         order: _currentOrder == 'favs' ? null : _currentOrder,
+        dir: _ascending ? 'asc' : null,
         limit: 20,
         offset: _items.length,
       );
@@ -367,7 +369,7 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
 
   // 指标切换条（第 4 种不重复控件形态，docs/16）：既有三种为
   // 胶囊+BottomSheet / 汉堡+Drawer / FilterChip 行，四指标经典榜用
-  // SegmentedButton（Material 分段控件，横向平铺四选）。
+  // SegmentedButton（Material 分段控件，横向平铺四选）+ 尾部逆序按钮。
   Widget _metricSwitcher() {
     const metrics = [
       ('clicks', '点击'),
@@ -375,17 +377,46 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
       ('praises', '点赞'),
       ('words', '字数'),
     ];
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 6, 16, 2),
-      child: SegmentedButton<String>(
-        segments: [
-          for (final (key, label) in metrics)
-            ButtonSegment(value: key, label: Text(label)),
+      child: Row(
+        children: [
+          Expanded(
+            child: SegmentedButton<String>(
+              segments: [
+                for (final (key, label) in metrics)
+                  ButtonSegment(value: key, label: Text(label)),
+              ],
+              // 用户 2026-11-21：去掉激活段右侧的 ✔（默认 showSelectedIcon）。
+              showSelectedIcon: false,
+              selected: {_currentOrder},
+              onSelectionChanged: (sel) => _selectOrder(sel.first),
+            ),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            // 逆序切换（docs/15：Icons.compare_arrows = 逆序）：升序态
+            // 图标着色；对四个累计值榜均生效（pct 榜无逆序）。
+            tooltip: _ascending ? '切换为降序' : '切换为升序',
+            icon: Icon(
+              Icons.compare_arrows,
+              color: _ascending ? scheme.primary : null,
+            ),
+            onPressed: _toggleAscending,
+          ),
         ],
-        selected: {_currentOrder},
-        onSelectionChanged: (sel) => _selectOrder(sel.first),
       ),
     );
+  }
+
+  void _toggleAscending() {
+    setState(() {
+      _ascending = !_ascending;
+      _resetList();
+    });
+    _scroll.jumpTo(0);
+    _loadMore();
   }
 
   void _selectOrder(String o) {

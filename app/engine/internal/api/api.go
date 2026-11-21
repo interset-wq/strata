@@ -780,9 +780,15 @@ func (s *Server) rankingClassic(c *gin.Context) {
 			"order must be one of \"favs\", \"pct\", \"clicks\", \"praises\", \"words\"")
 		return
 	}
+	dir := c.Query("dir")
+	if dir != "" && dir != "asc" && dir != "desc" {
+		fail(c, http.StatusBadRequest, "invalid_argument",
+			"dir must be \"asc\" or \"desc\"")
+		return
+	}
 	items, err := s.store.ClassicBooks(c.Request.Context(),
 		c.Query("genre"), c.Query("status"), c.Query("contest"), form, wordsBand,
-		year, limit, offset, order)
+		year, limit, offset, order, dir)
 	if err != nil {
 		fail(c, http.StatusInternalServerError, "internal", err.Error())
 		return
@@ -794,12 +800,16 @@ func (s *Server) rankingClassic(c *gin.Context) {
 	if order == "pct" {
 		ordering = "fav_pctl"
 	}
+	dirEcho := "desc"
+	if dir == "asc" {
+		dirEcho = "asc"
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"meta": gin.H{
 			"kind": "classic", "pool": "seed", "ordering": ordering,
 			"genre": c.Query("genre"), "status": c.Query("status"),
 			"contest": c.Query("contest"), "form": form, "year": year,
-			"order": order, "licensed_excluded": true,
+			"order": order, "dir": dirEcho, "licensed_excluded": true,
 		},
 		"items": items,
 	})

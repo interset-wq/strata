@@ -209,7 +209,7 @@ Classic 全库榜（docs/12 展示列）：平台累计值排序，不涉及分�
 `recommend`(praises) / `popular`(clicks) / `favs` / `new`(est_date) / `finish`(已完结按 favs) /
 `words`。`offset` 分页（默认 0）。items 为 RankItem（含 `status`/`words`/`clicks`/`cover_url`）。
 
-### GET /strata/rankings/classic?genre=&status=&contest=&form=&year=&order=&limit=&offset=（**已实现**）
+### GET /strata/rankings/classic?genre=&status=&contest=&form=&year=&order=&dir=&limit=&offset=（**已实现**）
 
 Classic 主线分类/状态/大赛列表：默认按平台累计 `favs` 降序（`favs DESC, nid ASC`）。
 `genre`/`status`/`contest` 与 `/rankings/favs` 同义；`contest=1` 表示全部大赛作品。
@@ -217,7 +217,9 @@ Classic 主线分类/状态/大赛列表：默认按平台累计 `favs` 降序�
 `favs`（默认）、`pct`（同代收藏分位 `fav_pctl DESC`、NULL 末尾——
 docs/form-definitions §6 优质短篇口径）与三个经典榜指标 `clicks`/`praises`/`words`
 （平台累计值 `DESC, favs DESC, nid ASC`、NULL 末尾——展示层，docs/12）；
-非法值 400。`items` 为 RankItem（含 `form`），`meta.ordering` 回显实际排序
+非法值 400。`dir` 可选 `asc`（逆序，用户 2026-11-21；累计值四榜升序、
+NULL 仍排末尾，`pct` 忽略；缺省 `desc`），`meta.dir` 回显。`items` 为
+RankItem（含 `form`），`meta.ordering` 回显实际排序
 （`favs`/`fav_pctl`/`clicks`/`praises`/`words`）。
 
 短篇 tab（docs/form-definitions §4 收录资格）的年份榜/比赛榜/题材榜/优质榜

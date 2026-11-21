@@ -373,7 +373,7 @@ WHERE est_year = ? AND is_licensed = 0 AND fav_pctl IS NOT NULL`
 // same-generation percentiles: Classic mode mirrors novly's cumulative view
 // and has no quantitative layer.
 func (s *Store) ClassicBooks(ctx context.Context, genre, status, contest, form, wordsBand string,
-	year, limit, offset int, order string) ([]RankItem, error) {
+	year, limit, offset int, order, dir string) ([]RankItem, error) {
 	query := `
 SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
        seed.books.est_year, seed.books.status, seed.books.words, seed.books.clicks,
@@ -421,14 +421,24 @@ WHERE seed.books.is_licensed = 0`
 	switch order {
 	case "pct":
 		// 优质短篇榜：同代收藏分位（docs/form-definitions §6）；SQLite
-		// NULL 按最小值，DESC 排末尾。
+		// NULL 按最小值，DESC 排末尾。pct 升序无产品含义，忽略 dir。
 		query += " ORDER BY seed.books.fav_pctl DESC, seed.books.favs DESC, seed.books.nid ASC LIMIT ? OFFSET ?"
 	case "clicks", "praises", "words":
-		// 经典榜（平台累计值，展示层，docs/12）：同一 NULL 排末尾规则，
-		// 次级键 favs 保证平局可复现。
-		query += " ORDER BY seed.books." + order + " DESC, seed.books.favs DESC, seed.books.nid ASC LIMIT ? OFFSET ?"
+		// 经典榜（平台累计值，展示层，docs/12）：次级键 favs 保证平局
+		// 可复现；dir=asc 为逆序（用户 2026-11-21），NULL 仍排末尾
+		// （NULLS LAST，SQLite ≥3.30，本驱动 3.54）。
+		if dir == "asc" {
+			query += " ORDER BY seed.books." + order + " ASC NULLS LAST, seed.books.favs DESC, seed.books.nid ASC LIMIT ? OFFSET ?"
+		} else {
+			query += " ORDER BY seed.books." + order + " DESC, seed.books.favs DESC, seed.books.nid ASC LIMIT ? OFFSET ?"
+		}
 	default:
-		query += " ORDER BY seed.books.favs DESC, seed.books.nid ASC LIMIT ? OFFSET ?"
+		// 收藏榜（默认 order）同样支持逆序。
+		if dir == "asc" {
+			query += " ORDER BY seed.books.favs ASC NULLS LAST, seed.books.nid ASC LIMIT ? OFFSET ?"
+		} else {
+			query += " ORDER BY seed.books.favs DESC, seed.books.nid ASC LIMIT ? OFFSET ?"
+		}
 	}
 	args = append(args, limit, offset)
 

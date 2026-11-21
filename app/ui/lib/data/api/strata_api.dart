@@ -186,6 +186,7 @@ class StrataApi {
     String? wordsBand,
     int? year,
     String? order,
+    String? dir,
     int limit = 50,
     int offset = 0,
   }) async {
@@ -198,6 +199,7 @@ class StrataApi {
       'words-band': ?wordsBand,
       if (year != null) 'year': '$year',
       'order': ?order,
+      'dir': ?dir,
       if (offset > 0) 'offset': '$offset',
     });
     return (body['items'] as List)
