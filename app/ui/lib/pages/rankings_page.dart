@@ -149,7 +149,7 @@ class _RankingsPageState extends ConsumerState<RankingsPage>
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600)),
                             const SizedBox(height: 1),
-                            Text('SFACG 官方三来源：月榜库（2013-03 起任意月）/ PC 当期四榜 / 移动热销榜',
+                            Text('SFACG 官方两来源：月榜库（2013-03 起任意月）/ PC 当期三榜',
                                 style: TextStyle(
                                     fontSize: 11,
                                     color: scheme.onSurfaceVariant)),

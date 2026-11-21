@@ -9,13 +9,12 @@ import '../widgets/default_cover.dart';
 /// 官方榜单页（网格入口）：每格指向一个榜单详情页。
 /// 来源（docs/sfacg-live-ranks.md）：
 ///  1. 历史月榜库（MonthlyBoy.ashx，2013-03 起任意月份，月票带票数）
-///  2. PC 当期四榜（book.sfacg.com/Rank/）
-///  3. 移动热销榜（m.sfacg.com/rank/sale.html）——移动五榜中仅此一个有效
-///     （人气/收藏/新书/日轻四个榜数据落后 >3 年，2026-11-20 用户实测判定过时）
-/// 网格结构与详情页分离，便于后续由 demo 改造为正式榜单页。
+///  2. PC 当期四榜（book.sfacg.com/Rank/，App 展示前三榜；粉丝榜为用户充值榜）
+/// 移动榜单 2026-11-21 整体移除（官方 API 多 bug，数据不可信；端点保真保留）。
+/// 网格结构与详情页分离，便于后续演进。
 
 /// 榜单格定义：id 同时是路由参数。
-/// m0/m2/m3/m4 = 月榜库 rank 0/2/3/4；pc0..pc2 = PC 页前三板（粉丝榜为用户充值榜，不展示）；sale = 移动热销榜。
+/// m0/m2/m3/m4 = 月榜库 rank 0/2/3/4；pc0..pc2 = PC 页前三板（粉丝榜为用户充值榜，不展示）。移动榜单已整体移除（2026-11-21：官方 API 多 bug，数据不可信）。
 const _boardGroups = [
   (
     '历史月榜库（2013-03 至今）',
@@ -31,20 +30,11 @@ const _boardGroups = [
   (
     'PC 当期榜',
     'book.sfacg.com/Rank/——一页四榜，App 展示三榜（粉丝榜实为用户充值榜，'
-        '2026-11-21 判定无意义，不展示）',
+        '2026-11-21 判定无意义，不展示）。移动榜单已整体移除（官方 API 多 bug）',
     [
       ('pc0', '月度月票榜', '带月票票数'),
       ('pc1', '月度打赏榜', '当期打赏（无数值）'),
       ('pc2', '月度热销榜', '当期点券消耗（无数值）'),
-    ],
-  ),
-  (
-    '移动',
-    'm.sfacg.com/rank/——仅热销榜有效（与手机 App「畅销榜」几乎一致，'
-        '数据更新滞后约 ≤3 天）；人气/收藏/新书/日轻四榜数据落后 >3 年，'
-        '2026-11-20 实测判定过时，不展示',
-    [
-      ('sale', '热销榜', '与手机 App「畅销榜」一致（top 20，无数值）'),
     ],
   ),
 ];
@@ -110,15 +100,6 @@ final _boardDetailProvider = FutureProvider.autoDispose
       note: _boardNote(board),
       items: b.entries,
       valueLabel: b.name == '月度月票榜' ? '月票' : null,
-    );
-  }
-  if (board == 'sale') {
-    final items = await handle.api.officialRanksMobile(slug: 'sale');
-    return _BoardDetail(
-      title: '移动热销榜',
-      note: 'm.sfacg.com/rank/sale.html——与手机 App「畅销榜」几乎一致，'
-          '数据更新滞后约 ≤3 天',
-      items: items,
     );
   }
   throw ArgumentError('unknown board: $board');

@@ -2039,11 +2039,12 @@ func (s *Server) officialRanksMobile(c *gin.Context) {
 }
 
 // officialRanksSaleSet serves the passive "官方热销" signal: the nids
-// currently on a cached 热销 board — 月榜库当期 rank=3, PC 月度热销榜,
-// 移动热销榜. It NEVER fetches: an empty or expired cache yields an empty
-// set, so the endpoint is offline-safe and costs nothing to poll. Boards
-// only enter the set after the user (or the rankings page) has loaded them
-// at least once.
+// currently on a cached 热销 board — 月榜库当期 rank=3, PC 月度热销榜.
+// (移动热销 removed 2026-11-21: the official mobile-rank API is buggy and
+// its data untrustworthy; the app no longer loads mobile boards.) It NEVER
+// fetches: an empty or expired cache yields an empty set, so the endpoint
+// is offline-safe and costs nothing to poll. Boards only enter the set
+// after the user (or the rankings page) has loaded them at least once.
 func (s *Server) officialRanksSaleSet(c *gin.Context) {
 	now := time.Now()
 	month := fmt.Sprintf("%04d-%02d", now.Year(), int(now.Month()))
@@ -2051,7 +2052,6 @@ func (s *Server) officialRanksSaleSet(c *gin.Context) {
 	for _, key := range []string{
 		"monthly:" + month + ":3", // 月榜库 当期热销榜
 		"pc:current",              // PC 月度热销榜（boards 里只取热销）
-		"mobile:sale",             // 移动热销榜
 	} {
 		body, ok, err := s.store.OfficialRanksGet(c.Request.Context(), key, officialRanksTTL)
 		if err != nil || !ok {

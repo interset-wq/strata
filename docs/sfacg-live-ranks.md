@@ -9,7 +9,7 @@
 | 端点 | 认证 | 结果 |
 | --- | --- | --- |
 | `book.sfacg.com/Rank/` | 无 | **可用**。一页含 4 榜：月度月票（**带票数**）、月度打赏、月度热销、粉丝榜（读者侧，消费火券）。条目 URL 含 nid。**2026-11-21（用户）**：粉丝榜实为用户充值榜（火券消费），对产品无意义，App 内不展示（端点保真、展示层裁剪，同移动四榜口径） |
-| `m.sfacg.com/rank/{original,bm,new,jp,sale}.html` | 无 | **可用**（curl 直抓）。人气/收藏/新书/日轻/热销，各 top 20，无数值，nid 在相对链接 `/b/{nid}/`。**2026-11-20 实测（用户）**：其中只有**热销榜有效**（与手机 App「畅销榜」几乎一致，数据更新滞后约 ≤3 天）；人气/收藏/新书/日轻四榜数据好几年未变（落后 >3 年），判定过时，App 内不再展示 |
+| `m.sfacg.com/rank/{original,bm,new,jp,sale}.html` | 无 | **可用**（curl 直抓）。人气/收藏/新书/日轻/热销，各 top 20，无数值，nid 在相对链接 `/b/{nid}/`。**2026-11-20 实测（用户）**：其中只有**热销榜有效**（与手机 App「畅销榜」几乎一致，数据更新滞后约 ≤3 天）；人气/收藏/新书/日轻四榜数据好几年未变（落后 >3 年），判定过时，App 内不再展示。**2026-11-21（用户）**：App 整体移除移动榜单——官方移动榜单 API 多 bug（官方自身问题，我们的代码无法解决），数据不可信；端点与本文保留事实 |
 | `m.sfacg.com/rank/ticket.html` | 无 | JS 渲染，curl 拿不到（用 web 版替代） |
 | `m.sfacg.com/API/HTML5.ashx?op=search&keyword={kw}` | 无 | **可用**。JSON，固定 ~12 条，含 `NovelID`/`Point` 评分/`TypeName`（参数名是 `keyword`，`q`/`key`/`s` 均报 501） |
 | `pages.sfacg.com/ajax/act/MonthlyBoy.ashx?op=getRanks&date={YYYY-MM}&rank={N}` | 无 | **可用，且可查任意月份（历史月票库）**。rank: 0=月票榜(top20, ticketNum=月票)、2=新书榜(top10)、3=热销榜(top20)、4=对话月票榜(top20)；rank=1 为 novly 未收录的未知榜。**2013-03 起连续有数据**（2013-02 及更早实测为空），每月一期、月度清零。语义证据：[novly](https://github.com/light-nook-labs/novly) `utils/{monthlyApi,urls,months}.ts` + `app/monthly/[ym].tsx`。抓取器：`analysis/fetch_monthly_ranks.py` → `out/monthly_ranks.jsonl` |
