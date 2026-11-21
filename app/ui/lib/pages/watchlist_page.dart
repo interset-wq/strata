@@ -73,7 +73,7 @@ class _WatchlistPageState extends ConsumerState<WatchlistPage> {
           }
           final items = snap.data ?? [];
           if (items.isEmpty) {
-            return _EmptyState(onBrowse: () => context.go('/'));
+            return _EmptyState(onBrowse: () => context.go('/home'));
           }
           // 官方式筛选 chips：全部 + 题材聚合（数据驱动，无假筛选）
           final genres =
