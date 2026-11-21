@@ -1890,7 +1890,7 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'detail')`,
 func (s *Store) Observations(ctx context.Context, nid int64) ([]Observation, error) {
 	rows, err := s.DB.QueryContext(ctx, `
 SELECT observed_at, clicks, favs, praises, words, short_comments,
-       long_comments, status, updated_at
+       long_comments, status, updated_at, source
 FROM observations WHERE nid = ? ORDER BY observed_at DESC`, nid)
 	if err != nil {
 		return nil, err
@@ -1906,7 +1906,7 @@ FROM observations WHERE nid = ? ORDER BY observed_at DESC`, nid)
 			status, updatedAt     sql.NullString
 		)
 		if err := rows.Scan(&o.ObservedAt, &clicks, &favs, &praises, &words,
-			&shortC, &longC, &status, &updatedAt); err != nil {
+			&shortC, &longC, &status, &updatedAt, &o.Source); err != nil {
 			return nil, err
 		}
 		o.Clicks = intPtr(clicks)

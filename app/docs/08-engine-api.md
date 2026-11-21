@@ -290,6 +290,23 @@ App API 成功→精确元数据写观测 + cover 缓存；否则 HTML 兜底（
 仅 alive 写观测）。无论成败均盖章 `last_poll_at`，坏书不会卡死队列；
 失败不写观测行——数据页据实区分「暂无更新」与「数据缺口」。
 
+### POST/DELETE /strata/dev/simulate?nid=&days=（**已实现**，工作台开发辅助）
+
+作者工作台（docs/07）开发辅助：真实轮询观测需要数周才能积累，此端点向
+user.db 生成一段**确定性**合成观测序列（同 nid+days 重放数值一致，时间戳
+锚定运行日），供更新热力图 / 六指标折线 / 同期对照开发验收。`days` 默认
+60、范围 1..180。起点 = 种子书当前值（种子是 2026-05 快照，终点高于种子，
+与真实计数器行为一致；库外书用中性基线）。覆盖六指标：words / favs /
+praises / short_comments / long_comments / clicks。序列含三种日类以覆盖全部
+渲染路径：**更新日**（~80%，Δwords 2,500–6,499 横跨全勤 3,000 线）、
+**断更日**（~12%，有观测但 Δwords=0）、**缺口日**（~8%，无观测行——
+数据缺口 ≠ 断更；缺口期计数器仍在涨，次日差分读作「含 N 天累计」）；
+已完结书永不加字。行 `source='simulate'`（观测时序端点现返回 source 标记，
+顺带修复此前 SELECT 漏列的缺陷），重跑替换同 nid 的 simulate 行
+（幂等），不碰 seed.db 与真实观测行。POST 响应
+`{nid,days,rows,gap_days,flat_days,start_words,end_words,start_favs,end_favs,
+status,source}`；DELETE 仅删该 nid 的 simulate 行，响应 `{nid,deleted}`。
+
 ### GET /strata/random?limit=&status=&form=（**已实现**）
 
 首页"换一换"网格数据源：`is_licensed=0` 种子库内 `ORDER BY RANDOM()` 均匀抽样

@@ -53,6 +53,29 @@ func getJSON(t *testing.T, url string, status int) map[string]any {
 	return body
 }
 
+// doJSON is getJSON with an explicit method (POST/DELETE endpoints).
+func doJSON(t *testing.T, method, url string, status int) map[string]any {
+	t.Helper()
+	req, err := http.NewRequest(method, url, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != status {
+		t.Fatalf("%s %s status = %d, want %d",
+			method, url, resp.StatusCode, status)
+	}
+	var body map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	return body
+}
+
 func TestHealthz(t *testing.T) {
 	srv, _ := newTestServer(t)
 	body := getJSON(t, srv.URL+"/strata/healthz", http.StatusOK)
@@ -482,6 +505,28 @@ func TestRankingClassic(t *testing.T) {
 	getJSON(t, srv.URL+"/strata/rankings/classic?year=0", http.StatusBadRequest)
 	getJSON(t, srv.URL+"/strata/rankings/classic?year=x", http.StatusBadRequest)
 
+	// words-band splits the dialogue tab by documented length classes:
+	// short <= 50k, medium 50k..150k, long > 150k. The only dialogue test
+	// book (1008) sits exactly on the short ceiling.
+	body = getJSON(t, srv.URL+
+		"/strata/rankings/classic?form=dialogue&words-band=short", http.StatusOK)
+	items = body["items"].([]any)
+	if len(items) != 1 || items[0].(map[string]any)["nid"].(float64) != 1008 {
+		t.Fatalf("dialogue short band = %v", items)
+	}
+	body = getJSON(t, srv.URL+
+		"/strata/rankings/classic?form=dialogue&words-band=medium", http.StatusOK)
+	if items = body["items"].([]any); len(items) != 0 {
+		t.Fatalf("dialogue medium band = %v", items)
+	}
+	body = getJSON(t, srv.URL+
+		"/strata/rankings/classic?form=dialogue&words-band=long", http.StatusOK)
+	if items = body["items"].([]any); len(items) != 0 {
+		t.Fatalf("dialogue long band = %v", items)
+	}
+	getJSON(t, srv.URL+"/strata/rankings/classic?words-band=giant",
+		http.StatusBadRequest)
+
 	getJSON(t, srv.URL+"/strata/rankings/classic?form=novella",
 		http.StatusBadRequest)
 }
@@ -747,5 +792,91 @@ func TestRandomShort(t *testing.T) {
 	}
 	if len(items) != 2 || !seen[1002] || !seen[1004] {
 		t.Fatalf("items = %v, want {1002 1004}", items)
+	}
+}
+
+// TestDevSimulate: the workbench dev aid (docs/07) — a deterministic
+// synthetic observation series. nid 1001 is 连载中 in testseed (words
+// 120,000 / favs 500) and testseed planted one real 'detail'
+// observation at 1700000000 (2023-11-14, far outside the 60-day
+// window): it must survive re-runs and the delete.
+func TestDevSimulate(t *testing.T) {
+	srv, _ := newTestServer(t)
+
+	body := doJSON(t, http.MethodPost,
+		srv.URL+"/strata/dev/simulate?nid=1001&days=60", http.StatusOK)
+	if body["nid"].(float64) != 1001 || body["days"].(float64) != 60 {
+		t.Fatalf("body = %v", body)
+	}
+	rows := body["rows"].(float64)
+	gaps := body["gap_days"].(float64)
+	flats := body["flat_days"].(float64)
+	if gaps <= 0 || flats <= 0 {
+		t.Fatalf("day classes missing: gaps=%v flats=%v", gaps, flats)
+	}
+	if rows+gaps != 60 {
+		t.Fatalf("rows+gaps = %v, want 60 (rows=%v gaps=%v)",
+			rows+gaps, rows, gaps)
+	}
+	if body["end_words"].(float64) <= body["start_words"].(float64) {
+		t.Fatalf("serializing book must grow words: %v", body)
+	}
+	if body["end_favs"].(float64) <= body["start_favs"].(float64) {
+		t.Fatalf("favs must grow: %v", body)
+	}
+
+	// Deterministic + idempotent: a re-run regenerates the same values.
+	body2 := doJSON(t, http.MethodPost,
+		srv.URL+"/strata/dev/simulate?nid=1001&days=60", http.StatusOK)
+	if body2["rows"] != body["rows"] ||
+		body2["end_words"] != body["end_words"] ||
+		body2["end_favs"] != body["end_favs"] {
+		t.Fatalf("re-run diverged: %v vs %v", body2, body)
+	}
+
+	// The observations endpoint exposes the series with source markers;
+	// the planted real 'detail' row rides along as the oldest one.
+	obs := getJSON(t, srv.URL+"/strata/books/1001/observations", http.StatusOK)
+	items := obs["items"].([]any)
+	if float64(len(items)) != rows+1 {
+		t.Fatalf("observations = %d rows, want %d (+1 detail)",
+			len(items), int(rows)+1)
+	}
+	var sawDetail, sawSimulate bool
+	for _, it := range items {
+		m := it.(map[string]any)
+		switch m["source"] {
+		case "detail":
+			sawDetail = true
+		case "simulate":
+			sawSimulate = true
+		}
+	}
+	if !sawDetail || !sawSimulate {
+		t.Fatalf("source markers: detail=%v simulate=%v",
+			sawDetail, sawSimulate)
+	}
+
+	// Delete removes only the simulate rows.
+	del := doJSON(t, http.MethodDelete,
+		srv.URL+"/strata/dev/simulate?nid=1001", http.StatusOK)
+	if del["deleted"] != rows {
+		t.Fatalf("deleted = %v, want %v", del["deleted"], rows)
+	}
+	obs = getJSON(t, srv.URL+"/strata/books/1001/observations", http.StatusOK)
+	if items = obs["items"].([]any); len(items) != 1 ||
+		items[0].(map[string]any)["source"] != "detail" {
+		t.Fatalf("after delete = %v, want the single detail row", items)
+	}
+
+	// Invalid input.
+	for _, path := range []string{
+		"/strata/dev/simulate",
+		"/strata/dev/simulate?nid=0",
+		"/strata/dev/simulate?nid=abc",
+		"/strata/dev/simulate?nid=1001&days=0",
+		"/strata/dev/simulate?nid=1001&days=999",
+	} {
+		doJSON(t, http.MethodPost, srv.URL+path, http.StatusBadRequest)
 	}
 }

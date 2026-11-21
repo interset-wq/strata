@@ -140,6 +140,8 @@ func New(s *store.Store) *gin.Engine {
 	group.GET("/banner", srv.banner)
 	group.GET("/author-books", srv.authorBooks)
 	group.GET("/author-profile", srv.authorProfile)
+	group.POST("/dev/simulate", srv.devSimulate)
+	group.DELETE("/dev/simulate", srv.devSimulateDelete)
 	srv.startWatcher(context.Background())
 	return r
 }
@@ -1431,6 +1433,54 @@ func (s *Server) observations(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"items": items})
+}
+
+// devSimulate generates a deterministic synthetic observation series for
+// one nid (docs/07 workbench dev aid): real polling takes weeks, so the
+// workbench UI (更新热力图、六指标折线、同期对照) develops against
+// simulate rows. user.db only, source='simulate'; seed.db and real
+// observation rows are untouched. Re-running replaces the nid's
+// simulate rows (idempotent).
+func (s *Server) devSimulate(c *gin.Context) {
+	nid, err := strconv.ParseInt(c.Query("nid"), 10, 64)
+	if err != nil || nid <= 0 {
+		fail(c, http.StatusBadRequest, "invalid_argument",
+			"nid must be a positive integer")
+		return
+	}
+	days := 60
+	if raw := c.Query("days"); raw != "" {
+		d, err := strconv.Atoi(raw)
+		if err != nil || d < 1 || d > 180 {
+			fail(c, http.StatusBadRequest, "invalid_argument",
+				"days must be 1..180")
+			return
+		}
+		days = d
+	}
+	summary, err := s.store.SimulateObservations(c.Request.Context(), nid, days)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, summary)
+}
+
+// devSimulateDelete removes one nid's dev-simulation observation rows
+// (source='simulate' only).
+func (s *Server) devSimulateDelete(c *gin.Context) {
+	nid, err := strconv.ParseInt(c.Query("nid"), 10, 64)
+	if err != nil || nid <= 0 {
+		fail(c, http.StatusBadRequest, "invalid_argument",
+			"nid must be a positive integer")
+		return
+	}
+	n, err := s.store.DeleteSimulatedObservations(c.Request.Context(), nid)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"nid": nid, "deleted": n})
 }
 
 // calendar serves the release-calendar view (docs/14 P1): seed books
