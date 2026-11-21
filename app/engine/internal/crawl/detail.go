@@ -80,6 +80,7 @@ var (
 	reProfile     = regexp.MustCompile(`(?s)<ul class="book_profile">(.*?)</ul>`)
 	reSummary     = regexp.MustCompile(`(?s)<li[^>]*class="book_bk_qs1"[^>]*>(.*?)</li>`)
 	reTag         = regexp.MustCompile(`(?s)<[^>]+>`)
+	reBr          = regexp.MustCompile(`(?i)<br\s*/?>`)
 	reAuthorBlock = regexp.MustCompile(`(?s)<ul class="book_Author">(.*?)</ul>`)
 	reAuthorImg   = regexp.MustCompile(`(?s)<img[^>]+src=['"]([^'"]+)['"]`)
 	reAuthorName  = regexp.MustCompile(`(?s)<li[^>]*>(?:\s*<img[^>]*>)?(?:<[^>]+>|\s)*([^<]+)</li>`)
@@ -187,7 +188,7 @@ func ParseDetail(html string) (DetailState, *Detail) {
 	}
 	if m := reProfile.FindStringSubmatch(html); m != nil {
 		if sm := reSummary.FindStringSubmatch(m[1]); sm != nil {
-			d.Summary = cleanText(sm[1])
+			d.Summary = cleanIntroText(sm[1])
 		}
 	}
 
@@ -224,6 +225,26 @@ func cleanText(s string) string {
 	s = reTag.ReplaceAllString(s, " ")
 	s = html.UnescapeString(s)
 	return strings.Join(strings.Fields(s), " ")
+}
+
+// cleanIntroText is the multi-line variant for the book intro (book_bk_qs1).
+// The official page keeps paragraph breaks as real newlines (rendered by CSS
+// white-space, not <br>), and cleanText's full whitespace collapse turned
+// every intro into one run-on line — the user reported the detail-page
+// intro looked 混乱 for exactly that reason (2026-11-21). Newlines (and
+// <br>, in case the page format drifts) become single "\n"; runs of other
+// whitespace still collapse; empty lines drop.
+func cleanIntroText(s string) string {
+	s = reBr.ReplaceAllString(s, "\n")
+	s = reTag.ReplaceAllString(s, " ")
+	s = html.UnescapeString(s)
+	lines := make([]string, 0, 8)
+	for _, ln := range strings.Split(s, "\n") {
+		if t := strings.Join(strings.Fields(ln), " "); t != "" {
+			lines = append(lines, t)
+		}
+	}
+	return strings.Join(lines, "\n")
 }
 
 // normalizeURL completes protocol-relative and root-relative page URLs.

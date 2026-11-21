@@ -49,6 +49,11 @@ func TestParseDetailAlive(t *testing.T) {
 	if !strings.Contains(d.Summary, "超级英雄") {
 		t.Fatalf("summary = %q", d.Summary)
 	}
+	// 2026-11-21: the intro keeps its line breaks (the official page stores
+	// them as real newlines); the old cleanText collapsed them into spaces.
+	if !strings.Contains(d.Summary, "\n") {
+		t.Fatalf("summary should preserve line breaks, got %q", d.Summary)
+	}
 }
 
 func TestParseDetailDead(t *testing.T) {
