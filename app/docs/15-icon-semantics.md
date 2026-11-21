@@ -29,6 +29,7 @@
 | 打开官方页面 | `Icons.open_in_new` | 详情页 AppBar：系统浏览器打开移动版详情页（App 自身不加载官方内容） |
 | 复制（标题/ID） | `Icons.copy_rounded` | 详情页：长按标题复制、元数据卡「书籍 ID」行复制（SnackBar 反馈「××已复制」） |
 | 逆序切换 | `Icons.compare_arrows` | 经典榜单页指标行尾部：升/降序切换（升序态图标着色，tooltip 提示当前可切方向） |
+| 筛选 | `Icons.filter_list` | 经典榜单页 AppBar：五维筛选面板（状态/价格/年份/题材/标签 BottomSheet，有激活维度时带计数角标） |
 
 ## 分类入口（首页宫格）
 

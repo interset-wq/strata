@@ -187,14 +187,10 @@ final router = GoRouter(
         return ClassicListPage(
           title: q['title'] ?? '短篇',
           form: q['form'] ?? 'short',
-          year: int.tryParse(q['year'] ?? ''),
           contest: q['contest'],
-          genre: q['genre'],
           wordsBand: q['words-band'],
           order: q['order'] ?? 'favs',
-          yearSwitchable: (q['year-switchable'] ?? '') == '1',
           contestSwitchable: (q['contest-switchable'] ?? '') == '1',
-          genreSwitchable: (q['genre-switchable'] ?? '') == '1',
           metricSwitchable: (q['metric-switchable'] ?? '') == '1',
         );
       },

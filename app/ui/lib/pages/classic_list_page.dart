@@ -6,37 +6,30 @@ import '../data/api/strata_api.dart';
 import '../widgets/back_to_top.dart';
 import '../widgets/book_row_tile.dart';
 
-/// 通用榜单列表页（短篇 tab 各入口的落点）：classic 端点 + 任意
-/// year/contest/genre 轴 + order（favs=收藏降序，pct=同代分位降序，
-/// docs/form-definitions §6 优质短篇口径）。20 本/页上滑加载。
-/// 页内轴切换器（用户 2026-11-19 定：入口不做中间页，直达榜单 + 页内切轴），
-/// 三种控件刻意不重复：年份 = ModalBottomSheet、比赛 = Drawer（侧滑面板）、
-/// 题材 = FilterChip 行。
+/// 通用榜单列表页（各 tab 入口的落点）：classic 端点 + 任意维度 +
+/// order（favs=收藏降序，pct=同代分位降序，docs/form-definitions §6
+/// 优质口径）。20 本/页上滑加载。
+/// 页内两类控件（用户 2026-11-21 定）：比赛赛道 = Drawer（侧滑面板，
+/// 大池要搜索）；五维筛选（状态/价格/年份/题材/标签）= 统一筛选
+/// BottomSheet（AppBar filter_list 按钮 + 激活计数角标）。旧的年份
+/// bottom sheet / 题材 chip 行并入筛选面板（docs/16）。
 class ClassicListPage extends ConsumerStatefulWidget {
   final String title;
   final String form;
-  final int? year;
   final String? contest;
-  final String? genre;
   final String? wordsBand; // 'short' | 'medium' | 'long'（对话 tab 篇幅轴）
   final String order; // 'favs' | 'pct' | 'clicks' | 'praises' | 'words'
-  final bool yearSwitchable;
   final bool contestSwitchable;
-  final bool genreSwitchable;
   final bool metricSwitchable;
 
   const ClassicListPage({
     super.key,
     required this.title,
     this.form = 'short',
-    this.year,
     this.contest,
-    this.genre,
     this.wordsBand,
     this.order = 'favs',
-    this.yearSwitchable = false,
     this.contestSwitchable = false,
-    this.genreSwitchable = false,
     this.metricSwitchable = false,
   });
 
@@ -48,9 +41,12 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
   final _scroll = ScrollController();
   final _drawerSearch = TextEditingController();
   bool _showTop = false;
-  int? _currentYear; // 年份轴（bottom sheet 切换）
+  int? _currentYear; // 筛选维度：年份（筛选面板切换）
   String? _currentContest; // 比赛轴（drawer 切换）
-  String? _currentGenre; // 题材轴（chip 行切换）
+  String? _currentGenre; // 筛选维度：题材（筛选面板切换）
+  String? _fStatus; // 筛选维度：状态（已完结/连载中）
+  String? _fPtype; // 筛选维度：价格（免费/VIP/签约，数据驱动）
+  String? _fTag; // 筛选维度：标签
   String _drawerQuery = ''; // drawer 搜索词（本地过滤赛道组）
   String _currentOrder = 'favs'; // 指标轴（经典榜单四榜切换）
   bool _ascending = false; // 逆序（升序）态
@@ -62,9 +58,7 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
   @override
   void initState() {
     super.initState();
-    _currentYear = widget.year;
     _currentContest = widget.contest;
-    _currentGenre = widget.genre;
     const metrics = ['clicks', 'favs', 'praises', 'words'];
     _currentOrder = widget.metricSwitchable
         ? (metrics.contains(widget.order) ? widget.order : 'clicks')
@@ -100,6 +94,9 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
         year: _currentYear,
         contest: _currentContest,
         genre: _currentGenre,
+        status: _fStatus,
+        ptype: _fPtype,
+        tag: _fTag,
         wordsBand: widget.wordsBand,
         order: _currentOrder == 'favs' ? null : _currentOrder,
         dir: _ascending ? 'asc' : null,
@@ -126,12 +123,13 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
     return Scaffold(
       // 比赛轴启用时提供侧滑面板（AppBar 自动出现汉堡按钮作为入口）。
       drawer: widget.contestSwitchable ? _buildContestDrawer() : null,
-      appBar: AppBar(title: Text(_appBarTitle())),
+      appBar: AppBar(
+        title: Text(_appBarTitle()),
+        actions: [_filterButton()],
+      ),
       body: Column(
         children: [
           if (widget.metricSwitchable) _metricSwitcher(),
-          if (widget.yearSwitchable) _yearSelector(),
-          if (widget.genreSwitchable) _genreChips(),
           Expanded(
             child: RefreshIndicator(
               onRefresh: () async {
@@ -173,179 +171,68 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
     );
   }
 
-  // 年份切换条（固定列表上方）：胶囊按钮显示当前轴，点开
-  // ModalBottomSheet 选择面板（用户 2026-11-19 定：dropdown 是 web 表单
-  // 风格，美观性一般，改 bottom sheet）。数据 = /year-groups。
-  Widget _yearSelector() {
-    final scheme = Theme.of(context).colorScheme;
-    final res = ref.watch(yearGroupsProvider(widget.form));
-    return res.when(
-      loading: () => const SizedBox(height: 52),
-      error: (e, _) => const SizedBox(height: 52),
-      data: (r) {
-        String label;
-        if (_currentYear == null) {
-          label = '全部年份 · ${r.total} 本';
-        } else {
-          int? cnt;
-          for (final g in r.groups) {
-            if (g.year == _currentYear) {
-              cnt = g.count;
-              break;
-            }
-          }
-          label = cnt == null ? '$_currentYear' : '$_currentYear · $cnt 本';
-        }
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 2, 16, 6),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: () => _openYearSheet(context, r),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: scheme.surface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: scheme.outline.withValues(alpha: .4)),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.calendar_month,
-                    size: 18,
-                    color: scheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      label,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  Icon(
-                    Icons.expand_more,
-                    size: 18,
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
+  // 筛选面板入口（AppBar 右侧，docs/15：Icons.filter_list = 筛选）：
+  // 状态/价格/年份/题材/标签五维 BottomSheet（用户 2026-11-21：所有
+  // 经典榜单页统一多维 filter）；有激活维度时图标带计数角标。
+  Widget _filterButton() {
+    final n = _activeFilterCount;
+    return IconButton(
+      tooltip: '筛选',
+      icon: Badge(
+        isLabelVisible: n > 0,
+        label: Text('$n', style: const TextStyle(fontSize: 10)),
+        child: const Icon(Icons.filter_list),
+      ),
+      onPressed: _openFilterSheet,
     );
   }
 
-  // 年份选择 bottom sheet：全部年份 + 各年（年份降序 + 本数 + 选中态），
-  // 固定 62% 屏高、内部滚动，圆角纸面容器。
-  void _openYearSheet(BuildContext context, YearGroupsResult r) {
-    final scheme = Theme.of(context).colorScheme;
+  int get _activeFilterCount {
+    var n = 0;
+    if (_fStatus != null) n++;
+    if (_fPtype != null) n++;
+    if (_currentYear != null) n++;
+    if (_currentGenre != null) n++;
+    if (_fTag != null) n++;
+    return n;
+  }
+
+  void _openFilterSheet() {
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => SizedBox(
-        height: MediaQuery.of(ctx).size.height * 0.62,
-        child: Container(
-          decoration: BoxDecoration(
-            color: scheme.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(ctx).viewInsets.bottom,
-          ),
-          child: Column(
-            children: [
-              const SizedBox(height: 12),
-              Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: scheme.outline.withValues(alpha: .3),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 14),
-              Text(
-                '选择年份',
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 6),
-              Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  itemCount: r.groups.length + 1,
-                  itemBuilder: (c, i) {
-                    final year = i == 0 ? null : r.groups[i - 1].year;
-                    final count = i == 0 ? r.total : r.groups[i - 1].count;
-                    final selected = year == _currentYear;
-                    return InkWell(
-                      onTap: () {
-                        Navigator.pop(ctx);
-                        _selectYear(year);
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 13,
-                        ),
-                        color: selected
-                            ? scheme.primary.withValues(alpha: .08)
-                            : null,
-                        child: Row(
-                          children: [
-                            Text(
-                              year == null ? '全部年份' : '$year',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: selected
-                                    ? FontWeight.w700
-                                    : FontWeight.w500,
-                                color: selected ? scheme.primary : null,
-                              ),
-                            ),
-                            const Spacer(),
-                            Text(
-                              '$count 本',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: scheme.onSurfaceVariant,
-                              ),
-                            ),
-                            if (selected)
-                              Icon(
-                                Icons.check,
-                                size: 18,
-                                color: scheme.primary,
-                              ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (ctx) => _FilterSheet(
+        form: widget.form,
+        year: _currentYear,
+        genre: _currentGenre,
+        status: _fStatus,
+        ptype: _fPtype,
+        tag: _fTag,
+        onChanged: (year, genre, status, ptype, tag) =>
+            _onFilterChanged(year, genre, status, ptype, tag),
       ),
     );
   }
 
-  void _selectYear(int? y) {
-    if (y == _currentYear) return;
+  // 筛选面板 live-apply：值未变不重载；变化则重置列表、回顶、重载
+  // （面板保持打开，可连续多选维度）。
+  void _onFilterChanged(int? year, String? genre, String? status,
+      String? ptype, String? tag) {
+    final changed = year != _currentYear ||
+        genre != _currentGenre ||
+        status != _fStatus ||
+        ptype != _fPtype ||
+        tag != _fTag;
     setState(() {
-      _currentYear = y;
-      _items = const [];
-      _done = false;
-      _error = null;
-      _loading = false;
+      _currentYear = year;
+      _currentGenre = genre;
+      _fStatus = status;
+      _fPtype = ptype;
+      _fTag = tag;
+      _resetList();
     });
+    if (!changed) return;
     _scroll.jumpTo(0);
     _loadMore();
   }
@@ -541,41 +428,6 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
     );
   }
 
-  // 题材 chip 行：「全部题材」+ 各题材（本数），FilterChip 单选切换。
-  Widget _genreChips() {
-    final scheme = Theme.of(context).colorScheme;
-    final res = ref.watch(genreGroupsProvider(widget.form));
-    return res.when(
-      loading: () => const SizedBox(height: 48),
-      error: (e, _) => const SizedBox(height: 48),
-      data: (r) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 2, 16, 8),
-        child: Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            FilterChip(
-              label: const Text('全部题材', style: TextStyle(fontSize: 12)),
-              selected: _currentGenre == null,
-              onSelected: (_) => _selectGenre(null),
-              selectedColor: scheme.primary.withValues(alpha: .15),
-            ),
-            for (final g in r.groups)
-              FilterChip(
-                label: Text(
-                  '${g.genre}  ${g.count} 本',
-                  style: const TextStyle(fontSize: 12),
-                ),
-                selected: _currentGenre == g.genre,
-                onSelected: (_) => _selectGenre(g.genre),
-                selectedColor: scheme.primary.withValues(alpha: .15),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
   // 切轴通用：重置列表并回顶重载。
   void _resetList() {
     _items = const [];
@@ -588,16 +440,6 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
     if (c == _currentContest) return;
     setState(() {
       _currentContest = c;
-      _resetList();
-    });
-    _scroll.jumpTo(0);
-    _loadMore();
-  }
-
-  void _selectGenre(String? g) {
-    if (g == _currentGenre) return;
-    setState(() {
-      _currentGenre = g;
       _resetList();
     });
     _scroll.jumpTo(0);
@@ -636,5 +478,268 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
       );
     }
     return const SizedBox.shrink();
+  }
+}
+
+/// 筛选面板 BottomSheet（用户 2026-11-21：所有经典榜单页统一的多维
+/// filter）：状态/价格/年份/题材/标签五维，ChoiceChip 单选 + 「全部」
+/// 复位；点选 live-apply（背后列表实时刷新），面板保持打开直到
+/// 「完成」。值列表 = /facets（form 池口径）；状态是固定枚举，
+/// 价格值数据驱动（免费/VIP/签约）。
+class _FilterSheet extends ConsumerStatefulWidget {
+  final String form;
+  final int? year;
+  final String? genre;
+  final String? status;
+  final String? ptype;
+  final String? tag;
+  final void Function(int? year, String? genre, String? status, String? ptype,
+      String? tag) onChanged;
+
+  const _FilterSheet({
+    required this.form,
+    required this.year,
+    required this.genre,
+    required this.status,
+    required this.ptype,
+    required this.tag,
+    required this.onChanged,
+  });
+
+  @override
+  ConsumerState<_FilterSheet> createState() => _FilterSheetState();
+}
+
+class _FilterSheetState extends ConsumerState<_FilterSheet> {
+  int? _year;
+  String? _genre;
+  String? _status;
+  String? _ptype;
+  String? _tag;
+
+  @override
+  void initState() {
+    super.initState();
+    _year = widget.year;
+    _genre = widget.genre;
+    _status = widget.status;
+    _ptype = widget.ptype;
+    _tag = widget.tag;
+  }
+
+  // live-apply：更新本地选中态并通知父页（父页对比后决定是否重载）。
+  void _pick(void Function() apply, {required bool changed}) {
+    if (!changed) return;
+    apply();
+    setState(() {});
+    widget.onChanged(_year, _genre, _status, _ptype, _tag);
+  }
+
+  Widget _section(String title, Widget chips) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Text(
+              title,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          chips,
+        ],
+      ),
+    );
+  }
+
+  Widget _chip(String label, bool selected, void Function() onTap,
+      {String? trailing}) {
+    return ChoiceChip(
+      label: Text(
+        trailing == null ? label : '$label  $trailing',
+        style: const TextStyle(fontSize: 12),
+      ),
+      selected: selected,
+      onSelected: (_) => onTap(),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final res = ref.watch(facetsProvider(widget.form));
+    return res.when(
+      loading: () => const SizedBox(
+        height: 160,
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      ),
+      error: (e, _) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Text(
+          '加载筛选值失败：$e',
+          style: TextStyle(fontSize: 12, color: scheme.error),
+        ),
+      ),
+      data: (f) {
+        final active = _year != null ||
+            _genre != null ||
+            _status != null ||
+            _ptype != null ||
+            _tag != null;
+        return ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.85,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: scheme.outline.withValues(alpha: .3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: Row(
+                  children: [
+                    Text(
+                      '筛选',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const Spacer(),
+                    if (active)
+                      TextButton(
+                        onPressed: () => _pick(() {
+                          _year = null;
+                          _genre = null;
+                          _status = null;
+                          _ptype = null;
+                          _tag = null;
+                        }, changed: true),
+                        child: const Text('清除全部'),
+                      ),
+                  ],
+                ),
+              ),
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Column(
+                    children: [
+                      _section(
+                        '状态',
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            _chip('全部', _status == null,
+                                () => _pick(() => _status = null,
+                                    changed: _status != null)),
+                            for (final s in ['已完结', '连载中'])
+                              _chip(s, _status == s,
+                                  () => _pick(() => _status = s,
+                                      changed: _status != s)),
+                          ],
+                        ),
+                      ),
+                      _section(
+                        '价格',
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            _chip('全部', _ptype == null,
+                                () => _pick(() => _ptype = null,
+                                    changed: _ptype != null)),
+                            for (final p in f.ptypes)
+                              _chip(p.name, _ptype == p.name,
+                                  () => _pick(() => _ptype = p.name,
+                                      changed: _ptype != p.name),
+                                  trailing: '${p.count} 本'),
+                          ],
+                        ),
+                      ),
+                      _section(
+                        '年份',
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            _chip('全部年份', _year == null,
+                                () => _pick(() => _year = null,
+                                    changed: _year != null)),
+                            for (final y in f.years)
+                              _chip('${y.year}', _year == y.year,
+                                  () => _pick(() => _year = y.year,
+                                      changed: _year != y.year),
+                                  trailing: '${y.count} 本'),
+                          ],
+                        ),
+                      ),
+                      _section(
+                        '题材',
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            _chip('全部题材', _genre == null,
+                                () => _pick(() => _genre = null,
+                                    changed: _genre != null)),
+                            for (final g in f.genres)
+                              _chip(g.name, _genre == g.name,
+                                  () => _pick(() => _genre = g.name,
+                                      changed: _genre != g.name),
+                                  trailing: '${g.count} 本'),
+                          ],
+                        ),
+                      ),
+                      _section(
+                        '标签',
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            _chip('全部', _tag == null,
+                                () => _pick(() => _tag = null,
+                                    changed: _tag != null)),
+                            for (final t in f.tags)
+                              _chip(t.name, _tag == t.name,
+                                  () => _pick(() => _tag = t.name,
+                                      changed: _tag != t.name),
+                                  trailing: '${t.count} 本'),
+                          ],
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: FilledButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('完成'),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }

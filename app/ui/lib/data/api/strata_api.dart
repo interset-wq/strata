@@ -185,6 +185,8 @@ class StrataApi {
     String? form,
     String? wordsBand,
     int? year,
+    String? tag,
+    String? ptype,
     String? order,
     String? dir,
     int limit = 50,
@@ -198,6 +200,8 @@ class StrataApi {
       'form': ?form,
       'words-band': ?wordsBand,
       if (year != null) 'year': '$year',
+      'tag': ?tag,
+      'ptype': ?ptype,
       'order': ?order,
       'dir': ?dir,
       if (offset > 0) 'offset': '$offset',
@@ -493,6 +497,12 @@ class StrataApi {
           .map((e) => IpGroup.fromJson(e as Map<String, dynamic>))
           .toList(),
     );
+  }
+
+  /// 筛选 facet（经典榜单筛选面板）：form 池的题材/价格/年份/标签值列表。
+  Future<FacetsResult> facets({String? form}) async {
+    final body = await _get('/facets', {'form': ?form});
+    return FacetsResult.fromJson(body);
   }
 
   /// 短篇 tab 年份入口：form 池按 est_year 聚合（年份降序）。
@@ -1027,6 +1037,64 @@ class IpGroupsResult {
   final List<IpGroup> groups;
 
   const IpGroupsResult({required this.total, required this.groups});
+}
+
+/// 筛选 facet 的一个可选项 + 池内本数（GET /facets）。
+class FacetValue {
+  final String name;
+  final int count;
+
+  const FacetValue({required this.name, required this.count});
+
+  factory FacetValue.fromJson(Map<String, dynamic> j) => FacetValue(
+    name: j['name'] as String,
+    count: (j['count'] as num).toInt(),
+  );
+}
+
+/// 年份 facet：est_year → 本数（年份降序）。
+class FacetYear {
+  final int year;
+  final int count;
+
+  const FacetYear({required this.year, required this.count});
+
+  factory FacetYear.fromJson(Map<String, dynamic> j) => FacetYear(
+    year: (j['year'] as num).toInt(),
+    count: (j['count'] as num).toInt(),
+  );
+}
+
+/// 筛选 facet（经典榜单筛选面板，用户 2026-11-21）：某 form 池的
+/// genres/ptypes/tags（top 60，count DESC）/years（year DESC）。
+/// 状态是固定枚举（已完结/连载中），不在 facet 里。
+class FacetsResult {
+  final List<FacetValue> genres;
+  final List<FacetValue> ptypes;
+  final List<FacetValue> tags;
+  final List<FacetYear> years;
+
+  const FacetsResult({
+    required this.genres,
+    required this.ptypes,
+    required this.tags,
+    required this.years,
+  });
+
+  factory FacetsResult.fromJson(Map<String, dynamic> j) => FacetsResult(
+    genres: (j['genres'] as List)
+        .map((e) => FacetValue.fromJson(e as Map<String, dynamic>))
+        .toList(),
+    ptypes: (j['ptypes'] as List)
+        .map((e) => FacetValue.fromJson(e as Map<String, dynamic>))
+        .toList(),
+    tags: (j['tags'] as List)
+        .map((e) => FacetValue.fromJson(e as Map<String, dynamic>))
+        .toList(),
+    years: (j['years'] as List)
+        .map((e) => FacetYear.fromJson(e as Map<String, dynamic>))
+        .toList(),
+  );
 }
 
 /// 年份分组：est_year → 本数（年份降序）。

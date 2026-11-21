@@ -172,15 +172,26 @@ form **且有封面**（covers 观测或 seed `cover_url` 非空）的书按
 
 短篇 tab 年份榜入口：`form` 必填（同 `/banner` 的枚举校验），池按
 `est_year` 聚合（`est_year DESC`）。返回 `total`（池总量）+
-`groups: [{year, count}]`。用途 = `/classic-list` 年份榜页的**年份
-bottom sheet**（页内切换、无中间页，用户 2026-11-19 定）。
+`groups: [{year, count}]`。原用途 = `/classic-list` 年份榜页的**年份
+bottom sheet**（用户 2026-11-19 定）；2026-11-21 筛选面板化后经典页
+年份值改走 `/facets`，本端点保留。
 
 ### GET /strata/genre-groups?form=（**已实现**）
 
 短篇 tab 题材榜入口：`form` 必填（同上），池按 `genre`（非空）聚合
 （`count DESC, genre ASC` 稳定序）。返回 `total`（池总量）+
-`groups: [{genre, count}]`。用途 = `/classic-list` 题材榜页的
-**FilterChip 行**（「全部题材」+ 各题材标签，单选切换）。
+`groups: [{genre, count}]`。原用途 = `/classic-list` 题材榜页的
+**FilterChip 行**（用户 2026-11-19 定）；2026-11-21 筛选面板化后经典页
+题材值改走 `/facets`，本端点保留。
+
+### GET /strata/facets?form=（**已实现**）
+
+筛选 facet（用户 2026-11-21：所有经典榜单页统一多维 filter）：`form`
+可选（空 = 全 form），返回经典页筛选面板各维度的值列表 + 池内本数：
+`genres` / `ptypes` / `tags`（top 60，`count DESC, name ASC`）+
+`years`（`year DESC`）。池口径与 classic 列表一致（`is_licensed=0`）；
+状态是固定枚举（已完结/连载中），不在 facet 里。无白名单：
+`/rankings/classic` 的 `tag` / `ptype` 传未知值时匹配不到，不报错。
 
 ### GET /strata/rankings/favs?year=&genre=&limit=
 
@@ -213,11 +224,14 @@ Classic 全库榜（docs/12 展示列）：平台累计值排序，不涉及分�
 `recommend`(praises) / `popular`(clicks) / `favs` / `new`(est_date) / `finish`(已完结按 favs) /
 `words`。`offset` 分页（默认 0）。items 为 RankItem（含 `status`/`words`/`clicks`/`cover_url`）。
 
-### GET /strata/rankings/classic?genre=&status=&contest=&form=&year=&order=&dir=&limit=&offset=（**已实现**）
+### GET /strata/rankings/classic?genre=&status=&contest=&form=&year=&tag=&ptype=&order=&dir=&limit=&offset=（**已实现**）
 
 Classic 主线分类/状态/大赛列表：默认按平台累计 `favs` 降序（`favs DESC, nid ASC`）。
 `genre`/`status`/`contest` 与 `/rankings/favs` 同义；`contest=1` 表示全部大赛作品。
-`year` 可选（正整数，按 `est_year` 精确过滤；非法值 400）。`order` 可选：
+`year` 可选（正整数，按 `est_year` 精确过滤；非法值 400）。`tag` /
+`ptype` 可选（精确匹配，取值来自 `/facets`，用户 2026-11-21 筛选面板：
+`tag` 走 book_tags EXISTS、`ptype` 匹配 price_type；未知值匹配不到）。
+`order` 可选：
 `favs`（默认）、`pct`（同代收藏分位 `fav_pctl DESC`、NULL 末尾——
 docs/form-definitions §6 优质短篇口径）与三个经典榜指标 `clicks`/`praises`/`words`
 （平台累计值 `DESC, favs DESC, nid ASC`、NULL 末尾——展示层，docs/12）；
@@ -228,9 +242,11 @@ RankItem（含 `form`），`meta.ordering` 回显实际排序
 
 短篇 tab（docs/form-definitions §4 收录资格）的年份榜/比赛榜/题材榜/优质榜
 以 `form=short[&year=Y|&contest=X|&genre=G|&order=pct]` 调本端点（不带
-status——种子层已实施完结条款，池本身已干净）。三个轴入口**不做中间页**：
-直达 `/classic-list` 榜单页，页内用不重复的控件切轴——年份 =
-ModalBottomSheet、比赛 = Drawer、题材 = FilterChip（用户 2026-11-19 定）、
+status——种子层已实施完结条款，池本身已干净）。入口**不做中间页**：
+直达 `/classic-list` 榜单页，页内两类控件——比赛赛道 = Drawer（侧滑
+面板，大池要搜索），五维筛选（状态/价格/年份/题材/标签）= 统一筛选
+BottomSheet（用户 2026-11-21：所有经典榜单页共用；旧年份 ModalBottomSheet
+/ 题材 FilterChip 行并入筛选面板）、
 指标 = SegmentedButton（用户 2026-11-21：短篇 tab「经典榜单」入口
 `metric-switchable=1`，点击/收藏/点赞/字数四榜页内切换，20 本/页上滑加载）。
 

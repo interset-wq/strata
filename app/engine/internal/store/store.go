@@ -374,7 +374,7 @@ WHERE est_year = ? AND is_licensed = 0 AND fav_pctl IS NOT NULL`
 // status and contest pages. It intentionally sorts by absolute favs, not by
 // same-generation percentiles: Classic mode mirrors novly's cumulative view
 // and has no quantitative layer.
-func (s *Store) ClassicBooks(ctx context.Context, genre, status, contest, form, wordsBand string,
+func (s *Store) ClassicBooks(ctx context.Context, genre, status, contest, form, wordsBand, tag, ptype string,
 	year, limit, offset int, order, dir string) ([]RankItem, error) {
 	query := `
 SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
@@ -420,6 +420,14 @@ WHERE seed.books.is_licensed = 0`
 	if year > 0 {
 		query += " AND seed.books.est_year = ?"
 		args = append(args, year)
+	}
+	if ptype != "" {
+		query += " AND seed.books.price_type = ?"
+		args = append(args, ptype)
+	}
+	if tag != "" {
+		query += " AND EXISTS (SELECT 1 FROM seed.book_tags t WHERE t.nid = seed.books.nid AND t.tag = ?)"
+		args = append(args, tag)
 	}
 	switch order {
 	case "pct":
@@ -1147,6 +1155,107 @@ GROUP BY contest ORDER BY c DESC, contest ASC`, args...)
 		return 0, nil, err
 	}
 	return total, mergeContestGroups(groups), nil
+}
+
+// FacetValue is one selectable value of a filter dimension with its pool
+// count (GET /strata/facets).
+type FacetValue struct {
+	Name  string `json:"name"`
+	Count int    `json:"count"`
+}
+
+// FacetYear is one est_year cohort facet (a number, not a name).
+type FacetYear struct {
+	Year  int `json:"year"`
+	Count int `json:"count"`
+}
+
+// Facets is one form pool's filter facet lists for the classic-list filter
+// sheet (user 2026-11-21): genres, price types, the top 60 tags and years,
+// each with pool counts over the same is_licensed=0 pool the classic lists
+// read. form "" means every form. No allow-lists: unknown values in
+// /rankings/classic simply match nothing.
+func (s *Store) Facets(ctx context.Context, form string) (
+	genres, ptypes, tags []FacetValue, years []FacetYear, err error) {
+	where := " WHERE seed.books.is_licensed = 0"
+	args := []any{}
+	if form != "" {
+		where += " AND seed.books.form = ?"
+		args = append(args, form)
+	}
+	count := func(column, extra string) ([]FacetValue, error) {
+		rows, qerr := s.DB.QueryContext(ctx,
+			"SELECT "+column+", COUNT(*) AS c FROM seed.books"+where+extra+
+				" GROUP BY "+column+" ORDER BY c DESC, "+column+" ASC", args...)
+		if qerr != nil {
+			return nil, qerr
+		}
+		defer rows.Close()
+		out := []FacetValue{}
+		for rows.Next() {
+			var v FacetValue
+			if serr := rows.Scan(&v.Name, &v.Count); serr != nil {
+				return nil, serr
+			}
+			out = append(out, v)
+		}
+		return out, rows.Err()
+	}
+	if genres, err = count("genre", " AND genre IS NOT NULL AND genre != ''"); err != nil {
+		return
+	}
+	if ptypes, err = count("price_type", " AND price_type IS NOT NULL AND price_type != ''"); err != nil {
+		return
+	}
+	tagWhere := " WHERE b.is_licensed = 0"
+	tagArgs := []any{}
+	if form != "" {
+		tagWhere += " AND b.form = ?"
+		tagArgs = append(tagArgs, form)
+	}
+	tagRows, terr := s.DB.QueryContext(ctx, `
+SELECT t.tag, COUNT(*) AS c
+FROM seed.book_tags t
+JOIN seed.books b ON b.nid = t.nid`+tagWhere+`
+GROUP BY t.tag ORDER BY c DESC, t.tag ASC LIMIT 60`, tagArgs...)
+	if terr != nil {
+		return
+	}
+	tags = []FacetValue{}
+	for tagRows.Next() {
+		var v FacetValue
+		if serr := tagRows.Scan(&v.Name, &v.Count); serr != nil {
+			tagRows.Close()
+			return nil, nil, nil, nil, serr
+		}
+		tags = append(tags, v)
+	}
+	if serr := tagRows.Err(); serr != nil {
+		tagRows.Close()
+		return nil, nil, nil, nil, serr
+	}
+	tagRows.Close()
+	yearRows, yerr := s.DB.QueryContext(ctx, `
+SELECT est_year, COUNT(*) AS c FROM seed.books`+where+
+		` AND est_year IS NOT NULL GROUP BY est_year ORDER BY est_year DESC`, args...)
+	if yerr != nil {
+		return
+	}
+	years = []FacetYear{}
+	for yearRows.Next() {
+		var y FacetYear
+		if serr := yearRows.Scan(&y.Year, &y.Count); serr != nil {
+			yearRows.Close()
+			return nil, nil, nil, nil, serr
+		}
+		years = append(years, y)
+	}
+	if serr := yearRows.Err(); serr != nil {
+		yearRows.Close()
+		return nil, nil, nil, nil, serr
+	}
+	yearRows.Close()
+	return
 }
 
 // YearGroup is one est_year cohort of a form pool: the short tab's year

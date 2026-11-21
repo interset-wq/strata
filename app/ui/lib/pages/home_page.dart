@@ -822,9 +822,9 @@ class _HomePageState extends ConsumerState<HomePage> {
       (
         Icons.calendar_month,
         '年份榜',
-        '按出生年份筛选',
+        '筛选面板里选年份',
         '/classic-list?title=${Uri.encodeComponent('年份榜')}'
-            '&form=medium&year-switchable=1',
+            '&form=medium',
       ),
       (
         Icons.emoji_events,
@@ -836,9 +836,9 @@ class _HomePageState extends ConsumerState<HomePage> {
       (
         Icons.category,
         '题材榜',
-        '按题材标签筛选',
+        '筛选面板里选题材',
         '/classic-list?title=${Uri.encodeComponent('题材榜')}'
-            '&form=medium&genre-switchable=1',
+            '&form=medium',
       ),
       (
         Icons.star,
@@ -875,8 +875,8 @@ class _HomePageState extends ConsumerState<HomePage> {
       (
         Icons.calendar_month,
         '年份榜',
-        '按出生年份筛选',
-        listPath('年份榜', '&year-switchable=1'),
+        '筛选面板里选年份',
+        listPath('年份榜', ''),
       ),
       (
         Icons.emoji_events,
@@ -887,8 +887,8 @@ class _HomePageState extends ConsumerState<HomePage> {
       (
         Icons.category,
         '题材榜',
-        '按题材标签筛选',
-        listPath('题材榜', '&genre-switchable=1'),
+        '筛选面板里选题材',
+        listPath('题材榜', ''),
       ),
       (Icons.star, '优质对话', '同代分位头部', listPath('优质对话', '&order=pct')),
       (Icons.shuffle, '随机对话', '随机 100 本', '/dialogue-random'),
@@ -977,8 +977,8 @@ class _HomePageState extends ConsumerState<HomePage> {
       (
         Icons.calendar_month,
         '年份榜',
-        '榜内面板切换年份',
-        '/classic-list?title=年份榜&form=short&year-switchable=1',
+        '筛选面板里选年份',
+        '/classic-list?title=年份榜&form=short',
       ),
       (
         Icons.emoji_events,
@@ -989,8 +989,8 @@ class _HomePageState extends ConsumerState<HomePage> {
       (
         Icons.category,
         '题材榜',
-        '标签行切换题材',
-        '/classic-list?title=题材榜&form=short&genre-switchable=1',
+        '筛选面板里选题材',
+        '/classic-list?title=题材榜&form=short',
       ),
       (
         Icons.star,

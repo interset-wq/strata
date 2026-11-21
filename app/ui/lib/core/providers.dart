@@ -179,6 +179,16 @@ final contestGroupsProvider = FutureProvider.family<IpGroupsResult, String>((
   return handle.api.ipGroups(form: form);
 });
 
+/// 筛选 facet（经典榜单筛选面板）：form 池的状态外五维度值列表
+/// （状态为固定枚举，不在 facet 里）。
+final facetsProvider = FutureProvider.family<FacetsResult, String>((
+  ref,
+  form,
+) async {
+  final handle = await ref.watch(bootProvider.future);
+  return handle.api.facets(form: form);
+});
+
 /// 年份聚合（est_year DESC）by form：榜单页年份 bottom sheet / chip 行。
 final yearGroupsProvider = FutureProvider.family<YearGroupsResult, String>((
   ref,

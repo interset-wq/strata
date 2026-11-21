@@ -533,3 +533,64 @@ func TestNormalizeContest(t *testing.T) {
 		}
 	}
 }
+
+func TestClassicTagPtypeFilters(t *testing.T) {
+	st := openTestStore(t)
+	ctx := context.Background()
+	// book_tags rows: 1001 热血/战斗, 1004 战斗, 2001 战斗 (licensed, excluded),
+	// 1003 2020萌神; every test book is price_type 免费.
+	items, err := st.ClassicBooks(ctx, "", "", "", "", "", "战斗", "", 0, 100, 0, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 2 || items[0].NID != 1001 || items[1].NID != 1004 {
+		t.Fatalf("tag=战斗: got %+v", items)
+	}
+	items, err = st.ClassicBooks(ctx, "", "", "", "", "", "2020萌神", "", 0, 100, 0, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 1 || items[0].NID != 1003 {
+		t.Fatalf("tag=2020萌神: got %+v", items)
+	}
+	items, err = st.ClassicBooks(ctx, "", "", "", "", "", "", "VIP", 0, 100, 0, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 0 {
+		t.Fatalf("ptype=VIP: want 0 rows, got %+v", items)
+	}
+	items, err = st.ClassicBooks(ctx, "", "", "", "", "", "战斗", "免费", 0, 100, 0, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 2 {
+		t.Fatalf("tag=战斗 + ptype=免费: got %+v", items)
+	}
+}
+
+func TestFacets(t *testing.T) {
+	st := openTestStore(t)
+	ctx := context.Background()
+	genres, ptypes, tags, years, err := st.Facets(ctx, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(ptypes) != 1 || ptypes[0].Name != "免费" || ptypes[0].Count != 11 {
+		t.Fatalf("ptypes: %+v", ptypes)
+	}
+	if len(genres) != 4 || genres[0].Name != "都市" || genres[0].Count != 5 {
+		t.Fatalf("genres: %+v", genres)
+	}
+	if len(tags) != 3 || tags[0].Name != "战斗" || tags[0].Count != 2 {
+		t.Fatalf("tags: %+v", tags)
+	}
+	if len(years) == 0 {
+		t.Fatalf("years empty")
+	}
+	for i := 1; i < len(years); i++ {
+		if years[i-1].Year < years[i].Year {
+			t.Fatalf("years not DESC: %+v", years)
+		}
+	}
+}

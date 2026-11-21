@@ -132,6 +132,7 @@ func New(s *store.Store) *gin.Engine {
 	group.GET("/cover-carousel", srv.coverCarousel)
 	group.GET("/calendar", srv.calendar)
 	group.GET("/ip-groups", srv.ipGroups)
+	group.GET("/facets", srv.facets)
 	group.GET("/year-groups", srv.yearGroups)
 	group.GET("/genre-groups", srv.genreGroups)
 	group.GET("/ip-books", srv.ipBooks)
@@ -787,9 +788,11 @@ func (s *Server) rankingClassic(c *gin.Context) {
 		return
 	}
 	contest := store.NormalizeContest(c.Query("contest"))
+	tag := c.Query("tag")
+	ptype := c.Query("ptype")
 	items, err := s.store.ClassicBooks(c.Request.Context(),
 		c.Query("genre"), c.Query("status"), contest, form, wordsBand,
-		year, limit, offset, order, dir)
+		tag, ptype, year, limit, offset, order, dir)
 	if err != nil {
 		fail(c, http.StatusInternalServerError, "internal", err.Error())
 		return
@@ -810,6 +813,7 @@ func (s *Server) rankingClassic(c *gin.Context) {
 			"kind": "classic", "pool": "seed", "ordering": ordering,
 			"genre": c.Query("genre"), "status": c.Query("status"),
 			"contest": contest, "form": form, "year": year,
+			"tag": tag, "ptype": ptype,
 			"order": order, "dir": dirEcho, "licensed_excluded": true,
 		},
 		"items": items,
@@ -1795,6 +1799,28 @@ func (s *Server) ipGroups(c *gin.Context) {
 		"meta":   gin.H{"pool": "seed", "form": form, "status": c.Query("status"), "ordering": "count"},
 		"total":  total,
 		"groups": groups,
+	})
+}
+
+// facets serves the classic-list filter sheet's value lists for one form
+// pool: genres / price types / top 60 tags / years, each with pool counts
+// (user 2026-11-21: the unified multi-dimension filter on every classic
+// rankings page). form "" (all forms) is allowed.
+func (s *Server) facets(c *gin.Context) {
+	form, ok := parseForm(c)
+	if !ok {
+		fail(c, http.StatusBadRequest, "invalid_argument",
+			"form must be invalid|short|medium|long|dialogue|ip_collab")
+		return
+	}
+	genres, ptypes, tags, years, err := s.store.Facets(c.Request.Context(), form)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"meta":   gin.H{"pool": "seed", "form": form, "tag_limit": 60},
+		"genres": genres, "ptypes": ptypes, "tags": tags, "years": years,
 	})
 }
 
