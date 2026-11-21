@@ -100,8 +100,8 @@ HTML 含书名/作者/分类/签约/封面/简介/收藏/赞/字数/状态/更�
 **不返回任何外链字段**：漫画站被官方定期关闭（当前详情页全 404），有声无 Web 模板，
 拼出的 URL 即死链。UI 只按 `>0` 显示「有改编漫画 / 有有声」的静态标注；
 `effective`（种子书）与 `book`（库外书）另派生布尔 `has_comic`/`has_audio`
-（>0 为 true）供 UI 直接消费；数据仅 App API 通路（`STRATA_APP_API=1` +
-存活态刷新成功）写入（docs/05 §6、§6.1）。
+（>0 为 true）供 UI 直接消费；数据仅在 App API 通路开启（设置项 `app_api_enabled`
+或 `STRATA_APP_API=1`）且存活态刷新成功时写入（docs/05 §6、§6.1）。
 `comic_folder` 仅为官方恢复后复用的留档。`null`（未抓/失败）与 `0`（确认无改编）
 都不显示标注。
 
@@ -349,9 +349,10 @@ v1 为**同步调用**（限速器已串行化，一次前台刷新只占一个�
 { "state": "dead" | "zombie", "written": false }
 ```
 
-**App API 增强通路（实验性，默认关闭）**：环境变量 `STRATA_APP_API=1` 启用。
-启用后 refresh 先走 `api.sfacg.com/novels/{id}`（App 内置公共凭据自签，共用全局限速器，
-前台优先）；成功时以 App 精确值写入观测（`clicks`= `viewTimes` 精确整数、
+**App API 增强通路（默认关闭）**：设置项 `app_api_enabled`（`PUT /settings`，见下节）启用；
+未设置过时环境变量 `STRATA_APP_API=1` 兜底（native 开发用）。启用后 refresh 先走
+`api.sfacg.com/novels/{id}`（App 内置公共凭据自签，共用全局限速器，前台优先）；
+成功时以 App 精确值写入观测（`clicks`= `viewTimes` 精确整数、
 `favs`=`markCount`、`words`=`charCount`），响应为：
 
 ```json
@@ -364,6 +365,21 @@ v1 为**同步调用**（限速器已串行化，一次前台刷新只占一个�
 HTML 基线，响应不带 `source` 字段——调用方无需区分。**独立判据**：App API 只判
 `status.httpCode==200 && data.novelId>0`（可用/不可用两态），死亡/僵尸三态判定仍
 以 HTML 基线为准；`addTime` 不进定年模型，命中书为种子 `est_conf=exact` 档（05 §0）。
+
+### GET / PUT /strata/settings（**已实现**）
+
+GET 200：
+
+```json
+{ "detail_rate_limit_enabled": true, "detail_refresh_window_seconds": 86400,
+  "app_api_enabled": false }
+```
+
+PUT body 传 `detail_rate_limit_enabled` / `app_api_enabled`（至少一个，bool），响应同
+GET。两项均持久化在 user.db prefs：详情刷新限流默认开；App API 默认关，未设置过时
+环境变量 `STRATA_APP_API=1` 兜底（native 开发用）。App API 通路认证为 App 内置固定
+凭据 + 每请求自签（`sfacg-app-api.md` §1，引擎 `crawl/appapi.go` 已实现），无需用户
+输入任何凭据；共用全局限速器，前台优先，任何失败静默回落移动版 HTML 基线。
 
 ### GET /strata/books/:nid/observations（**已实现**）
 

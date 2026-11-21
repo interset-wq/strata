@@ -88,6 +88,12 @@ class StrataApi {
             as Map<String, dynamic>,
       );
 
+  Future<EngineSettings> setAppAPIEnabled(bool enabled) async =>
+      EngineSettings.fromJson(
+        await _putBody('/settings', {'app_api_enabled': enabled})
+            as Map<String, dynamic>,
+      );
+
   Future<BookDetail> book(int nid) async =>
       BookDetail.fromJson(await _get('/books/$nid') as Map<String, dynamic>);
 
@@ -589,19 +595,22 @@ class StrataApi {
   Future<void> close() async => _client.close();
 }
 
-/// 引擎侧用户可调的抓取限制（详情刷新 24h 冷却开关）。
+/// 引擎侧用户可调的抓取限制（详情刷新 24h 冷却开关、App API 增强开关）。
 class EngineSettings {
   final bool detailRateLimitEnabled;
   final int windowSeconds;
+  final bool appApiEnabled;
 
   EngineSettings({
     required this.detailRateLimitEnabled,
     required this.windowSeconds,
+    this.appApiEnabled = false,
   });
 
   factory EngineSettings.fromJson(Map<String, dynamic> j) => EngineSettings(
     detailRateLimitEnabled: j['detail_rate_limit_enabled'] as bool? ?? true,
     windowSeconds: j['detail_refresh_window_seconds'] as int? ?? 86400,
+    appApiEnabled: j['app_api_enabled'] as bool? ?? false,
   );
 }
 

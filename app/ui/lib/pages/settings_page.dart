@@ -102,21 +102,44 @@ class SettingsPage extends ConsumerWidget {
                     child: Text('引擎未就绪：$e',
                         style: TextStyle(color: scheme.error, fontSize: 12)),
                   ),
-                  data: (st) => SwitchListTile(
-                    title: const Text('详情刷新限流（24 小时一次）'),
-                    subtitle: Text(
-                      st.detailRateLimitEnabled
-                          ? '同一本书每天最多向官方发起一次刷新请求'
-                          : '已关闭——可随时手动刷新（请节制）',
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                    value: st.detailRateLimitEnabled,
-                    onChanged: (v) async {
-                      await ref
-                          .read(bootProvider.future)
-                          .then((h) => h.api.setDetailRateLimitEnabled(v));
-                      ref.invalidate(detailRateLimitProvider);
-                    },
+                  data: (st) => Column(
+                    children: [
+                      SwitchListTile(
+                        title: const Text('详情刷新限流（24 小时一次）'),
+                        subtitle: Text(
+                          st.detailRateLimitEnabled
+                              ? '同一本书每天最多向官方发起一次刷新请求'
+                              : '已关闭——可随时手动刷新（请节制）',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        value: st.detailRateLimitEnabled,
+                        onChanged: (v) async {
+                          await ref
+                              .read(bootProvider.future)
+                              .then((h) => h.api.setDetailRateLimitEnabled(v));
+                          ref.invalidate(detailRateLimitProvider);
+                        },
+                      ),
+                      // App API 增强通路（docs/05 §3.5）：开关持久化为引擎
+                      // 设置项；认证是 App 内置凭据自签（sfacg-app-api.md §1），
+                      // 无需用户输入任何凭据。
+                      SwitchListTile(
+                        title: const Text('App API 增强抓取'),
+                        subtitle: Text(
+                          st.appApiEnabled
+                              ? '刷新优先走 App API（精确字数/评分/改编漫画·有声标注），失败自动回落'
+                              : '关闭——刷新只走移动版页面（默认）',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        value: st.appApiEnabled,
+                        onChanged: (v) async {
+                          await ref
+                              .read(bootProvider.future)
+                              .then((h) => h.api.setAppAPIEnabled(v));
+                          ref.invalidate(detailRateLimitProvider);
+                        },
+                      ),
+                    ],
                   ),
                 ),
           ),

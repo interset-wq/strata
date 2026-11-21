@@ -60,6 +60,7 @@ type Server struct {
 const (
 	detailRefreshWindow = 24 * time.Hour
 	detailRateLimitPref = "detail_rate_limit_enabled"
+	appAPIPref          = "app_api_enabled"
 )
 
 func New(s *store.Store) *gin.Engine {
@@ -176,30 +177,49 @@ func (s *Server) settings(c *gin.Context) {
 		fail(c, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
+	appAPI, err := s.appAPIEnabled(c.Request.Context())
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"detail_rate_limit_enabled":     enabled,
 		"detail_refresh_window_seconds": int64(detailRefreshWindow / time.Second),
+		"app_api_enabled":               appAPI,
 	})
 }
 
 func (s *Server) updateSettings(c *gin.Context) {
 	var body struct {
 		DetailRateLimitEnabled *bool `json:"detail_rate_limit_enabled"`
+		AppAPIEnabled          *bool `json:"app_api_enabled"`
 	}
-	if err := c.ShouldBindJSON(&body); err != nil || body.DetailRateLimitEnabled == nil {
+	if err := c.ShouldBindJSON(&body); err != nil ||
+		(body.DetailRateLimitEnabled == nil && body.AppAPIEnabled == nil) {
 		fail(c, http.StatusBadRequest, "invalid_argument",
-			"detail_rate_limit_enabled is required")
+			"detail_rate_limit_enabled or app_api_enabled is required")
 		return
 	}
-	value := "0"
-	if *body.DetailRateLimitEnabled {
-		value = "1"
+	if body.DetailRateLimitEnabled != nil {
+		if err := s.store.SetPref(c.Request.Context(), detailRateLimitPref, boolPref(*body.DetailRateLimitEnabled)); err != nil {
+			fail(c, http.StatusInternalServerError, "internal", err.Error())
+			return
+		}
 	}
-	if err := s.store.SetPref(c.Request.Context(), detailRateLimitPref, value); err != nil {
-		fail(c, http.StatusInternalServerError, "internal", err.Error())
-		return
+	if body.AppAPIEnabled != nil {
+		if err := s.store.SetPref(c.Request.Context(), appAPIPref, boolPref(*body.AppAPIEnabled)); err != nil {
+			fail(c, http.StatusInternalServerError, "internal", err.Error())
+			return
+		}
 	}
 	s.settings(c)
+}
+
+func boolPref(v bool) string {
+	if v {
+		return "1"
+	}
+	return "0"
 }
 
 // detailRateLimitEnabled returns the persisted preference; missing means on.
@@ -212,6 +232,20 @@ func (s *Server) detailRateLimitEnabled(ctx context.Context) (bool, error) {
 		return true, nil
 	}
 	return v != "0" && v != "false", nil
+}
+
+// appAPIEnabled returns the persisted App-API preference (设置页开关); when
+// never set it falls back to the STRATA_APP_API env snapshot taken at
+// startup (native dev runs). Off by default.
+func (s *Server) appAPIEnabled(ctx context.Context) (bool, error) {
+	v, ok, err := s.store.Pref(ctx, appAPIPref)
+	if err != nil {
+		return false, err
+	}
+	if !ok {
+		return s.appAPI, nil
+	}
+	return v == "1" || v == "true", nil
 }
 
 // detailRefreshInfo describes the cooldown for one book on GET /books/:nid so
@@ -1107,10 +1141,11 @@ func (s *Server) bookRankSeed(c *gin.Context) {
 // /adpworks, docs/05 §6) after a successful alive write: comic_id and
 // album_id (0 = confirmed none), plus the comic folderName archive when a
 // comic exists. Pure best-effort: any failure leaves the columns NULL and
-// never affects the refresh response. App-API path only (signed client), so
-// it is a no-op for the default HTML-only build.
+// never affects the refresh response. Gated by the app_api_enabled setting
+// (STRATA_APP_API env bootstrap), off by default.
 func (s *Server) enrichAdpworks(ctx context.Context, nid int64) {
-	if !s.appAPI {
+	enabled, err := s.appAPIEnabled(ctx)
+	if err != nil || !enabled {
 		return
 	}
 	aw, err := crawl.FetchAdpWorks(ctx, s.client, s.limiter, nid, true)
@@ -1147,11 +1182,11 @@ func (s *Server) bookRefresh(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
 	defer cancel()
 
-	// App API enhancement (docs/05 §3.5): opt-in via STRATA_APP_API=1.
-	// On success every field the response carries is persisted; ANY failure
-	// silently falls through to the mobile HTML baseline — no retry, no
-	// user-visible error.
-	if s.appAPI {
+	// App API enhancement (docs/05 §3.5): opt-in via the app_api_enabled
+	// setting (STRATA_APP_API env bootstrap). On success every field the
+	// response carries is persisted; ANY failure silently falls through to
+	// the mobile HTML baseline — no retry, no user-visible error.
+	if appAPIOn, sErr := s.appAPIEnabled(ctx); sErr == nil && appAPIOn {
 		if app, aerr := crawl.FetchAppNovel(ctx, s.client, s.limiter, nid, true); aerr == nil {
 			observedAt := time.Now().Unix()
 			if err := s.writeApp(ctx, nid, app, observedAt); err == nil {
