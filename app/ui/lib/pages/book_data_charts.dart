@@ -124,12 +124,25 @@ class _UpdateHeatmapState extends State<UpdateHeatmap> {
       ];
     }
 
-    const s = 11.0, g = 2.0;
+    // 自适应格子：4 周 → 24px 大方格，12 周 → 铺满卡片，26 周 → ~11px
+    // 恰好铺满——三档都不需要横向滚动（inner 宽 = 屏宽 - 页边距 32 - 卡边距 28）
+    const g = 2.0;
+    final cols = _weeks;
+    final innerW = MediaQuery.sizeOf(context).width - 60;
+    final s = ((innerW - (cols - 1) * g) / cols).clamp(9.0, 24.0);
+    // 月份刻度：可见范围内每个 1 号
+    final labels = <_MonthLabel>[];
+    for (var i = 0; i < tail.length; i++) {
+      if (tail[i].day.day == 1) {
+        labels.add(_MonthLabel(x: i * (s + g), text: '${tail[i].day.month}月'));
+      }
+    }
     final grid = SizedBox(
-      height: 7 * (s + g),
-      width: _weeks * (s + g) - g,
+      height: 7 * (s + g) + 16,
+      width: cols * (s + g) - g,
       child: CustomPaint(
-          painter: _HeatmapPainter(cells: tail, scheme: scheme)),
+          painter: _HeatmapPainter(
+              cells: tail, scheme: scheme, cell: s, labels: labels)),
     );
 
     return Container(
@@ -160,15 +173,21 @@ class _UpdateHeatmapState extends State<UpdateHeatmap> {
                 selected: {_weeks},
                 onSelectionChanged: (sel) => setState(() => _weeks = sel.first),
                 showSelectedIcon: false,
+                style: ButtonStyle(
+                  backgroundColor: WidgetStateProperty.resolveWith(
+                      (states) => states.contains(WidgetState.selected)
+                          ? scheme.primary
+                          : Colors.transparent),
+                  foregroundColor: WidgetStateProperty.resolveWith(
+                      (states) => states.contains(WidgetState.selected)
+                          ? scheme.onPrimary
+                          : scheme.onSurface),
+                ),
               ),
             ],
           ),
           const SizedBox(height: 10),
-          if (_weeks > 12)
-            SingleChildScrollView(
-                scrollDirection: Axis.horizontal, child: grid)
-          else
-            grid,
+          grid,
           const SizedBox(height: 10),
           Wrap(
             spacing: 10,
@@ -187,9 +206,9 @@ class _UpdateHeatmapState extends State<UpdateHeatmap> {
             ],
           ),
           const SizedBox(height: 4),
-          Text('格内点 = 含多日累计；空白 ≠ 断更，是没打开 App 的数据缺口',
+          Text('格内点 = 含多日累计；空白 = 数据缺口（不是无更新日）',
               style: TextStyle(fontSize: 10, color: scheme.onSurfaceVariant)),
-          Text('估算值，非官方判定；全勤线 ${wan(kAttendanceThreshold)} 字/日'
+          Text('估算值，非官方判定  全勤线 ${wan(kAttendanceThreshold)} 字/日'
               '（官方口径）',
               style: TextStyle(
                   fontSize: 10,
@@ -228,12 +247,19 @@ class _UpdateHeatmapState extends State<UpdateHeatmap> {
 class _HeatmapPainter extends CustomPainter {
   final List<DayCell> cells; // 长度 = 周数 × 7，列 = 周，行 = 一(0)..日(6)
   final ColorScheme scheme;
+  final double cell;
+  final List<_MonthLabel> labels;
 
-  _HeatmapPainter({required this.cells, required this.scheme});
+  _HeatmapPainter(
+      {required this.cells,
+      required this.scheme,
+      required this.cell,
+      required this.labels});
 
   @override
   void paint(Canvas canvas, Size size) {
-    const s = 11.0, g = 2.0;
+    const g = 2.0;
+    final s = cell;
     for (var i = 0; i < cells.length; i++) {
       final col = i ~/ 7, row = i % 7;
       final rect = Rect.fromLTWH(col * (s + g), row * (s + g), s, s);
@@ -251,11 +277,23 @@ class _HeatmapPainter extends CustomPainter {
       } else {
         canvas.drawRRect(rrect, Paint()..color = fill);
         if (c.kind == DayKind.observed && c.cumDays > 1) {
-          // 含多日累计的小点标记
-          canvas.drawCircle(Offset(rect.right - 3, rect.top + 3), 1.6,
-              Paint()..color = scheme.onSurface.withValues(alpha: .65));
+          // 含多日累计的小点标记（半径随格子缩放）
+          final r = (s * 0.16).clamp(1.2, 2.2);
+          canvas.drawCircle(Offset(rect.right - r - 1.5, rect.top + r + 1.5),
+              r, Paint()..color = scheme.onSurface.withValues(alpha: .65));
         }
       }
+    }
+    // 月份刻度标签（底部 16px 区）
+    for (final l in labels) {
+      final tp = TextPainter(
+        text: TextSpan(
+            text: l.text,
+            style:
+                TextStyle(fontSize: 10, color: scheme.onSurfaceVariant)),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      tp.paint(canvas, Offset(l.x + 1, 7 * (s + g) + 4));
     }
   }
 
@@ -272,7 +310,15 @@ class _HeatmapPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_HeatmapPainter old) =>
-      old.cells.length != cells.length;
+      old.cells.length != cells.length || old.cell != cell;
+}
+
+/// 月份刻度标签（x = 该月 1 号所在列的列首）。
+class _MonthLabel {
+  final double x;
+  final String text;
+
+  const _MonthLabel({required this.x, required this.text});
 }
 
 /// 全勤达标看板（docs/07 §5）：月累计/目标、断更次数（已用/允许 1）、
@@ -328,19 +374,41 @@ class AttendanceBoard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          _row(
-              context,
-              '断更已用',
-              halts == 0
-                  ? '0 / 1'
-                  : halts == 1
-                      ? '1 / 1——再断更一次即失全勤'
-                      : '$halts / 1——全勤已破（估算）',
-              color: halts == 0
-                  ? null
-                  : halts == 1
-                      ? scheme.tertiary
-                      : scheme.error),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('断更已用',
+                  style: TextStyle(
+                      fontSize: 12, color: scheme.onSurfaceVariant)),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(halts == 0 ? '0 / 1' : halts == 1 ? '1 / 1' : '$halts / 1',
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: halts == 0
+                              ? null
+                              : halts == 1
+                                  ? scheme.tertiary
+                                  : scheme.error)),
+                  Text(halts == 0
+                      ? '全勤保持中'
+                      : halts == 1
+                          ? '再断更一次即失全勤'
+                          : '全勤已破（估算）',
+                      style: TextStyle(
+                          fontSize: 10,
+                          color: halts == 0
+                              ? scheme.onSurfaceVariant
+                              : halts == 1
+                                  ? scheme.tertiary
+                                  : scheme.error)),
+                ],
+              ),
+            ],
+          ),
           const SizedBox(height: 6),
           _row(context, '预计达标', delta >= target ? '跟得上' : '落后 ${wan(target - delta)} 字',
               color: delta >= target ? scheme.primary : null),

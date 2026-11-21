@@ -24,6 +24,7 @@ class _BookDataPageState extends ConsumerState<BookDataPage> {
   late Future<List<Object?>> _data; // [List<ObservationRow>, BookDetail?]
   final ScrollController _scroll = ScrollController();
   bool _showTop = false;
+  bool _showAllObs = false;
 
   @override
   void initState() {
@@ -128,7 +129,21 @@ class _BookDataPageState extends ConsumerState<BookDataPage> {
                 ],
               ),
               const SizedBox(height: 8),
-              for (final o in items) _ObsRow(o: o),
+              // 默认只给最近 7 条——52 条全展开约 12 屏，把图表区埋掉；
+              // 需要原始序列时手动展开
+              for (final o in (_showAllObs ? items : items.take(7)))
+                _ObsRow(o: o),
+              if (items.length > 7) ...[
+                const SizedBox(height: 2),
+                Center(
+                  child: TextButton(
+                    onPressed: () =>
+                        setState(() => _showAllObs = !_showAllObs),
+                    child:
+                        Text(_showAllObs ? '收起' : '展开全部 ${items.length} 条'),
+                  ),
+                ),
+              ],
             ],
           );
         },
