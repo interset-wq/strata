@@ -8,6 +8,13 @@ import '../core/providers.dart';
 import '../data/api/strata_api.dart';
 import '../widgets/metric_badge.dart';
 
+/// 官方热销信号（docs/sfacg-live-ranks.md）：当前在已缓存官方热销榜上的
+/// nid 集合。被动信号——引擎从不为它抓取，未缓存/离线时为空集（不显示徽标）。
+final _saleSetProvider = FutureProvider.autoDispose<Set<int>>((ref) async {
+  final h = await ref.read(bootProvider.future);
+  return h.api.officialSaleSet();
+});
+
 /// 书籍详情页：种子数据 + 最新观测的 effective 展示，
 /// 附三态刷新（docs/05）与观测历史。
 class BookDetailPage extends ConsumerStatefulWidget {
@@ -154,6 +161,11 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
           String? s(Object? v) => v?.toString();
           final licensed = b['is_licensed'] == true;
           final scheme = Theme.of(context).colorScheme;
+          // 官方热销徽标（被动信号：缓存未命中/离线 → false，静默不显示）。
+          final onSale = ref.watch(_saleSetProvider).maybeWhen(
+                data: (set) => set.contains(widget.nid),
+                orElse: () => false,
+              );
           // 种子 cover_url 存相对路径（无前缀，上游爬虫缺前缀为已知问题）：
           // 有值拼 CDN 前缀；空值用官方默认封面兜底（用户拍板 2026-11-17）。
           final raw = s(eff['cover_url'] ?? b['cover_url']);
@@ -224,6 +236,8 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                               _badge(context,
                                   s(eff['status'] ?? b['status'])!,
                                   filled: true),
+                            if (onSale)
+                              _badge(context, '官方热销', filled: true),
                             if (s(eff['genre'] ?? b['genre']) != null)
                               _badge(context,
                                   s(eff['genre'] ?? b['genre'])!),

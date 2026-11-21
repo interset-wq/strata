@@ -4,8 +4,9 @@ import 'package:go_router/go_router.dart';
 
 import '../core/providers.dart';
 import '../data/api/strata_api.dart';
+import '../widgets/default_cover.dart';
 
-/// 官方榜单 demo 页（网格入口）：每格指向一个榜单详情页。
+/// 官方榜单页（网格入口）：每格指向一个榜单详情页。
 /// 来源（docs/sfacg-live-ranks.md）：
 ///  1. 历史月榜库（MonthlyBoy.ashx，2013-03 起任意月份，月票带票数）
 ///  2. PC 当期四榜（book.sfacg.com/Rank/）
@@ -220,7 +221,7 @@ class OfficialRanksPage extends ConsumerWidget {
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('官方榜单（demo）')),
+      appBar: AppBar(title: const Text('官方榜单')),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -322,6 +323,13 @@ class _RankList extends StatelessWidget {
                     ),
                   ),
                 ),
+                const SizedBox(width: 8),
+                SizedBox(
+                  width: 38,
+                  height: 54,
+                  child: coverImage(it.coverUrl, it.nid),
+                ),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

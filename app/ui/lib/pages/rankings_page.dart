@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../core/providers.dart';
 import '../data/api/strata_api.dart';
@@ -123,6 +124,46 @@ class _RankingsPageState extends ConsumerState<RankingsPage>
                 ],
               ),
             ),
+          // 官方榜单入口（docs/sfacg-live-ranks.md）：本页是站内口径（累计值
+          // 分位），官方榜单是平台当期口径，两个来源分开导航。
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
+            child: Card(
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: () => context.push('/official-ranks'),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 10),
+                  child: Row(
+                    children: [
+                      Icon(Icons.leaderboard_outlined,
+                          size: 18, color: scheme.primary),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('官方榜单',
+                                style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 1),
+                            Text('SFACG 官方三来源：月榜库（2013-03 起任意月）/ PC 当期四榜 / 移动热销榜',
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: scheme.onSurfaceVariant)),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.chevron_right,
+                          size: 18, color: scheme.onSurfaceVariant),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
           Expanded(
             child: Stack(
               children: [

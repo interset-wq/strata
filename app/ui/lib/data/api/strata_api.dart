@@ -161,6 +161,15 @@ class StrataApi {
         .toList();
   }
 
+  /// 官方热销信号（docs/sfacg-live-ranks.md）：当前在已缓存官方热销榜上
+  /// （月榜库当期 rank=3 ∪ PC 月度热销 ∪ 移动热销）的 nid 集合。
+  /// 引擎侧从不为它发起抓取——未缓存/离线时返回空集，静默降级。
+  Future<Set<int>> officialSaleSet() async {
+    final body = await _get('/official-ranks/sale-set') as Map<String, dynamic>;
+    final nids = (body['nids'] as List? ?? const []);
+    return nids.map((e) => (e as num).toInt()).toSet();
+  }
+
   /// Classic category/status/contest list: absolute favs order by default,
   /// or same-generation favorite percentile (order='pct', 优质短篇口径).
   Future<List<RankItem>> rankingClassic({
