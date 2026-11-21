@@ -51,7 +51,7 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
   int? _currentYear; // 年份轴（bottom sheet 切换）
   String? _currentContest; // 比赛轴（drawer 切换）
   String? _currentGenre; // 题材轴（chip 行切换）
-  String _drawerQuery = ''; // drawer 搜索词（本地过滤 38 组）
+  String _drawerQuery = ''; // drawer 搜索词（本地过滤赛道组）
   String _currentOrder = 'favs'; // 指标轴（经典榜单四榜切换）
   bool _ascending = false; // 逆序（升序）态
   List<RankItem> _items = [];
@@ -429,7 +429,8 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
     _loadMore();
   }
 
-  // 比赛 drawer：38 个赛道组（contest 聚合 count DESC）+ 本地搜索过滤 +
+  // 比赛 drawer：各赛道组（contest 归一化聚合 count DESC，N征系篇幅赛项
+  // 已并入母赛事）+ 本地搜索过滤 +
   // 选中态。material drawer 的标准触发 = AppBar 汉堡 / 屏幕左缘右滑。
   Widget _buildContestDrawer() {
     final scheme = Theme.of(context).colorScheme;

@@ -139,8 +139,10 @@ short→IP 的回退是 UI 的职责（`bannerProvider` 一处集中），API �
 ### GET /strata/ip-groups?form=&status=（**已实现**）
 
 contest 聚合端点：`form` 必填，池按征文（`contest`，非空）`GROUP BY` 聚合，
-`count DESC, contest ASC` 稳定序。返回 `total`（池总量，含无 contest 的
-书）+ `groups: [{contest, count}]`。
+`count DESC, contest ASC` 稳定序。组名已归一化（`NormalizeContest`，用户
+2026-11-21）：仅 N征 系列是多赛项赛事（六征长篇/中篇/短篇 → 六征），其他
+征文名原样返回。返回 `total`（池总量，含无 contest 的书）+
+`groups: [{contest, count}]`。
 
 - IP tab 入口行（`form=ip_collab`）：端上取前 2 组作命名 IP 入口
   （崩坏3征文 → 崩坏3，去“征文”后缀），其余折成“其他”（total − 前 2 之和）。
@@ -151,8 +153,9 @@ contest 聚合端点：`form` 必填，池按征文（`contest`，非空）`GROU
 
 ### GET /strata/ip-books?form=&group=&limit=&offset=（**已实现**）
 
-一个 IP 入口的列表：`group` 必填——征文名（精确匹配）或 `'other'`
-（收藏数前 2 名征文之外的长尾，引擎内部算 top-2）。组内 `favs DESC,
+一个 IP 入口的列表：`group` 必填——征文名（归一化匹配：母赛事名命中其
+全部篇幅赛项，归一化规则见聚合端点）或 `'other'`
+（归一化后收藏数前 2 名征文之外的长尾，引擎内部算 top-2）。组内 `favs DESC,
 nid ASC`，分页同 `/rankings/classic`。未知征文名返回空列表不报错。
 
 ### GET /strata/cover-carousel?form=&limit=&seed=（**已实现**）
@@ -199,9 +202,10 @@ bottom sheet**（页内切换、无中间页，用户 2026-11-19 定）。
 分位只按种子池（`is_licensed=0`）计算；`licensed_excluded` 恒为 true，榜单永不出现授权书。
 
 **二级页过滤参数（宫格入口，已实现）**：`status=已完结|连载中`（精确匹配，非法值 400）、
-`contest=1`（全部参赛作品）或 `contest=具体届次名`（如 `2025春季征文`，精确匹配）。
+`contest=1`（全部参赛作品）或 `contest=具体届次名`（如 `2025春季征文`；
+归一化匹配：`六征` 这类母赛事名命中其 长篇/中篇/短篇 三个赛项）。
 与 `genre` 可组合，均在分位榜口径内过滤。`contest` 取值在端上从 `contest=1` 结果
-聚合（items 的 `contest` 字段），不单独提供枚举端点。
+聚合（items 的 `contest` 字段，已是归一化赛事名），不单独提供枚举端点。
 
 ### GET /strata/rankings/board?kind=&form=&limit=&offset=（**已实现**）
 

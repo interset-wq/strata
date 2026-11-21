@@ -505,3 +505,31 @@ VALUES (5555, 'Newly Found', 'Author Z', NULL, 'search', 1700000000)`); err != n
 		t.Fatalf("discovered nid 5555 missing from watchlist: %+v", items)
 	}
 }
+
+func TestNormalizeContest(t *testing.T) {
+	cases := map[string]string{
+		// N征系列：篇幅赛项并入母赛事（用户 2026-11-21：只有 x征 多赛项）
+		"六征长篇":          "六征",
+		"六征中篇":          "六征",
+		"六征短篇":          "六征",
+		"十三征长篇":         "十三征",
+		"七征对话类征文长篇":     "七征对话类征文",
+		"七征对话类征文短篇":     "七征对话类征文",
+		"九征对话小说":         "九征对话小说", // 无篇幅后缀：原样
+		"十征":             "十征",
+		// 非 N征 赛事：一律原样
+		"冬季征文":           "冬季征文",
+		"怪谈异闻主题征文长篇":    "怪谈异闻主题征文长篇",
+		"春节征文长篇":         "春节征文长篇",
+		"2025春季征文":        "2025春季征文",
+		"“超新星杯”短篇大赛":    "“超新星杯”短篇大赛",
+		"崩坏3征文":          "崩坏3征文",
+		"征长篇":            "征长篇", // 无数字前缀不算 N征
+		"":               "",
+	}
+	for in, want := range cases {
+		if got := NormalizeContest(in); got != want {
+			t.Errorf("NormalizeContest(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

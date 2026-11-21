@@ -990,8 +990,9 @@ String? contestIpLabel(String? contest) {
 }
 
 /// contest（征文）→ 短篇 tab 比赛 chip 的紧凑标签：
-/// 去「征文」/「同人征文」后缀（四征短篇 → 四征短篇、2025春季征文 →
-/// 2025春季），「超新星杯」特殊处理（“超新星杯”短篇大赛 → 超新星杯）。
+/// 去「征文」/「同人征文」后缀（2025春季征文 → 2025春季），「超新星杯」
+/// 特殊处理（“超新星杯”短篇大赛 → 超新星杯）。入参已是引擎归一化后的
+/// 赛事名（六征长篇/中篇/短篇 → 六征，仅 N征 系列，用户 2026-11-21）。
 String contestChipLabel(String contest) {
   if (contest.contains('超新星杯')) return '超新星杯';
   var s = contest;

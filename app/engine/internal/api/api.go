@@ -518,7 +518,7 @@ func (s *Server) rankingFavs(c *gin.Context) {
 		fail(c, http.StatusBadRequest, "invalid_argument", "unknown status")
 		return
 	}
-	contest := c.Query("contest")
+	contest := store.NormalizeContest(c.Query("contest"))
 
 	items, err := s.store.RankingFavs(c.Request.Context(), year, genre, status, contest, limit)
 	if err != nil {
@@ -786,8 +786,9 @@ func (s *Server) rankingClassic(c *gin.Context) {
 			"dir must be \"asc\" or \"desc\"")
 		return
 	}
+	contest := store.NormalizeContest(c.Query("contest"))
 	items, err := s.store.ClassicBooks(c.Request.Context(),
-		c.Query("genre"), c.Query("status"), c.Query("contest"), form, wordsBand,
+		c.Query("genre"), c.Query("status"), contest, form, wordsBand,
 		year, limit, offset, order, dir)
 	if err != nil {
 		fail(c, http.StatusInternalServerError, "internal", err.Error())
@@ -808,7 +809,7 @@ func (s *Server) rankingClassic(c *gin.Context) {
 		"meta": gin.H{
 			"kind": "classic", "pool": "seed", "ordering": ordering,
 			"genre": c.Query("genre"), "status": c.Query("status"),
-			"contest": c.Query("contest"), "form": form, "year": year,
+			"contest": contest, "form": form, "year": year,
 			"order": order, "dir": dirEcho, "licensed_excluded": true,
 		},
 		"items": items,
@@ -1848,7 +1849,7 @@ func (s *Server) ipBooks(c *gin.Context) {
 			"form must be invalid|short|medium|long|dialogue|ip_collab")
 		return
 	}
-	group := c.Query("group")
+	group := store.NormalizeContest(c.Query("group"))
 	if group == "" {
 		fail(c, http.StatusBadRequest, "invalid_argument",
 			"group must be a contest name or 'other'")

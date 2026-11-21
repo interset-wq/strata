@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"sort"
 	"strings"
 	"time"
 
@@ -205,7 +206,7 @@ FROM seed.books WHERE nid = ?`
 	b.Genre = strPtr(genre)
 	b.PriceType = strPtr(priceType)
 	b.Status = strPtr(status)
-	b.Contest = strPtr(contest)
+	b.Contest = contestPtr(contest)
 	b.Words = intPtr(words)
 	b.Clicks = intPtr(clicks)
 	b.Favs = intPtr(favs)
@@ -328,13 +329,14 @@ WHERE est_year = ? AND is_licensed = 0 AND fav_pctl IS NOT NULL`
 		args = append(args, status)
 	}
 	if contest != "" {
-		// contest=1 means "any contest entry"; any other value matches one
-		// specific contest name exactly.
+		// contest=1 means "any contest entry"; any other value (normalized
+		// at the API layer) matches the event or any of its divisions.
 		if contest == "1" {
 			query += " AND contest != ''"
 		} else {
-			query += " AND contest = ?"
-			args = append(args, contest)
+			clause, ca := contestMatchClause("contest", contest)
+			query += " AND " + clause
+			args = append(args, ca...)
 		}
 	}
 	query += " ORDER BY fav_pctl DESC, seed.books.nid ASC LIMIT ?"
@@ -362,7 +364,7 @@ WHERE est_year = ? AND is_licensed = 0 AND fav_pctl IS NOT NULL`
 		item.Genre = strPtr(gen)
 		item.Favs = intPtr(favs)
 		item.FavPctl = pctl
-		item.Contest = strPtr(contest)
+		item.Contest = contestPtr(contest)
 		items = append(items, item)
 	}
 	return items, rows.Err()
@@ -395,8 +397,9 @@ WHERE seed.books.is_licensed = 0`
 		if contest == "1" {
 			query += " AND seed.books.contest != ''"
 		} else {
-			query += " AND seed.books.contest = ?"
-			args = append(args, contest)
+			clause, ca := contestMatchClause("seed.books.contest", contest)
+			query += " AND " + clause
+			args = append(args, ca...)
 		}
 	}
 	if form != "" {
@@ -466,7 +469,7 @@ WHERE seed.books.is_licensed = 0`
 		item.Clicks = intPtr(clicks)
 		item.Favs = intPtr(favs)
 		item.Praises = intPtr(praises)
-		item.Contest = strPtr(contest)
+		item.Contest = contestPtr(contest)
 		item.CoverURL = strPtr(cover)
 		items = append(items, item)
 	}
@@ -1143,7 +1146,7 @@ GROUP BY contest ORDER BY c DESC, contest ASC`, args...)
 	if err := rows.Err(); err != nil {
 		return 0, nil, err
 	}
-	return total, groups, nil
+	return total, mergeContestGroups(groups), nil
 }
 
 // YearGroup is one est_year cohort of a form pool: the short tab's year
@@ -1233,38 +1236,59 @@ func (s *Store) IpBooks(ctx context.Context, form, group string,
 	where := "seed.books.form = ?"
 	args := []any{form}
 	if group == "other" {
-		var top []string
+		// Top-2 events by merged (normalized) count: fetch every raw group,
+		// fold divisions into events, keep the top-2 event names, then
+		// exclude every raw spelling of those two events.
 		rows, err := s.DB.QueryContext(ctx, `
-SELECT contest FROM seed.books
+SELECT contest, COUNT(*) AS c FROM seed.books
 WHERE form = ? AND contest IS NOT NULL AND contest != ''
-GROUP BY contest ORDER BY COUNT(*) DESC, contest ASC LIMIT 2`, form)
+GROUP BY contest ORDER BY c DESC, contest ASC`, form)
 		if err != nil {
 			return nil, err
 		}
+		var names []string
+		merged := map[string]int{}
 		for rows.Next() {
 			var c string
-			if err := rows.Scan(&c); err != nil {
+			var n int
+			if err := rows.Scan(&c, &n); err != nil {
 				rows.Close()
 				return nil, err
 			}
-			top = append(top, c)
+			name := NormalizeContest(c)
+			if merged[name] == 0 {
+				names = append(names, name)
+			}
+			merged[name] += n
 		}
 		rows.Close()
 		if err := rows.Err(); err != nil {
 			return nil, err
 		}
+		sort.Slice(names, func(i, j int) bool {
+			if merged[names[i]] != merged[names[j]] {
+				return merged[names[i]] > merged[names[j]]
+			}
+			return names[i] < names[j]
+		})
+		if len(names) > 2 {
+			names = names[:2]
+		}
 		where += " AND contest IS NOT NULL AND contest != ''"
-		if len(top) > 0 {
-			ph := make([]string, len(top))
-			for i, c := range top {
-				ph[i] = "?"
-				args = append(args, c)
+		if len(names) > 0 {
+			ph := []string{}
+			for _, name := range names {
+				for _, v := range []string{name, name + "长篇", name + "中篇", name + "短篇"} {
+					ph = append(ph, "?")
+					args = append(args, v)
+				}
 			}
 			where += fmt.Sprintf(" AND contest NOT IN (%s)", strings.Join(ph, ","))
 		}
 	} else {
-		where += " AND contest = ?"
-		args = append(args, group)
+		clause, ca := contestMatchClause("contest", group)
+		where += " AND " + clause
+		args = append(args, ca...)
 	}
 	query := `
 SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
@@ -1304,7 +1328,7 @@ WHERE ` + where +
 		item.Clicks = intPtr(clicks)
 		item.Favs = intPtr(favs)
 		item.Praises = intPtr(praises)
-		item.Contest = strPtr(contest)
+		item.Contest = contestPtr(contest)
 		item.CoverURL = strPtr(cover)
 		items = append(items, item)
 	}
@@ -2221,6 +2245,79 @@ func strPtr(v sql.NullString) *string {
 	}
 	s := v.String
 	return &s
+}
+
+// NormalizeContest collapses multi-division contest names to the
+// event-level name (user 2026-11-21): only the N征 series is multi-division
+// (六征 splits into 长篇/中篇/短篇; 七征 also carries a 对话类 division), so
+// the trailing 篇幅 suffix is stripped only from N征* names — every other
+// contest name is returned unchanged (it is a single-event contest).
+func NormalizeContest(s string) string {
+	if !isZhengEvent(s) {
+		return s
+	}
+	for _, suf := range []string{"长篇", "中篇", "短篇"} {
+		if strings.HasSuffix(s, suf) {
+			return strings.TrimSuffix(s, suf)
+		}
+	}
+	return s
+}
+
+// isZhengEvent reports whether s starts with a Chinese-numeral 征 event
+// prefix: one or more of 一二三四五六七八九十, then 征 (五征, 十三征,
+// 七征对话类征文 …). A 征 without a numeral prefix does not match.
+func isZhengEvent(s string) bool {
+	digits := false
+	for _, r := range s {
+		if strings.ContainsRune("一二三四五六七八九十", r) {
+			digits = true
+			continue
+		}
+		return digits && r == '征'
+	}
+	return false
+}
+
+// contestPtr is strPtr + NormalizeContest: every contest value the API
+// returns is event-level (六征长篇 → 六征).
+func contestPtr(v sql.NullString) *string {
+	p := strPtr(v)
+	if p == nil {
+		return nil
+	}
+	s := NormalizeContest(*p)
+	return &s
+}
+
+// contestMatchClause returns a WHERE fragment matching one normalized
+// contest name against the raw column: the event name or any of its
+// division spellings (六征 → 六征 / 六征长篇 / 六征中篇 / 六征短篇). col is
+// the column reference, optionally table-qualified.
+func contestMatchClause(col, name string) (string, []any) {
+	return "(" + col + " = ? OR " + col + " = ? || '长篇' OR " +
+		col + " = ? || '中篇' OR " + col + " = ? || '短篇')",
+		[]any{name, name, name, name}
+}
+
+// mergeContestGroups folds 征-series divisions into their event name (see
+// NormalizeContest) and re-sorts by merged count DESC, name ASC.
+func mergeContestGroups(groups []IpGroup) []IpGroup {
+	merged := map[string]int{}
+	for _, g := range groups {
+		merged[NormalizeContest(g.Contest)] += g.Count
+	}
+	out := make([]IpGroup, 0, len(merged))
+	for name, count := range merged {
+		out = append(out, IpGroup{Contest: name, Count: count})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Count != out[j].Count {
+			return out[i].Count > out[j].Count
+		}
+		return out[i].Contest < out[j].Contest
+	})
+	return out
 }
 
 func intPtr(v sql.NullInt64) *int64 {
