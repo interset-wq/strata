@@ -807,19 +807,17 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  // 短篇 tab 入口列表：5 个目的地专属入口（年份/比赛/题材/优质/随机）。
-  // 原五格宫格只有一行高、页面只占半屏，改纵向列表（用户 2026-11-19 定）：
-  // 每行图标 + 标题 + 描述 + 箭头，撑满页面。icon 登记见 docs/15
-  // （比赛/题材复用全局宫格语义）。
-  // 中篇 tab 入口网格（2×3）：总榜/年份/比赛/题材/优质/随机。
-  // 入口只做导航，轴切换留在 ClassicListPage 页内（docs/16）。
+  // 中篇 tab 入口网格（2×3）：经典榜单/年份/比赛/题材/优质/随机。
+  // 首位经典榜单与短篇 tab 同构（点击/收藏/点赞/字数四段切换 + 逆序，
+  // 总榜=其中收藏段，故不再单列总榜入口）；入口只做导航，轴切换留在
+  // ClassicListPage 页内（docs/16）。
   Widget _mediumEntryGrid(BuildContext context) {
     final entries = <(IconData, String, String, String)>[
       (
-        Icons.format_list_numbered,
-        '中篇总榜',
-        '全部中篇 · 收藏降序',
-        '/classic-list?title=${Uri.encodeComponent('中篇总榜')}&form=medium',
+        Icons.leaderboard,
+        '经典榜单',
+        '点击/收藏/点赞/字数',
+        '/classic-list?title=经典榜单&form=medium&metric-switchable=1',
       ),
       (
         Icons.calendar_month,
@@ -854,12 +852,13 @@ class _HomePageState extends ConsumerState<HomePage> {
     return _portalGrid(context, entries, crossAxisCount: 2);
   }
 
-  // 对话 tab 入口网格（3×3）：篇幅优先，再是榜单轴。
+  // 对话 tab 入口网格（3×3）：篇幅优先，再是榜单轴。首位经典榜单与
+  // 短篇/中篇同构（四段切换 + 逆序，总榜=其中收藏段）。
   List<(IconData, String, String, String)> _dialogueEntryGridEntries() {
     String listPath(String title, String extra) =>
         '/classic-list?title=${Uri.encodeComponent(title)}&form=dialogue$extra';
     return [
-      (Icons.format_list_numbered, '对话总榜', '全部对话 · 收藏降序', listPath('对话总榜', '')),
+      (Icons.leaderboard, '经典榜单', '点击/收藏/点赞/字数', listPath('经典榜单', '&metric-switchable=1')),
       (Icons.short_text, '短对话', '≤5 万字', listPath('短对话', '&words-band=short')),
       (
         Icons.menu_book,

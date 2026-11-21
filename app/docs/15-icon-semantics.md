@@ -38,7 +38,7 @@
 | 按状态浏览 | `Icons.update` | 首页宫格 |
 | 征文比赛 | `Icons.emoji_events` | 首页宫格 |
 | 短篇榜 | `Icons.article` | 首页宫格 |
-| 经典榜单入口 | `Icons.leaderboard` | 短篇 tab 入口列表：点击/收藏/点赞/字数四榜（页内 SegmentedButton 切换） |
+| 经典榜单入口 | `Icons.leaderboard` | 短篇入口列表 / 中篇/对话入口网格：点击/收藏/点赞/字数四榜（页内 SegmentedButton 切换；总榜=其中收藏段，故各 tab 不再单列总榜入口） |
 
 ## 分类入口（首页 curated 宽卡）
 
@@ -52,7 +52,6 @@
 
 | 语义 | icon | 使用处 |
 | --- | --- | --- |
-| 分类总榜 | `Icons.format_list_numbered` | 中篇/对话 tab 入口网格（全部作品收藏序；年份榜默认"全部年份"也可达） |
 | 短对话 | `Icons.short_text` | 对话 tab 入口网格（≤5 万字） |
 | 中对话 | `Icons.menu_book` | 对话 tab 入口网格（5–15 万字） |
 | 长对话 | `Icons.auto_stories` | 对话 tab 入口网格（>15 万字） |
