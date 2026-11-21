@@ -2541,14 +2541,11 @@ func contestPtr(v sql.NullString) *string {
 	return &s
 }
 
-// contestMatchClause returns a WHERE fragment matching one normalized
-// contest name against the raw column: the event name or any of its
-// division spellings (六征 → 六征 / 六征长篇 / 六征中篇 / 六征短篇). col is
-// the column reference, optionally table-qualified.
+// contestMatchClause returns a WHERE fragment matching one event-level
+// contest name against the raw column (see contestEventMatch in
+// contests.go). col is the column reference, optionally table-qualified.
 func contestMatchClause(col, name string) (string, []any) {
-	return "(" + col + " = ? OR " + col + " = ? || '长篇' OR " +
-		col + " = ? || '中篇' OR " + col + " = ? || '短篇')",
-		[]any{name, name, name, name}
+	return contestEventMatch(col, name)
 }
 
 // mergeContestGroups folds 征-series divisions into their event name (see

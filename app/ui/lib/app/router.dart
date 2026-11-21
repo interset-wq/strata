@@ -6,6 +6,8 @@ import '../pages/book_data_page.dart';
 import '../pages/book_detail_page.dart';
 import '../pages/boot_page.dart';
 import '../pages/browse_page.dart';
+import '../pages/contest_archive_page.dart';
+import '../pages/contest_list_page.dart';
 import '../pages/classic_list_page.dart';
 import '../pages/discover_page.dart';
 import '../pages/featured_gallery_page.dart';
@@ -130,7 +132,19 @@ final router = GoRouter(
           (m) => m.name == (state.uri.queryParameters['mode'] ?? ''),
           orElse: () => BrowseMode.category,
         ),
+        initialContest: state.uri.queryParameters['c'],
       ),
+    ),
+    // 赛事档案（docs/contest-display-in-app.md 形态一）：本地零请求视图，
+    // 库外参赛规模/获奖属 P1 清单 API。
+    GoRoute(
+      path: '/contests',
+      builder: (_, _) => const ContestListPage(),
+    ),
+    GoRoute(
+      path: '/contests/:name',
+      builder: (_, state) =>
+          ContestArchivePage(name: state.pathParameters['name']!),
     ),
     GoRoute(path: '/discover', builder: (_, _) => const DiscoverPage()),
     GoRoute(

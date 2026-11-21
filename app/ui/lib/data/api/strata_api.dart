@@ -367,6 +367,31 @@ class StrataApi {
         .toList();
   }
 
+  /// 赛事档案列表（docs/contest-display-in-app.md 形态一）：seed 内置库按
+  /// 赛事聚合（N征系列并入母赛事），零请求。官方日期来自引擎内嵌的
+  /// 用户核实静态表（analysis/references/contest-editions.md）。
+  Future<List<ContestGroup>> contestArchive() async {
+    final body = await _get('/contests');
+    return (body['groups'] as List)
+        .map((e) => ContestGroup.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// 一届赛事的代表作：各 form 头部按同代收藏分位（fav_pctl，NULL 殿后），
+  /// per 限每形态条数（docs/12 红线：累计原始值不进排序）。
+  Future<List<RankItem>> contestArchiveBooks({
+    required String contest,
+    int per = 10,
+  }) async {
+    final body = await _get('/contests/books', {
+      'contest': contest,
+      'per': '$per',
+    });
+    return (body['items'] as List)
+        .map((e) => RankItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   /// 编辑精选（seed featured=1，构建期人工选定，非"热门"）。
   /// 传 form 时只取该形态的 featured 池，池子不足 limit 时原样返回。
   Future<List<FeaturedItem>> featured({int limit = 6, String? form}) async {
@@ -838,6 +863,50 @@ class CalendarResponse {
       cells = (m['cells'] as List)
           .map((e) => CalendarDay.fromJson(e as Map<String, dynamic>))
           .toList();
+}
+
+/// 赛事档案条目（/strata/contests）：赛事级聚合 + 官方日期（用户核实）。
+/// count/forms 只覆盖内置库（seed 收录）作品；库外参赛规模属 P1 清单 API。
+class ContestGroup {
+  final String name;
+  final String series; // x|winter|spring|autumn|other
+  final int count;
+  final Map<String, int> forms;
+  final List<String> tracks; // 原始赛项名，count DESC
+  final int yearMin;
+  final int yearMax;
+  final int? year; // 官方启动年份（静态表）
+  final String? start; // 官方启动日（无则 null，UI 只显年份）
+  final String? end;
+  final String? note; // 公布等后续节点
+
+  ContestGroup({
+    required this.name,
+    required this.series,
+    required this.count,
+    required this.forms,
+    required this.tracks,
+    required this.yearMin,
+    required this.yearMax,
+    this.year,
+    this.start,
+    this.end,
+    this.note,
+  });
+
+  ContestGroup.fromJson(Map<String, dynamic> m)
+      : name = m['name'] as String,
+        series = m['series'] as String,
+        count = (m['count'] as num).toInt(),
+        forms = (m['forms'] as Map<String, dynamic>)
+            .map((k, v) => MapEntry(k, (v as num).toInt())),
+        tracks = (m['tracks'] as List).map((e) => e as String).toList(),
+        yearMin = (m['year_min'] as num).toInt(),
+        yearMax = (m['year_max'] as num).toInt(),
+        year = (m['year'] as num?)?.toInt(),
+        start = m['start'] as String?,
+        end = m['end'] as String?,
+        note = m['note'] as String?;
 }
 
 class RankItem {

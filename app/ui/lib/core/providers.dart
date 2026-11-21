@@ -179,6 +179,21 @@ final contestGroupsProvider = FutureProvider.family<IpGroupsResult, String>((
   return handle.api.ipGroups(form: form);
 });
 
+/// 赛事档案列表（docs/contest-display-in-app.md 形态一）：seed 内置库按
+/// 赛事聚合 + 引擎内嵌官方日期（用户核实）。零请求。
+final contestArchiveProvider =
+    FutureProvider<List<ContestGroup>>((ref) async {
+  final handle = await ref.watch(bootProvider.future);
+  return handle.api.contestArchive();
+});
+
+/// 一届赛事的代表作（per-form 窗口，同代收藏分位序）。
+final contestArchiveBooksProvider =
+    FutureProvider.family<List<RankItem>, String>((ref, contest) async {
+  final handle = await ref.watch(bootProvider.future);
+  return handle.api.contestArchiveBooks(contest: contest);
+});
+
 /// 筛选 facet（经典榜单筛选面板）：form 池的状态外五维度值列表
 /// （状态为固定枚举，不在 facet 里）。
 final facetsProvider = FutureProvider.family<FacetsResult, String>((

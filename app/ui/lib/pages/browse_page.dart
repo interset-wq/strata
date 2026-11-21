@@ -18,7 +18,10 @@ enum BrowseMode { category, status, contest, short }
 class BrowsePage extends ConsumerStatefulWidget {
   final BrowseMode mode;
 
-  const BrowsePage({super.key, required this.mode});
+  /// 初始赛事（赛事档案页"浏览全部作品"跳转携带，query c）。
+  final String? initialContest;
+
+  const BrowsePage({super.key, required this.mode, this.initialContest});
 
   @override
   ConsumerState<BrowsePage> createState() => _BrowsePageState();
@@ -33,6 +36,9 @@ class _BrowsePageState extends ConsumerState<BrowsePage> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialContest != null && widget.initialContest!.isNotEmpty) {
+      _contest = widget.initialContest!;
+    }
     _scroll.addListener(() {
       final show = _scroll.hasClients && _scroll.offset > 500;
       if (show != _showTop) setState(() => _showTop = show);
@@ -173,14 +179,8 @@ class _Body extends ConsumerWidget {
   }
 
   Future<void> _pickContest(BuildContext context, WidgetRef ref) async {
-    final handle = await ref.read(bootProvider.future);
-    final items =
-        await handle.api.rankingClassic(contest: '1', limit: 200);
-    final contests = <String>{
-      for (final it in items)
-        if (it.contest != null && it.contest!.isNotEmpty) it.contest!,
-    }.toList()
-      ..sort();
+    // 赛事名来自赛事档案（归并后的事件名，含对话类分轨；零新增请求）。
+    final groups = await ref.read(contestArchiveProvider.future);
     if (!context.mounted) return;
     await showModalBottomSheet<void>(
       context: context,
@@ -190,14 +190,20 @@ class _Body extends ConsumerWidget {
           children: [
             Padding(
               padding: const EdgeInsets.all(16),
-              child: Text('选择征文比赛（共 ${contests.length} 届）',
+              child: Text('选择征文比赛（共 ${groups.length} 届）',
                   style: Theme.of(context).textTheme.titleLarge),
             ),
-            for (final c in contests)
+            for (final g in groups)
               ListTile(
-                title: Text(c),
+                title: Text(g.name),
+                trailing: Text('${g.count}',
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context)
+                            .colorScheme
+                            .onSurfaceVariant)),
                 onTap: () {
-                  onContest(c);
+                  onContest(g.name);
                   Navigator.pop(context);
                 },
               ),

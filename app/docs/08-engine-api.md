@@ -335,6 +335,46 @@ form 过滤即池本身）。
 200：同上结构，`meta.kind="short"`、`ordering="favs"`、`short_max_words=50000`，
 `items` 元素为 `{ nid, title, author, genre, est_year, favs, words }`（无分位字段）。
 
+### GET /strata/contests
+
+赛事档案列表（docs/contest-display-in-app.md 形态一）：seed 内置库（`is_licensed=0`）
+按赛事事件聚合——N征 系列并入母赛事（对话类分轨随之并入），非 N征 赛事以
+原名为单事件。零网络请求。官方日期来自引擎内嵌静态表（源
+`analysis/references/contest-editions.md`，用户核实；缺失只显届次/年份，不编造）。
+
+200：`{ groups: [ContestGroup] }`，示例（`.25` 种子实测）：
+
+```json
+{
+  "name": "七征", "series": "x", "count": 399,
+  "forms": { "long": 280, "dialogue": 107, "short": 8, "medium": 4 },
+  "tracks": ["七征长篇", "七征对话类征文长篇", "七征对话类征文短篇", "七征中篇", "七征短篇"],
+  "year_min": 2019, "year_max": 2019,
+  "year": 2019, "start": null, "end": null, "note": null
+}
+```
+
+- `series`：`x`（N征）/ `winter` / `spring` / `autumn` / `other`。分节排序，
+  节内按 cohort 最早 `est_year`、再按名。
+- `count`/`forms`：仅内置库（种子收录）作品，**非官方全量参赛规模**
+  （属 P1 清单 API）。`forms` 按 DOM 核实的 `form` 统计，与 `tracks`
+  （平台原始赛项标注）不必互洽。
+- `tracks`：赛事原始赛项名（count DESC）。
+- `year`/`start`/`end`/`note`：官方元数据（静态表），无则 null；
+  `year_min`/`year_max` 是库内书 `est_year` 区间（在库口径）。
+
+### GET /strata/contests/books?contest=&per=
+
+一届赛事的代表作：per-form 窗口
+（`ROW_NUMBER() OVER (PARTITION BY form ORDER BY (fav_pctl IS NULL) ASC,
+fav_pctl DESC, nid)`），`per` 限每形态条数（1..50，默认 10）；
+累计原始值不进排序（docs/12 红线）。covers 覆盖层适用。
+
+- 400 `invalid_argument`：`contest` 缺失，或 `per` 越界。
+- 匹配语义与榜单筛选一致：N征 事件前缀匹配（含对话类分轨），非 N征 精确匹配。
+
+200：`{ contest, items: [RankItem] }`（`rank` = 该 form 组内名次 1..per）。
+
 ## 草案（Phase 3/4 实现，未落地前 UI 不得依赖）
 
 ### GET /strata/search?q=&limit=（**已实现**）

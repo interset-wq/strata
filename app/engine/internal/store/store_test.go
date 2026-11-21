@@ -153,7 +153,8 @@ func TestRankingShort(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(items) != 2 || items[0].NID != 1002 || items[1].NID != 1004 {
+	if len(items) != 3 || items[0].NID != 3003 || items[1].NID != 1002 ||
+		items[2].NID != 1004 {
 		t.Fatalf("items = %+v", items)
 	}
 	if items[0].Words == nil || *items[0].Words != 30000 {
@@ -402,7 +403,7 @@ func TestSearch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(items) != 2 || items[0].NID != 1003 || items[1].NID != 1001 {
+	if len(items) != 4 || items[0].NID != 3001 || items[1].NID != 1003 {
 		t.Fatalf("items = %+v", items)
 	}
 	if items[0].CoverURL != nil {
@@ -679,10 +680,10 @@ func TestFacets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(ptypes) != 1 || ptypes[0].Name != "免费" || ptypes[0].Count != 11 {
+	if len(ptypes) != 1 || ptypes[0].Name != "免费" || ptypes[0].Count != 15 {
 		t.Fatalf("ptypes: %+v", ptypes)
 	}
-	if len(genres) != 4 || genres[0].Name != "都市" || genres[0].Count != 5 {
+	if len(genres) != 5 || genres[0].Name != "都市" || genres[0].Count != 6 {
 		t.Fatalf("genres: %+v", genres)
 	}
 	if len(tags) != 3 || tags[0].Name != "战斗" || tags[0].Count != 2 {

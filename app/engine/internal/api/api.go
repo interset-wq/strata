@@ -96,6 +96,8 @@ func New(s *store.Store) *gin.Engine {
 	group := r.Group("/strata")
 	group.GET("/healthz", srv.healthz)
 	group.GET("/meta", srv.meta)
+	group.GET("/contests", srv.contestArchive)
+	group.GET("/contests/books", srv.contestArchiveBooks)
 	group.GET("/settings", srv.settings)
 	group.PUT("/settings", srv.updateSettings)
 	group.GET("/books/:nid", srv.book)
@@ -834,6 +836,43 @@ func (s *Server) rankingClassic(c *gin.Context) {
 		},
 		"items": items,
 	})
+}
+
+// contestArchive lists the event-level contest groups from the seed — the
+// archive list (docs/contest-display-in-app.md 形态一; zero requests).
+func (s *Server) contestArchive(c *gin.Context) {
+	groups, err := s.store.ContestGroups(c.Request.Context())
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"groups": groups})
+}
+
+// contestArchiveBooks lists one contest's per-form representative books by
+// fav_pctl (same-generation percentile, NULLs last; docs/12 red line:
+// cumulative raw values never enter ORDER BY).
+func (s *Server) contestArchiveBooks(c *gin.Context) {
+	name := c.Query("contest")
+	if name == "" {
+		fail(c, http.StatusBadRequest, "invalid_argument", "contest is required")
+		return
+	}
+	per := 10
+	if raw := c.Query("per"); raw != "" {
+		v, err := strconv.Atoi(raw)
+		if err != nil || v < 1 || v > 50 {
+			fail(c, http.StatusBadRequest, "invalid_argument", "per must be 1..50")
+			return
+		}
+		per = v
+	}
+	items, err := s.store.ContestBooks(c.Request.Context(), name, per)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"contest": name, "items": items})
 }
 
 func (s *Server) discover(c *gin.Context) {

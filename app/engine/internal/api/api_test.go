@@ -79,7 +79,7 @@ func doJSON(t *testing.T, method, url string, status int) map[string]any {
 func TestHealthz(t *testing.T) {
 	srv, _ := newTestServer(t)
 	body := getJSON(t, srv.URL+"/strata/healthz", http.StatusOK)
-	if body["book_count"].(float64) != 12 || body["seed_version"] != "test-1" {
+	if body["book_count"].(float64) != 16 || body["seed_version"] != "test-1" {
 		t.Fatalf("body = %v", body)
 	}
 }
@@ -453,10 +453,10 @@ func TestRankingShort(t *testing.T) {
 	srv, _ := newTestServer(t)
 	body := getJSON(t, srv.URL+"/strata/rankings/short?limit=5", http.StatusOK)
 	items := body["items"].([]any)
-	if len(items) != 2 {
+	if len(items) != 3 {
 		t.Fatalf("items = %d", len(items))
 	}
-	if items[0].(map[string]any)["nid"].(float64) != 1002 {
+	if items[0].(map[string]any)["nid"].(float64) != 3003 {
 		t.Fatalf("first = %v", items[0])
 	}
 }
@@ -468,9 +468,9 @@ func TestRankingClassic(t *testing.T) {
 	if len(items) != 2 {
 		t.Fatalf("items = %d", len(items))
 	}
-	// Absolute favs across all years: 1003 (900) before 1001 (500).
+	// Absolute favs across all years: 3001 (3000) before 1003 (900).
 	first := items[0].(map[string]any)
-	if first["nid"].(float64) != 1003 || first["favs"].(float64) != 900 {
+	if first["nid"].(float64) != 3001 || first["favs"].(float64) != 3000 {
 		t.Fatalf("first = %v", first)
 	}
 	if first["form"] != "long" {
@@ -479,11 +479,11 @@ func TestRankingClassic(t *testing.T) {
 
 	body = getJSON(t, srv.URL+"/strata/rankings/classic?form=short", http.StatusOK)
 	items = body["items"].([]any)
-	if len(items) != 2 {
+	if len(items) != 3 {
 		t.Fatalf("short items = %d", len(items))
 	}
-	if items[0].(map[string]any)["nid"].(float64) != 1002 ||
-		items[1].(map[string]any)["nid"].(float64) != 1004 {
+	if items[0].(map[string]any)["nid"].(float64) != 3003 ||
+		items[1].(map[string]any)["nid"].(float64) != 1002 {
 		t.Fatalf("short order = %v", items)
 	}
 
@@ -506,12 +506,12 @@ func TestRankingClassic(t *testing.T) {
 	getJSON(t, srv.URL+"/strata/rankings/classic?year=x", http.StatusBadRequest)
 
 	// words-band splits the dialogue tab by documented length classes:
-	// short <= 50k, medium 50k..150k, long > 150k. The only dialogue test
-	// book (1008) sits exactly on the short ceiling.
+	// short <= 50k, medium 50k..150k, long > 150k. Dialogue test books:
+	// 3002 (40k) and 1008 (50k, exactly on the short ceiling).
 	body = getJSON(t, srv.URL+
 		"/strata/rankings/classic?form=dialogue&words-band=short", http.StatusOK)
 	items = body["items"].([]any)
-	if len(items) != 1 || items[0].(map[string]any)["nid"].(float64) != 1008 {
+	if len(items) != 2 || items[0].(map[string]any)["nid"].(float64) != 3002 {
 		t.Fatalf("dialogue short band = %v", items)
 	}
 	body = getJSON(t, srv.URL+
@@ -535,7 +535,7 @@ func TestRandomFormFilter(t *testing.T) {
 	srv, _ := newTestServer(t)
 	body := getJSON(t, srv.URL+"/strata/random?limit=8&form=short", http.StatusOK)
 	items := body["items"].([]any)
-	if len(items) != 2 {
+	if len(items) != 3 {
 		t.Fatalf("items = %d", len(items))
 	}
 	for _, it := range items {
@@ -547,7 +547,7 @@ func TestRandomFormFilter(t *testing.T) {
 	// The browse pool must not apply the mega-book gate to short forms.
 	body = getJSON(t,
 		srv.URL+"/strata/random?limit=8&status=browse&form=short", http.StatusOK)
-	if len(body["items"].([]any)) != 2 {
+	if len(body["items"].([]any)) != 3 {
 		t.Fatalf("browse short items = %v", body["items"])
 	}
 }
@@ -560,8 +560,8 @@ func TestRankingNew(t *testing.T) {
 		t.Fatalf("min_est_year = %v", meta["min_est_year"])
 	}
 	items := body["items"].([]any)
-	if len(items) != 1 {
-		t.Fatalf("items = %d, want only nid 1005", len(items))
+	if len(items) != 2 {
+		t.Fatalf("items = %d, want nid 1005 and 3003", len(items))
 	}
 	first := items[0].(map[string]any)
 	if first["nid"].(float64) != 1005 || first["fav_pctl"].(float64) != 0.95 {
@@ -581,10 +581,10 @@ func TestSearch(t *testing.T) {
 
 	body = getJSON(t, srv.URL+"/strata/search?q=Long", http.StatusOK)
 	items = body["items"].([]any)
-	if len(items) != 2 {
+	if len(items) != 4 {
 		t.Fatalf("Long search = %d items", len(items))
 	}
-	if items[0].(map[string]any)["nid"].(float64) != 1003 {
+	if items[0].(map[string]any)["nid"].(float64) != 3001 {
 		t.Fatalf("order = %v (higher favs first)", items)
 	}
 }
@@ -715,14 +715,16 @@ func TestYearGroups(t *testing.T) {
 	srv, _ := newTestServer(t)
 	body := getJSON(t, srv.URL+"/strata/year-groups?form=short",
 		http.StatusOK)
-	if body["total"].(float64) != 2 {
-		t.Fatalf("total = %v, want 2", body["total"])
+	if body["total"].(float64) != 3 {
+		t.Fatalf("total = %v, want 3", body["total"])
 	}
 	groups := body["groups"].([]any)
-	if len(groups) != 1 ||
-		int(groups[0].(map[string]any)["year"].(float64)) != 2010 ||
-		int(groups[0].(map[string]any)["count"].(float64)) != 2 {
-		t.Fatalf("groups = %v, want [{2010 2}]", groups)
+	if len(groups) != 2 ||
+		int(groups[0].(map[string]any)["year"].(float64)) != 2025 ||
+		int(groups[0].(map[string]any)["count"].(float64)) != 1 ||
+		int(groups[1].(map[string]any)["year"].(float64)) != 2010 ||
+		int(groups[1].(map[string]any)["count"].(float64)) != 2 {
+		t.Fatalf("groups = %v, want [{2025 1} {2010 2}]", groups)
 	}
 	// form is mandatory.
 	getJSON(t, srv.URL+"/strata/year-groups", http.StatusBadRequest)
@@ -734,12 +736,12 @@ func TestGenreGroups(t *testing.T) {
 	srv, _ := newTestServer(t)
 	body := getJSON(t, srv.URL+"/strata/genre-groups?form=short",
 		http.StatusOK)
-	if body["total"].(float64) != 2 {
-		t.Fatalf("total = %v, want 2", body["total"])
+	if body["total"].(float64) != 3 {
+		t.Fatalf("total = %v, want 3", body["total"])
 	}
 	groups := body["groups"].([]any)
-	if len(groups) != 2 {
-		t.Fatalf("groups = %v, want 2 genres", groups)
+	if len(groups) != 3 {
+		t.Fatalf("groups = %v, want 3 genres", groups)
 	}
 	for _, g := range groups {
 		if int(g.(map[string]any)["count"].(float64)) != 1 {
@@ -761,18 +763,19 @@ func TestRankingClassicOrderPct(t *testing.T) {
 		srv.URL+"/strata/rankings/classic?form=short&limit=10&order=pct",
 		http.StatusOK)
 	items := body["items"].([]any)
-	if len(items) != 2 ||
-		items[0].(map[string]any)["nid"] != 1004.0 ||
-		items[1].(map[string]any)["nid"] != 1002.0 {
-		t.Fatalf("pct items = %v, want [1004 1002]", items)
+	if len(items) != 3 ||
+		items[0].(map[string]any)["nid"] != 3003.0 ||
+		items[1].(map[string]any)["nid"] != 1004.0 ||
+		items[2].(map[string]any)["nid"] != 1002.0 {
+		t.Fatalf("pct items = %v, want [3003 1004 1002]", items)
 	}
 	// Default ordering is still favs DESC.
 	body = getJSON(t, srv.URL+"/strata/rankings/classic?form=short&limit=10",
 		http.StatusOK)
 	items = body["items"].([]any)
-	if items[0].(map[string]any)["nid"] != 1002.0 ||
-		items[1].(map[string]any)["nid"] != 1004.0 {
-		t.Fatalf("favs items = %v, want [1002 1004]", items)
+	if items[0].(map[string]any)["nid"] != 3003.0 ||
+		items[1].(map[string]any)["nid"] != 1002.0 {
+		t.Fatalf("favs items = %v, want [3003 1002 1004]", items)
 	}
 	getJSON(t, srv.URL+"/strata/rankings/classic?form=short&order=bogus",
 		http.StatusBadRequest)
@@ -790,8 +793,8 @@ func TestRandomShort(t *testing.T) {
 	for _, it := range items {
 		seen[int64(it.(map[string]any)["nid"].(float64))] = true
 	}
-	if len(items) != 2 || !seen[1002] || !seen[1004] {
-		t.Fatalf("items = %v, want {1002 1004}", items)
+	if len(items) != 3 || !seen[1002] || !seen[1004] || !seen[3003] {
+		t.Fatalf("items = %v, want {1002 1004 3003}", items)
 	}
 }
 

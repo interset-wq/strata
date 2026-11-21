@@ -62,6 +62,10 @@ var books = []book{
 	{nid: 1009, title: "IP J", author: "Author J", genre: "都市", status: "连载中", words: 30000, favs: 100, pctl: 0.5, year: 2014},
 	{nid: 1010, title: "IP K", author: "Author K", genre: "科幻", status: "已完结", words: 120000, favs: 80, pctl: 0.5, year: 2015},
 	{nid: 1011, title: "IP L", author: "Author L", genre: "奇幻", status: "连载中", words: 20000, favs: 50, pctl: 0.4, year: 2016},
+	{nid: 3001, title: "Zheng Long X", author: "Author X", genre: "魔幻", status: "连载中", words: 1000000, favs: 3000, pctl: 0.99, year: 2019},
+	{nid: 3002, title: "Zheng Dialogue Y", author: "Author Y", genre: "都市", status: "连载中", words: 40000, favs: 1500, pctl: 0.95, year: 2019},
+	{nid: 3003, title: "Spring Short Z", author: "Author Z", genre: "校园", status: "已完结", words: 30000, favs: 800, pctl: 0.9, year: 2025},
+	{nid: 3004, title: "Thirteen Long W", author: "Author W", genre: "科幻", status: "连载中", words: 800000, favs: 500, pctl: nil, year: 2025},
 }
 
 // Build writes assets/seed.db.gz + manifest.json and a user.db with one
@@ -121,6 +125,26 @@ VALUES(?,?,?,?, '免费', ?, NULL, ?, 1000, ?, 10, ?, NULL, '2026-04-01T00:00:00
 		return nil, err
 	}
 	if _, err := db.Exec(`UPDATE books SET form='ip_collab', contest='龙之谷征文' WHERE nid = 1011`); err != nil {
+		db.Close()
+		return nil, err
+	}
+	// 3001–3004 feed the contest archive endpoints (docs/contest-
+	// display-in-app.md 形态一): a N征 event with two divisions (incl. the
+	// 对话类 spelling the fixed-suffix matcher used to miss), a spring
+	// contest, and a 十三征 long book with NULL fav_pctl.
+	if _, err := db.Exec(`UPDATE books SET form='long', contest='七征长篇' WHERE nid = 3001`); err != nil {
+		db.Close()
+		return nil, err
+	}
+	if _, err := db.Exec(`UPDATE books SET form='dialogue', contest='七征对话类征文长篇' WHERE nid = 3002`); err != nil {
+		db.Close()
+		return nil, err
+	}
+	if _, err := db.Exec(`UPDATE books SET form='short', contest='2025春季征文' WHERE nid = 3003`); err != nil {
+		db.Close()
+		return nil, err
+	}
+	if _, err := db.Exec(`UPDATE books SET form='long', contest='十三征长篇' WHERE nid = 3004`); err != nil {
 		db.Close()
 		return nil, err
 	}

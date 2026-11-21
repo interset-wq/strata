@@ -773,7 +773,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     final entries = [
       (Icons.category, '分类', '/browse?mode=category'),
       (Icons.update, '状态', '/browse?mode=status'),
-      (Icons.emoji_events, '比赛', '/browse?mode=contest'),
+      (Icons.emoji_events, '比赛', '/contests'),
       (Icons.leaderboard, '经典榜单',
           '/classic-list?title=经典榜单&form=long&metric-switchable=1'),
     ];
