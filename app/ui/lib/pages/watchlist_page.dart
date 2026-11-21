@@ -236,6 +236,13 @@ class _WatchCard extends StatelessWidget {
                   ],
                 ),
               ),
+              // 观测数据快捷入口（docs/07 工作台直达路径）
+              IconButton(
+                icon: Icon(Icons.timeline,
+                    size: 18, color: scheme.onSurfaceVariant),
+                tooltip: '观测数据',
+                onPressed: () => context.push('/book/${item.nid}/data'),
+              ),
               // 追踪切换（v6：激活 = 后台抓取，未激活 = 只存）
               IconButton(
                 icon: Icon(

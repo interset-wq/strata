@@ -22,7 +22,7 @@
 | 返回 | `Icons.arrow_back` | 二级页 AppBar |
 | 回到顶部 | `Icons.arrow_upward` | 长页右下角 BackToTop（滚动 >500px 出现） |
 | 换源切换 | `Icons.swap_vert` | 榜单页口径切换 |
-| 观测时序 | `Icons.timeline` | 详情页「观测数据」入口 |
+| 观测时序 | `Icons.timeline` | 数据页入口（`/book/:nid/data`）：关注页行尾快捷入口 / 详情页「观测历史」行尾「图表」按钮 |
 | 阅读记录入口 | `Icons.history` | 首页搜索行右侧 |
 | 搜索 | `Icons.search` | 首页搜索框、榜单页 |
 | 形式推断说明 | `Icons.info` | 首页 form tab 行末按钮：弹出「关于小说形式」模态框（形式为推断，非官方分类；原右上角刷新按钮改造，刷新走下拉手势） |

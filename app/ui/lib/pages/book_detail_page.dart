@@ -373,8 +373,20 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                     style: TextStyle(color: refreshColor)),
               ],
               const Divider(height: 32),
-              Text('观测历史',
-                  style: Theme.of(context).textTheme.titleMedium),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text('观测历史',
+                        style: Theme.of(context).textTheme.titleMedium),
+                  ),
+                  TextButton.icon(
+                    onPressed: () =>
+                        context.push('/book/${widget.nid}/data'),
+                    icon: const Icon(Icons.timeline, size: 18),
+                    label: const Text('图表'),
+                  ),
+                ],
+              ),
               const SizedBox(height: 8),
               _observationsList(),
             ],
