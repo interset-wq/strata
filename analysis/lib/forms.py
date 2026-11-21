@@ -2,7 +2,7 @@
 
 六值互斥：`invalid / short / medium / long / dialogue / ip_collab`，逐级覆盖：
 字数兜底（含 invalid 下界）→ 对话形态估计 → 详情页 DOM 的散文证据（撤销估计）→
-短篇点击天花板 → 对话征文 → 详情页 DOM 的对话证据 → IP 合作。
+短篇点击天花板 → 对话征文 → 详情页 DOM 的对话证据 → App 官方 `categoryId` → IP 合作。
 
 2026-11-19 用户裁定两项修正（见 `docs/form-definitions.md` §0/§3）：
 1. **取消篇幅征文命名覆盖字数**：征文名（「X征短篇/中篇/长篇」）只反映投稿赛道，
@@ -33,6 +33,30 @@ from lib import web_dialogue as WD
 # 「不需要 DOM 判决，很多你可以直接问我，因为对话数据非常出众的作品非常少」——
 # 数据量大的书判错代价最大，逐本问人比再爬一遍便宜。
 USER_FORM_FILE = paths.ANCHORS_DIR / "form_user_verified.jsonl"
+
+# App 官方形态标记：`analysis/out/app_api_novels.jsonl` 快照导出（见 export_app_categories.py）。
+# 只做**正向**判定：cat=1/4 → dialogue。绝不反向用 cat=0 撤销——categoryId=1 是产品线
+# 后启用的分类，早期对话书（nid 83,937 起，5,666 本）在 API 里仍是 cat=0，反向撤销会
+# 毁掉一半对话库。cat=3 是征文赛道、不反映真实字数（§0），也不据此判形态。
+APP_CATEGORY_FILE = paths.ANCHORS_DIR / "app_categories.jsonl"
+APP_DIALOGUE_CATS = frozenset({1, 4})
+
+
+@lru_cache(maxsize=1)
+def app_categories() -> dict[int, int]:
+    """`nid -> categoryId`（App 官方产品线标记，来自已有 API 快照）。
+
+    只用于正向判对话（1/4）。覆盖率约全库 45%，缺席不作反向推断。
+    """
+    if not APP_CATEGORY_FILE.exists():
+        return {}
+    out: dict[int, int] = {}
+    for line in APP_CATEGORY_FILE.read_text(encoding="utf-8").splitlines():
+        if not line.strip() or line.startswith("//"):
+            continue
+        row = json.loads(line)
+        out[int(row["nid"])] = int(row["categoryId"])
+    return out
 
 
 @lru_cache(maxsize=1)
@@ -116,6 +140,19 @@ def classify(df: pd.DataFrame) -> pd.Series:
     #       也覆盖 4 本「第一章」命名的沉浸式互动小说（745405 / 746269 / 729181 /
     #       758261），章节命名判据对它们全部失效。
     form = np.where(wd == "dialogue", "dialogue", form)
+    # 级 3.6：App 官方产品线标记 cat=1/4 → dialogue（2026-11-20 用户定案）。
+    #       这是 App 侧直接给出的形态金标，可救回 invalid（对话按「话」连载，
+    #       字数天然短）；种子已 100% DOM 真值、零冲突，价值在 universe 层的
+    #       ~7,000 本规则误判（short/invalid/medium/long → dialogue）。
+    #       只正向判、不反向撤销：早期对话书 API 仍是 cat=0（见 APP_CATEGORY_FILE 注）。
+    ac = app_categories()
+    if ac:
+        nid = pd.to_numeric(
+            d["id"] if "id" in d.columns else d.get("nid"), errors="coerce"
+        )
+        cat = nid.map(lambda x: ac.get(int(x)) if pd.notna(x) else None)
+        official = cat.isin(APP_DIALOGUE_CATS).to_numpy()
+        form = np.where(official, "dialogue", form)
     # 级 4：IP 合作（最高）
     ip = contest.map(lambda x: any(name in x for name in IP_COLLAB_NAMES))
     form = np.where(ip.to_numpy(), "ip_collab", form)

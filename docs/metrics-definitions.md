@@ -172,6 +172,7 @@ len = log(字数/15万) / log(100万/15万)，夹在 [0,1]
 | 官方字段的原始语义、端点参数 | [`sfacg-app-api.md`](./sfacg-app-api.md)、[`sfacg-endpoints.md`](./sfacg-endpoints.md) |
 | 指标的**物理存储**、列类型、索引、体积 | `app/docs/02-data-model.md` |
 | 小说形式 `form` 的六值判定与优先级 | [`form-definitions.md`](./form-definitions.md) |
+| 量化模式需要几个自定义指标（2 个核心职责的收敛定案） | [`quantitative-mode-metrics.md`](./quantitative-mode-metrics.md) |
 | `lqs` 的完整定义、校准、行为与边界 | [`length-weighted-quality.md`](./length-weighted-quality.md) |
 | 深榜 D2 的指标与深度 | `app/docs/10-deep-ranks.md`、报告 21 |
 | 双模式展示/推荐解耦 | `app/docs/12-dual-mode.md` |

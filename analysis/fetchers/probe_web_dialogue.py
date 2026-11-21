@@ -55,6 +55,17 @@ HEADERS = {
 }
 RE_INFO = re.compile(r'<p class="chapter-content[^"]*">(.*?)</p>', re.S)
 RE_TITLE = re.compile(r"<title>\s*(.*?)\s*-", re.S)
+# 作者区（用户 2026-11-20 指出，后续作者详情页要用）：
+# `.author-box .author-desc` = 作者简介（可为空），
+# `.author-box .author-mask img@src` = 头像 URL，`.autor-name`（拼写如此）= 显示名。
+# App API 不返回 intro/头像，只能从 Web DOM 取；头像 URL 随账号变更，需带抓取时点。
+RE_AUTHOR_BOX = re.compile(r'<div class="author-box">(.*?)<div class="side-part', re.S)
+RE_AUTHOR_NAME = re.compile(r'class="autor-name"[^>]*>(.*?)</p>', re.S)
+RE_AUTHOR_DESC = re.compile(r'class="author-desc"[^>]*>(.*?)</p>', re.S)
+RE_AUTHOR_AVATAR = re.compile(r'class="author-mask"[^>]*>\s*<img[^>]+src="([^"]+)"', re.S)
+RE_AUTHOR_INFO_AVATAR = re.compile(r'class="author-info[^"]*">\s*<div class="author-mask">\s*'
+                                   r'<img[^>]+src="([^"]+)"', re.S)
+RE_AUTHOR_INFO_NAME = re.compile(r'class="author-name"[^>]*>\s*<span>(.*?)</span>', re.S)
 # 对话产品线的产品声明（用户指定关键词）
 DIALOGUE_KEYS = ("对话小说", "互动小说")
 DELAY = 0.7
@@ -64,6 +75,27 @@ RETRY = 3
 def _clean(html_frag: str) -> str:
     txt = re.sub(r"<[^>]+>", "", html_frag)
     return re.sub(r"\s+", " ", txt).strip()
+
+
+def author_fields(html: str) -> dict[str, str]:
+    """作者显示名/简介/头像；intro 可为空串（用户明确：有些作者没写）。"""
+    m = RE_AUTHOR_BOX.search(html)
+    block = m.group(1) if m else ""
+    name = desc = avatar = ""
+    if block:
+        n, d, a = (RE_AUTHOR_NAME.search(block), RE_AUTHOR_DESC.search(block),
+                   RE_AUTHOR_AVATAR.search(block))
+        name, desc, avatar = (_clean(n.group(1)) if n else "",
+                              _clean(d.group(1)) if d else "",
+                              a.group(1).strip() if a else "")
+    if not name:
+        n = RE_AUTHOR_INFO_NAME.search(html)
+        name = _clean(n.group(1)) if n else ""
+    if not avatar:
+        a = RE_AUTHOR_INFO_AVATAR.search(html)
+        avatar = a.group(1).strip() if a else ""
+    return {"author_name": name[:60], "author_intro": desc[:1000],
+            "author_avatar": avatar[:500]}
 
 
 def probe(nid: int) -> dict:
@@ -91,6 +123,7 @@ def probe(nid: int) -> dict:
                 "bytes": len(t),
                 "page_title": (title_m.group(1) if title_m else "")[:40],
                 "info": info[:80],
+                **author_fields(t),
             }
         except Exception as e:  # noqa: BLE001
             last_err = f"{type(e).__name__}: {e}"[:120]

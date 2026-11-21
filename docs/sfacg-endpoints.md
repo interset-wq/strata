@@ -75,6 +75,8 @@
 | 15 | 分类列表（PC） | `GET book.sfacg.com/List/?tid={n}` | 无 | 分页 | `PageIndex` | 34 KB |
 | 16 | 更新窗口列表 | `GET book.sfacg.com/List/?ud={days}&PageIndex={n}` | 无 | 20 | `PageIndex`（站方截断 ≈82 页） | 29 KB |
 | 17 | 单书月票 | `GET book.sfacg.com/ajax/ashx/GetTicketNum.ashx?nid={id}` | 无 | 1 本 | — | 1 B |
+| 18 | **征文参赛清单（旧）** | `GET pages.sfacg.com/ajax/ashx/Common.ashx?op=getNovelsByTag` | 无 | `ps` 可 200 | `pi`（0 起） | ~40 KB |
+| 19 | **征文参赛清单（新）** | `GET pages.sfacg.com/api/essay/getNovels` | 无 | 逐页 ≤500 | `page`（1 起） | — |
 
 **分类 tid 映射**（从 PC 分类页现抓，九个值，无遗漏）：
 
@@ -582,6 +584,51 @@ GET https://pages.sfacg.com/ajax/act/MonthlyBoy.ashx?op=getRanks&date={YYYY-MM}&
 
 来源：第三方 `jiuweiyaya/sfacg-rank`，本项目实测复核。
 
+### 7.4 征文参赛清单（`getNovelsByTag` / `essay/getNovels`）——补采短/中篇（2026-11-20 实测）
+
+征文活动页的「参赛作品区」是**分页 REST 接口**，无需登录、无认证，
+返回 `nid/标题/作者/作品简介/封面/categoryID`，可用于补采单向游标扫描漏掉的短/中篇。
+**两套接口按征文页年代分**（另见专题 `docs/contest-roster-harvest.md`）：
+
+| | 旧 H5 页（2018–2022） | 新 SPA 页（2023 起） |
+| --- | --- | --- |
+| 地址 | `GET pages.sfacg.com/ajax/ashx/Common.ashx` | `GET pages.sfacg.com/api/essay/getNovels` |
+| 参数 | `op=getNovelsByTag&tagId={t}&ps=200&pi={0起}` | `tagIds={t}&page={1起}&size={n}` |
+| 返回 | `{status,novels[],totalPage}` | `{status:{errorCode},data:{totalPage,novels[]}}` |
+| 条目字段 | `NovelID/NovelName/AuthorName/Intro/Cover/CategoryID` | `novelID/novelName/authorName/intro/cover/categoryID` |
+| 单页上限 | `ps=200` 实测可用 | `size=500` 实测可用（更大值反被服务端截断） |
+
+```text
+GET https://pages.sfacg.com/ajax/ashx/Common.ashx?op=getNovelsByTag&tagId=415&ps=200&pi=0
+GET https://pages.sfacg.com/api/essay/getNovels?tagIds=704&page=1&size=500
+```
+
+**关键陷阱**：
+
+- **字段名大小写两套不同**（`NovelID` vs `novelID`、`Intro` vs `intro`），解析要兼容。
+- **翻页起点随页面版本变**：旧 H5 用 `pi={0起}`；新 SPA 多数用 `page={1起}`，但 2025/2026 春征 UUID 页的
+  `getNovelList` 传 `page: currentPage-1`（0 基）——**按页面 JS 实际传参为准，不要假设固定 1 基**。
+- **`tagId` 是「某届比赛的某个赛项」的编号，每次新增、跨届不复用**（用户裁定 2026-11-21）：
+  长/中/短各有独立 id，每办一届就新分配一批（十三征 752/753/754 与十二征 702/703/704 无复用关系，
+  2024 春征 = 699、2025 春征 = 746、2025 秋征 = 772、2026 春征 = 789、2024 秋征 = 725、八征冬征 = 726、九征冬征 = 774、**七征冬征 = 692、六征冬征 = 485（均单轨）**），且同一赛事 sandbox 与生产环境 id 不同（十二征短篇 `533` vs `704`；2024 春征 sandbox `530` vs pages `699`）。
+  **tagId 的位置也随版本变**：旧 SPA 写在打包 JS 变量里，UUID 页写在 HTML `data-tagid` 属性。
+  必须按每届页面实际取生产值、按 `location.host` 前缀选环境，**不能从届次/赛项名推导、更不能猜**；
+  这也是 tag 地图永远追不齐的根因。已实测的 tag 表见专题文档。
+- **活动页 URL 形态演进**：`zwYYYY` → `zwYYYYMMDD` → 2025 起 `zw/essayActivity_{UUID}.html`
+  （春/秋征用 UUID 页、冬征从第八届起也用 UUID 页、无法从届次推导，只能由用户 App 提供入口，
+  已实证 2024 秋/2025 春/2025 秋/2026 春/八征冬/九征冬六版，详见 `contest-roster-fields.md` §8.5）。
+  **例外**：冬征六/七届（2022-12 / 2023-12）是日期式 SPA `zw20221205` / `zw20231204`（单轨 tagId 写死在 JS），
+  获奖写死在 Vue render 函数而非 HTML `data-tagid`（第四代形态，六征 `showBookDetail(数字)`、
+  七征 `openNovel("字符串")`，详见 `contest-roster-fields.md` §8.6/§8.7）。
+- `categoryID` 取值旧接口 `0/1`、新接口 `0/1/3`，与 `forms` 的 categoryId 判据同源，
+  但**不能当 form 真值**（E.28 只正向用 `1/4`）。
+- 清单里的 `intro` 是**作品简介**，不是作者 intro（作者资料见 `author-profile-on-demand.md`）。
+- 只覆盖**参赛**作品；未参赛的一次性完本短篇仍会漏，非全库金标。
+
+**请求样例**（2026-11-20 实测）：14 个 tag 去重 31,092 本，9,012 本（29%）不在 db，
+短/中篇赛道漏采最重（十二征短篇 171/321）。实测用 0.25–0.6 s 串行 / 4 并发，无风控迹象；
+沿用引擎既有抓取限速，只取清单元数据、不取正文、不登录。
+
 ---
 
 ## 8. 限流与失败模式
@@ -678,6 +725,11 @@ uv run --project analysis python analysis/fetchers/probe_novelbytype.py [--tid 2
 # 整类普查（约 20 分钟/类）：唯一 nid、重复、空页、与库的双向差额，§5.1 靠它定案
 uv run --project analysis python analysis/fetchers/probe_novelbytype.py --tid 29 --census
 # → analysis/out/novelbytype_census_29.json
+
+# 征文参赛清单（§7.4，数分钟）：两套分页接口 + tag 表 + 与 db 的补采差额
+uv run --project analysis python analysis/fetchers/probe_contest_roster.py [--tags 704,703,702] [--size 500]
+# → analysis/out/contest_roster.csv（含 in_db 列）
+# tag 表与 URL 风格见 docs/contest-roster-harvest.md；只取清单元数据、不取正文
 ```
 
 **复现注意**：HTML 搜索探针之间必须 sleep ≥5 秒（脚本已内置 `GAP=6`），否则会被静默限流并污染结果

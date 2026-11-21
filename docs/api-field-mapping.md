@@ -97,7 +97,9 @@ App 不返回 `praises`/`contest`/`tags`，因此赞藏比 `pr` 与分位列无�
 ### 3.4 `categoryId` 是形态标记，不是题材（2026-11-20 实测定案）
 
 > 校准脚本 `analysis/probe_category_id.py`（`--fetch` 可从每个 genre 分层重抓）。
-> 本节是用户要求「多找几本书验证、确定真实语义」的结果；原猜测「cate 和 genre 同义」被数据否证。
+> 本节是用户要求「多找几本书验证、确定真实语义」的结果。用户所说「cate 和 genre 是同义词」指**英文词义**——
+> `category` 与 `genre` 都是「分类」维度，故按每个 genre 分层采样验证；
+> 实测两者**取值维度不同**：`categoryId` 是产品线/形态，`typeId/genre` 是题材。
 
 **真实语义**（API 全快照 114,381 本 + 9 个 genre 各 8 本分层抽样 + DOM 真值 7,227 本）：
 
@@ -108,12 +110,16 @@ App 不返回 `praises`/`contest`/`tags`，因此赞藏比 `pr` 与分位列无�
 | `3` | 短篇 | 有征书清一色「N征短篇」「超新星杯短篇大赛」；字数 <2 万占 78% |
 | `4` | 沉浸式互动小说 | 5 本 DOM 真值全 dialogue，预读区均为「全新的沉浸式互动小说…只能在APP上观看」；签约 39/40、2024+ 才出现 |
 
-**与 `genre/typeId` 不是同义词**（用户原猜测）：`cat=1` 在九个 genre 里都出现，同一个 genre 内
-`cat=0/1/3/4` 并存——`categoryId` 是**产品线/形态**维度，`typeId` 才是题材。抽样交叉表见探针输出。
+**与 `genre/typeId` 的取值不同义**：用户原话的「同义」指英文词义上 `category`/`genre` 都是分类维度；
+实测两个字段的**取值空间正交**——`cat=1` 在九个 genre 里都出现，同一个 genre 内 `cat=0/1/3/4`
+并存。`categoryId` 编码产品线/形态，`typeId` 才编码题材。抽样交叉表见探针输出。
 
-**用途**：这是 App 侧直接给出的形态金标（比本地 `forms.classify` 的形态估计可靠），
-但本项目种子已 100% DOM 真值、且用户裁定 form 侧不再做精度工程，故**不据此改判据/种子**；
-仅作为「App → 本地字段」的权威对照记录。取值分布随版本变化（数字仅供参考）。
+**用途**：这是 App 侧直接给出的形态金标（比本地 `forms.classify` 的形态估计可靠）。
+2026-11-20 已作为**正向判据**接入 `analysis/lib/forms.py` 级 3.6：`cat=1/4 → dialogue`，
+可救回 invalid，低于用户裁定级。**只正向、不反向**——`cat=0` 不撤销 dialogue（早期对话书
+API 仍是 cat=0），`cat=3` 是征文赛道不判形态。覆盖约全库 45%，缺席不作推断。
+E.28 重建种子：救回 241 本被形态规则误判挡在种子外的 cat=1 对话书（对话档 6,189→6,430）。
+取值分布随版本变化（数字仅供参考）。
 
 ---
 
@@ -153,6 +159,26 @@ App 不返回 `praises`/`contest`/`tags`，因此赞藏比 `pr` 与分位列无�
 | `est_year/est_date/est_conf` | `lib/eras.py` 定年 | ❌ 不适用（本地推导，`addTime` 仅旁证） |
 | `fav_pctl/click_pctl/praise_pctl/pr/pctl_pr` | 构建期全库分位 | ❌ 需全量重建 |
 | `is_licensed` | 授权名单 | ❌ 本地名单判定 |
+| 作者 `intro` / 头像 | **Web 详情页 DOM**（用户 2026-11-20 指出） | ❌ App API 无；移动版给头像/名字/作品集，intro 仅 PC 版；按需抓、不内置 |
+
+### 5.1 作者资料：Web DOM 独有（App 按需抓取，不内置）
+
+作者资料不在 App API 的 18 字段里，只能从 Web 详情页取；**移动版** `m.sfacg.com/b/{nid}/`
+的 `.book_Author` 给头像、作者名和作品集，**intro 仍只有 PC 版** `.author-box .author-desc` 有
+（用户提示移动版可能可取，实测三本样本确认此边界）。选择器（见
+`analysis/fetchers/probe_web_dialogue.py::author_fields`）：
+
+| 内容 | 选择器 | 备注 |
+|---|---|---|
+| 简介 | `.author-box .author-desc`（PC） | **可为空串**（用户明确：有些作者没写），不编造默认值；移动版没有 |
+| 头像 | `.book_Author li:first-child img@src`（移动）/ `.author-box .author-mask img@src`（PC） | 缺省图是 `common/0.gif`，不是真实头像 |
+| 显示名 | `.book_Author li:first-child`（移动）/ `.author-box .autor-name`（PC） | class 拼写 `autor` 是页面原样；身份仍以 `authorId` 为准 |
+
+**取数方式（用户 2026-11-20 裁定）**：不做预采、不随种子内置作者资料；App 打开作者详情页时，
+从该作者名下任取一本书，对其 PC 详情页发起一次请求，解析后直接供页面使用。
+完整设计（触发、字段契约、失败降级、限速、与现有抓取通路的关系）见
+[`author-profile-on-demand.md`](./author-profile-on-demand.md)。
+头像 URL 与简介都会随作者改动，属快照数据，不写回 `seed.db`。
 
 ---
 

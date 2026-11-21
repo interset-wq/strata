@@ -7,8 +7,9 @@
     3 = 短篇（征文清一色「N征短篇」；字数 <2 万占 78%）
     4 = 沉浸式互动小说（5 本 DOM 真值全为 dialogue 且 info 均为「沉浸式互动小说…只能在APP观看」）
 
-关键反证：categoryId 与 genre/typeId 不是同义词——cat=1 跨 9 个 genre 都出现，
-且同 genre 内 cat=0/1/3/4 并存。用户原猜测「cate 和 genre 同义」经数据否证。
+关键：用户所说「cate 和 genre 同义」指英文词义（category≈genre，都是分类维度），
+故按每个 genre 分层采样；实测两者**取值空间正交**——cat=1 跨 9 个 genre 都出现，
+且同 genre 内 cat=0/1/3/4 并存。categoryId 编码形态，typeId 编码题材。
 
 用法：uv run python probe_category_id.py          # 用已有 app_api 快照现算
       uv run python probe_category_id.py --fetch  # 重新抓每个 genre 的样本

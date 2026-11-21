@@ -1,9 +1,8 @@
 # `form` 形式字段与种子收录资格——权威口径
 
-> **状态**：已实施，`seed_version=20260503.22` 落地（含 E.9–E.24 全部条款）。
-> **种子的 form 现在 100% 是 DOM 事实**（18,616 合格书逐本核验，见 §3.5 / E.24），
-> 不再含任何估计值；universe 仍为规则估计，误差率见 §5。
-> 本文是 `books.form` 六值判定与收录资格的**唯一权威口径**；实现真源：
+> **状态**：已实施，`seed_version=20260503.24` 落地（含 E.9–E.24 全部条款 + E.28 App `categoryId` 正向判据）。
+> **种子的 form 现在 100% 是 DOM 事实 + App 官方产品线标记**（见 §3.5 / E.24、§3.5.2 / E.28），
+> 不再含任何估计值；universe 仍为规则估计+覆盖到的 `categoryId`，误差率见 §5。> 本文是 `books.form` 六值判定与收录资格的**唯一权威口径**；实现真源：
 > 分类 `analysis/lib/forms.py::classify`（对话判据 `analysis/lib/dialogue_form.py`、
 > 详情页真值 `analysis/lib/web_dialogue.py`），
 > 收录资格 `app/tools/seedbuild/seed_policy.py`。本文不改代码、不改定年、不硬编码分布数字。
@@ -38,6 +37,7 @@ CREATE INDEX idx_books_form ON books(form, favs DESC);   -- schema v2→v3，24�
 | 1.5 | 短篇点击天花板（§3.1 / E.19） | 确定性（App 目验） | `invalid` |
 | 2 | 对话征文标记（§3.5） | 确定性 | `dialogue` |
 | 3.5 | 详情页 DOM 的**对话**证据（§3.5 / E.22） | 确定性（产品线声明，优先于征文组别） | `dialogue` |
+| 3.6 | App 官方 `categoryId=1/4`（§3.5.2 / E.28） | 确定性（App 产品线标记，仅正向） | `dialogue`，可救回 invalid |
 | 3（最高） | IP 合作封闭名单（§3.6） | 确定性 | `ip_collab` |
 
 - **用户裁定压过一切（E.27）**：`analysis/anchors/form_user_verified.jsonl` 里的 nid
@@ -199,6 +199,24 @@ universe 43,277 本。互动小说并入本值。
   天花板/资格；若裁定与 P6/P7/P8/P9 冲突，说明裁定本身需要复核，不许绕过断言）。
 - **不做的事**：不因为裁定扩大爬取、不为裁定加启发式；裁定是终点不是训练集
   （E.23/E.24 已证明跨档/作者传播会把散文大规模误判）。
+
+#### 3.5.2 App `categoryId` 正向判据（级 3.6，E.28）
+
+用户 2026-11-20 指出：既然 `categoryId` 的语义已定案（`docs/api-field-mapping.md` §3.4），
+就可以直接用它判形态、解决对话被误判成其他形式的问题。实测确认它是 App 侧官方产品线标记，
+比本地规则可靠，故接入为正向判据。
+
+- **判据**：`cat=1`（对话小说）或 `cat=4`（沉浸式互动小说）→ `dialogue`，可救回 `invalid`
+  （对话按「话」连载、字数天然短）。锚点 `analysis/anchors/app_categories.jsonl` 由
+  `export_app_categories.py` 从已有 API 快照导出；`lib/forms.py::app_categories()` 加载。
+- **只正向、不反向**：`cat=0` **不撤销** dialogue——`categoryId=1` 是产品线后期才启用的分类，
+  早期对话书（nid 83,937 起，约 5,666 本）在 API 里仍是 cat=0，反向撤销会毁掉一半对话库。
+  `cat=3` 是征文赛道（字数跨度大），按 §0 不据征文名判篇幅，也不据此判形态。
+- **覆盖边界**：App API 快照只覆盖约 45% 的书（数字随版本变化），缺席**不作推断**——
+  未覆盖的书仍走原有规则链。故本判据大幅收敛误判，但不是全库金标。
+- **优先级**：低于用户裁定（级 -1），高于 IP 名单以外的所有级；与 DOM 对话证据一致时互为印证。
+- **效果**：universe 中 `cat=1/4` 的误判（此前被判 short/invalid/medium/long）清零；
+  种子重建救回 241 本被形态资格挡在门外的 cat=1 对话书（`seed_version` → 20260503.24）。
 
 ### 3.6 `ip_collab`（IP 合作）
 
