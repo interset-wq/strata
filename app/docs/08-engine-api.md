@@ -214,15 +214,19 @@ Classic 全库榜（docs/12 展示列）：平台累计值排序，不涉及分�
 Classic 主线分类/状态/大赛列表：默认按平台累计 `favs` 降序（`favs DESC, nid ASC`）。
 `genre`/`status`/`contest` 与 `/rankings/favs` 同义；`contest=1` 表示全部大赛作品。
 `year` 可选（正整数，按 `est_year` 精确过滤；非法值 400）。`order` 可选：
-`favs`（默认）或 `pct`（同代收藏分位 `fav_pctl DESC`、NULL 末尾——
-docs/form-definitions §6 优质短篇口径；非法值 400）。`items` 为 RankItem
-（含 `form`），`meta.ordering` 回显实际排序（`favs`/`fav_pctl`）。
+`favs`（默认）、`pct`（同代收藏分位 `fav_pctl DESC`、NULL 末尾——
+docs/form-definitions §6 优质短篇口径）与三个经典榜指标 `clicks`/`praises`/`words`
+（平台累计值 `DESC, favs DESC, nid ASC`、NULL 末尾——展示层，docs/12）；
+非法值 400。`items` 为 RankItem（含 `form`），`meta.ordering` 回显实际排序
+（`favs`/`fav_pctl`/`clicks`/`praises`/`words`）。
 
 短篇 tab（docs/form-definitions §4 收录资格）的年份榜/比赛榜/题材榜/优质榜
 以 `form=short[&year=Y|&contest=X|&genre=G|&order=pct]` 调本端点（不带
 status——种子层已实施完结条款，池本身已干净）。三个轴入口**不做中间页**：
-直达 `/classic-list` 榜单页，页内用三种不重复的控件切轴——年份 =
-ModalBottomSheet、比赛 = Drawer、题材 = FilterChip（用户 2026-11-19 定）。
+直达 `/classic-list` 榜单页，页内用不重复的控件切轴——年份 =
+ModalBottomSheet、比赛 = Drawer、题材 = FilterChip（用户 2026-11-19 定）、
+指标 = SegmentedButton（用户 2026-11-21：短篇 tab「经典榜单」入口
+`metric-switchable=1`，点击/收藏/点赞/字数四榜页内切换，20 本/页上滑加载）。
 
 ### GET /strata/discover?cursor=&form=&limit=（**已实现**）
 

@@ -970,6 +970,12 @@ class _HomePageState extends ConsumerState<HomePage> {
     final scheme = Theme.of(context).colorScheme;
     final entries = [
       (
+        Icons.leaderboard,
+        '经典榜单',
+        '点击/收藏/点赞/字数',
+        '/classic-list?title=经典榜单&form=short&metric-switchable=1',
+      ),
+      (
         Icons.calendar_month,
         '年份榜',
         '榜内面板切换年份',

@@ -37,6 +37,7 @@
 | 按状态浏览 | `Icons.update` | 首页宫格 |
 | 征文比赛 | `Icons.emoji_events` | 首页宫格 |
 | 短篇榜 | `Icons.article` | 首页宫格 |
+| 经典榜单入口 | `Icons.leaderboard` | 短篇 tab 入口列表：点击/收藏/点赞/字数四榜（页内 SegmentedButton 切换） |
 
 ## 分类入口（首页 curated 宽卡）
 

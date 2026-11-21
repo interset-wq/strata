@@ -19,10 +19,11 @@ class ClassicListPage extends ConsumerStatefulWidget {
   final String? contest;
   final String? genre;
   final String? wordsBand; // 'short' | 'medium' | 'long'（对话 tab 篇幅轴）
-  final String order; // 'favs' | 'pct'
+  final String order; // 'favs' | 'pct' | 'clicks' | 'praises' | 'words'
   final bool yearSwitchable;
   final bool contestSwitchable;
   final bool genreSwitchable;
+  final bool metricSwitchable;
 
   const ClassicListPage({
     super.key,
@@ -36,6 +37,7 @@ class ClassicListPage extends ConsumerStatefulWidget {
     this.yearSwitchable = false,
     this.contestSwitchable = false,
     this.genreSwitchable = false,
+    this.metricSwitchable = false,
   });
 
   @override
@@ -50,6 +52,7 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
   String? _currentContest; // 比赛轴（drawer 切换）
   String? _currentGenre; // 题材轴（chip 行切换）
   String _drawerQuery = ''; // drawer 搜索词（本地过滤 38 组）
+  String _currentOrder = 'favs'; // 指标轴（经典榜单四榜切换）
   List<RankItem> _items = [];
   bool _loading = false;
   bool _done = false;
@@ -61,6 +64,10 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
     _currentYear = widget.year;
     _currentContest = widget.contest;
     _currentGenre = widget.genre;
+    const metrics = ['clicks', 'favs', 'praises', 'words'];
+    _currentOrder = widget.metricSwitchable
+        ? (metrics.contains(widget.order) ? widget.order : 'clicks')
+        : widget.order;
     _loadMore();
     _scroll.addListener(() {
       // 距底 400px 预取下一页。
@@ -93,7 +100,7 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
         contest: _currentContest,
         genre: _currentGenre,
         wordsBand: widget.wordsBand,
-        order: widget.order == 'favs' ? null : widget.order,
+        order: _currentOrder == 'favs' ? null : _currentOrder,
         limit: 20,
         offset: _items.length,
       );
@@ -120,6 +127,7 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
       appBar: AppBar(title: Text(_appBarTitle())),
       body: Column(
         children: [
+          if (widget.metricSwitchable) _metricSwitcher(),
           if (widget.yearSwitchable) _yearSelector(),
           if (widget.genreSwitchable) _genreChips(),
           Expanded(
@@ -345,7 +353,49 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
     if (widget.contestSwitchable && _currentContest != null) {
       return '${widget.title}  ${contestIpLabel(_currentContest)}';
     }
+    if (widget.metricSwitchable) {
+      const labels = {
+        'clicks': '点击榜',
+        'favs': '收藏榜',
+        'praises': '点赞榜',
+        'words': '字数榜',
+      };
+      return '${widget.title}  ${labels[_currentOrder] ?? ''}';
+    }
     return widget.title;
+  }
+
+  // 指标切换条（第 4 种不重复控件形态，docs/16）：既有三种为
+  // 胶囊+BottomSheet / 汉堡+Drawer / FilterChip 行，四指标经典榜用
+  // SegmentedButton（Material 分段控件，横向平铺四选）。
+  Widget _metricSwitcher() {
+    const metrics = [
+      ('clicks', '点击'),
+      ('favs', '收藏'),
+      ('praises', '点赞'),
+      ('words', '字数'),
+    ];
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 2),
+      child: SegmentedButton<String>(
+        segments: [
+          for (final (key, label) in metrics)
+            ButtonSegment(value: key, label: Text(label)),
+        ],
+        selected: {_currentOrder},
+        onSelectionChanged: (sel) => _selectOrder(sel.first),
+      ),
+    );
+  }
+
+  void _selectOrder(String o) {
+    if (o == _currentOrder) return;
+    setState(() {
+      _currentOrder = o;
+      _resetList();
+    });
+    _scroll.jumpTo(0);
+    _loadMore();
   }
 
   // 比赛 drawer：38 个赛道组（contest 聚合 count DESC）+ 本地搜索过滤 +

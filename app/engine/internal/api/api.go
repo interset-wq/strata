@@ -774,9 +774,10 @@ func (s *Server) rankingClassic(c *gin.Context) {
 		}
 	}
 	order := c.Query("order")
-	if order != "" && order != "favs" && order != "pct" {
+	if order != "" && order != "favs" && order != "pct" && order != "clicks" &&
+		order != "praises" && order != "words" {
 		fail(c, http.StatusBadRequest, "invalid_argument",
-			"order must be \"favs\" or \"pct\"")
+			"order must be one of \"favs\", \"pct\", \"clicks\", \"praises\", \"words\"")
 		return
 	}
 	items, err := s.store.ClassicBooks(c.Request.Context(),
@@ -786,7 +787,10 @@ func (s *Server) rankingClassic(c *gin.Context) {
 		fail(c, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
-	ordering := "favs"
+	ordering := order
+	if ordering == "" {
+		ordering = "favs"
+	}
 	if order == "pct" {
 		ordering = "fav_pctl"
 	}

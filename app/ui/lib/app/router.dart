@@ -195,6 +195,7 @@ final router = GoRouter(
           yearSwitchable: (q['year-switchable'] ?? '') == '1',
           contestSwitchable: (q['contest-switchable'] ?? '') == '1',
           genreSwitchable: (q['genre-switchable'] ?? '') == '1',
+          metricSwitchable: (q['metric-switchable'] ?? '') == '1',
         );
       },
     ),

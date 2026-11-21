@@ -423,6 +423,10 @@ WHERE seed.books.is_licensed = 0`
 		// 优质短篇榜：同代收藏分位（docs/form-definitions §6）；SQLite
 		// NULL 按最小值，DESC 排末尾。
 		query += " ORDER BY seed.books.fav_pctl DESC, seed.books.favs DESC, seed.books.nid ASC LIMIT ? OFFSET ?"
+	case "clicks", "praises", "words":
+		// 经典榜（平台累计值，展示层，docs/12）：同一 NULL 排末尾规则，
+		// 次级键 favs 保证平局可复现。
+		query += " ORDER BY seed.books." + order + " DESC, seed.books.favs DESC, seed.books.nid ASC LIMIT ? OFFSET ?"
 	default:
 		query += " ORDER BY seed.books.favs DESC, seed.books.nid ASC LIMIT ? OFFSET ?"
 	}
