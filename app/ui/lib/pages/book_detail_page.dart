@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../widgets/default_cover.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -122,6 +124,27 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
     if (err == null) ref.invalidate(bookProvider(widget.nid));
   }
 
+  /// 官方页面直达（docs/15：Icons.open_in_new = 官方页面）：移动版详情页，
+  /// 用系统浏览器打开——App 自身不加载官方页面内容。
+  Future<void> _openOfficial() async {
+    final url = Uri.parse('https://m.sfacg.com/b/${widget.nid}/');
+    var ok = false;
+    try {
+      ok = await launchUrl(url, mode: LaunchMode.externalApplication);
+    } catch (_) {}
+    if (!mounted || ok) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('无法打开浏览器')));
+  }
+
+  /// 复制反馈（标题 / 书籍 ID）。
+  void _copied(String what) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$what已复制'),
+            duration: const Duration(seconds: 1)));
+  }
+
   @override
   Widget build(BuildContext context) {
     final detail = ref.watch(bookProvider(widget.nid));
@@ -131,6 +154,12 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
         title: const Text('书籍详情'),
         centerTitle: true,
         actions: [
+          IconButton(
+            // 官方页面直达（docs/15）：系统浏览器打开移动版详情页。
+            icon: const Icon(Icons.open_in_new),
+            tooltip: '打开官方页面',
+            onPressed: _openOfficial,
+          ),
           IconButton(
             icon: Icon(tracking ? Icons.visibility : Icons.visibility_outlined),
             tooltip: !onWatch
@@ -177,6 +206,10 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                 data: (set) => set.contains(widget.nid),
                 orElse: () => false,
               );
+          // 改编标注（docs/05 §6）：仅 App API 通路（STRATA_APP_API=1）有数据；
+          // NULL（未抓）与 0（确认无）引擎侧都已折成 false，不显示。
+          final hasComic = (eff['has_comic'] ?? b['has_comic']) == true;
+          final hasAudio = (eff['has_audio'] ?? b['has_audio']) == true;
           // 种子 cover_url 存相对路径（无前缀，上游爬虫缺前缀为已知问题）：
           // 有值拼 CDN 前缀；空值用官方默认封面兜底（用户拍板 2026-11-17）。
           final raw = s(eff['cover_url'] ?? b['cover_url']);
@@ -218,8 +251,21 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(s(eff['title'] ?? b['title']) ?? '',
-                            style: Theme.of(context).textTheme.headlineSmall),
+                        // 标题快速复制：长按（用户 2026-11-21 要求）。
+                        Tooltip(
+                          message: '长按复制标题',
+                          child: GestureDetector(
+                            onLongPress: () {
+                              final t = s(eff['title'] ?? b['title']) ?? '';
+                              Clipboard.setData(ClipboardData(text: t));
+                              _copied('标题');
+                            },
+                            child: Text(
+                                s(eff['title'] ?? b['title']) ?? '',
+                                style:
+                                    Theme.of(context).textTheme.headlineSmall),
+                          ),
+                        ),
                         const SizedBox(height: 6),
                         InkWell(
                           // 作者入口（docs/author-profile-on-demand）：
@@ -249,6 +295,10 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                                   filled: true),
                             if (onSale)
                               _badge(context, '官方热销', filled: true),
+                            if (hasComic)
+                              _badge(context, '有改编漫画'),
+                            if (hasAudio)
+                              _badge(context, '有有声'),
                             if (s(eff['genre'] ?? b['genre']) != null)
                               _badge(context,
                                   s(eff['genre'] ?? b['genre'])!),
@@ -624,6 +674,40 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                     fontSize: 12,
                     color: Theme.of(context).colorScheme.onSurfaceVariant)),
             const SizedBox(height: 6),
+            InkWell(
+              // 书籍 ID（可复制，用户 2026-11-21 要求）：复制 nid 便于跨端检索。
+              onTap: () {
+                Clipboard.setData(ClipboardData(text: '${widget.nid}'));
+                _copied('书籍 ID');
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('书籍 ID',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant)),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('${widget.nid}',
+                            style: const TextStyle(fontSize: 12)),
+                        const SizedBox(width: 4),
+                        Icon(Icons.copy_rounded,
+                            size: 12,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
             row('状态', eff['status']?.toString() ?? s(b['status'])),
             row('上架日期', s(b['est_date'])),
             row('收录置信度', s(b['est_conf'])),

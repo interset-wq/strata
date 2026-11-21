@@ -42,6 +42,39 @@ func TestCoverURLs(t *testing.T) {
 	}
 }
 
+func TestSetAdaptation(t *testing.T) {
+	st := openTestStore(t)
+	if err := st.SetAdaptation(context.Background(), 1001, 2937, 0, nil); err != nil {
+		t.Fatal(err)
+	}
+	m, err := st.BookMeta(context.Background(), 1001)
+	if err != nil || m == nil {
+		t.Fatalf("meta = %+v, err = %v", m, err)
+	}
+	if m.ComicID == nil || *m.ComicID != 2937 {
+		t.Fatalf("comic_id = %v, want 2937", m.ComicID)
+	}
+	if m.AlbumID == nil || *m.AlbumID != 0 {
+		t.Fatalf("album_id = %v, want 0 (confirmed none)", m.AlbumID)
+	}
+	// 0 overwrites a previous positive value — confirmed-none is new truth
+	// and must clear an earlier adaptation (docs/05 §6: 0 vs NULL).
+	folder := "XJYQS"
+	if err := st.SetAdaptation(context.Background(), 1001, 0, 97, &folder); err != nil {
+		t.Fatal(err)
+	}
+	m, _ = st.BookMeta(context.Background(), 1001)
+	if m.ComicID == nil || *m.ComicID != 0 {
+		t.Fatalf("comic_id = %v, want 0 after overwrite", m.ComicID)
+	}
+	if m.AlbumID == nil || *m.AlbumID != 97 {
+		t.Fatalf("album_id = %v, want 97", m.AlbumID)
+	}
+	if m.ComicFolder == nil || *m.ComicFolder != "XJYQS" {
+		t.Fatalf("comic_folder = %v, want XJYQS", m.ComicFolder)
+	}
+}
+
 func TestBookMergesLatestObservation(t *testing.T) {
 	st := openTestStore(t)
 	detail, err := st.Book(context.Background(), 1001)

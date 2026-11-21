@@ -76,7 +76,8 @@ UI 启动轮询即打这个端点（200ms 间隔、15s 超时），`status=="ok"
                  "status": …, "cover_url": …, "summary": …,
                  "updated_at": …, "add_time": …, "point": …,
                  "author_id": …, "type_id": …, "category_id": …,
-                 "is_sensitive": …, "allow_down": … },
+                 "is_sensitive": …, "allow_down": …,
+                 "has_comic": …, "has_audio": … },
   "cover": "https://…cover…" | null
 }
 ```
@@ -98,6 +99,9 @@ HTML 含书名/作者/分类/签约/封面/简介/收藏/赞/字数/状态/更�
 
 **不返回任何外链字段**：漫画站被官方定期关闭（当前详情页全 404），有声无 Web 模板，
 拼出的 URL 即死链。UI 只按 `>0` 显示「有改编漫画 / 有有声」的静态标注；
+`effective`（种子书）与 `book`（库外书）另派生布尔 `has_comic`/`has_audio`
+（>0 为 true）供 UI 直接消费；数据仅 App API 通路（`STRATA_APP_API=1` +
+存活态刷新成功）写入（docs/05 §6、§6.1）。
 `comic_folder` 仅为官方恢复后复用的留档。`null`（未抓/失败）与 `0`（确认无改编）
 都不显示标注。
 

@@ -11,7 +11,7 @@ import (
 // docs/author-profile-on-demand §4) — purely additive, created by the
 // idempotent DDL replay in EnsureUserDB. v8 adds the works cache
 // column to author_profiles (official works list replays on cache hits).
-const userSchemaVersion = 9
+const userSchemaVersion = 10
 
 // userSchemaV5 is the v5-era full user.db DDL: additive across
 // versions (v1 → v5), replayed idempotently on every schema pass — a
@@ -138,7 +138,12 @@ CREATE TABLE IF NOT EXISTS book_meta(
   bg_banner    TEXT,
   category_id  INTEGER,
   is_sensitive INTEGER,
-  allow_down   INTEGER
+  allow_down   INTEGER,
+  -- 衍生作品（App API /adpworks，docs/05 §6）：0=确认无改编，NULL=未抓/失败；
+  -- 只作详情页「有改编」标注，不外链（§6.1）；comic_folder 留档供漫画站恢复后复用
+  comic_id     INTEGER,
+  album_id     INTEGER,
+  comic_folder TEXT
 );
 
 -- One row per nid records the last outbound detail-fetch attempt. An attempt
@@ -219,6 +224,9 @@ func EnsureUserDB(path string) error {
 	if err := migrateV7toV8(db); err != nil {
 		return fmt.Errorf("migrate v7→v8: %w", err)
 	}
+	if err := migrateV9toV10(db); err != nil {
+		return fmt.Errorf("migrate v9→v10: %w", err)
+	}
 	if _, err := db.Exec(fmt.Sprintf("PRAGMA user_version=%d", userSchemaVersion)); err != nil {
 		return err
 	}
@@ -260,6 +268,24 @@ func migrateV7toV8(db *sql.DB) error {
 	}
 	_, err = db.Exec("ALTER TABLE author_profiles ADD COLUMN works TEXT")
 	return err
+}
+
+// migrateV9toV10 adds the adaptation-works columns to book_meta (docs/05 §6:
+// comic_id/album_id 0=确认无, NULL=未抓/失败; comic_folder 留档). Idempotent
+// column checks tolerate replays.
+func migrateV9toV10(db *sql.DB) error {
+	for _, col := range []struct{ name, typ string }{
+		{"comic_id", "INTEGER"},
+		{"album_id", "INTEGER"},
+		{"comic_folder", "TEXT"},
+	} {
+		if !hasColumn(db, "book_meta", col.name) {
+			if _, err := db.Exec("ALTER TABLE book_meta ADD COLUMN " + col.name + " " + col.typ); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // migrateV5toV6 folds the legacy bookshelf into the watchlist

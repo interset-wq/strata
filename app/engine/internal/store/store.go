@@ -91,6 +91,9 @@ type BookMeta struct {
 	CategoryID  *int64   `json:"category_id"`
 	IsSensitive *bool    `json:"is_sensitive"`
 	AllowDown   *bool    `json:"allow_down"`
+	ComicID     *int64   `json:"comic_id,omitempty"`
+	AlbumID     *int64   `json:"album_id,omitempty"`
+	ComicFolder *string  `json:"comic_folder,omitempty"`
 }
 
 type BookDetail struct {
@@ -1859,7 +1862,8 @@ func (s *Store) BookMeta(ctx context.Context, nid int64) (*BookMeta, error) {
 	const q = `
 SELECT nid, source, fetched_at, title, author, author_id, genre, type_id,
  price_type, status, cover_url, summary, words, favs, praises, clicks,
- updated_at, add_time, point, bg_banner, category_id, is_sensitive, allow_down
+ updated_at, add_time, point, bg_banner, category_id, is_sensitive, allow_down,
+ comic_id, album_id, comic_folder
 FROM book_meta WHERE nid = ?`
 	var (
 		m                                              BookMeta
@@ -1867,13 +1871,16 @@ FROM book_meta WHERE nid = ?`
 		summary, updatedAt, addTime, bgBanner          sql.NullString
 		authorID, typeID, words, favs, praises, clicks sql.NullInt64
 		categoryID, isSensitive, allowDown             sql.NullInt64
+		comicID, albumID                               sql.NullInt64
+		comicFolder                                    sql.NullString
 		point                                          sql.NullFloat64
 	)
 	err := s.DB.QueryRowContext(ctx, q, nid).Scan(
 		&m.NID, &m.Source, &m.FetchedAt, &title, &author, &authorID, &genre,
 		&typeID, &priceType, &status, &cover, &summary, &words, &favs,
 		&praises, &clicks, &updatedAt, &addTime, &point, &bgBanner,
-		&categoryID, &isSensitive, &allowDown,
+		&categoryID, &isSensitive, &allowDown, &comicID, &albumID,
+		&comicFolder,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
@@ -1901,7 +1908,28 @@ FROM book_meta WHERE nid = ?`
 	m.CategoryID = intPtr(categoryID)
 	m.IsSensitive = boolPtr(isSensitive)
 	m.AllowDown = boolPtr(allowDown)
+	m.ComicID = intPtr(comicID)
+	m.AlbumID = intPtr(albumID)
+	m.ComicFolder = strPtr(comicFolder)
 	return &m, nil
+}
+
+// SetAdaptation stores the official adaptation-works result (docs/05 §6):
+// comic_id/album_id where 0 = confirmed none. Unlike UpsertBookMeta it
+// touches only the three adaptation columns, so a best-effort follow-up
+// fetch never clobbers source/fetched_at of the main write. Callers invoke
+// it only after a successful alive write; a fetch failure calls nothing and
+// the columns stay NULL (未抓/失败, strictly distinct from 0).
+func (s *Store) SetAdaptation(ctx context.Context, nid int64, comicID, albumID int64, comicFolder *string) error {
+	_, err := s.DB.ExecContext(ctx, `
+INSERT INTO book_meta(nid, source, fetched_at, comic_id, album_id, comic_folder)
+VALUES (?, 'adpworks', 0, ?, ?, ?)
+ON CONFLICT(nid) DO UPDATE SET
+ comic_id=excluded.comic_id,
+ album_id=excluded.album_id,
+ comic_folder=excluded.comic_folder`,
+		nid, comicID, albumID, comicFolder)
+	return err
 }
 
 // RefreshAttempt reads the last user-triggered detail fetch for a nid.
