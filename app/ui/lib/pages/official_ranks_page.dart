@@ -303,71 +303,77 @@ class _RankList extends StatelessWidget {
     return Column(
       children: [
         for (final it in items)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(
-                  width: 24,
-                  child: Text(
-                    '${it.rank}',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: it.rank <= 3
-                          ? FontWeight.w700
-                          : FontWeight.w400,
-                      color: it.rank <= 3
-                          ? Theme.of(context).colorScheme.primary
-                          : Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                SizedBox(
-                  width: 38,
-                  height: 54,
-                  child: coverImage(it.coverUrl, it.nid),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(it.title,
-                          style: const TextStyle(
-                              fontWeight: FontWeight.w600, fontSize: 14)),
-                      if (it.author.isNotEmpty || it.genre != null)
-                        Text(
-                          [it.author, it.genre]
-                              .where((s) => s != null && s.isNotEmpty)
-                              .join(' · '),
-                          style: TextStyle(
-                              fontSize: 12,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant),
-                        ),
-                    ],
-                  ),
-                ),
-                if (it.value > 0 && valueLabel != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary
-                          .withValues(alpha: .08),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
+          InkWell(
+            // 点行 → 详情页：seed 书走常规详情；库外书 404 后由详情页
+            // 自动收录（按需抓取写回 user.db，docs/08 §search-remote）。
+            // PC 粉丝榜条目无 nid（读者侧），不可点。
+            onTap: it.nid > 0 ? () => context.push('/book/${it.nid}') : null,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(
+                    width: 24,
                     child: Text(
-                      '$valueLabel ${it.value}',
+                      '${it.rank}',
                       style: TextStyle(
-                          fontSize: 12,
-                          color: Theme.of(context).colorScheme.primary),
+                        fontSize: 14,
+                        fontWeight: it.rank <= 3
+                            ? FontWeight.w700
+                            : FontWeight.w400,
+                        color: it.rank <= 3
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ),
-              ],
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 38,
+                    height: 54,
+                    child: coverImage(it.coverUrl, it.nid),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(it.title,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w600, fontSize: 14)),
+                        if (it.author.isNotEmpty || it.genre != null)
+                          Text(
+                            [it.author, it.genre]
+                                .where((s) => s != null && s.isNotEmpty)
+                                .join(' · '),
+                            style: TextStyle(
+                                fontSize: 12,
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant),
+                          ),
+                      ],
+                    ),
+                  ),
+                  if (it.value > 0 && valueLabel != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primary
+                            .withValues(alpha: .08),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '$valueLabel ${it.value}',
+                        style: TextStyle(
+                            fontSize: 12,
+                            color: Theme.of(context).colorScheme.primary),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
       ],
