@@ -12,8 +12,16 @@ final detailRateLimitProvider =
   return handle.api.settings();
 });
 
+/// 工作台测试书开关的数据源：引擎 /dev/test-book（docs/07 开发辅助）。
+final testBookProvider =
+    FutureProvider.autoDispose<TestBook>((ref) async {
+  final handle = await ref.watch(bootProvider.future);
+  return handle.api.testBook();
+});
+
 /// 设置页：外观、数据状态、口径说明、关于。
 class SettingsPage extends ConsumerWidget {
+
   const SettingsPage({super.key});
 
   @override
@@ -142,6 +150,45 @@ class SettingsPage extends ConsumerWidget {
                     ],
                   ),
                 ),
+          ),
+          const SizedBox(height: 16),
+          Text('测试工具', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 8),
+          Card(
+            child: ref.watch(testBookProvider).when(
+              loading: () => const Padding(
+                padding: EdgeInsets.all(16),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+              error: (e, _) => Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text('引擎未就绪：$e',
+                    style: TextStyle(color: scheme.error, fontSize: 12)),
+              ),
+              data: (tb) => SwitchListTile(
+                title: const Text('工作台测试书'),
+                subtitle: Text(
+                  tb.present
+                      ? '已注入「${tb.title}」：${tb.rows ?? 0} 条模拟观测，关注 tab 可见'
+                      : '注入一本带 60 天模拟观测数据的虚构书，用于开发作者工作台',
+                  style: const TextStyle(fontSize: 12),
+                ),
+                value: tb.present,
+                onChanged: (v) async {
+                  final h = await ref.read(bootProvider.future);
+                  try {
+                    if (v) {
+                      await h.api.injectTestBook();
+                    } else {
+                      await h.api.removeTestBook();
+                    }
+                  } finally {
+                    // 成败都重新同步开关状态
+                    ref.invalidate(testBookProvider);
+                  }
+                },
+              ),
+            ),
           ),
           const SizedBox(height: 16),
           Text('口径说明', style: Theme.of(context).textTheme.titleLarge),

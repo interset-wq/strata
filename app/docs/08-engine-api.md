@@ -307,6 +307,20 @@ praises / short_comments / long_comments / clicks。序列含三种日类以覆�
 `{nid,days,rows,gap_days,flat_days,start_words,end_words,start_favs,end_favs,
 status,source}`；DELETE 仅删该 nid 的 simulate 行，响应 `{nid,deleted}`。
 
+### GET/POST/DELETE /strata/dev/test-book（**已实现**，设置页测试开关）
+
+作者工作台（docs/07）开发辅助：「设置 → 测试工具 → 工作台测试书」Switch 的
+背后即此端点。POST 注入一本**虚构**测试书（固定 nid 99,000,001，远高于平台
+真实 nid 段，永不冲突；nid 定年走 extrapolation 低置信档，对虚构书是诚实的），
+模仿真实库外书链路，引擎零特判：60 天模拟观测（SimulateObservations，
+`source:'simulate'`，非种子书中性基线）+ `book_meta` 行（最新观测值 = 书
+「当前值」，详情页因此走 `source:"local"` overlay 链）+ `discovered` 行
+（watchlist title COALESCE 与收录管理可找到它）+ watchlist 条目（`role:'self'`，
+**不追踪**——虚构书无官方页，后台轮询必失败；用户可手动激活验证失败路径，
+docs/07 §4）。DELETE 一次性清四表。GET/POST/DELETE 响应
+`{nid,present,title,days,rows}`（缺席时仅前二字段非空）。`days` 默认 60，范围
+1..180。不碰 seed.db；幂等重注入（同 nid 替换旧状态）。
+
 ### GET /strata/random?limit=&status=&form=（**已实现**）
 
 首页"换一换"网格数据源：`is_licensed=0` 种子库内 `ORDER BY RANDOM()` 均匀抽样

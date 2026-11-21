@@ -94,6 +94,18 @@ class StrataApi {
             as Map<String, dynamic>,
       );
 
+  /// 工作台虚构测试书（docs/07 开发辅助，设置页测试开关）：状态读取。
+  Future<TestBook> testBook() async =>
+      TestBook.fromJson(await _get('/dev/test-book') as Map<String, dynamic>);
+
+  /// 注入虚构测试书：60 天模拟观测 + 详情 overlay + 关注条目（不追踪）。
+  Future<TestBook> injectTestBook({int days = 60}) async =>
+      TestBook.fromJson(
+          await _post('/dev/test-book?days=$days') as Map<String, dynamic>);
+
+  /// 移除虚构测试书（overlay / 收录 / 关注 / 观测一并清理）。
+  Future<void> removeTestBook() => _delete('/dev/test-book');
+
   Future<BookDetail> book(int nid) async =>
       BookDetail.fromJson(await _get('/books/$nid') as Map<String, dynamic>);
 
@@ -640,6 +652,31 @@ class EngineSettings {
     windowSeconds: j['detail_refresh_window_seconds'] as int? ?? 86400,
     appApiEnabled: j['app_api_enabled'] as bool? ?? false,
   );
+}
+
+/// 工作台虚构测试书状态（设置页测试开关，docs/07 开发辅助）。
+class TestBook {
+  final int nid;
+  final bool present;
+  final String? title;
+  final int? days;
+  final int? rows;
+
+  const TestBook({
+    required this.nid,
+    required this.present,
+    this.title,
+    this.days,
+    this.rows,
+  });
+
+  factory TestBook.fromJson(Map<String, dynamic> j) => TestBook(
+        nid: j['nid'] as int? ?? 0,
+        present: j['present'] as bool? ?? false,
+        title: j['title'] as String?,
+        days: j['days'] as int?,
+        rows: j['rows'] as int?,
+      );
 }
 
 /// 浏览足迹：纯本地 user.db 数据。

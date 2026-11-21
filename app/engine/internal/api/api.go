@@ -142,6 +142,9 @@ func New(s *store.Store) *gin.Engine {
 	group.GET("/author-profile", srv.authorProfile)
 	group.POST("/dev/simulate", srv.devSimulate)
 	group.DELETE("/dev/simulate", srv.devSimulateDelete)
+	group.GET("/dev/test-book", srv.devTestBook)
+	group.POST("/dev/test-book", srv.devTestBookInject)
+	group.DELETE("/dev/test-book", srv.devTestBookRemove)
 	srv.startWatcher(context.Background())
 	return r
 }
@@ -1481,6 +1484,49 @@ func (s *Server) devSimulateDelete(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"nid": nid, "deleted": n})
+}
+
+// devTestBook (GET) reports the fictional workbench test book's state —
+// the settings test switch's source of truth (docs/07 dev aid).
+func (s *Server) devTestBook(c *gin.Context) {
+	tb, err := s.store.TestBookState(c.Request.Context())
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, tb)
+}
+
+// devTestBookInject (POST) injects the fictional test book: simulated
+// observation series (default 60 days, 1..180) + overlay metadata +
+// discovery + a watchlist entry (polling off).
+func (s *Server) devTestBookInject(c *gin.Context) {
+	days := 60
+	if raw := c.Query("days"); raw != "" {
+		d, err := strconv.Atoi(raw)
+		if err != nil || d < 1 || d > 180 {
+			fail(c, http.StatusBadRequest, "invalid_argument",
+				"days must be 1..180")
+			return
+		}
+		days = d
+	}
+	tb, err := s.store.InjectTestBook(c.Request.Context(), days)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, tb)
+}
+
+// devTestBookRemove (DELETE) tears the fictional test book down.
+func (s *Server) devTestBookRemove(c *gin.Context) {
+	tb, err := s.store.RemoveTestBook(c.Request.Context())
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, tb)
 }
 
 // calendar serves the release-calendar view (docs/14 P1): seed books

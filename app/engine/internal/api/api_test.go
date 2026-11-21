@@ -880,3 +880,97 @@ func TestDevSimulate(t *testing.T) {
 		doJSON(t, http.MethodPost, srv.URL+path, http.StatusBadRequest)
 	}
 }
+
+// TestDevTestBook: the settings test switch (docs/07 dev aid) — inject
+// the fictional workbench book and watch it flow through the detail
+// overlay, the watchlist and the observations endpoint, then remove it.
+func TestDevTestBook(t *testing.T) {
+	srv, _ := newTestServer(t)
+
+	// Initial state: absent.
+	body := doJSON(t, http.MethodGet,
+		srv.URL+"/strata/dev/test-book", http.StatusOK)
+	if body["present"] != false {
+		t.Fatalf("initial state = %v", body)
+	}
+
+	// Inject (default 60 days).
+	body = doJSON(t, http.MethodPost,
+		srv.URL+"/strata/dev/test-book", http.StatusOK)
+	if body["present"] != true || body["nid"].(float64) != 99000001 {
+		t.Fatalf("inject = %v", body)
+	}
+	rows := body["rows"].(float64)
+	if body["days"].(float64) != 60 || rows <= 0 || rows > 60 {
+		t.Fatalf("inject series = %v", body)
+	}
+
+	// Detail overlay: the fictional book serves the local view.
+	detail := getJSON(t, srv.URL+"/strata/books/99000001", http.StatusOK)
+	book := detail["book"].(map[string]any)
+	if detail["source"] != "local" || book["title"] != "工作台测试·全勤纪" {
+		t.Fatalf("detail = %v", detail)
+	}
+	if book["words"] == nil || book["favs"] == nil {
+		t.Fatalf("detail counters missing: %v", book)
+	}
+
+	// The watchlist lists it (discovered-row title fallback), inactive.
+	wl := getJSON(t, srv.URL+"/strata/watchlist", http.StatusOK)
+	found := false
+	for _, it := range wl["items"].([]any) {
+		m := it.(map[string]any)
+		if m["nid"].(float64) == 99000001 {
+			found = true
+			if m["title"] != "工作台测试·全勤纪" || m["active"] != false {
+				t.Fatalf("watchlist item = %v", m)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("test book missing from watchlist: %v", wl["items"])
+	}
+
+	// The observation series is exposed with the simulate source.
+	obs := getJSON(t,
+		srv.URL+"/strata/books/99000001/observations", http.StatusOK)
+	oitems := obs["items"].([]any)
+	if float64(len(oitems)) != rows {
+		t.Fatalf("observations = %d rows, want %v", len(oitems), rows)
+	}
+
+	// Idempotent re-inject: same series size, no row multiplication.
+	body2 := doJSON(t, http.MethodPost,
+		srv.URL+"/strata/dev/test-book", http.StatusOK)
+	if body2["rows"] != rows {
+		t.Fatalf("re-inject rows = %v, want %v", body2["rows"], rows)
+	}
+	obs = getJSON(t, srv.URL+"/strata/books/99000001/observations",
+		http.StatusOK)
+	if oitems = obs["items"].([]any); float64(len(oitems)) != rows {
+		t.Fatalf("after re-inject = %d rows", len(oitems))
+	}
+
+	// Remove: everything is torn down.
+	body = doJSON(t, http.MethodDelete,
+		srv.URL+"/strata/dev/test-book", http.StatusOK)
+	if body["present"] != false {
+		t.Fatalf("remove = %v", body)
+	}
+	getJSON(t, srv.URL+"/strata/books/99000001", http.StatusNotFound)
+	wl = getJSON(t, srv.URL+"/strata/watchlist", http.StatusOK)
+	if items, _ := wl["items"].([]any); len(items) != 0 {
+		t.Fatalf("watchlist after remove = %v", wl)
+	}
+	obs = getJSON(t, srv.URL+"/strata/books/99000001/observations",
+		http.StatusOK)
+	if len(obs["items"].([]any)) != 0 {
+		t.Fatalf("observations after remove = %v", obs)
+	}
+
+	// Invalid days.
+	for _, q := range []string{"?days=0", "?days=999", "?days=abc"} {
+		doJSON(t, http.MethodPost,
+			srv.URL+"/strata/dev/test-book"+q, http.StatusBadRequest)
+	}
+}

@@ -80,6 +80,11 @@ SELECT words, clicks, favs, praises, status FROM seed.books WHERE nid = ?`, nid)
 	if st.Valid {
 		status = st.String
 	}
+	if err == sql.ErrNoRows {
+		// Out-of-seed book: a neutral baseline (a second-year serial)
+		// so the series looks like a real book.
+		words, clicks, favs, praises = 200000, 300000, 1500, 400
+	}
 	serializing := status == "连载中"
 	startWords, startFavs := words, favs
 
