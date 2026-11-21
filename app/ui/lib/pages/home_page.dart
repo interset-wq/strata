@@ -300,6 +300,13 @@ class _HomePageState extends ConsumerState<HomePage> {
                 _dialogueEntryGridEntries(),
                 crossAxisCount: 3,
               ),
+              _wideEntryCard(
+                context,
+                icon: Icons.leaderboard_outlined,
+                title: '官方对话月票榜',
+                subtitle: '2017-07 起 · 按月可查',
+                route: '/official-ranks/m4',
+              ),
             ],
           ),
           if (_showTop)
@@ -371,6 +378,13 @@ class _HomePageState extends ConsumerState<HomePage> {
             _featuredCarousel(context, banners),
             const SizedBox(height: 8),
             _entryGrid(context),
+            _wideEntryCard(
+              context,
+              icon: Icons.leaderboard_outlined,
+              title: '官方榜单',
+              subtitle: '月票 / 新书 / 热销 / 打赏 · 在线',
+              route: '/official-ranks',
+            ),
             _sectionTitle(
               context,
               '连载发现',

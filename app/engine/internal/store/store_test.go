@@ -28,6 +28,20 @@ func openTestStore(t *testing.T) *Store {
 	return st
 }
 
+func TestCoverURLs(t *testing.T) {
+	st := openTestStore(t)
+	got, err := st.CoverURLs(context.Background(), []int64{1008, 999999})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got[1008] != "cover-1008.jpg" {
+		t.Fatalf("cover 1008 = %q, want cover-1008.jpg", got[1008])
+	}
+	if _, ok := got[999999]; ok {
+		t.Fatalf("unexpected cover for missing nid: %q", got[999999])
+	}
+}
+
 func TestBookMergesLatestObservation(t *testing.T) {
 	st := openTestStore(t)
 	detail, err := st.Book(context.Background(), 1001)

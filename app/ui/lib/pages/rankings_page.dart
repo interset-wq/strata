@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../core/providers.dart';
 import '../data/api/strata_api.dart';
@@ -18,10 +17,14 @@ const _boards = [
 
 final _boardProvider = FutureProvider.autoDispose
     .family<List<RankItem>, (String, int, int)>((ref, arg) async {
-  final handle = await ref.watch(bootProvider.future);
-  return handle.api.rankingBoard(
-      kind: arg.$1, year: arg.$2, limit: 50, offset: arg.$3);
-});
+      final handle = await ref.watch(bootProvider.future);
+      return handle.api.rankingBoard(
+        kind: arg.$1,
+        year: arg.$2,
+        limit: 50,
+        offset: arg.$3,
+      );
+    });
 
 /// 榜单页：顶部六榜 tab + 年份快速切换（demo 原下拉风格）。
 /// 无页面标题、无模式行；列表与其他页面共用统一行卡（BookRowCard）。
@@ -47,7 +50,9 @@ class _RankingsPageState extends ConsumerState<RankingsPage>
     _tabs = TabController(length: _boards.length, vsync: this);
     _tabs.addListener(() {
       final i = _tabs.index;
-      if (i >= 0 && _boards[i].$1 != _kind) setState(() => _kind = _boards[i].$1);
+      if (i >= 0 && _boards[i].$1 != _kind) {
+        setState(() => _kind = _boards[i].$1);
+      }
     });
     _scroll.addListener(() {
       final show = _scroll.offset > 500;
@@ -84,12 +89,12 @@ class _RankingsPageState extends ConsumerState<RankingsPage>
           unselectedLabelColor: scheme.onSurfaceVariant,
           indicatorColor: scheme.primary,
           dividerColor: Colors.transparent,
-          labelStyle:
-              const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+          labelStyle: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
           unselectedLabelStyle: const TextStyle(fontSize: 14),
-          tabs: [
-            for (final (_, label) in _boards) Tab(text: label),
-          ],
+          tabs: [for (final (_, label) in _boards) Tab(text: label)],
         ),
       ),
       body: Column(
@@ -106,9 +111,12 @@ class _RankingsPageState extends ConsumerState<RankingsPage>
                     items: [
                       for (int y = genMax; y >= genMin; y--)
                         DropdownMenuItem(
-                            value: y,
-                            child: Text('$y',
-                                style: const TextStyle(fontSize: 13))),
+                          value: y,
+                          child: Text(
+                            '$y',
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ),
                     ],
                     onChanged: (v) {
                       if (v == null) return;
@@ -117,68 +125,36 @@ class _RankingsPageState extends ConsumerState<RankingsPage>
                     },
                   ),
                   const Spacer(),
-                  Text('按 $_year 定年（$genMin–$genMax）',
-                      style: TextStyle(
-                          fontSize: 11,
-                          color: scheme.onSurfaceVariant.withValues(alpha: .7))),
+                  Text(
+                    '按 $_year 定年（$genMin–$genMax）',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: scheme.onSurfaceVariant.withValues(alpha: .7),
+                    ),
+                  ),
                 ],
               ),
             ),
-          // 官方榜单入口（docs/sfacg-live-ranks.md）：本页是站内口径（累计值
-          // 分位），官方榜单是平台当期口径，两个来源分开导航。
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
-            child: Card(
-              clipBehavior: Clip.antiAlias,
-              child: InkWell(
-                onTap: () => context.push('/official-ranks'),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 10),
-                  child: Row(
-                    children: [
-                      Icon(Icons.leaderboard_outlined,
-                          size: 18, color: scheme.primary),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('官方榜单',
-                                style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w600)),
-                            const SizedBox(height: 1),
-                            Text('SFACG 官方两来源：月榜库（2013-03 起任意月）/ PC 当期三榜',
-                                style: TextStyle(
-                                    fontSize: 11,
-                                    color: scheme.onSurfaceVariant)),
-                          ],
-                        ),
-                      ),
-                      Icon(Icons.chevron_right,
-                          size: 18, color: scheme.onSurfaceVariant),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
           Expanded(
             child: Stack(
               children: [
                 _BoardList(
-                    key: ValueKey('$_kind-$_year'),
-                    kind: _kind,
-                    year: _year,
-                    scroll: _scroll),
+                  key: ValueKey('$_kind-$_year'),
+                  kind: _kind,
+                  year: _year,
+                  scroll: _scroll,
+                ),
                 if (_showTop)
                   Positioned(
                     right: 10,
                     bottom: 10,
-                    child: _BackToTop(onTap: () => _scroll.animateTo(0,
+                    child: _BackToTop(
+                      onTap: () => _scroll.animateTo(
+                        0,
                         duration: const Duration(milliseconds: 400),
-                        curve: Curves.easeOut)),
+                        curve: Curves.easeOut,
+                      ),
+                    ),
                   ),
               ],
             ),
@@ -194,8 +170,12 @@ class _BoardList extends ConsumerWidget {
   final int year;
   final ScrollController scroll;
 
-  const _BoardList(
-      {super.key, required this.kind, required this.year, required this.scroll});
+  const _BoardList({
+    super.key,
+    required this.kind,
+    required this.year,
+    required this.scroll,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -203,8 +183,8 @@ class _BoardList extends ConsumerWidget {
     final scheme = Theme.of(context).colorScheme;
     return items.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Padding(
-          padding: const EdgeInsets.all(16), child: Text('加载失败：$e')),
+      error: (e, _) =>
+          Padding(padding: const EdgeInsets.all(16), child: Text('加载失败：$e')),
       data: (list) => list.isEmpty
           ? const Center(child: Text('该年份下无种子书目'))
           : ListView.builder(
@@ -215,10 +195,14 @@ class _BoardList extends ConsumerWidget {
                 if (i == list.length) {
                   return Padding(
                     padding: const EdgeInsets.only(top: 6),
-                    child: Text('上滑加载更多 · 平台累计值，老书占优',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                            fontSize: 11, color: scheme.onSurfaceVariant)),
+                    child: Text(
+                      '上滑加载更多 · 平台累计值，老书占优',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
                   );
                 }
                 return BookRowCard(item: list[i]);

@@ -32,6 +32,8 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
 
   bool refreshing = false;
   bool _footprintLogged = false;
+  // 榜单库外书自动补全（docs/08 §rank-seed）：每次进页至多一次。
+  bool _autoCompleted = false;
   // 库外书（官方搜索「新书」）自动收录状态，docs/08 §search-remote。
   bool _collectTried = false;
   bool _collecting = false;
@@ -155,6 +157,15 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                 onError: (_) {});
           }
           final b = d.book;
+          // 榜单库外书自动补全（docs/08 §rank-seed）：rank-seed 预写只
+          // 有标题/作者/封面（无字数）——首帧立即渲染，完整数据走后台
+          // refresh 静默补全，不再全屏转圈等收录。
+          if (!_autoCompleted && b['words'] == null) {
+            _autoCompleted = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) _refresh(context);
+            });
+          }
           // effective = 种子值被最新本地观测覆盖后的展示值（契约 08）。
           final eff = (d.effective ?? const {}).cast<String, dynamic>();
 

@@ -2106,6 +2106,59 @@ LIMIT ? OFFSET ?`
 	return items, rows.Err()
 }
 
+// CoverURLs returns the best-known cover for each nid: a locally fetched
+// cover wins over the seed cover_url. Missing nids are omitted. Official PC
+// rank rows carry no <img>, so the API joins them back to the seed here.
+func (s *Store) CoverURLs(ctx context.Context, nids []int64) (map[int64]string, error) {
+	out := make(map[int64]string, len(nids))
+	if len(nids) == 0 {
+		return out, nil
+	}
+	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(nids)), ",")
+	args := make([]any, len(nids))
+	for i, nid := range nids {
+		args[i] = nid
+	}
+	rows, err := s.DB.QueryContext(ctx, `
+SELECT seed.books.nid, COALESCE(c.cover, NULLIF(seed.books.cover_url, ''))
+FROM seed.books
+LEFT JOIN covers c ON c.nid = seed.books.nid
+WHERE seed.books.nid IN (`+placeholders+`)`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var nid int64
+		var cover sql.NullString
+		if err := rows.Scan(&nid, &cover); err != nil {
+			return nil, err
+		}
+		if cover.Valid && cover.String != "" {
+			out[nid] = cover.String
+		}
+	}
+	return out, rows.Err()
+}
+
+// SeedFromRank writes a minimal book_meta row from an official-rank entry
+// (docs/08 §rank-seed) so the detail page renders instantly instead of
+// 404-ing into a blocking collect. Existing rows are never downgraded:
+// basic fields are filled only when empty; full fetch data (words, favs,
+// summary, …) is left to the standard refresh path.
+func (s *Store) SeedFromRank(ctx context.Context, nid int64, title, author, coverURL, genre string) error {
+	_, err := s.DB.ExecContext(ctx, `
+INSERT INTO book_meta(nid, source, fetched_at, title, author, cover_url, genre)
+VALUES (?, 'rank', ?, ?, ?, ?, ?)
+ON CONFLICT(nid) DO UPDATE SET
+  title     = COALESCE(NULLIF(book_meta.title, ''), excluded.title),
+  author    = COALESCE(NULLIF(book_meta.author, ''), excluded.author),
+  cover_url = COALESCE(NULLIF(book_meta.cover_url, ''), excluded.cover_url),
+  genre     = COALESCE(NULLIF(book_meta.genre, ''), excluded.genre)`,
+		nid, time.Now().Unix(), title, author, coverURL, genre)
+	return err
+}
+
 // Cover returns the locally fetched cover path for a nid, if any.
 func (s *Store) Cover(ctx context.Context, nid int64) (string, error) {
 	var cover string

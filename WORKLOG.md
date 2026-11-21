@@ -359,3 +359,117 @@ Never delete or rewrite other agents' entries.
 - **Note**: 2026-born rankers (772261 凤傲天后悔 13,030 favs) remain outside the
   stats universe by the est_year ≤ 2025 cap — a pre-existing calibre decision,
   revisit only if the gen cap itself changes.
+
+---
+
+## 2026-11-20 - Medium tab portal + fixed carousel
+
+- **Did**: replaced the medium home tab's chips + infinite `BookRowTile` list
+  with a fixed featured carousel + 2×3 entry grid (总榜/年份/比赛/题材/优质/随机).
+  Added `/medium-random` (`status=short&form=medium`); `RandomPoolPage`
+  now accepts an optional form. Home carousel is per form: medium/IP use a fixed
+  favs-order featured pool, short falls back to the IP pool, long/dialogue keep
+  the date-seeded shuffle. `/featured` and `/banner` accept `form`.
+  Updated docs/15, docs/16, and the Flutter carousel tests.
+- **Verified**: `go test ./...`, `flutter analyze`, `flutter test` pass;
+  debug APK built and installed; device smoke saw the 3-book fixed medium
+  carousel, 中篇总榜 and 随机中篇 routes, and the short tab's IP fallback.
+- **Next**: user acceptance on the device. Do not drive the phone via adb
+  unless the user explicitly asks; the user will operate it.
+
+---
+
+## 2026-11-20 - Dialogue tab length-aware portal
+
+- **Did**: replaced the dialogue tab's genre chips + infinite list with a
+  cover-composed carousel + 3x3 entry grid. The grid puts length bands first
+  (short <=50k, medium 50k-150k, long >150k) before total/year/contest/genre/
+  quality/random, because the dialogue pool spans 3k-1.77M words and a single
+  favs list is dominated by long works. Added `words-band` to
+  `/strata/rankings/classic` (short|medium|long), plumbed it through
+  `ClassicListPage`, and added `/dialogue-random`.
+- **Verified**: `go test ./...`, `flutter analyze`, `flutter test` pass;
+  rebuilt `libstrata.so` and the debug APK. No adb install/tap was performed.
+- **Next**: device acceptance by the user; check the 3-column card readability
+  and each length-band route.
+
+---
+
+## 2026-11-21 - Official ranks scope split (long / dialogue)
+
+- **Did**: reused the committed official-ranks Go API and demo; added `scope`
+  to `OfficialRanksPage`. The long tab shows monthly ticket/new/hot + PC
+  current boards; the dialogue tab shows only the dialogue monthly-ticket
+  board. Added home wide-card entries in both tabs, removed the duplicate entry
+  from the local rankings page, and passed `scope` through `/official-ranks`.
+- **Verified**: `flutter analyze` and `flutter test` pass; the Go API is
+  unchanged. Official board requests still go through the engine TTL cache.
+- **Next**: device acceptance of both entry cards; do not drive the phone via
+  adb unless the user explicitly asks.
+
+---
+
+## 2026-11-21 - Official dialogue direct + month picker
+
+- **Did**: changed the dialogue tab's official card to open `/official-ranks/m4`
+  directly (no intermediate board grid). Replaced the official detail page's
+  month `DropdownButtonFormField` with a `‹ 2026-11 ›` strip plus a year/month
+  BottomSheet, because the dropdown was buggy and felt like an old web form
+  (user feedback). Added previous/next month limits and disabled months outside
+  2013-03..current.
+- **Verified**: `flutter analyze` and `flutter test` pass; debug APK rebuilt and
+  installed immediately (user preference: always install after build).
+- **Next**: device acceptance of the dialogue direct entry and month picker.
+
+---
+
+## 2026-11-21 - Drop duplicate PC current boards
+
+- **Did**: removed PC current 月度月票榜 and 月度热销榜 from the official-ranks
+  grid. Their current-month values are the same boards as the historical
+  monthly library's current `rank=0` and `rank=3`. Only PC 月度打赏榜 remains
+  (the monthly library has no 打赏 board). Go endpoint unchanged.
+- **Verified**: `flutter analyze` and `flutter test` pass; debug APK rebuilt and
+  installed immediately. No phone operation.
+- **Next**: user acceptance.
+
+---
+
+## 2026-11-21 - Official rankings: remove grid, switch boards with tabs
+
+- **Did**: deleted the intermediate official board grid. The long tab's official
+  card now opens the ranking page directly with a TabBar for 月票/新书/热销/
+  打赏. Extracted the month switcher + list into `_OfficialBoardView`, shared by
+  the tab page and the dialogue direct page (`/official-ranks/m4`). Removed the
+  now-unused `scope` query plumbing.
+- **Verified**: `flutter analyze` and `flutter test` pass; debug APK rebuilt and
+  installed immediately. No phone operation.
+- **Next**: user acceptance of tab switching and the shared month picker.
+
+---
+
+## 2026-11-21 - Fill PC rank covers from seed
+
+- **Did**: PC Rank rows carry no `<img>` at all, so every PC board entry had an
+  empty `cover_url` and fell back to the default cover. Added
+  `Store.CoverURLs` (local `covers` wins, then `seed.books.cover_url`) and used
+  it in `officialRanksPc` to enrich every nid before caching/serving. Verified
+  against the live page: the 打赏 rows have no image markup.
+- **Verified**: `go test ./...` passes; rebuilt `libstrata.so` with NDK 28.2
+  and rebuilt/installed the debug APK. No phone operation.
+- **Also**: bumped the PC cache key to `pc:current:v2` so a v1 body cached
+  before cover enrichment is not reused.
+- **Next**: user acceptance of the 打赏 tab covers.
+
+---
+
+## 2026-11-21 - Dialogue monthly picker starts 2017-07
+
+- **Did**: user verified the dialogue monthly-ticket board's first data month is
+  **2017-07** (continuous from 2018-07, with a few empty slots in between). The
+  month picker's lower bound is now board-specific: `m4` starts at 2017-07,
+  every other historical board stays at 2013-03. Empty months remain selectable
+  and render 无数据 rather than being hidden.
+- **Verified**: `flutter analyze` and `flutter test` pass; rebuilt/installed the
+  debug APK. No phone operation.
+- **Next**: user acceptance of the dialogue month range.

@@ -91,16 +91,18 @@ final router = GoRouter(
           routes: [
             GoRoute(path: '/settings', builder: (_, _) => const SettingsPage()),
             GoRoute(
-                path: '/collected',
-                builder: (_, _) => const CollectedPage()),
-              GoRoute(
-                path: '/official-ranks',
-                builder: (_, _) => const OfficialRanksPage()),
-              GoRoute(
-                path: '/official-ranks/:board',
-                builder: (_, st) =>
-                    OfficialRankDetailPage(board: st.pathParameters['board']!),
-              ),
+              path: '/collected',
+              builder: (_, _) => const CollectedPage(),
+            ),
+            GoRoute(
+              path: '/official-ranks',
+              builder: (_, _) => const OfficialRanksPage(),
+            ),
+            GoRoute(
+              path: '/official-ranks/:board',
+              builder: (_, st) =>
+                  OfficialRankDetailPage(board: st.pathParameters['board']!),
+            ),
           ],
         ),
       ],

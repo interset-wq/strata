@@ -42,16 +42,21 @@
 | --- | --- | --- |
 | 授权作品（licensed） | `Icons.lock` | 首页宽卡入口（可点击用实心，与规则 4 一致） |
 | 萌神获奖 | `Icons.emoji_events` | 首页宽卡入口（与宫格"征文比赛"同"获奖"语义，复用） |
+| 官方榜单 | `Icons.leaderboard_outlined` | 首页长篇宽卡（页内 Tab 切换月票/新书/热销/打赏）/ 对话 tab 宽卡（直达对话月票榜 m4）；文档不登记本数 |
 
-## 分类入口（短篇 tab 入口列表）
+## 分类入口（短篇 tab 入口列表 / 中篇/对话 tab 入口网格）
 
 | 语义 | icon | 使用处 |
 | --- | --- | --- |
-| 年份榜 | `Icons.calendar_month` | 短篇 tab 入口列表（年份列表入口） |
-| 比赛榜 | `Icons.emoji_events` | 短篇 tab 入口列表（复用"征文比赛"语义） |
-| 题材浏览 | `Icons.category` | 短篇 tab 入口列表（复用"分类找书"语义） |
-| 优质短篇 | `Icons.star` | 短篇 tab 入口列表（同代分位榜，docs/form-definitions §6） |
-| 随机短篇 | `Icons.shuffle` | 短篇 tab 入口列表（短篇随机池，/strata/random?status=short） |
+| 分类总榜 | `Icons.format_list_numbered` | 中篇/对话 tab 入口网格（全部作品收藏序；年份榜默认"全部年份"也可达） |
+| 短对话 | `Icons.short_text` | 对话 tab 入口网格（≤5 万字） |
+| 中对话 | `Icons.menu_book` | 对话 tab 入口网格（5–15 万字） |
+| 长对话 | `Icons.auto_stories` | 对话 tab 入口网格（>15 万字） |
+| 年份榜 | `Icons.calendar_month` | 短篇 tab 入口列表 / 中篇/对话 tab 入口网格 |
+| 比赛榜 | `Icons.emoji_events` | 短篇 tab 入口列表 / 中篇/对话 tab 入口网格（复用"征文比赛"语义） |
+| 题材浏览 | `Icons.category` | 短篇 tab 入口列表 / 中篇/对话 tab 入口网格（复用"分类找书"语义） |
+| 优质短篇/中篇/对话 | `Icons.star` | 短篇入口列表 / 中篇/对话入口网格（同代分位榜，docs/form-definitions §6） |
+| 随机短篇/中篇/对话 | `Icons.shuffle` | 短篇入口列表 / 中篇/对话入口网格（/strata/random?status=short，form 区分） |
 
 ## 主导航（底部 Tab Bar）
 

@@ -434,7 +434,7 @@ nid 同向跟随。未知作者返回空列表，不是错误。items 为标准 
   列表走 `/author-books`）。只写 user.db，不碰 seed.db。
 - 抓取走全局限速器（foreground 槽），与详情页刷新共享配额。
 
-## 官方榜单（docs/sfacg-live-ranks.md 三来源；入口 = 榜单页「官方榜单」卡）
+## 官方榜单（docs/sfacg-live-ranks.md 三来源；入口 = 首页长篇页内 Tab / 对话直达 m4）
 
 四个端点均为 `GET`，响应为完整榜单 JSON；抓取走全局限速器（foreground
 槽），TTL 缓存两层：进程内存 + `user.db official_ranks_cache`（schema
@@ -443,7 +443,9 @@ v9，重启不丢；当期 24h / 历史月 365d）。失败 → 502 `upstream`�
 ### GET /strata/official-ranks/monthly?date=YYYY-MM&rank=0|2|3|4（**已实现**）
 
 历史月榜库（MonthlyBoy.ashx，2013-03 起任意月）。rank：0 月票 / 2 新书 /
-3 热销 / 4 对话月票（2017-07 起）。响应 `{meta:{month,rank,kind,note,…},
+3 热销 / 4 对话月票（2017-07 第一份；2018-07 起连续）。UI 可选下界：
+`m4` = 2017-07，其余历史月榜 = 2013-03；中间空槽照常可选并显示「无数据」。
+响应 `{meta:{month,rank,kind,note,…},
 items:[{rank,nid,title,author,cover_url,value?}]}`——月票/对话月票带
 `value`（票数），其余无数值。
 
@@ -453,7 +455,11 @@ PC 当期四榜（book.sfacg.com/Rank/）一页返回：`{meta, boards:[{name,
 entries:[…]}]}`，顺序 月度月票榜（带票数）/ 月度打赏榜 / 月度热销榜 /
 粉丝榜（读者侧，消费火券，条目**无 nid**，`nid=0`）。粉丝榜实为用户
 充值榜，对产品无意义，App 不展示（端点保真、展示层裁剪，同移动四榜
-口径；2026-11-21 用户判定）。
+口径；2026-11-21 用户判定）。App 进一步只展示**月度打赏榜**：PC 月度
+月票/热销与历史月榜当月 `rank=0/3` 是同一榜，不重复展示（2026-11-21
+用户判定）。PC 榜单页的排行行**本身没有 `<img>`**；服务端按 nid 回查
+`seed.books.cover_url` / `covers` 补齐 `cover_url`，仍缺失的才由端上默认
+封面兜底。
 
 ### GET /strata/official-ranks/mobile?board=original|bm|new|jp|sale（**已实现**）
 
@@ -471,6 +477,17 @@ sale-set。
 不再加载移动榜单，官方 API 数据不可信）。**从不为它发起
 抓取**——缓存未命中/过期/离线一律空集，UI 据此静默降级（详情页「官方
 热销」徽标不显示）。
+
+### POST /strata/books/:nid/rank-seed（**已实现**）
+
+即时详情的预写（2026-11-21，收录提速）：官方榜单行被点时，UI 先调用
+本端点把该行的 title/author/cover_url/genre 写入 `user.db book_meta`
+（source=`rank`；`ON CONFLICT` 只填空字段，**从不覆盖**已有数据——完整
+抓取数据仍归标准 refresh 路径），再导航 `/book/:nid`。库外书由此首帧
+即渲染最小 overlay（不再 404 → 全屏转圈等 ~10s 收录）；详情页发现
+overlay 无 `words` 时自动触发一次后台 refresh 静默补全。纯本地写，
+**从不触网**。请求体 `{title, author, cover_url, genre}`（均可省略）；
+响应 `{seeded: true}`。
 
 ## FFI 启动契约（Phase 1）
 

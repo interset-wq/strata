@@ -85,7 +85,7 @@ func New(s *store.Store) *gin.Engine {
 		client:  client,
 		appAPI:  os.Getenv("STRATA_APP_API") == "1",
 		ranksCache: &officialRanksState{
-			entries:  map[string]struct {
+			entries: map[string]struct {
 				loadedAt time.Time
 				body     []byte
 			}{},
@@ -99,6 +99,7 @@ func New(s *store.Store) *gin.Engine {
 	group.PUT("/settings", srv.updateSettings)
 	group.GET("/books/:nid", srv.book)
 	group.POST("/books/:nid/refresh", srv.bookRefresh)
+	group.POST("/books/:nid/rank-seed", srv.bookRankSeed)
 	group.GET("/books/:nid/observations", srv.observations)
 	group.GET("/watchlist", srv.watchList)
 	group.POST("/watchlist/:nid", srv.watchAdd)
@@ -1069,6 +1070,35 @@ func (s *Server) discoveredDelete(c *gin.Context) {
 // By default each book is limited to one outbound detail request per 24h.
 // The attempt is stamped BEFORE the request, so dead/zombie/network failures
 // also consume the window. The Settings switch can disable this limit.
+// bookRankSeed pre-writes a minimal book_meta row from an official-rank
+// entry (docs/08 §rank-seed): the rankings UI calls it right before
+// navigating to /book/:nid, so an out-of-seed book renders its overlay
+// immediately and the full data is completed by a background refresh
+// instead of a ~10s blocking collect spinner. Local write only — never
+// touches the network.
+func (s *Server) bookRankSeed(c *gin.Context) {
+	nid, err := strconv.ParseInt(c.Param("nid"), 10, 64)
+	if err != nil || nid <= 0 {
+		fail(c, http.StatusBadRequest, "invalid_argument", "nid must be a positive integer")
+		return
+	}
+	var req struct {
+		Title    string `json:"title"`
+		Author   string `json:"author"`
+		CoverURL string `json:"cover_url"`
+		Genre    string `json:"genre"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		fail(c, http.StatusBadRequest, "invalid_argument", "invalid json body")
+		return
+	}
+	if err := s.store.SeedFromRank(c.Request.Context(), nid, req.Title, req.Author, req.CoverURL, req.Genre); err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"seeded": true})
+}
+
 func (s *Server) bookRefresh(c *gin.Context) {
 	nid, err := strconv.ParseInt(c.Param("nid"), 10, 64)
 	if err != nil || nid <= 0 {
@@ -1821,8 +1851,8 @@ func fail(c *gin.Context, status int, code, message string) {
 // officialRanksHistoricalTTL covers past months — that data never changes,
 // so one fetch per session is enough.
 const (
-	officialRanksTTL            = 24 * time.Hour
-	officialRanksHistoricalTTL  = 365 * 24 * time.Hour
+	officialRanksTTL           = 24 * time.Hour
+	officialRanksHistoricalTTL = 365 * 24 * time.Hour
 )
 
 type officialRanksState struct {
@@ -1985,12 +2015,33 @@ func (s *Server) officialRanksServed(ctx context.Context, key string,
 // officialRanksPc serves the four current-month boards of the PC Rank page
 // (月票 with 票数 / 打赏 / 热销 are book boards; 粉丝 is reader-side).
 func (s *Server) officialRanksPc(c *gin.Context) {
+	// v2 key: the v1 cache body was written before cover enrichment.
 	body, err := s.officialRanksServed(c.Request.Context(),
-		"pc:current", officialRanksTTL, func() ([]byte, error) {
+		"pc:current:v2", officialRanksTTL, func() ([]byte, error) {
 			boards, ferr := crawl.FetchPcRanks(c.Request.Context(),
 				s.client, s.limiter, true)
 			if ferr != nil {
 				return nil, ferr
+			}
+			// The PC rank page has no <img> in its rows. Join every nid back
+			// to the seed/user cover so the UI does not fall back to the
+			// default placeholder for the whole board (2026-11-21).
+			nids := make([]int64, 0, len(boards)*20)
+			for _, board := range boards {
+				for _, entry := range board.Entries {
+					if entry.NID > 0 {
+						nids = append(nids, entry.NID)
+					}
+				}
+			}
+			covers, _ := s.store.CoverURLs(c.Request.Context(), nids)
+			for bi := range boards {
+				for ei := range boards[bi].Entries {
+					entry := &boards[bi].Entries[ei]
+					if entry.CoverURL == "" && entry.NID > 0 {
+						entry.CoverURL = covers[entry.NID]
+					}
+				}
 			}
 			return json.Marshal(gin.H{
 				"meta": gin.H{
@@ -2051,7 +2102,7 @@ func (s *Server) officialRanksSaleSet(c *gin.Context) {
 	ids := map[int64]struct{}{}
 	for _, key := range []string{
 		"monthly:" + month + ":3", // 月榜库 当期热销榜
-		"pc:current",              // PC 月度热销榜（boards 里只取热销）
+		"pc:current:v2",           // PC 月度热销榜（boards 里只取热销）
 	} {
 		body, ok, err := s.store.OfficialRanksGet(c.Request.Context(), key, officialRanksTTL)
 		if err != nil || !ok {

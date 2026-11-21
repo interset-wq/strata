@@ -244,6 +244,24 @@ class StrataApi {
 
   /// Triggers a mobile-page detail fetch (sync; global limiter serializes).
   /// state: alive | dead | zombie; written: observation appended.
+  /// 榜单预写（docs/08 §rank-seed）：点榜单行时先把该行 title/author/
+  /// 封面/题材写入 user.db book_meta（source=rank，只填空字段），
+  /// 库外书详情页首帧即可渲染，完整数据由后台 refresh 补全。纯本地写。
+  Future<void> rankSeed({
+    required int nid,
+    required String title,
+    String author = '',
+    String coverUrl = '',
+    String genre = '',
+  }) async {
+    await _postBody('/books/$nid/rank-seed', {
+      'title': title,
+      'author': author,
+      'cover_url': coverUrl,
+      'genre': genre,
+    });
+  }
+
   Future<RefreshResult> refresh(int nid) async {
     final body = await _post('/books/$nid/refresh', internet: true);
     return RefreshResult.fromJson(body);
