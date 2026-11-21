@@ -1238,19 +1238,27 @@ class DiscoveredItem {
 
 class ObservationRow {
   final int observedAt;
+  final int? clicks;
   final int? favs;
   final int? praises;
   final int? words;
+  final int? shortComments;
+  final int? longComments;
   final String? status;
   final String? updatedAt;
+  final String? source;
 
   ObservationRow.fromJson(Map<String, dynamic> m)
     : observedAt = m['observed_at'] as int,
+      clicks = m['clicks'] as int?,
       favs = m['favs'] as int?,
       praises = m['praises'] as int?,
       words = m['words'] as int?,
+      shortComments = m['short_comments'] as int?,
+      longComments = m['long_comments'] as int?,
       status = m['status'] as String?,
-      updatedAt = m['updated_at'] as String?;
+      updatedAt = m['updated_at'] as String?,
+      source = m['source'] as String?;
 }
 
 class BookDetail {
@@ -1259,13 +1267,19 @@ class BookDetail {
   final Map<String, dynamic> book;
   final List<String> tags;
   final Map<String, dynamic>? effective;
+  // local/meta 仅用于基线判别（docs/07 §6）：非种子书 local 恒 null 且
+  // meta 非空；种子书无观测时两者皆空，有观测时 local 非空。
+  final Map<String, dynamic>? local;
+  final Map<String, dynamic>? meta;
 
   BookDetail.fromJson(Map<String, dynamic> m)
     : source = m['source'] as String,
       dataEnd = m['data_end'] as String,
       book = m['book'] as Map<String, dynamic>,
       tags = (m['tags'] as List).cast<String>(),
-      effective = m['effective'] as Map<String, dynamic>?;
+      effective = m['effective'] as Map<String, dynamic>?,
+      local = m['local'] as Map<String, dynamic>?,
+      meta = m['meta'] as Map<String, dynamic>?;
 }
 
 /// 官方榜单一行（三来源共用，docs/sfacg-live-ranks.md）。

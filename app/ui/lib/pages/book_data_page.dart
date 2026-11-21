@@ -3,11 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/providers.dart';
 import '../data/api/strata_api.dart';
+import '../widgets/back_to_top.dart';
 import '../widgets/metric_badge.dart';
+import 'book_data_charts.dart';
 
-/// 单书数据页（Phase 5 作者工作台）：本机观测时序 + 更新历史。
-/// 红线（docs/12）：诚实区分「暂无更新」与「数据缺口」，
-/// 不在端上伪造全库时序——只展示本机已有的观测点。
+/// 单书数据页（Phase 5 作者工作台，docs/07 §5 图表矩阵）：更新热力图
+/// （首屏）+ 全勤达标看板 + 当前值仪表盘 + 六指标趋势 + 同期对照空态 +
+/// 观测时序。全部端上现算（引擎零新端点）。红线（docs/12）：诚实区分
+/// 「暂无更新」与「数据缺口」，不在端上伪造全库时序。
 class BookDataPage extends ConsumerStatefulWidget {
   final int nid;
 
@@ -18,17 +21,35 @@ class BookDataPage extends ConsumerStatefulWidget {
 }
 
 class _BookDataPageState extends ConsumerState<BookDataPage> {
-  late Future<List<ObservationRow>> _obs;
+  late Future<List<Object?>> _data; // [List<ObservationRow>, BookDetail?]
+  final ScrollController _scroll = ScrollController();
+  bool _showTop = false;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    // book 可 404（库外书未抓过详情）——吞掉置 null，当前值仪表盘降级
+    _data = Future.wait<Object?>([
+      ref
+          .read(bootProvider.future)
+          .then((h) => h.api.observations(widget.nid)),
+      ref
+          .read(bootProvider.future)
+          .then<BookDetail?>((h) => h.api.book(widget.nid))
+          .catchError((_) => null),
+    ]);
+    _scroll.addListener(_onScroll);
   }
 
-  void _load() {
-    _obs =
-        ref.read(bootProvider.future).then((h) => h.api.observations(widget.nid));
+  void _onScroll() {
+    final show = _scroll.offset > 500;
+    if (show != _showTop) setState(() => _showTop = show);
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
   }
 
   @override
@@ -36,8 +57,14 @@ class _BookDataPageState extends ConsumerState<BookDataPage> {
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(title: const Text('观测数据')),
-      body: FutureBuilder<List<ObservationRow>>(
-        future: _obs,
+      floatingActionButton: _showTop
+          ? BackToTop(onTap: () => _scroll.animateTo(
+                0,
+                duration: const Duration(milliseconds: 400),
+                curve: Curves.easeOut))
+          : null,
+      body: FutureBuilder<List<Object?>>(
+        future: _data,
         builder: (context, snap) {
           if (snap.connectionState != ConnectionState.done) {
             return const Center(child: CircularProgressIndicator());
@@ -45,65 +72,61 @@ class _BookDataPageState extends ConsumerState<BookDataPage> {
           if (snap.hasError) {
             return Center(child: Text('加载失败：${snap.error}'));
           }
-          final items = snap.data ?? [];
+          final items = snap.data![0] as List<ObservationRow>;
+          final book = snap.data![1] as BookDetail?;
           if (items.length < 2) {
             return _GapState(count: items.length);
           }
-          // 区分「暂无更新」与「有变化」：对比最近两条观测的累计值
+          final cells = buildDayCells(items);
+          final hasWords = items.any((o) => o.words != null);
           final newest = items.first;
           final previous = items[1];
-          final changed = (newest.favs != previous.favs) ||
+          final changed = (newest.words != previous.words) ||
+              (newest.favs != previous.favs) ||
               (newest.praises != previous.praises) ||
-              (newest.words != previous.words);
+              (newest.clicks != previous.clicks);
           final first = items.last;
           final spanDays =
               ((newest.observedAt - first.observedAt) / 86400).floor();
           return ListView(
+            controller: _scroll,
             padding: const EdgeInsets.all(16),
             children: [
-              // 摘要卡：诚实结论
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: scheme.primary.withValues(alpha: .08),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      changed ? '检测到更新' : '暂无更新',
-                      style: TextStyle(
-                          fontFamily: 'serif',
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: scheme.primary),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '本机已观测 ${items.length} 次，跨度 $spanDays 天。'
-                      '${changed
-                          ? '与上一次观测相比指标有变化。'
-                          : '两次观测之间各项累计值没有变化——是暂时没有新数据，不是数据缺口。'}',
-                      style: TextStyle(
-                          fontSize: 11.5, color: scheme.onSurfaceVariant),
-                    ),
-                  ],
-                ),
-              ),
+              // 1. 更新热力图（首屏）+ 全勤达标看板——需字数观测
+              if (hasWords) ...[
+                UpdateHeatmap(cells: cells),
+                const SizedBox(height: 14),
+                AttendanceBoard(cells: cells, status: newest.status),
+                const SizedBox(height: 14),
+              ],
+              // 2. 当前值仪表盘（book 端点可达时）
+              if (book != null) ...[
+                CurrentValuesGrid(detail: book, latest: newest),
+                const SizedBox(height: 14),
+              ],
+              // 3. 六指标趋势折线
+              MetricTrend(items: items),
               const SizedBox(height: 14),
-              // 观测折线：观测点 ≥3 才启用（docs/12 红线——不足不硬画）
-              if (items.length >= 3)
-                _TrendChart(
-                  points: (items.reversed.toList())
-                      .where((o) => o.favs != null)
-                      .map((o) => o.favs!.toDouble())
-                      .toList(),
-                ),
-              if (items.length >= 3) const SizedBox(height: 14),
-              Text('观测时序（新 → 旧）',
-                  style: TextStyle(
-                      fontSize: 12, color: scheme.onSurfaceVariant)),
+              // 4. 同期对照（空态）
+              const PeerCompareEmpty(),
+              const SizedBox(height: 14),
+              // 5. 观测时序
+              Row(
+                children: [
+                  Text('观测时序（新 → 旧）',
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: scheme.onSurfaceVariant)),
+                  const Spacer(),
+                  Text('${changed ? '检测到更新' : '暂无更新'} · ${items.length} 次 / $spanDays 天',
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: changed
+                              ? scheme.primary
+                              : scheme.onSurfaceVariant)),
+                ],
+              ),
               const SizedBox(height: 8),
               for (final o in items) _ObsRow(o: o),
             ],
@@ -173,6 +196,11 @@ class _ObsRow extends StatelessWidget {
               Text('${t.month}/${t.day} ${t.hour}:${t.minute.toString().padLeft(2, '0')}',
                   style: TextStyle(
                       fontSize: 12, fontWeight: FontWeight.w700)),
+              if (o.source != null && o.source != 'detail')
+                Text(o.source == 'simulate' ? '模拟' : (o.source ?? ''),
+                    style: TextStyle(
+                        fontSize: 10,
+                        color: scheme.onSurfaceVariant.withValues(alpha: .7))),
             ],
           ),
           const SizedBox(height: 6),
@@ -180,14 +208,20 @@ class _ObsRow extends StatelessWidget {
             spacing: 4,
             runSpacing: 4,
             children: [
-              if (o.favs != null)
-                _chip(context, '收藏 ${_wan(o.favs!)}', icon: MetricIcons.favs),
-              if (o.praises != null)
-                _chip(context, '点赞 ${_wan(o.praises!)}',
-                    icon: MetricIcons.praises),
               if (o.words != null)
-                _chip(context, '字数 ${_wan(o.words!)}',
+                _chip(context, '字数 ${wan(o.words!)}',
                     fg: scheme.primary, icon: MetricIcons.words),
+              if (o.clicks != null)
+                _chip(context, '点击 ${wan(o.clicks!)}'),
+              if (o.favs != null)
+                _chip(context, '收藏 ${wan(o.favs!)}', icon: MetricIcons.favs),
+              if (o.praises != null)
+                _chip(context, '点赞 ${wan(o.praises!)}',
+                    icon: MetricIcons.praises),
+              if (o.shortComments != null)
+                _chip(context, '短评 ${o.shortComments}'),
+              if (o.longComments != null)
+                _chip(context, '长评 ${o.longComments}'),
             ],
           ),
           if (o.updatedAt != null)
@@ -223,106 +257,4 @@ class _ObsRow extends StatelessWidget {
       ),
     );
   }
-}
-
-/// 观测折线（favs 时序）：朱砂细线 + 端点数值。观测点 ≥3 才画。
-class _TrendChart extends StatelessWidget {
-  final List<double> points;
-
-  const _TrendChart({required this.points});
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final isRising = points.last >= points.first;
-    final color = isRising ? scheme.primary : scheme.tertiary;
-    final minV = points.reduce((a, b) => a < b ? a : b);
-    final maxV = points.reduce((a, b) => a > b ? a : b);
-    final span = (maxV - minV).abs().clamp(1.0, double.infinity);
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        border: Border.all(color: scheme.outline.withValues(alpha: .4)),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('收藏时序',
-                  style: TextStyle(
-                      fontSize: 11, color: scheme.onSurfaceVariant)),
-              Text('${_wan(points.first.toInt())} → ${_wan(points.last.toInt())}',
-                  style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: color)),
-            ],
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            height: 72,
-            width: double.infinity,
-            child: CustomPaint(
-              painter: _SparklinePainter(
-                  points: points, minV: minV, span: span, color: color),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SparklinePainter extends CustomPainter {
-  final List<double> points;
-  final double minV;
-  final double span;
-  final Color color;
-
-  _SparklinePainter({
-    required this.points,
-    required this.minV,
-    required this.span,
-    required this.color,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (points.length < 2) return;
-    final step = size.width / (points.length - 1);
-    final path = Path();
-    for (var i = 0; i < points.length; i++) {
-      final x = i * step;
-      final y = size.height - (points[i] - minV) / span * size.height;
-      if (i == 0) {
-        path.moveTo(x, y);
-      } else {
-        path.lineTo(x, y);
-      }
-    }
-    canvas.drawPath(
-        path,
-        Paint()
-          ..color = color
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.6
-          ..strokeJoin = StrokeJoin.round);
-    // 端点小圆
-    canvas.drawCircle(
-        Offset(size.width, size.height - (points.last - minV) / span * size.height),
-        2.5,
-        Paint()..color = color);
-  }
-
-  @override
-  bool shouldRepaint(covariant _SparklinePainter old) =>
-      old.points.length != points.length;
-}
-
-String _wan(int n) {
-  if (n >= 10000) return '${(n / 10000).toStringAsFixed(1)}万';
-  return '$n';
 }
