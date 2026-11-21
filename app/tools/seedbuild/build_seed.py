@@ -58,7 +58,7 @@ SCHEMA = Path(__file__).resolve().parent / "schema.sql"
 DATASET = REPO / "dataset" / "out" / "books.jsonl"
 
 SCHEMA_VERSION = 4
-SEED_VERSION = "20260503.23"
+SEED_VERSION = "20260503.25"  # P10 假完结入种剔除（145 本）+ 用户裁定表生效（86430）
 CONTENT_END = pd.Timestamp("2026-05-03")
 GEN_MIN, GEN_MAX = 2007, 2025
 
@@ -67,9 +67,9 @@ EXPECT_UNIVERSE = 241_864       # 241,758 + 108（E.14 补充书，est_year 全�
 EXPECT_ANALYSIS_ROWS = 245_887  # 245,779 + 108 月榜遗漏书（E.14）
 EXPECT_DATASET_ROWS = 248_338   # v20260503.7: 248,230 + 108 月榜遗漏书（E.14）
 EXPECT_LICENSED = 47
-EXPECT_ADMITTED = 18_609       # E.24 全种子 DOM 核验 + E.25 移除 7 本 Web 死链
-EXPECT_SEED = 18_656           # 18,609 + 47 licensed
-EXPECT_COVERAGE_MIN = 0.9650   # eligible 口径（弃书+invalid 剔除后；详见 P3）。
+EXPECT_ADMITTED = 18_704       # E.28 基线 18,849 再减 P10 假完结 145 本（含裁定 86430）
+EXPECT_SEED = 18_751           # 18,704 + 47 licensed
+EXPECT_COVERAGE_MIN = 0.9640   # P10 剔除后 eligible 分母同步缩小，覆盖率 96.53%，门槛不变
 # E.17 同人短字数条款把 6,012 本同人从 short 移入 dialogue：这些书不再受 E.11
 # 弃书约束，eligible 分母因此多出 0.87% 的收藏，而种子只吸收其中 700 本有质量锚
 # 的书。门槛随分母下调，P3 的同分母对比（vs V0 +0.00pp）才是回归判据。
@@ -392,6 +392,10 @@ def build_frames() -> tuple[pd.DataFrame, dict]:
             "invalid": {
                 "total": len(res["invalid"]),
                 "in_seed": len(res["invalid"] & set(res["ids"])),  # 恒为 0（P6）
+            },
+            "fake_complete_p10": {
+                "total": len(res["fake_complete"]),
+                "in_seed": len(res["fake_complete"] & set(res["ids"])),  # 恒为 0（P10）
             },
         },
         "postconditions": checks,

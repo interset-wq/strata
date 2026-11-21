@@ -1,47 +1,69 @@
 # 全局文档（`docs/`）
 
-> 本目录存放**跨 analysis（数据分析）与 app（产品）共用的全局文档**：外部接口事实、
-> 我们自定义指标的定义、小说形式的定义。
-> analysis 目录只负责数据分析与报告；app/docs 只负责产品设计。
-> 三者的边界：全局定义放这里，使用方在原位置留一行绝对路径指针。
+本目录只放**跨 `analysis/`（数据分析）与 `app/`（产品）共用的全局定义与接口事实**。
+分析报告在 `analysis/reports/`，产品设计在 `app/docs/`；全局事实留这里，使用方在原位置只留指针。
 
-## 文档清单
+## 先看哪里
 
-| 文档 | 类别 | 权威范围 |
-| --- | --- | --- |
-| [`sfacg-endpoints.md`](./sfacg-endpoints.md) | 接口事实 | SFACG **PC 端** HTML + `HTML5.ashx` 端点、参数、状态码、限流、存活判据 |
-| [`sfacg-app-api.md`](./sfacg-app-api.md) | 接口事实 | SFACG **官方 App API**（`api.sfacg.com`）认证、19 字段、端点、77 推送位 |
-| [`sfacg-live-ranks.md`](./sfacg-live-ranks.md) | 接口事实 | 现网榜单端点（`MonthlyBoy.ashx` 任意月、月票/新书/热销口径） |
-| [`metrics-definitions.md`](./metrics-definitions.md) | **自定义指标** | 定年/universe/五分位/pr/覆盖率/断更/生命状态/推荐信号白名单的唯一权威定义 |
-| [`quantitative-mode-metrics.md`](./quantitative-mode-metrics.md) | **设计定案** | 量化模式从零设计需要几个自定义指标：**2 个核心**——排序分（口碑发现分，`lqs`/`mqs` 为同指标的不同域实现、不可合并）+ 位置分（`fav_pctl`）；展示视角/`ref_pctl`/基础维度列为可选扩展；含三档施工范围与 6 条开发红线 |
-| [`form-definitions.md`](./form-definitions.md) | **小说形式** | `form` 六值（invalid/short/medium/long/dialogue/ip_collab）判定优先级、边界、优质短篇判定 |
-| [`length-weighted-quality.md`](./length-weighted-quality.md) | **自定义指标** | 篇幅加权口碑分 `lqs`：长篇区排序信号，`pr` 的「世代 × 收藏档」分位 × 归一化篇幅系数（0.75–1.0）、校准与边界 |
-| [`lqs-ranking-integration.md`](./lqs-ranking-integration.md) | **实施规格** | 推荐层如何接入 `lqs`：现状排序基线、两级排序键、对话小配额、验收断言；指标定义仍在 `length-weighted-quality.md` |
-| [`api-field-mapping.md`](./api-field-mapping.md) | **字段对应** | App API 18 字段 ↔ CSV/books 列的实测对应、一致率、值映射、写回约束（`point`/`bgBanner` 误映射纠正） |
-| [`author-profile-on-demand.md`](./author-profile-on-demand.md) | **设计定案** | 作者资料不预采：App 打开作者页按需请求某本书详情页取头像/名字/作品集，intro 仅 PC 版 |
-| [`fake-complete-short-medium.md`](./fake-complete-short-medium.md) | **分析待裁定** | 假完结短/中篇污染排名池：长篇征文即假、第二类僵尸、短篇覆盖缺口；含用户裁定与治理方案 |
-| [`contest-roster-harvest.md`](./contest-roster-harvest.md) | 接口事实 + 研究 | 征文参赛清单两套端点、tagId 地图、补采短/中篇的覆盖实证与探针 |
-| [`contest-roster-fields.md`](./contest-roster-fields.md) | 接口事实 | 征文清单两套接口逐字段说明 + 真实响应样例（6 字段、大小写差异、Cover 格式差异），供 App 核对 |
-| [`contest-display-in-app.md`](./contest-display-in-app.md) | **设计定案** | 在 App 内展示征文信息：赛事档案页 + 参赛清单浏览页的三层数据来源、「我们的形式」筛选排序、降级与待裁定 |
-| [`ref-percentile-for-discovered.md`](./ref-percentile-for-discovered.md) | **设计定案** | 库外自动收录书的分位：`ref_pctl` 断点表查表法（nid 定年分组 + favs 查 universe 分布），跨代可比、无需运行时全库；含收藏速率否证与边界降级 |
-| [`anchor-density-strategy.md`](./anchor-density-strategy.md) | **分析定案** | 定年锚点按 id 区调整密度是否成立：早期误差大是锚点少非多、外推误差只由 max anchor 距离决定；策略=P0 常态化补最新锚点、早期保留、中段低优先 |
-| [`award-winners-as-seed-source.md`](./award-winners-as-seed-source.md) | **分析定案** | 征文获奖书入种（用户已批准）：**剔除 602 本入围污染**→净获奖 **911 本** 规范化表 `contest_awards_normalized.csv`（11 届）+ 140 本库外补采清单；奖项名 44 本可靠/867 本待标定；获奖只作筛选徽标不打分；schema v5 `contest_awards` 表 + 断言 + 双产物的 app/ 交接规格（本 agent 不碰冻结的 app/） |
-| [`contest-url-api-patterns.md`](./contest-url-api-patterns.md) | **统领研究** | 比赛 URL 与 API 规律总览：四代 URL 形态/四季节奏/tagId 分配/获奖四代形态四类规律，如何转化为种子质量（补书目+补优质+提定年），研究路线图（已验证 vs 待研究缺口）；细节走本文指针 |
+| 要做的事 | 先读 |
+| --- | --- |
+| 抓 PC 端页面 / 搜索 / 榜单 / 判活 | `sfacg-endpoints.md` |
+| 抓 App API（元数据、精确到秒的 `addTime`、`viewTimes`） | `sfacg-app-api.md` |
+| 判断当前榜是否可用、展示裁定 | `sfacg-live-ranks.md` |
+| 把 API 字段写回本地列 | `api-field-mapping.md`、`metrics-definitions.md` |
+| 判断 `form` 或种子收录资格 | `form-definitions.md`、`fake-complete-short-medium.md` |
+| 设计量化模式指标 | `quantitative-mode-metrics.md` → `metrics-definitions.md` → 域文档 |
+| 征文发现、tagId、获奖入种、App 展示 | `contest-url-api-patterns.md` 导航，再按权威分工读对应文档 |
+| 作者头像 / 简介 / 作品集 | `author-profile-on-demand.md` |
 
-## 使用约定
+## 文档索引
 
-- **原位置的指针**：文档迁来后，`analysis/references/` 与 `app/docs/` 的原文件
-  只剩一行项目根绝对路径（如 `/docs/sfacg-app-api.md`），指向本目录。
-  交叉引用无需修改——顺着指针即可找到正文。
-- **路径是项目根绝对路径**：以 `/docs/...` 表示，不是操作系统绝对路径。
-- **权威性**：接口事实以本目录三份为准；指标口径以 `metrics-definitions.md` 为准
-  （`lqs` 的完整定义在其 [`length-weighted-quality.md`](./length-weighted-quality.md)）；
-  形式以 `form-definitions.md` 为准；API 字段与本地列的对应关系以 `api-field-mapping.md`
-  为准。报告里的数字是结论，不是定义。
+### 接口事实
 
-## 边界提醒
+| 文档 | 权威范围 |
+| --- | --- |
+| [`sfacg-endpoints.md`](./sfacg-endpoints.md) | PC 端端点、参数、限流、状态码陷阱、判活三态 |
+| [`sfacg-app-api.md`](./sfacg-app-api.md) | App API 认证、端点、18 字段字典、77 推送位、能力边界 |
+| [`sfacg-live-ranks.md`](./sfacg-live-ranks.md) | 当期榜单端点、快照与展示裁定；历史月榜端点在 endpoints |
+| [`api-field-mapping.md`](./api-field-mapping.md) | App API 字段 ↔ 本地列的实测映射与写回约束 |
+| [`author-profile-on-demand.md`](./author-profile-on-demand.md) | 作者资料按需抓取：触发、DOM 选择器、返回契约、降级 |
 
-- 本目录**不放**数据分析报告（在 `analysis/reports/`）与产品设计文档（在 `app/docs/`）。
-- 动手抓数据前先读对应接口事实文档，不要猜参数、不要试探性请求。
-- 所有接口文档遵守同一合规边界：只取书目元数据、不取正文、不登录、不用用户
-  cookie、串行 ≥0.5s。
+### 指标与形态
+
+| 文档 | 权威范围 |
+| --- | --- |
+| [`metrics-definitions.md`](./metrics-definitions.md) | 自定义指标总口径：定年、universe、分位、派生口径、推荐信号白名单 |
+| [`quantitative-mode-metrics.md`](./quantitative-mode-metrics.md) | 量化模式定案：**只有 2 个核心指标**——排序分 + 位置分 |
+| [`length-weighted-quality.md`](./length-weighted-quality.md) | 排序分的长篇域 `lqs`：公式、常量、校准、边界 |
+| [`medium-quality-score.md`](./medium-quality-score.md) | 排序分的中篇域 `mqs`：已定参、归档未落地；与 `lqs` 不合并 |
+| [`ref-percentile-for-discovered.md`](./ref-percentile-for-discovered.md) | 位置分 `fav_pctl` 的库外域 `ref_pctl`：断点表查表法 |
+| [`lqs-ranking-integration.md`](./lqs-ranking-integration.md) | 推荐层接入 `lqs` 的排序键、候选门槛、验收断言 |
+| [`form-definitions.md`](./form-definitions.md) | `form` 六值判定与种子收录资格的唯一真源 |
+| [`fake-complete-short-medium.md`](./fake-complete-short-medium.md) | 假完结短/中篇与第二类僵尸裁定：分析定案、实施待放行 |
+| [`anchor-density-strategy.md`](./anchor-density-strategy.md) | 定年锚点密度策略：P0 常规补最新锚点，早期保留、中段低优先 |
+
+### 征文
+
+| 文档 | 权威范围 |
+| --- | --- |
+| [`contest-url-api-patterns.md`](./contest-url-api-patterns.md) | 规律总览与导航：URL 演进、四季节奏、API/tagId 规律 |
+| [`contest-roster-harvest.md`](./contest-roster-harvest.md) | tagId 地图、活动页 URL 台账、补采覆盖与试号实证 |
+| [`contest-roster-fields.md`](./contest-roster-fields.md) | 清单返回字段与获奖存储四代形态、提取正则 |
+| [`award-winners-as-seed-source.md`](./award-winners-as-seed-source.md) | 获奖入种：净 911 / 剔除 602 / 补采 140、逐届明细与交接规格 |
+| [`contest-display-in-app.md`](./contest-display-in-app.md) | App 展示设计：赛事档案页、参赛清单浏览页、请求与降级 |
+
+## 权威分工
+
+- **同一事实只在一处维护**，其余文档只写文件级指针；发现重复表或重复数字，优先删重复。
+- 接口事实：PC 端看 `sfacg-endpoints.md`，App API 看 `sfacg-app-api.md`，字段映射看 `api-field-mapping.md`。
+- 指标：`metrics-definitions.md` 管“是什么”，`quantitative-mode-metrics.md` 管“要几个”；`lqs`/`mqs` 是同指标不同域、不合并；`ref_pctl` 是位置分库外域，不是第 3 个指标。
+- 征文：tagId/URL 看 `contest-roster-harvest.md`，字段/获奖形态看 `contest-roster-fields.md`，入种口径与逐届明细看 `award-winners-as-seed-source.md`，展示设计看 `contest-display-in-app.md`。
+- `form` 判定看 `form-definitions.md`；假完结剔除是它的 P10 指针规则，规则正文在 `fake-complete-short-medium.md`。
+- 数字是**某次快照的现算值**，随数据版本变化；禁止每次重算精确数字，禁止硬编码进代码。结构或语义矛盾照改，数值过期只标注。
+
+## 工作约定
+
+- 路径以项目根为基准；旧指针 `/docs/...` 等价于本目录的 `docs/...`。
+- 动手抓数据前先读对应接口档案，不猜参数、不做试探性请求。
+- 所有外部数据通路只取元数据、不取正文、不登录、不用用户 cookie，串行 ≥0.5s。
+- 当前 `app/` 处于 v6 开发冻结：本目录的“工程侧 / 实施”都只是交接规格，本文不执行。

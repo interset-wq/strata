@@ -137,6 +137,30 @@ def invalid_ids(df: pd.DataFrame) -> set[int]:
     return set(df.loc[form.eq("invalid").to_numpy(), "id"])
 
 
+def fake_complete_ids(df: pd.DataFrame) -> set[int]:
+    """P10 假完结（用户 2026-11-20 裁定）：short/medium 档征文名含「长篇」即假。
+
+    征文同时开长/中/短赛道，作者技不如人就断更并改状态完结；长篇赛道流量是
+    中短篇的上百至上千倍，长篇征文里的劣质书数据也可能远超真短篇优质书。
+    `status=已完结` 是作者自报字段，E.11/E.20 只查它，E.19 天花板只覆盖 ≤5
+    万字，5–15 万的中篇档整档没有对应闸门——故这条是确定性裁定，不是统计
+    阈值：只要「形态被判成 short/medium、却报了长篇征文」就剔除，无豁免。
+
+    只对 short/medium 生效：`long` 书本就是长篇赛道、`dialogue` 是形态产品线，
+    它们带长篇征文标记不适用本裁定，不计入返回集。依据是 `_form(df)`（分类
+    结果，含用户裁定通道），不改动 form 列本身——form 是作品属性，收录资格
+    才随规则变。全库命中远多于种子（21,916 vs 145），这里返回全集供 ineligible
+    与征文保底过滤共用；断言 P10 检查种子内命中为零。
+
+    详见 `docs/fake-complete-short-medium.md`。
+    """
+    form = _form(df)
+    contest = df["contest"].fillna("").astype(str)
+    mask = (form.isin(("short", "medium")).to_numpy()
+            & contest.str.contains("长篇", regex=False).to_numpy())
+    return set(df.loc[mask, "id"])
+
+
 def dead_ids(df: pd.DataFrame) -> set[int]:
     """E.25 Web 死链：详情页文案「小说不存在」的书无展示资格。
 
@@ -270,14 +294,17 @@ def admit(df: pd.DataFrame, content_end: pd.Timestamp,
 
     abandoned = abandoned_ids(df)
     invalid = invalid_ids(df)
+    fake_complete = fake_complete_ids(df)
     dead = dead_ids(df)
     exempt = exempt_from_abandon(df)
-    ineligible = abandoned | invalid | dead
+    ineligible = abandoned | invalid | fake_complete | dead
     anchors = (core | short | deep) - ineligible
 
     ids = set(anchors)
     contest_added, contest_detail = contest_guarantee(df, ids)  # 豁免弃书：全池
-    contest_added -= invalid | dead                             # 但不豁免 invalid/死链
+    # 但不豁免 invalid/P10 假完结/死链（这三类 145 本里有 124 本过保底门槛，
+    # 不二次过滤会被征文保底重新加回）。
+    contest_added -= invalid | fake_complete | dead
     ids |= contest_added
 
     # Diagnostic only: what the retired V2 time gate would have admitted.
@@ -300,6 +327,7 @@ def admit(df: pd.DataFrame, content_end: pd.Timestamp,
         "abandoned_in_seed": abandoned & ids,
         "abandon_exempt": exempt,
         "invalid": invalid,
+        "fake_complete": fake_complete,
         "dead": dead,
         "ineligible": ineligible,
         "loose": loose,
@@ -312,7 +340,7 @@ def admit(df: pd.DataFrame, content_end: pd.Timestamp,
 
 
 def postconditions(df: pd.DataFrame, res: dict) -> list[tuple[str, bool, str]]:
-    """Checks the rebuild must assert before shipping (P1-P9).
+    """Checks the rebuild must assert before shipping (P1-P10).
 
     P1/P3 use the **eligible** denominator (连载 short/medium + invalid excluded):
     those books voluntarily lost coverage under E.11/E.12, so counting them as a
@@ -369,6 +397,10 @@ def postconditions(df: pd.DataFrame, res: dict) -> list[tuple[str, bool, str]]:
     #     里它们的收藏/字数都还正常，形态规则看不出异常，只有详情页判活能拦住。
     dead = res["dead"]
     p9 = not (dead & res["ids"])
+    # P10: 征文含「长篇」的 short/medium（假完结）在任何渠道都不得入种——
+    #     包括征文保底（124/145 本过保底门槛，靠 contest_added 二次过滤拦住）。
+    fake = res["fake_complete"]
+    p10 = not (fake & res["ids"])
     return [
         ("P1 合格深榜书全部在种子内", p1,
          f"{len(res['deep'] - ineligible):,} 本合格深榜书，"
@@ -400,6 +432,9 @@ def postconditions(df: pd.DataFrame, res: dict) -> list[tuple[str, bool, str]]:
         ("P9 Web 死链零入种（详情页「小说不存在」）", p9,
          f"死链 {len(dead)} 本，入种 {len(dead & res['ids'])} 本"
          + (f"：{sorted(dead & res['ids'])}" if not p9 else "")),
+        ("P10 征文含「长篇」的 short/medium 零入种（假完结）", p10,
+         f"命中 {len(fake):,} 本，入种 {len(fake & res['ids'])} 本"
+         + (f"：{sorted(fake & res['ids'])[:10]}" if not p10 else "")),
     ]
 
 
