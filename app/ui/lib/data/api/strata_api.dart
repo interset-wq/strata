@@ -224,6 +224,22 @@ class StrataApi {
     return DiscoverPage.fromJson(body as Map<String, dynamic>);
   }
 
+  /// 量化推荐流（docs/12 §3、docs/lqs-ranking-integration.md）：两级排序
+  /// （lqs 长篇口碑组在前，其余按同代收藏分位兜底），游标分页。
+  /// 响应形状与 discover 同构（items + next_cursor），复用同一模型。
+  Future<DiscoverPage> recommend({
+    String? cursor,
+    String? form,
+    int limit = 20,
+  }) async {
+    final body = await _get('/recommend', {
+      'limit': '$limit',
+      'form': ?form,
+      if (cursor != null && cursor.isNotEmpty) 'cursor': cursor,
+    });
+    return DiscoverPage.fromJson(body as Map<String, dynamic>);
+  }
+
   Future<HistoryData> history({int limit = 50}) async {
     final body = await _get('/history', {'limit': '$limit'});
     return HistoryData.fromJson(body as Map<String, dynamic>);

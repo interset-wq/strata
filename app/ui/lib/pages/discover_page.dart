@@ -8,8 +8,13 @@ import '../widgets/default_cover.dart';
 import '../widgets/metric_badge.dart';
 import '../data/api/strata_api.dart';
 
-/// Classic 发现流（mockups 11 屏定稿，docs/12 §5）：有封面书按平台热度
-/// 两列封面墙，游标分页每批 20 本，上滑自动加载，back-to-top。
+/// 发现流 = 推荐层落点（docs/12 §2/§3、docs/lqs-ranking-integration.md）：
+/// 量化推荐流 /recommend（两级排序：lqs 长篇口碑组在前，其余按同代收藏
+/// 分位兜底），游标分页每批 20 本，上滑自动加载，back-to-top。展示层
+/// 与推荐层解耦——本流恒走量化信号，平台累计值只作展示锚点、不参与
+/// 排序（docs/12 §3.2 红线）。文案按「你可能错过的书」口径
+/// （docs/12 §7.2）；mockup 期的 "Classic" tab 行与 swap 占位按钮已
+/// 移除（模式切换属榜单页正式 UI 的待拍板项，发现流不挂模式）。
 class DiscoverPage extends ConsumerStatefulWidget {
   const DiscoverPage({super.key});
 
@@ -43,7 +48,7 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
     _loading = true;
     try {
       final handle = await ref.read(bootProvider.future);
-      final page = await handle.api.discover(cursor: _cursor);
+      final page = await handle.api.recommend(cursor: _cursor);
       setState(() {
         _items.addAll(page.items);
         _cursor = page.nextCursor;
@@ -66,38 +71,15 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(
-        title: Text('发现'),
-        actions: const [IconButton(icon: Icon(Icons.swap_vert), onPressed: null)],
-      ),
+      appBar: AppBar(title: Text('发现')),
       body: Column(
         children: [
-          Container(
-            height: 42,
-            decoration: BoxDecoration(
-                border: Border(
-                    bottom: BorderSide(
-                        color: scheme.outline.withValues(alpha: .3)))),
-            child: Row(
-              children: [
-                const SizedBox(width: 16),
-                Container(
-                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
-                  decoration: BoxDecoration(
-                      border: Border(
-                          bottom: BorderSide(width: 2, color: scheme.primary))),
-                  child: Text('Classic',
-                      style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: scheme.primary)),
-                ),
-              ],
-            ),
+          Padding(
+            padding: const EdgeInsets.only(left: 16),
+            child: Text('你可能错过的书 · 上滑不断翻',
+                style: TextStyle(
+                    fontSize: 11, color: scheme.onSurfaceVariant)),
           ),
-          Text('按平台热度发现 · 上滑不断翻',
-              style: TextStyle(
-                  fontSize: 11, color: scheme.onSurfaceVariant)),
           Expanded(
             child: Stack(
               children: [
@@ -200,8 +182,15 @@ class _DiscoverCard extends StatelessWidget {
                         style: TextStyle(
                             fontSize: 11, color: scheme.onSurfaceVariant)),
                     const SizedBox(height: 5),
-                    _badge(context, '点击 ${_wan(item.clicks ?? 0)}',
-                        fg: scheme.primary, icon: MetricIcons.clicks),
+                    // 位置分锚点（docs/12 §7.3）：分位永远与绝对值并列；
+                    // 推荐流有 fav_pctl 非空硬门槛，模型里的 0 只可能
+                    // 来自流外数据。
+                    _badge(
+                        context,
+                        '收藏 ${_wan(item.favs)}  '
+                        '分位 ${(item.favPctl * 100).toStringAsFixed(1)}%',
+                        fg: scheme.primary,
+                        icon: MetricIcons.favs),
                   ],
                 ),
               ),

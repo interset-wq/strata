@@ -300,6 +300,7 @@ type RankItem struct {
 	EstDate  *string  `json:"est_date,omitempty"`
 	Favs     *int64   `json:"favs"`
 	FavPctl  float64  `json:"fav_pctl"`
+	LQS      *float64 `json:"lqs,omitempty"`
 	Contest  *string  `json:"contest"`
 	CoverURL *string  `json:"cover_url"`
 	Status   *string  `json:"status"`
@@ -729,6 +730,140 @@ WHERE is_licensed = 0 AND COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) IS
 		items = append(items, item)
 	}
 	return items, rows.Err()
+}
+
+// Recommend is the quantitative recommendation stream (docs/12 §3,
+// docs/lqs-ranking-integration.md §3.2): two-level ordering, never a
+// single merged score — books carrying a length-weighted quality
+// score (lqs, long zone only) come first, inside their group by lqs
+// DESC; the lqs-less remainder falls back to fav_pctl DESC (the
+// position score), then nid for a stable tie-break. Keyset cursor
+// "lqs|favpctl|nid" (lqs part empty in the fallback group) for
+// overlap-free pagination; OFFSET is not used.
+//
+// Hard gates: is_licensed = 0, cover-bearing, fav_pctl NOT NULL
+// (recommendable-threshold proxy, docs/12 §3.3). Raw cumulative
+// values (clicks/favs/praises) ride along as display fields only —
+// they never appear in ORDER BY / WHERE (docs/12 §3.2 red line).
+func (s *Store) Recommend(ctx context.Context, cursor, form string, limit int) ([]RankItem, error) {
+	q := `
+SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
+       seed.books.est_year, seed.books.status, seed.books.words, seed.books.clicks,
+       seed.books.favs, seed.books.form, seed.books.lqs, seed.books.fav_pctl,
+       COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url
+FROM seed.books
+LEFT JOIN covers c ON c.nid = seed.books.nid
+WHERE is_licensed = 0
+  AND COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) IS NOT NULL
+  AND seed.books.fav_pctl IS NOT NULL`
+	args := []any{}
+	if form != "" {
+		q += " AND seed.books.form = ?"
+		args = append(args, form)
+	}
+	if cursor != "" {
+		lqsVal, fav, nid, err := parseRecommendCursor(cursor)
+		if err != nil {
+			return nil, err
+		}
+		// Group A (lqs NOT NULL): strictly after the cursor inside the
+		// lqs group. Group B (lqs NULL): all of it is after a group-A
+		// cursor (has = 0); after a group-B cursor, strictly later on
+		// (fav_pctl, nid).
+		q += ` AND (
+  (seed.books.lqs IS NOT NULL AND (
+      seed.books.lqs < ?
+      OR (seed.books.lqs = ? AND seed.books.fav_pctl < ?)
+      OR (seed.books.lqs = ? AND seed.books.fav_pctl = ? AND seed.books.nid > ?)
+  ))
+  OR
+  (seed.books.lqs IS NULL AND (
+      ? = 0
+      OR (seed.books.fav_pctl < ? OR (seed.books.fav_pctl = ? AND seed.books.nid > ?))
+  ))
+)`
+		var lqsArg any
+		has := 1
+		if lqsVal != nil {
+			lqsArg = *lqsVal
+			has = 0
+		}
+		args = append(args, lqsArg, lqsArg, fav, lqsArg, fav, nid,
+			has, fav, fav, nid)
+	}
+	q += ` ORDER BY (seed.books.lqs IS NULL) ASC, seed.books.lqs DESC,
+       seed.books.fav_pctl DESC, seed.books.nid ASC LIMIT ?`
+	args = append(args, limit)
+
+	rows, err := s.DB.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := make([]RankItem, 0, limit)
+	for rows.Next() {
+		var (
+			item                RankItem
+			gen, status, cover  sql.NullString
+			words, clicks, favs sql.NullInt64
+			lqs, pctl           sql.NullFloat64
+		)
+		if err := rows.Scan(&item.NID, &item.Title, &item.Author, &gen,
+			&item.EstYear, &status, &words, &clicks, &favs, &item.Form,
+			&lqs, &pctl, &cover); err != nil {
+			return nil, err
+		}
+		item.Rank = len(items) + 1
+		item.Genre = strPtr(gen)
+		item.Status = strPtr(status)
+		item.Words = intPtr(words)
+		item.Clicks = intPtr(clicks)
+		item.Favs = intPtr(favs)
+		item.CoverURL = strPtr(cover)
+		item.LQS = floatPtr(lqs)
+		item.FavPctl = pctl.Float64
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
+// RecommendCursor encodes (lqs, fav_pctl, nid) as the keyset cursor for
+// Recommend; parseRecommendCursor is the inverse. Floats are formatted
+// with minimal full precision so the round trip is exact. The lqs part
+// is empty in the fallback group.
+func RecommendCursor(lqs *float64, favPctl float64, nid int64) string {
+	s := ""
+	if lqs != nil {
+		s = strconv.FormatFloat(*lqs, 'g', -1, 64)
+	}
+	return s + "|" + strconv.FormatFloat(favPctl, 'g', -1, 64) + "|" +
+		strconv.FormatInt(nid, 10)
+}
+
+// parseRecommendCursor decodes the "lqs|favpctl|nid" keyset cursor.
+// Both scores live in (0, 1]; nid is positive.
+func parseRecommendCursor(cursor string) (*float64, float64, int64, error) {
+	parts := strings.Split(cursor, "|")
+	if len(parts) != 3 {
+		return nil, 0, 0, fmt.Errorf("invalid recommend cursor %q", cursor)
+	}
+	var lqs *float64
+	if parts[0] != "" {
+		f, err := strconv.ParseFloat(parts[0], 64)
+		if err != nil || f <= 0 || f > 1 {
+			return nil, 0, 0, fmt.Errorf("invalid lqs in recommend cursor %q", cursor)
+		}
+		lqs = &f
+	}
+	fav, err := strconv.ParseFloat(parts[1], 64)
+	if err != nil || fav <= 0 || fav > 1 {
+		return nil, 0, 0, fmt.Errorf("invalid fav_pctl in recommend cursor %q", cursor)
+	}
+	nid, err := strconv.ParseInt(parts[2], 10, 64)
+	if err != nil || nid <= 0 {
+		return nil, 0, 0, fmt.Errorf("invalid nid in recommend cursor %q", cursor)
+	}
+	return lqs, fav, nid, nil
 }
 
 // WatchAdd puts a book on the watchlist (v6: the single user-interest

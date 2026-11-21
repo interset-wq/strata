@@ -259,6 +259,19 @@ Classic 发现流（docs/12 §5）：候选池 = `is_licensed=0` 且**有封面*
 `clicks:nid`，缺省从顶部开始），每批默认 20，stateless。响应含 `next_cursor`
 （批末返回，为空表示到底）。
 
+### GET /strata/recommend?cursor=&form=&limit=（**已实现**，2026-11-21 接入）
+
+量化推荐流（docs/12 §3、docs/lqs-ranking-integration.md）：候选池 =
+`is_licensed=0` + **有封面**（硬门槛）+ `fav_pctl IS NOT NULL`（可推荐门槛代理）。
+**两级排序键**（不合并成一个分）：`lqs` 非空的长篇组在前、组内 `lqs DESC`；
+其余回退 `fav_pctl DESC`（同代收藏分位，位置分）；`nid ASC` 稳定平局键。
+**keyset 游标** = `lqs|favpctl|nid`（lqs 段在回退组为空；浮点全精度往返），
+stateless，每批默认 20。累计原始值（clicks/favs/praises）只出现在 SELECT 展示列，
+**禁入 ORDER BY / WHERE**（docs/12 §3.2 红线）。响应与 `/discover` 同构
+（items + next_cursor），`meta.ordering="lqs|fav_pctl"`、`licensed_excluded=true`。
+发现流 UI（发现页）已切换至本端点；`/discover` 保持 clicks 展示流口径不变
+（端点保真、展示层裁剪的同一政策）。
+
 ### GET/POST/PUT/DELETE /strata/watchlist（**已实现**，v6 起统一书架）
 
 用户兴趣的唯一列表（docs/02 §v6：本 app 无阅读功能，书架并入 watchlist——

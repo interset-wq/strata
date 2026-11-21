@@ -110,6 +110,7 @@ func New(s *store.Store) *gin.Engine {
 	group.GET("/rankings/board", srv.rankingBoard)
 	group.GET("/rankings/classic", srv.rankingClassic)
 	group.GET("/discover", srv.discover)
+	group.GET("/recommend", srv.recommend)
 	group.GET("/rankings/deep", srv.rankingDeep)
 	group.GET("/rankings/short", srv.rankingShort)
 	group.GET("/rankings/new", srv.rankingNew)
@@ -854,6 +855,41 @@ func (s *Server) discover(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"meta": gin.H{"pool": "seed", "ordering": "clicks", "cover_required": true,
 			"form": form},
+		"items":       items,
+		"next_cursor": nextCursor,
+	})
+}
+
+// recommend is the quantitative recommendation stream (docs/12 §3,
+// docs/lqs-ranking-integration.md): two-level ordering (lqs group
+// first, fav_pctl fallback), keyset cursor pagination, 20 per batch,
+// stateless. The display fields (clicks/favs/praises) ride along
+// read-only; they never influence ordering (docs/12 §3.2 red line).
+func (s *Server) recommend(c *gin.Context) {
+	limit, ok := parseLimit(c)
+	if !ok {
+		return
+	}
+	form, ok := parseForm(c)
+	if !ok {
+		return
+	}
+	items, err := s.store.Recommend(c.Request.Context(), c.Query("cursor"), form, limit)
+	if err != nil {
+		fail(c, http.StatusBadRequest, "invalid_argument", err.Error())
+		return
+	}
+	var nextCursor string
+	if len(items) == limit {
+		last := items[len(items)-1]
+		nextCursor = store.RecommendCursor(last.LQS, last.FavPctl, last.NID)
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"meta": gin.H{
+			"kind": "recommend", "pool": "seed",
+			"ordering": "lqs|fav_pctl", "cover_required": true,
+			"form": form, "licensed_excluded": true,
+		},
 		"items":       items,
 		"next_cursor": nextCursor,
 	})

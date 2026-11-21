@@ -577,6 +577,101 @@ func TestClassicTagPtypeFilters(t *testing.T) {
 	}
 }
 
+// TestRecommend pins the quantitative recommendation stream (docs/12
+// §3, docs/lqs-ranking-integration.md §3.2): two-level ordering, cover
+// hard gate, licensed exclusion, and the group A → group B cursor
+// transition. Covers are inserted into user.db (the observed-covers
+// channel); 1008 already carries a seed cover.
+func TestRecommend(t *testing.T) {
+	st := openTestStore(t)
+	ctx := context.Background()
+	for _, nid := range []int64{1001, 1003, 1005, 1007} {
+		if _, err := st.DB.ExecContext(ctx,
+			`INSERT INTO covers (nid, cover, fetched_at) VALUES (?, ?, ?)`,
+			nid, "observed-cover.jpg", 1); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Full stream: group A (lqs DESC): 1001 (0.9), 1003 (0.7 — its higher
+	// fav_pctl 0.99 must not outrank lqs); group B (fav_pctl DESC, nid
+	// ASC): 1005 (0.95), 1007 (0.7), 1008 (0.6, seed cover). Excluded:
+	// 1004/1006 cover-less, 2001 licensed (lqs 1.0 canary), 1002/1009–1011
+	// cover-less.
+	items, err := st.Recommend(ctx, "", "", 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []int64{1001, 1003, 1005, 1007, 1008}
+	if len(items) != len(want) {
+		t.Fatalf("items = %+v", items)
+	}
+	for i, w := range want {
+		if items[i].NID != w {
+			t.Fatalf("item %d = %d, want %d (stream %+v)", i, items[i].NID, w, items)
+		}
+	}
+	if items[1].LQS == nil || *items[1].LQS != 0.7 {
+		t.Fatalf("1003 lqs = %v, want 0.7", items[1].LQS)
+	}
+	if items[2].LQS != nil {
+		t.Fatalf("1005 lqs = %v, want nil (fallback group)", items[2].LQS)
+	}
+
+	// Page 1 (limit 2): the two group-A books.
+	page, err := st.Recommend(ctx, "", "", 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page) != 2 || page[0].NID != 1001 || page[1].NID != 1003 {
+		t.Fatalf("page1 = %+v", page)
+	}
+	cur := RecommendCursor(page[1].LQS, page[1].FavPctl, page[1].NID)
+	if cur != "0.7|0.99|1003" {
+		t.Fatalf("cursor = %q, want 0.7|0.99|1003", cur)
+	}
+
+	// Page 2 (cursor at the group-A tail): all of group B follows — the
+	// group transition must not skip or repeat.
+	page, err = st.Recommend(ctx, cur, "", 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page) != 2 || page[0].NID != 1005 || page[1].NID != 1007 {
+		t.Fatalf("page2 = %+v", page)
+	}
+
+	// Page 3 (cursor inside group B): strictly after on (fav_pctl, nid).
+	cur = RecommendCursor(page[1].LQS, page[1].FavPctl, page[1].NID)
+	if cur != "|0.7|1007" {
+		t.Fatalf("cursor = %q, want |0.7|1007 (empty lqs part)", cur)
+	}
+	page, err = st.Recommend(ctx, cur, "", 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page) != 1 || page[0].NID != 1008 {
+		t.Fatalf("page3 = %+v", page)
+	}
+
+	// form=medium: no lqs group (mqs not landed), pure fav_pctl fallback.
+	page, err = st.Recommend(ctx, "", "medium", 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page) != 1 || page[0].NID != 1007 {
+		t.Fatalf("medium page = %+v", page)
+	}
+
+	// Invalid cursors.
+	for _, bad := range []string{"abc", "0.7|0.99", "1.5|0.9|1001",
+		"0.7|-1|1001", "0.7|0.9|0"} {
+		if _, err := st.Recommend(ctx, bad, "", 10); err == nil {
+			t.Fatalf("cursor %q: want error", bad)
+		}
+	}
+}
+
 func TestFacets(t *testing.T) {
 	st := openTestStore(t)
 	ctx := context.Background()
