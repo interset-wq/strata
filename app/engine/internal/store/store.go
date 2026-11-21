@@ -374,8 +374,8 @@ WHERE est_year = ? AND is_licensed = 0 AND fav_pctl IS NOT NULL`
 // status and contest pages. It intentionally sorts by absolute favs, not by
 // same-generation percentiles: Classic mode mirrors novly's cumulative view
 // and has no quantitative layer.
-func (s *Store) ClassicBooks(ctx context.Context, genre, status, contest, form, wordsBand, tag, ptype string,
-	year, limit, offset int, order, dir string) ([]RankItem, error) {
+func (s *Store) ClassicBooks(ctx context.Context, genre, status, contest, form, wordsBand, ptype string,
+	tags []string, year, limit, offset int, order, dir string) ([]RankItem, error) {
 	query := `
 SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
        seed.books.est_year, seed.books.status, seed.books.words, seed.books.clicks,
@@ -425,9 +425,16 @@ WHERE seed.books.is_licensed = 0`
 		query += " AND seed.books.price_type = ?"
 		args = append(args, ptype)
 	}
-	if tag != "" {
-		query += " AND EXISTS (SELECT 1 FROM seed.book_tags t WHERE t.nid = seed.books.nid AND t.tag = ?)"
-		args = append(args, tag)
+	if len(tags) > 0 {
+		// 多值 = OR（用户 2026-11-21：筛选面板标签多选，命中任一即入）。
+		ph := make([]string, len(tags))
+		targs := make([]any, len(tags))
+		for i, tg := range tags {
+			ph[i] = "?"
+			targs[i] = tg
+		}
+		query += " AND EXISTS (SELECT 1 FROM seed.book_tags t WHERE t.nid = seed.books.nid AND t.tag IN (" + strings.Join(ph, ",") + "))"
+		args = append(args, targs...)
 	}
 	switch order {
 	case "pct":

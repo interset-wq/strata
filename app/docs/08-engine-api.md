@@ -229,8 +229,10 @@ Classic 全库榜（docs/12 展示列）：平台累计值排序，不涉及分�
 Classic 主线分类/状态/大赛列表：默认按平台累计 `favs` 降序（`favs DESC, nid ASC`）。
 `genre`/`status`/`contest` 与 `/rankings/favs` 同义；`contest=1` 表示全部大赛作品。
 `year` 可选（正整数，按 `est_year` 精确过滤；非法值 400）。`tag` /
-`ptype` 可选（精确匹配，取值来自 `/facets`，用户 2026-11-21 筛选面板：
-`tag` 走 book_tags EXISTS、`ptype` 匹配 price_type；未知值匹配不到）。
+`ptype` 可选（用户 2026-11-21 筛选面板，取值来自 `/facets`）：
+`tag` 为逗号分隔多值 = OR（多选命中任一即入，book_tags EXISTS IN）、
+`ptype` 单值精确匹配 price_type；未知值匹配不到。facets 返回的
+count 不参与面板展示（用户 2026-11-21：筛选不显示计数）。
 `order` 可选：
 `favs`（默认）、`pct`（同代收藏分位 `fav_pctl DESC`、NULL 末尾——
 docs/form-definitions §6 优质短篇口径）与三个经典榜指标 `clicks`/`praises`/`words`

@@ -788,11 +788,21 @@ func (s *Server) rankingClassic(c *gin.Context) {
 		return
 	}
 	contest := store.NormalizeContest(c.Query("contest"))
-	tag := c.Query("tag")
+	// tag = 逗号分隔多值，OR 语义（用户 2026-11-21：筛选面板标签多选，
+	// 命中所选标签任一即入）。
+	var tags []string
+	if raw := c.Query("tag"); raw != "" {
+		for _, p := range strings.Split(raw, ",") {
+			p = strings.TrimSpace(p)
+			if p != "" {
+				tags = append(tags, p)
+			}
+		}
+	}
 	ptype := c.Query("ptype")
 	items, err := s.store.ClassicBooks(c.Request.Context(),
 		c.Query("genre"), c.Query("status"), contest, form, wordsBand,
-		tag, ptype, year, limit, offset, order, dir)
+		ptype, tags, year, limit, offset, order, dir)
 	if err != nil {
 		fail(c, http.StatusInternalServerError, "internal", err.Error())
 		return
@@ -813,7 +823,7 @@ func (s *Server) rankingClassic(c *gin.Context) {
 			"kind": "classic", "pool": "seed", "ordering": ordering,
 			"genre": c.Query("genre"), "status": c.Query("status"),
 			"contest": contest, "form": form, "year": year,
-			"tag": tag, "ptype": ptype,
+			"tag": c.Query("tag"), "ptype": ptype,
 			"order": order, "dir": dirEcho, "licensed_excluded": true,
 		},
 		"items": items,

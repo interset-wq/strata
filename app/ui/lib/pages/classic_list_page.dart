@@ -46,7 +46,7 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
   String? _currentGenre; // 筛选维度：题材（筛选面板切换）
   String? _fStatus; // 筛选维度：状态（已完结/连载中）
   String? _fPtype; // 筛选维度：价格（免费/VIP/签约，数据驱动）
-  String? _fTag; // 筛选维度：标签
+  List<String> _fTags = const []; // 筛选维度：标签（多选 OR，用户 2026-11-21）
   String _drawerQuery = ''; // drawer 搜索词（本地过滤赛道组）
   String _currentOrder = 'favs'; // 指标轴（经典榜单四榜切换）
   bool _ascending = false; // 逆序（升序）态
@@ -96,7 +96,7 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
         genre: _currentGenre,
         status: _fStatus,
         ptype: _fPtype,
-        tag: _fTag,
+        tag: _fTags.isEmpty ? null : _fTags.join(','),
         wordsBand: widget.wordsBand,
         order: _currentOrder == 'favs' ? null : _currentOrder,
         dir: _ascending ? 'asc' : null,
@@ -193,7 +193,7 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
     if (_fPtype != null) n++;
     if (_currentYear != null) n++;
     if (_currentGenre != null) n++;
-    if (_fTag != null) n++;
+    n += _fTags.length;
     return n;
   }
 
@@ -208,9 +208,9 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
         genre: _currentGenre,
         status: _fStatus,
         ptype: _fPtype,
-        tag: _fTag,
-        onChanged: (year, genre, status, ptype, tag) =>
-            _onFilterChanged(year, genre, status, ptype, tag),
+        tags: List.of(_fTags),
+        onChanged: (year, genre, status, ptype, tags) =>
+            _onFilterChanged(year, genre, status, ptype, tags),
       ),
     );
   }
@@ -218,18 +218,18 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
   // 筛选面板 live-apply：值未变不重载；变化则重置列表、回顶、重载
   // （面板保持打开，可连续多选维度）。
   void _onFilterChanged(int? year, String? genre, String? status,
-      String? ptype, String? tag) {
+      String? ptype, List<String> tags) {
     final changed = year != _currentYear ||
         genre != _currentGenre ||
         status != _fStatus ||
         ptype != _fPtype ||
-        tag != _fTag;
+        tags.join(',') != _fTags.join(',');
     setState(() {
       _currentYear = year;
       _currentGenre = genre;
       _fStatus = status;
       _fPtype = ptype;
-      _fTag = tag;
+      _fTags = tags;
       _resetList();
     });
     if (!changed) return;
@@ -482,8 +482,10 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
 }
 
 /// 筛选面板 BottomSheet（用户 2026-11-21：所有经典榜单页统一的多维
-/// filter）：状态/价格/年份/题材/标签五维，ChoiceChip 单选 + 「全部」
-/// 复位；点选 live-apply（背后列表实时刷新），面板保持打开直到
+/// filter）：状态/价格/年份/题材/标签五维，单选 + 「全部」复位；
+/// 标签维度多选 OR（用户 2026-11-21）。chip 不显示计数、选中不显示
+/// ✔（showCheckmark:false，组件默认是 true，与 SegmentedButton 口径
+/// 一致）；点选 live-apply（背后列表实时刷新），面板保持打开直到
 /// 「完成」。值列表 = /facets（form 池口径）；状态是固定枚举，
 /// 价格值数据驱动（免费/VIP/签约）。
 class _FilterSheet extends ConsumerStatefulWidget {
@@ -492,9 +494,9 @@ class _FilterSheet extends ConsumerStatefulWidget {
   final String? genre;
   final String? status;
   final String? ptype;
-  final String? tag;
+  final List<String> tags;
   final void Function(int? year, String? genre, String? status, String? ptype,
-      String? tag) onChanged;
+      List<String> tags) onChanged;
 
   const _FilterSheet({
     required this.form,
@@ -502,7 +504,7 @@ class _FilterSheet extends ConsumerStatefulWidget {
     required this.genre,
     required this.status,
     required this.ptype,
-    required this.tag,
+    required this.tags,
     required this.onChanged,
   });
 
@@ -515,7 +517,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
   String? _genre;
   String? _status;
   String? _ptype;
-  String? _tag;
+  List<String> _tags = const [];
 
   @override
   void initState() {
@@ -524,7 +526,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
     _genre = widget.genre;
     _status = widget.status;
     _ptype = widget.ptype;
-    _tag = widget.tag;
+    _tags = List.of(widget.tags);
   }
 
   // live-apply：更新本地选中态并通知父页（父页对比后决定是否重载）。
@@ -532,7 +534,15 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
     if (!changed) return;
     apply();
     setState(() {});
-    widget.onChanged(_year, _genre, _status, _ptype, _tag);
+    widget.onChanged(_year, _genre, _status, _ptype, _tags);
+  }
+
+  // 标签多选（OR，用户 2026-11-21）：toggle 单个标签；「全部」= 清空。
+  void _pickTags(List<String> next) {
+    if (next.join(',') == _tags.join(',')) return;
+    _tags = next;
+    setState(() {});
+    widget.onChanged(_year, _genre, _status, _ptype, _tags);
   }
 
   Widget _section(String title, Widget chips) {
@@ -557,13 +567,12 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
     );
   }
 
-  Widget _chip(String label, bool selected, void Function() onTap,
-      {String? trailing}) {
+  Widget _chip(String label, bool selected, void Function() onTap) {
     return ChoiceChip(
-      label: Text(
-        trailing == null ? label : '$label  $trailing',
-        style: const TextStyle(fontSize: 12),
-      ),
+      // 用户 2026-11-21：选中不显示 ✔（组件默认 showCheckmark:true），
+      // 选中态靠填充底色表达——与 SegmentedButton 口径一致。
+      showCheckmark: false,
+      label: Text(label, style: const TextStyle(fontSize: 12)),
       selected: selected,
       onSelected: (_) => onTap(),
     );
@@ -590,7 +599,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
             _genre != null ||
             _status != null ||
             _ptype != null ||
-            _tag != null;
+            _tags.isNotEmpty;
         return ConstrainedBox(
           constraints: BoxConstraints(
             maxHeight: MediaQuery.of(context).size.height * 0.85,
@@ -626,7 +635,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                           _genre = null;
                           _status = null;
                           _ptype = null;
-                          _tag = null;
+                          _tags = const [];
                         }, changed: true),
                         child: const Text('清除全部'),
                       ),
@@ -666,8 +675,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                             for (final p in f.ptypes)
                               _chip(p.name, _ptype == p.name,
                                   () => _pick(() => _ptype = p.name,
-                                      changed: _ptype != p.name),
-                                  trailing: '${p.count} 本'),
+                                      changed: _ptype != p.name)),
                           ],
                         ),
                       ),
@@ -683,8 +691,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                             for (final y in f.years)
                               _chip('${y.year}', _year == y.year,
                                   () => _pick(() => _year = y.year,
-                                      changed: _year != y.year),
-                                  trailing: '${y.count} 本'),
+                                      changed: _year != y.year)),
                           ],
                         ),
                       ),
@@ -700,25 +707,36 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                             for (final g in f.genres)
                               _chip(g.name, _genre == g.name,
                                   () => _pick(() => _genre = g.name,
-                                      changed: _genre != g.name),
-                                  trailing: '${g.count} 本'),
+                                      changed: _genre != g.name)),
                           ],
                         ),
                       ),
                       _section(
-                        '标签',
+                        '标签（多选，OR）',
                         Wrap(
                           spacing: 8,
                           runSpacing: 8,
                           children: [
-                            _chip('全部', _tag == null,
-                                () => _pick(() => _tag = null,
-                                    changed: _tag != null)),
+                            FilterChip(
+                              showCheckmark: false, // 用户 2026-11-21
+                              label: const Text('全部',
+                                  style: TextStyle(fontSize: 12)),
+                              selected: _tags.isEmpty,
+                              onSelected: (_) => _pickTags(const []),
+                            ),
                             for (final t in f.tags)
-                              _chip(t.name, _tag == t.name,
-                                  () => _pick(() => _tag = t.name,
-                                      changed: _tag != t.name),
-                                  trailing: '${t.count} 本'),
+                              FilterChip(
+                                showCheckmark: false,
+                                label: Text(t.name,
+                                    style: const TextStyle(fontSize: 12)),
+                                selected: _tags.contains(t.name),
+                                onSelected: (on) => _pickTags(
+                                    on
+                                        ? [..._tags, t.name]
+                                        : _tags
+                                              .where((x) => x != t.name)
+                                              .toList()),
+                              ),
                           ],
                         ),
                       ),

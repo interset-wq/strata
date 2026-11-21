@@ -539,28 +539,36 @@ func TestClassicTagPtypeFilters(t *testing.T) {
 	ctx := context.Background()
 	// book_tags rows: 1001 热血/战斗, 1004 战斗, 2001 战斗 (licensed, excluded),
 	// 1003 2020萌神; every test book is price_type 免费.
-	items, err := st.ClassicBooks(ctx, "", "", "", "", "", "战斗", "", 0, 100, 0, "", "")
+	items, err := st.ClassicBooks(ctx, "", "", "", "", "", "", []string{"战斗"}, 0, 100, 0, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(items) != 2 || items[0].NID != 1001 || items[1].NID != 1004 {
 		t.Fatalf("tag=战斗: got %+v", items)
 	}
-	items, err = st.ClassicBooks(ctx, "", "", "", "", "", "2020萌神", "", 0, 100, 0, "", "")
+	items, err = st.ClassicBooks(ctx, "", "", "", "", "", "", []string{"2020萌神"}, 0, 100, 0, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(items) != 1 || items[0].NID != 1003 {
 		t.Fatalf("tag=2020萌神: got %+v", items)
 	}
-	items, err = st.ClassicBooks(ctx, "", "", "", "", "", "", "VIP", 0, 100, 0, "", "")
+	// 多值 = OR（用户 2026-11-21）：战斗 (1001/1004) ∪ 2020萌神 (1003)。
+	items, err = st.ClassicBooks(ctx, "", "", "", "", "", "", []string{"战斗", "2020萌神"}, 0, 100, 0, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 3 {
+		t.Fatalf("tag=战斗,2020萌神 (OR): got %+v", items)
+	}
+	items, err = st.ClassicBooks(ctx, "", "", "", "", "", "VIP", nil, 0, 100, 0, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(items) != 0 {
 		t.Fatalf("ptype=VIP: want 0 rows, got %+v", items)
 	}
-	items, err = st.ClassicBooks(ctx, "", "", "", "", "", "战斗", "免费", 0, 100, 0, "", "")
+	items, err = st.ClassicBooks(ctx, "", "", "", "", "", "免费", []string{"战斗"}, 0, 100, 0, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
