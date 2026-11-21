@@ -349,6 +349,8 @@ form 过滤即池本身）。
   "name": "七征", "series": "x", "count": 399,
   "forms": { "long": 280, "dialogue": 107, "short": 8, "medium": 4 },
   "tracks": ["七征长篇", "七征对话类征文长篇", "七征对话类征文短篇", "七征中篇", "七征短篇"],
+  "roster": true,
+  "roster_tracks": ["长篇", "中篇", "短篇", "对话类征文长篇", "对话类征文短篇"],
   "year_min": 2019, "year_max": 2019,
   "year": 2019, "start": null, "end": null, "note": null
 }
@@ -360,6 +362,10 @@ form 过滤即池本身）。
   （属 P1 清单 API）。`forms` 按 DOM 核实的 `form` 统计，与 `tracks`
   （平台原始赛项标注）不必互洽。
 - `tracks`：赛事原始赛项名（count DESC）。
+- `roster`/`roster_tracks`：该赛事是否可拉官方清单（引擎内嵌已验证 tagId
+  静态台账，`store/roster_tags.go`）+ 已验证赛道列表（空 = 单轨，
+  `roster_tracks` 键省略）。档案页「查看官方清单」入口恒在：`roster=false`
+  时引擎回落库内子集并提示「仅库内作品」（见 `/strata/roster` 降级）。
 - `year`/`start`/`end`/`note`：官方元数据（静态表），无则 null；
   `year_min`/`year_max` 是库内书 `est_year` 区间（在库口径）。
 
@@ -374,6 +380,57 @@ fav_pctl DESC, nid)`），`per` 限每形态条数（1..50，默认 10）；
 - 匹配语义与榜单筛选一致：N征 事件前缀匹配（含对话类分轨），非 N征 精确匹配。
 
 200：`{ contest, items: [RankItem] }`（`rank` = 该 form 组内名次 1..per）。
+
+### GET /strata/roster?contest=&division=&page=（**已实现**，2026-11-21 P1 官方清单）
+
+一届赛事的官方参赛清单一页（docs/contest-display-in-app.md 形态二，
+**按需**——全库后台批量抓清单禁止）。`contest` = 赛事事件名（同
+`/contests`）；`division` = 赛道（多轨赛事必传，取值 = `/contests` 该组
+`roster_tracks`；单轨留空）；`page` 从 1 起（引擎内部换算各世代页基：
+新 API 1-based、旧 API 0-based pi）。
+
+- 400 `invalid_argument`：`contest` 缺失；多轨赛事 `division` 缺失/未知；
+  `page` < 1。
+- tagId 台账是引擎内嵌静态表（29 条，源 docs/contest-roster-harvest.md；
+  tagId 只能从每届页面现场取、不能推导——新增届次务必现取后入表）。
+- 两代端点（按 tag 世代选择）：新 SPA（2023+，`api/essay/getNovels`，
+  size ≤ 500）/ 旧 H5（2018–22，`Common.ashx?op=getNovelsByTag`，ps ≤ 200，
+  相对封面路径拼 CDN 前缀）。清单行只有 6 字段
+  （nid/标题/作者/简介/封面/categoryID）；`category_id` 是赛道提示
+  （0 常规/1 对话/3 征文短篇/4 沉浸式），**不是 form 真值**（E.28 只正向
+  用 1/4）。
+- **size 边界陷阱**：个别 tag（如 724）size=500 返回空、≤8 正常——首页
+  空时引擎按 500→100→10 递减重试后再下结论（旧世代 ps=200 单档）。
+- 缓存：复用 `official_ranks_cache`（user.db v9），key = `roster:{tag}:{page}`；
+  TTL 按 `contest_meta` end 日期判（未结束 24h / 已结束 365d / end 未知 24h）。
+  缓存的是上游原始页；**本地 join 每次响应都做**（覆盖层/种子变化即时反映）。
+- **本地 join**：种子内作品 `in_library=true` + form/fav_pctl/favs/status/
+  est_year/words（seed 口径；用户观测覆盖层从不进 form/分位）；库外作品
+  只带清单 6 字段——不伪造徽标（docs/12 红线）。
+- **降级恒 200（无 502 墙）**：赛事无 tagId / 接口失效（新 API
+  `errorCode≠200`、旧 API 裸 `status≠200`、结构缺失、响应体畸形）/ 上游
+  抓取失败 → 引擎回落库内子集（同代分位序、cap 2000），响应
+  `source="degraded"` + `note`；UI 顶部提示条「仅库内作品，清单不完整」。
+  失效响应不入缓存，下次打开重试（不重试风暴）。
+- 清单顺序保持官方返回序；v1 无排序控件（用户 2026-11-21 定案）。
+- 库外条目点击复用搜索页链路：UI 推 `/book/{nid}`，详情页覆盖层按需抓
+  详情 + 自动收录（discovered），不写 seed。
+
+200：
+
+```json
+{ "contest": "十三征", "division": "长篇", "page": 1, "pages": 3,
+  "source": "official",
+  "items": [ { "nid": 713638, "title": "Re：如果成为神明",
+               "author": "某NoName", "intro": "…",
+               "cover": "https://rs.sfacg.com/web/novel/images/NovelCover/Big/2024/08/….jpg",
+               "category_id": 3, "in_library": true, "form": "short",
+               "fav_pctl": 0.93, "favs": 412, "status": "连载中",
+               "est_year": 2024, "words": 38000 } ] }
+```
+
+降级响应同形：`source="degraded"`、`note`（如「无官方清单，仅显示库内
+作品」）、`page`/`pages` 恒 1，items 为库内子集（无 intro/category_id）。
 
 ## 草案（Phase 3/4 实现，未落地前 UI 不得依赖）
 

@@ -54,8 +54,9 @@ var contestMeta = map[string]ContestMeta{
 	"奇幻世界主题征文": {Year: 2025, Start: "2025-06-06", End: "2025-08-31"},
 }
 
-// contestMetaFor returns the metadata for an event-level name.
-func contestMetaFor(name string) (ContestMeta, bool) {
+// ContestMetaFor returns the metadata for an event-level name. Exported for
+// the roster endpoint's TTL rule (ended events cache 365d, active 24h).
+func ContestMetaFor(name string) (ContestMeta, bool) {
 	m, ok := contestMeta[name]
 	return m, ok
 }

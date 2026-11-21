@@ -1,0 +1,7 @@
+{
+  "status": {"errorCode": 200, "msg": null},
+  "data": {
+    "totalPage": 1,
+    "novels": []
+  }
+}

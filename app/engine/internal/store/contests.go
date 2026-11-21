@@ -24,6 +24,12 @@ type ContestGroup struct {
 	Start   *string        `json:"start,omitempty"`
 	End     *string        `json:"end,omitempty"`
 	Note    *string        `json:"note,omitempty"`
+	// Roster = the event has at least one verified tagId (roster_tags.go);
+	// the archive page shows the 「查看官方清单」 entry from this flag.
+	// RosterTracks = the verified divisions for the roster page chips; empty
+	// (omitted) = single-track event.
+	Roster       bool     `json:"roster"`
+	RosterTracks []string `json:"roster_tracks,omitempty"`
 }
 
 // ContestEventName maps a raw contest string to its event-level name: the
@@ -137,7 +143,7 @@ GROUP BY contest, form`)
 			return tracks[i] < tracks[j]
 		})
 		a.g.Tracks = tracks
-		if m, ok := contestMetaFor(name); ok {
+		if m, ok := ContestMetaFor(name); ok {
 			if m.Year != 0 {
 				y := m.Year
 				a.g.Year = &y
@@ -153,6 +159,14 @@ GROUP BY contest, form`)
 			if m.Note != "" {
 				v := m.Note
 				a.g.Note = &v
+			}
+		}
+		if tags := RosterTagsFor(name); tags != nil {
+			a.g.Roster = true
+			for _, tg := range tags {
+				if tg.Division != "" {
+					a.g.RosterTracks = append(a.g.RosterTracks, tg.Division)
+				}
 			}
 		}
 		out = append(out, a.g)

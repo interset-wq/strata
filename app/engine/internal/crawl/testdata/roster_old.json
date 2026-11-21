@@ -1,0 +1,22 @@
+{
+  "status": 200,
+  "totalPage": 3,
+  "novels": [
+    {
+      "NovelID": 277050,
+      "CategoryID": 0,
+      "NovelName": "身为反派的我居然有位英雄男友",
+      "AuthorName": "鱼鱼鱼干",
+      "Intro": "       成为反派boss之后的和美才发现……",
+      "Cover": "2020-09-09/df267749-ceed-42f9-8fd3-964cc62c149e.jpg"
+    },
+    {
+      "NovelID": 990002,
+      "CategoryID": 3,
+      "NovelName": "旧接口短篇测试",
+      "AuthorName": null,
+      "Intro": null,
+      "Cover": "2021-03-03/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee.jpg"
+    }
+  ]
+}

@@ -182,11 +182,25 @@ class _Body extends ConsumerWidget {
                 ),
               ),
             ),
+            // 官方清单入口（形态二，按需）：无 tagId / 接口失效时由引擎
+            // 回落库内子集，页面内提示「仅库内作品」，入口恒在。
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () => context.push(
+                    '/contests/roster?c=${Uri.encodeComponent(name)}',
+                  ),
+                  child: const Text('查看官方清单'),
+                ),
+              ),
+            ),
             Padding(
               padding: const EdgeInsets.all(16),
               child: Text(
                 '代表作按同世代收藏分位排序，累计收藏仅展示；'
-                '参赛规模以官方清单为准（P1 接入后补齐）。',
+                '上方计数为在库规模，官方参赛规模见「查看官方清单」。',
                 style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
               ),
             ),

@@ -1,0 +1,32 @@
+{
+  "status": {"errorCode": 200, "msg": null},
+  "data": {
+    "totalPage": 2,
+    "novels": [
+      {
+        "novelID": 713638,
+        "categoryID": 3,
+        "novelName": "Re：如果成为神明",
+        "authorName": "某NoName",
+        "intro": "14岁的小天才云凪自主动从研究所离职……",
+        "cover": "https://rs.sfacg.com/web/novel/images/NovelCover/Big/2024/08/daea837b-bce6-4ca1-98c0-9a945c730a9f.jpg"
+      },
+      {
+        "novelID": 990001,
+        "categoryID": 0,
+        "novelName": "  测试长篇作品  ",
+        "authorName": null,
+        "intro": null,
+        "cover": "https://rs.sfacg.com/web/novel/images/NovelCover/Big/2025/01/11111111-2222-3333-4444-555555555555.jpg"
+      },
+      {
+        "novelID": 0,
+        "categoryID": 0,
+        "novelName": "占位行（无 nid，应被丢弃）",
+        "authorName": "占位",
+        "intro": "x",
+        "cover": ""
+      }
+    ]
+  }
+}

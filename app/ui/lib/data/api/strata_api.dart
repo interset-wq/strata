@@ -392,6 +392,23 @@ class StrataApi {
         .toList();
   }
 
+  /// 一届赛事的官方清单一页（形态二，按需）：引擎按 (tag, page) 缓存
+  /// （活跃 24h / 已结束 365d）并 join 本地 seed；接口失效回落库内子集
+  /// （source=degraded，见 note）。多轨赛事传 division（档案页
+  /// rosterTracks），单轨留空。
+  Future<RosterPage> roster({
+    required String contest,
+    String division = '',
+    int page = 1,
+  }) async {
+    final body = await _get('/roster', {
+      'contest': contest,
+      'division': division,
+      'page': '$page',
+    });
+    return RosterPage.fromJson(body);
+  }
+
   /// 编辑精选（seed featured=1，构建期人工选定，非"热门"）。
   /// 传 form 时只取该形态的 featured 池，池子不足 limit 时原样返回。
   Future<List<FeaturedItem>> featured({int limit = 6, String? form}) async {
@@ -879,6 +896,10 @@ class ContestGroup {
   final String? start; // 官方启动日（无则 null，UI 只显年份）
   final String? end;
   final String? note; // 公布等后续节点
+  /// 可拉取官方清单（引擎有已验证 tagId 静态台账）；
+  /// rosterTracks = 已验证赛道（空 = 单轨，roster 请求 division 传空）。
+  final bool roster;
+  final List<String> rosterTracks;
 
   ContestGroup({
     required this.name,
@@ -892,6 +913,8 @@ class ContestGroup {
     this.start,
     this.end,
     this.note,
+    this.roster = false,
+    this.rosterTracks = const [],
   });
 
   ContestGroup.fromJson(Map<String, dynamic> m)
@@ -906,7 +929,69 @@ class ContestGroup {
         year = (m['year'] as num?)?.toInt(),
         start = m['start'] as String?,
         end = m['end'] as String?,
-        note = m['note'] as String?;
+        note = m['note'] as String?,
+        roster = m['roster'] as bool? ?? false,
+        rosterTracks = (m['roster_tracks'] as List? ?? const [])
+            .map((e) => e as String)
+            .toList();
+}
+
+/// 官方清单条目（/strata/roster）：清单 6 字段（nid/标题/作者/简介/封面/
+/// categoryID）+ 本地 join。库内作品带 form/同世代分位/累计展示字段；库外
+/// 作品只有清单字段——不伪造徽标（docs/12 红线）。categoryID 是赛道提示
+/// （0 常规/1 对话/3 短篇/4 沉浸式），不是 form 真值（E.28）。
+class RosterItem {
+  final int nid;
+  final String title;
+  final String author;
+  final String intro;
+  final String? coverUrl;
+  final int categoryId;
+  final bool inLibrary;
+  final String? form;
+  final double? favPctl;
+  final int? favs;
+  final String? status;
+  final int? estYear;
+  final int? words;
+
+  RosterItem.fromJson(Map<String, dynamic> m)
+      : nid = m['nid'] as int,
+        title = m['title'] as String,
+        author = m['author'] as String? ?? '',
+        intro = m['intro'] as String? ?? '',
+        coverUrl = m['cover'] as String?,
+        categoryId = (m['category_id'] as num?)?.toInt() ?? 0,
+        inLibrary = m['in_library'] as bool? ?? false,
+        form = m['form'] as String?,
+        favPctl = (m['fav_pctl'] as num?)?.toDouble(),
+        favs = (m['favs'] as num?)?.toInt(),
+        status = m['status'] as String?,
+        estYear = (m['est_year'] as num?)?.toInt(),
+        words = (m['words'] as num?)?.toInt();
+}
+
+/// 官方清单页：source=official（上游清单）| degraded（引擎回落库内子集，
+/// 见 note）。库外条目点击复用搜索页链路（/book/{nid} → 详情 + 自动收录）。
+class RosterPage {
+  final String contest;
+  final String division;
+  final int page;
+  final int pages;
+  final String source;
+  final String? note;
+  final List<RosterItem> items;
+
+  RosterPage.fromJson(Map<String, dynamic> m)
+      : contest = m['contest'] as String,
+        division = m['division'] as String? ?? '',
+        page = (m['page'] as num?)?.toInt() ?? 1,
+        pages = (m['pages'] as num?)?.toInt() ?? 1,
+        source = m['source'] as String? ?? 'official',
+        note = m['note'] as String?,
+        items = (m['items'] as List)
+            .map((e) => RosterItem.fromJson(e as Map<String, dynamic>))
+            .toList();
 }
 
 class RankItem {

@@ -8,6 +8,7 @@ import '../pages/boot_page.dart';
 import '../pages/browse_page.dart';
 import '../pages/contest_archive_page.dart';
 import '../pages/contest_list_page.dart';
+import '../pages/roster_page.dart';
 import '../pages/classic_list_page.dart';
 import '../pages/discover_page.dart';
 import '../pages/featured_gallery_page.dart';
@@ -140,6 +141,14 @@ final router = GoRouter(
     GoRoute(
       path: '/contests',
       builder: (_, _) => const ContestListPage(),
+    ),
+    // 官方清单（形态二，按需 + 引擎按页缓存）；静态段必须在
+    // /contests/:name 之前注册，否则 'roster' 会被当赛事名吃掉。
+    GoRoute(
+      path: '/contests/roster',
+      builder: (_, state) => RosterPage(
+        contest: state.uri.queryParameters['c'] ?? '',
+      ),
     ),
     GoRoute(
       path: '/contests/:name',

@@ -37,6 +37,7 @@ const (
 )
 
 type Server struct {
+	engine  *gin.Engine
 	store   *store.Store
 	limiter *crawl.Limiter
 	client  *http.Client
@@ -55,6 +56,11 @@ type Server struct {
 	// TTL cache + in-flight coalescing for the official board endpoints
 	// (monthly-granularity data; one fetch per key serves repeated taps).
 	ranksCache *officialRanksState
+
+	// Seam for the roster endpoint tests: the default goes through the
+	// shared limiter (foreground lane) via crawl.FetchRoster.
+	rosterFetch func(ctx context.Context, client *http.Client, l *crawl.Limiter,
+		gen string, tag, page, size int) (*crawl.RosterPage, error)
 }
 
 const (
@@ -63,7 +69,14 @@ const (
 	appAPIPref          = "app_api_enabled"
 )
 
+// New builds the production HTTP engine (see NewServer for the seams the
+// tests exercise).
 func New(s *store.Store) *gin.Engine {
+	return NewServer(s).engine
+}
+
+// NewServer builds the server with its seams exposed; New wraps it.
+func NewServer(s *store.Store) *Server {
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -81,6 +94,7 @@ func New(s *store.Store) *gin.Engine {
 		},
 	}
 	srv := &Server{
+		engine:  r,
 		store:   s,
 		limiter: crawl.NewLimiter(crawl.DefaultInterval),
 		client:  client,
@@ -92,12 +106,17 @@ func New(s *store.Store) *gin.Engine {
 			}{},
 			inflight: map[string]chan []byte{},
 		},
+		rosterFetch: func(ctx context.Context, client *http.Client,
+			l *crawl.Limiter, gen string, tag, page, size int) (*crawl.RosterPage, error) {
+			return crawl.FetchRoster(ctx, client, l, gen, tag, page, size, true)
+		},
 	}
 	group := r.Group("/strata")
 	group.GET("/healthz", srv.healthz)
 	group.GET("/meta", srv.meta)
 	group.GET("/contests", srv.contestArchive)
 	group.GET("/contests/books", srv.contestArchiveBooks)
+	group.GET("/roster", srv.roster)
 	group.GET("/settings", srv.settings)
 	group.PUT("/settings", srv.updateSettings)
 	group.GET("/books/:nid", srv.book)
@@ -148,7 +167,7 @@ func New(s *store.Store) *gin.Engine {
 	group.POST("/dev/test-book", srv.devTestBookInject)
 	group.DELETE("/dev/test-book", srv.devTestBookRemove)
 	srv.startWatcher(context.Background())
-	return r
+	return srv
 }
 
 func (s *Server) healthz(c *gin.Context) {
@@ -873,6 +892,155 @@ func (s *Server) contestArchiveBooks(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"contest": name, "items": items})
+}
+
+// errRosterDead marks a structurally dead roster interface (errorCode
+// != 200 / bare status != 200 / malformed body). It is never cached, and
+// the endpoint degrades to the in-library subset instead of failing
+// (docs/contest-display-in-app.md 降级表).
+var errRosterDead = errors.New("api: roster interface dead")
+
+// rosterTTL mirrors the official-ranks rule: an ended event's roster never
+// changes → 365d; an active event (end in the future) → 24h; an unknown
+// end stays short (24h) so a still-collecting roster cannot serve stale
+// data.
+func rosterTTL(event string) time.Duration {
+	if m, ok := store.ContestMetaFor(event); ok && m.End != "" {
+		if end, err := time.Parse("2006-01-02", m.End); err == nil {
+			if time.Now().Before(end) {
+				return officialRanksTTL
+			}
+			return officialRanksHistoricalTTL
+		}
+	}
+	return officialRanksTTL
+}
+
+// roster serves one page of one event's official contest roster
+// (docs/contest-display-in-app.md 形态二; on-demand — no background batch).
+// The upstream page is cached per (tag, page) through the official-ranks
+// cache (24h active / 365d ended, in-flight coalescing, no retry storm);
+// the local join runs on every serve, so the badges stay live. A dead or
+// failed upstream degrades to the in-library subset (200, source=degraded)
+// — never blank, never a 502 wall.
+func (s *Server) roster(c *gin.Context) {
+	event := c.Query("contest")
+	if event == "" {
+		fail(c, http.StatusBadRequest, "invalid_argument", "contest is required")
+		return
+	}
+	division := c.Query("division")
+	page := 1
+	if raw := c.Query("page"); raw != "" {
+		v, err := strconv.Atoi(raw)
+		if err != nil || v < 1 {
+			fail(c, http.StatusBadRequest, "invalid_argument", "page must be >= 1")
+			return
+		}
+		page = v
+	}
+	tags := store.RosterTagsFor(event)
+	if tags == nil {
+		s.rosterDegrade(c, event, division, "无官方清单，仅显示库内作品")
+		return
+	}
+	t, ok := store.RosterTagFor(event, division)
+	if !ok {
+		fail(c, http.StatusBadRequest, "invalid_argument",
+			"unknown division for this contest")
+		return
+	}
+	ctx := c.Request.Context()
+	key := "roster:" + strconv.Itoa(t.Tag) + ":" + strconv.Itoa(page)
+	body, err := s.officialRanksServed(ctx, key, rosterTTL(event), func() ([]byte, error) {
+		// size boundary trap (e.g. tag 724: size=500 empty while smaller
+		// sizes work): retry smaller before concluding the tag is empty.
+		sizes := []int{200}
+		if t.Gen == store.RosterGenNew {
+			sizes = []int{500, 100, 10}
+		}
+		for i, sz := range sizes {
+			rp, ferr := s.rosterFetch(ctx, s.client, s.limiter, t.Gen, t.Tag,
+				page+t.PageStart-1, sz)
+			if ferr != nil {
+				return nil, ferr
+			}
+			if rp == nil {
+				return nil, errRosterDead
+			}
+			if len(rp.Entries) > 0 || i == len(sizes)-1 {
+				return json.Marshal(rp)
+			}
+		}
+		return nil, errRosterDead
+	})
+	if err != nil {
+		s.rosterDegrade(c, event, division, "官方清单暂不可用，仅显示库内作品")
+		return
+	}
+	var rp crawl.RosterPage
+	if err := json.Unmarshal(body, &rp); err != nil {
+		s.rosterDegrade(c, event, division, "官方清单暂不可用，仅显示库内作品")
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"contest":  event,
+		"division": division,
+		"page":     page,
+		"pages":    rp.TotalPage,
+		"source":   "official",
+		"items":    s.rosterJoin(ctx, &rp),
+	})
+}
+
+// rosterJoin attaches local enrichment to the official page: in-library
+// books get form / same-gen percentile / cumulative display fields (seed
+// only — the user overlay never feeds form or percentile); out-of-library
+// books stay roster-only, no badges, nothing fabricated (docs/12 red line).
+func (s *Server) rosterJoin(ctx context.Context, rp *crawl.RosterPage) []store.RosterItem {
+	nids := make([]int64, len(rp.Entries))
+	for i, e := range rp.Entries {
+		nids[i] = e.NID
+	}
+	local, _ := s.store.BooksByNIDs(ctx, nids)
+	items := make([]store.RosterItem, 0, len(rp.Entries))
+	for _, e := range rp.Entries {
+		it := store.RosterItem{
+			NID: int(e.NID), Title: e.Title, Author: e.Author,
+			Intro: e.Intro, Cover: e.Cover, CategoryID: e.CategoryID,
+		}
+		if b, ok := local[e.NID]; ok {
+			it.InLibrary = true
+			it.Form = b.Form
+			it.FavPctl = b.FavPctl
+			it.Favs = b.Favs
+			it.Status = b.Status
+			it.EstYear = b.EstYear
+			it.Words = b.Words
+		}
+		items = append(items, it)
+	}
+	return items
+}
+
+// rosterDegrade renders the in-library subset for (event, division) with
+// the same response shape (source=degraded) — 降级表: no blank screen, no
+// cleared values, no retry storm.
+func (s *Server) rosterDegrade(c *gin.Context, event, division, note string) {
+	items, err := s.store.RosterLocalBooks(c.Request.Context(), event, division)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"contest":  event,
+		"division": division,
+		"page":     1,
+		"pages":    1,
+		"source":   "degraded",
+		"note":     note,
+		"items":    items,
+	})
 }
 
 func (s *Server) discover(c *gin.Context) {
