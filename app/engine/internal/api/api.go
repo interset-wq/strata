@@ -343,8 +343,6 @@ func (s *Server) book(c *gin.Context) {
 			"cover_url":  meta.CoverURL,
 			"updated_at": meta.UpdatedAt,
 			"summary":    meta.Summary,
-			"has_comic":  meta.ComicID != nil && *meta.ComicID > 0,
-			"has_audio":  meta.AlbumID != nil && *meta.AlbumID > 0,
 		}
 		eff := gin.H{
 			"title":      meta.Title,
@@ -458,8 +456,6 @@ func effective(d *store.BookDetail) gin.H {
 		overlayInt(out, "category_id", m.CategoryID)
 		overlayBool(out, "is_sensitive", m.IsSensitive)
 		overlayBool(out, "allow_down", m.AllowDown)
-		out["has_comic"] = m.ComicID != nil && *m.ComicID > 0
-		out["has_audio"] = m.AlbumID != nil && *m.AlbumID > 0
 	}
 	if o == nil {
 		return out
@@ -1461,31 +1457,6 @@ func (s *Server) bookRankSeed(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"seeded": true})
 }
 
-// enrichAdpworks stores the official adaptation-works ids (App API
-// /adpworks, docs/05 §6) after a successful alive write: comic_id and
-// album_id (0 = confirmed none), plus the comic folderName archive when a
-// comic exists. Pure best-effort: any failure leaves the columns NULL and
-// never affects the refresh response. Gated by the app_api_enabled setting
-// (STRATA_APP_API env bootstrap), off by default.
-func (s *Server) enrichAdpworks(ctx context.Context, nid int64) {
-	enabled, err := s.appAPIEnabled(ctx)
-	if err != nil || !enabled {
-		return
-	}
-	aw, err := crawl.FetchAdpWorks(ctx, s.client, s.limiter, nid, true)
-	if err != nil || aw == nil {
-		return
-	}
-	var folder *string
-	if aw.ComicID > 0 {
-		if c, cerr := crawl.FetchComic(ctx, s.client, s.limiter, aw.ComicID, true); cerr == nil && c != nil && c.FolderName != "" {
-			f := c.FolderName
-			folder = &f
-		}
-	}
-	_ = s.store.SetAdaptation(ctx, nid, aw.ComicID, aw.AlbumID, folder)
-}
-
 func (s *Server) bookRefresh(c *gin.Context) {
 	nid, err := strconv.ParseInt(c.Param("nid"), 10, 64)
 	if err != nil || nid <= 0 {
@@ -1514,7 +1485,6 @@ func (s *Server) bookRefresh(c *gin.Context) {
 		if app, aerr := crawl.FetchAppNovel(ctx, s.client, s.limiter, nid, true); aerr == nil {
 			observedAt := time.Now().Unix()
 			if err := s.writeApp(ctx, nid, app, observedAt); err == nil {
-				s.enrichAdpworks(ctx, nid)
 				s.finishDetailRefresh(nid, now.Unix(), "app")
 				c.JSON(http.StatusOK, gin.H{
 					"state":    "alive",
@@ -1546,7 +1516,6 @@ func (s *Server) bookRefresh(c *gin.Context) {
 			return
 		}
 		resp["written"] = true
-		s.enrichAdpworks(ctx, nid)
 	}
 	s.finishDetailRefresh(nid, now.Unix(), state.String())
 	c.JSON(http.StatusOK, resp)
@@ -2200,7 +2169,7 @@ func (s *Server) authorProfile(c *gin.Context) {
 		"nid": nid, "author_name": name, "author_intro": intro,
 		"author_avatar": avatar, "works": works,
 		"offlibrary": s.offLibraryWorks(c.Request.Context(), works),
-		"verdict": verdict, "observed_at": fetchStart, "source": "live",
+		"verdict":    verdict, "observed_at": fetchStart, "source": "live",
 	})
 }
 

@@ -139,11 +139,7 @@ CREATE TABLE book_meta(
   words INTEGER, favs INTEGER, praises INTEGER, clicks INTEGER,
   updated_at TEXT, add_time TEXT, point REAL, bg_banner TEXT,
   category_id INTEGER, is_sensitive INTEGER, allow_down INTEGER,
-  tickets INTEGER,  -- 当月月票（GetTicketNum.ashx，每月 1 日清零；NULL=未抓/失败）
-  comic_id INTEGER, album_id INTEGER, comic_folder TEXT
-  -- 衍生作品（/adpworks/novelId/{nid}，0=无；comic_folder 取自 /comics/{comic_id}.folderName）。
-  -- 只作详情页「有改编」标注，不外链（官方漫画站定期关闭、有声无 Web 模板）；
-  -- comic_folder 留档供官方恢复后复用。NULL=未抓/失败，与 0（确认无改编）严格区分
+  tickets INTEGER  -- 当月月票（GetTicketNum.ashx，每月 1 日清零；NULL=未抓/失败）
 );
 -- HTML 有简介/赞、无 clicks；App API 有 clicks/addTime/point、无简介/赞。
 -- UPSERT 时本次缺失字段保留旧值，两通路可互补。UI 书目属性一律覆盖层优先、

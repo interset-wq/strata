@@ -42,39 +42,6 @@ func TestCoverURLs(t *testing.T) {
 	}
 }
 
-func TestSetAdaptation(t *testing.T) {
-	st := openTestStore(t)
-	if err := st.SetAdaptation(context.Background(), 1001, 2937, 0, nil); err != nil {
-		t.Fatal(err)
-	}
-	m, err := st.BookMeta(context.Background(), 1001)
-	if err != nil || m == nil {
-		t.Fatalf("meta = %+v, err = %v", m, err)
-	}
-	if m.ComicID == nil || *m.ComicID != 2937 {
-		t.Fatalf("comic_id = %v, want 2937", m.ComicID)
-	}
-	if m.AlbumID == nil || *m.AlbumID != 0 {
-		t.Fatalf("album_id = %v, want 0 (confirmed none)", m.AlbumID)
-	}
-	// 0 overwrites a previous positive value — confirmed-none is new truth
-	// and must clear an earlier adaptation (docs/05 §6: 0 vs NULL).
-	folder := "XJYQS"
-	if err := st.SetAdaptation(context.Background(), 1001, 0, 97, &folder); err != nil {
-		t.Fatal(err)
-	}
-	m, _ = st.BookMeta(context.Background(), 1001)
-	if m.ComicID == nil || *m.ComicID != 0 {
-		t.Fatalf("comic_id = %v, want 0 after overwrite", m.ComicID)
-	}
-	if m.AlbumID == nil || *m.AlbumID != 97 {
-		t.Fatalf("album_id = %v, want 97", m.AlbumID)
-	}
-	if m.ComicFolder == nil || *m.ComicFolder != "XJYQS" {
-		t.Fatalf("comic_folder = %v, want XJYQS", m.ComicFolder)
-	}
-}
-
 func TestBookMergesLatestObservation(t *testing.T) {
 	st := openTestStore(t)
 	detail, err := st.Book(context.Background(), 1001)
@@ -510,23 +477,23 @@ VALUES (5555, 'Newly Found', 'Author Z', NULL, 'search', 1700000000)`); err != n
 func TestNormalizeContest(t *testing.T) {
 	cases := map[string]string{
 		// N征系列：篇幅赛项并入母赛事（用户 2026-11-21：只有 x征 多赛项）
-		"六征长篇":          "六征",
-		"六征中篇":          "六征",
-		"六征短篇":          "六征",
-		"十三征长篇":         "十三征",
-		"七征对话类征文长篇":     "七征对话类征文",
-		"七征对话类征文短篇":     "七征对话类征文",
-		"九征对话小说":         "九征对话小说", // 无篇幅后缀：原样
-		"十征":             "十征",
+		"六征长篇":      "六征",
+		"六征中篇":      "六征",
+		"六征短篇":      "六征",
+		"十三征长篇":     "十三征",
+		"七征对话类征文长篇": "七征对话类征文",
+		"七征对话类征文短篇": "七征对话类征文",
+		"九征对话小说":    "九征对话小说", // 无篇幅后缀：原样
+		"十征":        "十征",
 		// 非 N征 赛事：一律原样
-		"冬季征文":           "冬季征文",
-		"怪谈异闻主题征文长篇":    "怪谈异闻主题征文长篇",
-		"春节征文长篇":         "春节征文长篇",
-		"2025春季征文":        "2025春季征文",
-		"“超新星杯”短篇大赛":    "“超新星杯”短篇大赛",
-		"崩坏3征文":          "崩坏3征文",
-		"征长篇":            "征长篇", // 无数字前缀不算 N征
-		"":               "",
+		"冬季征文":       "冬季征文",
+		"怪谈异闻主题征文长篇": "怪谈异闻主题征文长篇",
+		"春节征文长篇":     "春节征文长篇",
+		"2025春季征文":   "2025春季征文",
+		"“超新星杯”短篇大赛": "“超新星杯”短篇大赛",
+		"崩坏3征文":      "崩坏3征文",
+		"征长篇":        "征长篇", // 无数字前缀不算 N征
+		"":           "",
 	}
 	for in, want := range cases {
 		if got := NormalizeContest(in); got != want {

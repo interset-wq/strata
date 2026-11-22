@@ -155,20 +155,6 @@ ON CONFLICT(nid) DO UPDATE SET ...;
 | 月票 | `GetTicketNum.ashx?nid=` 裸整数（`docs/sfacg-endpoints.md` §7.3）：**存活态详情抓取追加 1 次**（1 B），失败置 NULL 不阻塞；写入 `book_meta.tickets`。**当月值每月 1 日清零，跨月不可比**——只存当期、UI 标「本月」，不做月票时序与月票榜 |
 | 标签 | 移动版无结构化标签、App API 不返回（仅 PC 版有）；`book_meta` 可挂 `tags` 列，待需求出现再抓，v1 不抓 |
 | 章节 | 移动版目录页 168 KB 不抓；**App API `chaps` 仅 `watchlist` 书抓**（一次性快照）：逐章 `addTime`（更新热力图数据源）、`charCount`（正文口径）、VIP/废章/待审标记；落 `novel_chapters` 独立表，失败即回落 |
-| 衍生作品 | `GET /adpworks/novelId/{id}`（`docs/sfacg-app-api.md` §3.4）一次 0.2 KB 得 `comicId`/`albumId`（`0`=无）。**存活态详情抓取追加此请求**，写入 `book_meta.comic_id/album_id`；`comic_id>0` 时再取一次 `/comics/{comic_id}` 的 `folderName` 存 `comic_folder`（留档，官方漫画站恢复后可直接复用）。**详情页只标「有改编漫画 / 有有声」，不给外链**（漫画站被官方定期关闭、有声无 Web 模板，见 §6.1）；`NULL`（未抓/失败）与 `0`（确认无改编）都不标注。全站改编漫画 **<50 本**、有声 **≈150 本**，均少于 `featured` 620 本且高度重叠，**不适合作全库维度或推荐信号** |
-
-### 6.1 直达入口
-
-**结论：不给外链，只在详情页标「有改编漫画 / 有有声」。**
-
-| 类型 | 模板 | 状态（2026-11-18 实测 + 用户浏览器复核） |
-| --- | --- | --- |
-| 漫画 | `http://manhua.sfacg.com/mh/{comic_folder}/` | **不可用**：官方定期关闭漫画站，当前仅首页可加载、所有详情页 404（官方 catalog 页自身链接亦 404，`mh.sfacg.com` 403） |
-| 有声 | 无 | 仅有 `albumId`、无 folderName，候选 Web 路径全 404 / 「出错啦」 |
-
-规则：不拼死链——站点常态不可用，拼出的 URL 大概率打不开，比没有入口更差。
-`comic_folder` 仍落库留档（`/comics/{id}.folderName`），官方恢复后无需重抓即可启用。
-入口文案只陈述事实（「有改编漫画」），不承诺可点击。
 
 ## 7. 不做
 

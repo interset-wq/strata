@@ -135,7 +135,7 @@ class SettingsPage extends ConsumerWidget {
                         title: const Text('App API 增强抓取'),
                         subtitle: Text(
                           st.appApiEnabled
-                              ? '刷新优先走 App API（精确字数/评分/改编漫画·有声标注），失败自动回落'
+                              ? '刷新优先走 App API（精确字数/评分等），失败自动回落'
                               : '关闭——刷新只走移动版页面（默认）',
                           style: const TextStyle(fontSize: 12),
                         ),

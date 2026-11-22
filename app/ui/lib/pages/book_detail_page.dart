@@ -206,10 +206,6 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                 data: (set) => set.contains(widget.nid),
                 orElse: () => false,
               );
-          // 改编标注（docs/05 §6）：仅 App API 通路（STRATA_APP_API=1）有数据；
-          // NULL（未抓）与 0（确认无）引擎侧都已折成 false，不显示。
-          final hasComic = (eff['has_comic'] ?? b['has_comic']) == true;
-          final hasAudio = (eff['has_audio'] ?? b['has_audio']) == true;
           // 种子 cover_url 存相对路径（无前缀，上游爬虫缺前缀为已知问题）：
           // 有值拼 CDN 前缀；空值用官方默认封面兜底（用户拍板 2026-11-17）。
           final raw = s(eff['cover_url'] ?? b['cover_url']);
@@ -295,10 +291,6 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                                   filled: true),
                             if (onSale)
                               _badge(context, '官方热销', filled: true),
-                            if (hasComic)
-                              _badge(context, '有改编漫画'),
-                            if (hasAudio)
-                              _badge(context, '有有声'),
                             if (s(eff['genre'] ?? b['genre']) != null)
                               _badge(context,
                                   s(eff['genre'] ?? b['genre'])!),

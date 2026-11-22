@@ -168,10 +168,9 @@ resp = requests.get("https://api.sfacg.com/novels/730611",
 `comicLastUpdateDate`/`albumLastUpdateDate`（无对应作品时 null）。样本：155640→comic 2937 + album 97，
 48704→comic 1920，730611→album 149（无漫画）。
 
-三条结论：① 规模 **<200 本**（改编漫画 <50、有声 ≈150），与 `featured` 交集很大、漫画改编大概率是其子集；
-② 只作详情页「看漫画/听有声」展示入口，**不作全库分析维度或推荐信号**（样本不足、命中率 <0.1%）；
-③ Web 入口模板虽在，但漫画站官方定期关闭、详情页**常态 404**，有声无任何 URL 字段——两端都不生成外链，
-端上只标「有改编」。陷阱：无效/已死/无衍生作品三者 `status` 都是 200 且 id 全 0，**不能判活**，只对已判活取值。
+规模 **<200 本**（改编漫画 <50、有声 ≈150），与 `featured` 交集很大、漫画改编大概率是其子集。
+Web 入口模板虽在，但漫画站官方定期关闭、详情页**常态 404**，有声无任何 URL 字段。
+陷阱：无效/已死/无衍生作品三者 `status` 都是 200 且 id 全 0，**不能判活**，只对已判活取值。
 
 `search/any`（或 `search/novels/result`）返回 `{novels, comics, albums}`：`albums` 带 `novelId` 可反查，
 `comics` 只有 `comicId`——漫画侧关联只能走 `/adpworks`；`GET /comics?novelId=` **不支持按小说过滤**
