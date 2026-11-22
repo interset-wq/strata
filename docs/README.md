@@ -39,7 +39,7 @@
 | [`ref-percentile-for-discovered.md`](./ref-percentile-for-discovered.md) | 位置分 `fav_pctl` 的库外域 `ref_pctl`：断点表查表法 |
 | [`lqs-ranking-integration.md`](./lqs-ranking-integration.md) | 推荐层接入 `lqs` 的排序键、候选门槛、验收断言 |
 | [`form-definitions.md`](./form-definitions.md) | `form` 六值判定与种子收录资格的唯一真源 |
-| [`fake-complete-short-medium.md`](./fake-complete-short-medium.md) | 假完结短/中篇与第二类僵尸裁定：分析定案、实施待放行 |
+| [`fake-complete-short-medium.md`](./fake-complete-short-medium.md) | 假完结短/中篇与第二类僵尸裁定：已实施（种子 P10） |
 | [`anchor-density-strategy.md`](./anchor-density-strategy.md) | 定年锚点密度策略：P0 常规补最新锚点，早期保留、中段低优先 |
 
 ### 征文
@@ -51,6 +51,7 @@
 | [`contest-roster-fields.md`](./contest-roster-fields.md) | 清单返回字段与获奖存储四代形态、提取正则 |
 | [`award-winners-as-seed-source.md`](./award-winners-as-seed-source.md) | 获奖入种：净 911 / 剔除 602 / 补采 140、逐届明细与交接规格 |
 | [`contest-display-in-app.md`](./contest-display-in-app.md) | App 展示设计：赛事档案页、参赛清单浏览页、请求与降级 |
+| [`contest-api-integration-feasibility.md`](./contest-api-integration-feasibility.md) | 端内接入工程可行性：接入点映射、风险与工作量（路径 A/B 均已落地） |
 
 ## 权威分工
 
@@ -66,4 +67,4 @@
 - 路径以项目根为基准；旧指针 `/docs/...` 等价于本目录的 `docs/...`。
 - 动手抓数据前先读对应接口档案，不猜参数、不做试探性请求。
 - 所有外部数据通路只取元数据、不取正文、不登录、不用用户 cookie，串行 ≥0.5s。
-- 当前 `app/` 处于 v6 开发冻结：本目录的“工程侧 / 实施”都只是交接规格，本文不执行。
+- `app/` 已解禁（v6 由开发 agent 施工）；本目录标注“工程侧 / 实施”的段落是交接规格、分析侧不执行。

@@ -161,7 +161,7 @@ mlen = log(字数 / 5万) / log(15万 / 5万)      # 夹在 [0, 1]
 ## 7. 落地（工程侧，本文不执行）
 
 - 种子：`books` 加 `mqs REAL` / `mqs_pctl REAL` 两列（不改 `lqs` 列语义）；`build_seed.py` 调实现，`validate.py` 断言 `mqs ∈ [0,1]`、非空数 = 域内 `favs ≥ 300` 数、`|rho(mqs, favs)| < 0.3`。
-- 唯一实现 `analysis/lib/mqs.py`（可与 `lib/lqs.py` 共用 `_pct` / 档位工具，但**不要参数化成一个函数**——两域锚点与门槛不同，合并会让调用方误用）。
+- 唯一实现（**待建，本文归档不落地**）`analysis/lib/mqs.py`（可与 `lib/lqs.py` 共用 `_pct` / 档位工具，但**不要参数化成一个函数**——两域锚点与门槛不同，合并会让调用方误用）。
 - 引擎：与 `lqs` 同批接入推荐层（`lqs-ranking-integration.md` 的模式）；中篇卡位按 `mqs DESC`，`mqs IS NULL` 回退 `fav_pctl DESC`。
 - 双模式：novly 模式仍展示收藏原值，排序走白名单信号。
 

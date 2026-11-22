@@ -14,7 +14,7 @@
 | `m.sfacg.com/rank/{original,bm,new,jp,sale}.html` | 无 | **可用**（curl 直抓）：人气/收藏/新书/日轻/热销，各 top 20，无数值，nid 在 `/b/{nid}/`。**仅热销榜有效**（≈App「畅销榜」，滞后 ≤3 天）；人气/收藏/新书/日轻四榜多年未变（落后 >3 年），判定过时。**App 已整体移除移动榜展示**——官方移动榜 API 多 bug、数据不可信；端点与本文保留事实 |
 | `m.sfacg.com/rank/ticket.html` | 无 | JS 渲染，curl 拿不到，用 web 版替代 |
 | `m.sfacg.com/API/HTML5.ashx?op=search&keyword={kw}` | 无 | **可用**。JSON，6–15 条、中位 12，含 `NovelID`/`Point` 评分/`TypeName`；参数名是 `keyword`，`q`/`key`/`s` 均报 501 |
-| `pages.sfacg.com/ajax/act/MonthlyBoy.ashx?op=getRanks&date={YYYY-MM}&rank={N}` | 无 | **可用，可查任意月份**（历史月票库）。rank：0=月票榜(top20, `ticketNum`=月票)、2=新书榜(top10)、3=热销榜(top20)、4=对话月票榜(top20)；rank=1 为未收录未知榜。**2013-03 起连续有数据**，每月一期、月度清零。抓取器 `analysis/fetch_monthly_ranks.py` → `out/monthly_ranks.jsonl`；端点细节与语义证据见 [`sfacg-endpoints.md`](./sfacg-endpoints.md) |
+| `pages.sfacg.com/ajax/act/MonthlyBoy.ashx?op=getRanks&date={YYYY-MM}&rank={N}` | 无 | **可用，可查任意月份**（历史月票库）。rank：0=月票榜(top20, `ticketNum`=月票)、2=新书榜(top10)、3=热销榜(top20)、4=对话月票榜(top20)；rank=1 为未收录未知榜。**2013-03 起连续有数据**，每月一期、月度清零。抓取器 `analysis/fetchers/fetch_monthly_ranks.py` → `out/monthly_ranks.jsonl`；端点细节与语义证据见 [`sfacg-endpoints.md`](./sfacg-endpoints.md) |
 | `api.sfacg.com/novels/{nid}?expand=...,ticket` | Basic + 每请求自签（App 内置凭据，见 [`sfacg-app-api.md`](./sfacg-app-api.md)） | 引擎已实现自签（`crawl/appapi.go`，设置项 `app_api_enabled`），本探针未接；单书月票（周/月）只能走此端点 |
 
 补充：App 曾有 11 榜（推荐/人气/畅销/新书/收藏/月票/打赏/种草/粉丝/角色/完结），种草/角色/完结 web 无对应页；

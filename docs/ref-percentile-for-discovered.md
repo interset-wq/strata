@@ -80,7 +80,7 @@ B = fav_breakpoints[year]
 
 三条红线的适用：累计跨时点不可比 → 时点差必须标注（§4.1）；快照态≠当期态 → 库外书只 `favs` 进指标、status/words 不混；累计不回流打分 → `ref_pctl` 是分位信号（白名单）、不是累计原值回流，`clicks` 不参与（§4.4）。
 
-**生成器规格**：新增 `analysis/build_fav_breakpoints.py`，输入 `analysis/out/novels.csv` + `lib/eras.py`，输出随种子打包的紧凑表（如 `fav_breakpoints.json`，仅数字）。分母口径须与 `metrics-definitions.md` 的 universe **完全一致**，否则参照系漂移、与 `fav_pctl` 不可比。断言：断点严格递增、覆盖 `gen_min..gen_max`、与 `fav_pctl` 在同代样本上插值误差在阈值内；版本随种子发版、与 `seed_version` 绑定。
+**生成器规格（待建，本文不执行）**：新增 `analysis/build_fav_breakpoints.py`，输入 `analysis/out/novels.csv` + `lib/eras.py`，输出随种子打包的紧凑表（如 `fav_breakpoints.json`，仅数字）。分母口径须与 `metrics-definitions.md` 的 universe **完全一致**，否则参照系漂移、与 `fav_pctl` 不可比。断言：断点严格递增、覆盖 `gen_min..gen_max`、与 `fav_pctl` 在同代样本上插值误差在阈值内；版本随种子发版、与 `seed_version` 绑定。
 
 ---
 
