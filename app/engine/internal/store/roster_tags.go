@@ -35,6 +35,21 @@ const (
 //     size<=8 works; the engine's size-downgrade retry covers it
 //     (docs/contest-roster-harvest.md §4).
 var rosterTags = []RosterTag{
+	// X征（夏）— 早期静态页内嵌 getNovelsByTag（2026-11-22 页面实证）
+	// 四征 list.html 的 list.js 写死 275/276/277；五征 list.html 的
+	// list.js 写死 377–380；六征活动页 showSysTagDetail 写死 383–386。
+	// 三组均走旧 H5 端点，pi 0 基；源码 docs/contest-roster-harvest.md §2.1。
+	{Event: "四征", Division: "长篇", Tag: 275, Gen: RosterGenOld, PageStart: 0},
+	{Event: "四征", Division: "中篇", Tag: 276, Gen: RosterGenOld, PageStart: 0},
+	{Event: "四征", Division: "短篇", Tag: 277, Gen: RosterGenOld, PageStart: 0},
+	{Event: "五征", Division: "长篇", Tag: 377, Gen: RosterGenOld, PageStart: 0},
+	{Event: "五征", Division: "中篇", Tag: 378, Gen: RosterGenOld, PageStart: 0},
+	{Event: "五征", Division: "短篇", Tag: 379, Gen: RosterGenOld, PageStart: 0},
+	{Event: "五征", Division: "对话小说", Tag: 380, Gen: RosterGenOld, PageStart: 0},
+	{Event: "六征", Division: "长篇", Tag: 383, Gen: RosterGenOld, PageStart: 0},
+	{Event: "六征", Division: "中篇", Tag: 384, Gen: RosterGenOld, PageStart: 0},
+	{Event: "六征", Division: "短篇", Tag: 385, Gen: RosterGenOld, PageStart: 0},
+	{Event: "六征", Division: "对话小说", Tag: 386, Gen: RosterGenOld, PageStart: 0},
 	// X征（夏）— 旧 H5 页
 	{Event: "七征", Division: "长篇", Tag: 408, Gen: RosterGenOld, PageStart: 0},
 	{Event: "七征", Division: "中篇", Tag: 409, Gen: RosterGenOld, PageStart: 0},
@@ -42,6 +57,8 @@ var rosterTags = []RosterTag{
 	{Event: "七征", Division: "对话类征文长篇", Tag: 411, Gen: RosterGenOld, PageStart: 0},
 	{Event: "七征", Division: "对话类征文短篇", Tag: 412, Gen: RosterGenOld, PageStart: 0},
 	{Event: "八征", Division: "", Tag: 418, Gen: RosterGenOld, PageStart: 0},
+	// 独立 IP 联动 — tag 278 首本即本地同标注，49/49 拉取中 31/31 本地命中
+	{Event: "楚楚动仁同人征文", Division: "", Tag: 278, Gen: RosterGenOld, PageStart: 0},
 	// 冬季征文 — 一~五征（旧 H5 页）
 	{Event: "冬季征文", Division: "", Tag: 381, Gen: RosterGenOld, PageStart: 0},
 	{Event: "第二届冬季征文", Division: "", Tag: 406, Gen: RosterGenOld, PageStart: 0},

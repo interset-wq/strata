@@ -73,6 +73,35 @@ func TestContestGroups(t *testing.T) {
 	}
 }
 
+func TestEarlyRosterTags(t *testing.T) {
+	// The early static pages do carry rosters: their JS writes the tagIds
+	// into list.html / showSysTagDetail. A missing entry here is what makes
+	// the UI degrade to the in-library subset (docs/contest-roster-harvest §2.1).
+	want := map[string][]RosterTag{
+		"四征": {{Division: "长篇", Tag: 275}, {Division: "中篇", Tag: 276},
+			{Division: "短篇", Tag: 277}},
+		"五征": {{Division: "长篇", Tag: 377}, {Division: "中篇", Tag: 378},
+			{Division: "短篇", Tag: 379}, {Division: "对话小说", Tag: 380}},
+		"六征": {{Division: "长篇", Tag: 383}, {Division: "中篇", Tag: 384},
+			{Division: "短篇", Tag: 385}, {Division: "对话小说", Tag: 386}},
+	}
+	for event, tags := range want {
+		got := RosterTagsFor(event)
+		if len(got) != len(tags) {
+			t.Fatalf("%s tags = %+v, want %+v", event, got, tags)
+		}
+		for i, w := range tags {
+			if got[i].Division != w.Division || got[i].Tag != w.Tag ||
+				got[i].Gen != RosterGenOld || got[i].PageStart != 0 {
+				t.Fatalf("%s tag[%d] = %+v, want %+v", event, i, got[i], w)
+			}
+		}
+	}
+	if tags := RosterTagsFor("三征"); tags != nil {
+		t.Fatalf("三征 has no live roster, got %+v", tags)
+	}
+}
+
 func TestContestLane(t *testing.T) {
 	cases := map[string]string{
 		"点鸭秋色回忆征文活动": "dialogue",

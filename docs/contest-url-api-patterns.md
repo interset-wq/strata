@@ -29,8 +29,8 @@
 
 | 世代 | URL 形态 | 数据存放 | 清单 API |
 | --- | --- | --- | --- |
-| 早期静态页（四/五征） | `book.sfacg.com/zwYYYY/` | 页面图片/少量链接 | 无（只有规则页文本） |
-| H5 活动页（2018–2022） | `pages.sfacg.com/{h5,pc}/act/zwYYYY/`、`/act/djzwYYYY/`（冬征） | 页面 `index.js` 顶部 `tagIds=[...]` | 旧 `Common.ashx?op=getNovelsByTag` |
+| 早期静态页（四/五征） | `book.sfacg.com/zwYYYY/`，参赛作品 `list.html` | `js/list.js` 顶部 `LoadNovel(1, tagId)` | 旧 `Common.ashx?op=getNovelsByTag`（四 275–277 / 五 377–380） |
+| H5 活动页（2018–2022） | `pages.sfacg.com/{h5,pc}/act/zwYYYY/`、`/act/djzwYYYY/`（冬征） | 2018 页面 `showSysTagDetail(383–386)`；2019 起 `index.js` 顶部 `tagIds=[...]` | 旧 `Common.ashx?op=getNovelsByTag` |
 | 日期式 SPA（2023 起） | `pages.sfacg.com/h5/act/zwYYYYMMDD/pc` | 打包 JS 里 `longTagId/middleTagId/shortTagId`（X 征三轨）或单 `tagId` | 新 `/api/essay/getNovels` |
 | UUID 页（2024 秋起） | `pages.sfacg.com/h5/act/zw/essayActivity_{UUID}.html` | HTML `data-tagid`；获奖写进 HTML `img[data-nid]` | 新 `/api/essay/getNovels` |
 
@@ -105,13 +105,13 @@ tagId 地图与逐届实证见 `contest-roster-harvest.md`（唯一权威）。
 - 比赛只覆盖**参赛书**：未参赛的一次性完本短篇、早期静态页时代作品仍会漏；给的是**书目与认可信号**，
   成绩与实时状态仍靠详情抓取。本文研究的是「发现 + 优质增补」，不是「成绩实时」或「全量覆盖」的替代。
 - 四代形态均已实证、获奖 = 优质已验证；获奖提取器正式化（脚本固化、探针兼容四代）为工程侧交接事项，分析侧不执行。
-- **当前残余空白**：一~六征早期静态页无清单 API、480/660 活动页 URL 未取、29 个独立赛事的活动页多无获奖名单（详见 harvest §2.8）。
-- 各赛事 tagId 已补全（四季主线 + 少年/对话线 + 29 个独立赛事，见 harvest §2），缺口均已有降级方案。
+- **当前残余空白**：一/二征页面下线、三征参赛展为空（确实无清单 API）；480/660 活动页 URL 未取；独立赛事多无获奖名单（详见 harvest §2.8）。四/五/六征已有清单 API，不再算空白。
+- 各赛事 tagId 已补全（四季主线四征起 + 少年/对话线 + 30 个独立赛事，见 harvest §2），缺口均已有降级方案。
 
 ## 交叉引用
 
 - **端点与参数**：`sfacg-endpoints.md`、`contest-roster-fields.md`
-- **tagId 地图 / URL 实证 / 补采覆盖**（含 29 个独立赛事，§2.8）：`contest-roster-harvest.md`（唯一权威）
+- **tagId 地图 / URL 实证 / 补采覆盖**（含 30 个独立赛事，§2.8）：`contest-roster-harvest.md`（唯一权威）
 - **清单字段 / 获奖四代形态 / 提取正则**：`contest-roster-fields.md`（权威）
 - **获奖逐届明细 / 入种口径（净 911、剔除 602、140 补采）**：`award-winners-as-seed-source.md`（权威）
 - **展示设计 / 三层数据落后 / 降级**：`contest-display-in-app.md`
