@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../pages/author_page.dart';
 import '../pages/book_data_page.dart';
 import '../pages/book_detail_page.dart';
+import '../pages/booklist_detail_page.dart';
+import '../pages/booklists_page.dart';
 import '../pages/boot_page.dart';
 import '../pages/browse_page.dart';
 import '../pages/contest_archive_page.dart';
@@ -154,6 +156,15 @@ final router = GoRouter(
       path: '/contests/:name',
       builder: (_, state) =>
           ContestArchivePage(name: state.pathParameters['name']!),
+    ),
+    // 官方书单（docs/booklist-in-app.md）：顺序 id 探测浏览，引擎 24h 缓存；
+    // 静态段在参数段之前注册（与 /contests/roster 同款）。
+    GoRoute(path: '/booklists', builder: (_, _) => const BooklistsPage()),
+    GoRoute(
+      path: '/booklists/:id',
+      builder: (_, state) => BooklistDetailPage(
+        id: int.tryParse(state.pathParameters['id'] ?? '') ?? 0,
+      ),
     ),
     GoRoute(path: '/discover', builder: (_, _) => const DiscoverPage()),
     GoRoute(

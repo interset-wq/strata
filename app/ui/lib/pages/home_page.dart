@@ -790,7 +790,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   Widget _entryGrid(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final entries = [
-      (Icons.category, '分类', '/browse?mode=category'),
+      (Icons.bookmarks, '书单', '/booklists'),
       (Icons.update, '状态', '/browse?mode=status'),
       (Icons.emoji_events, '比赛', '/contests'),
       (Icons.leaderboard, '经典榜单',

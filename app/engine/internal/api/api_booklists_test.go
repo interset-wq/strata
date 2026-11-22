@@ -1,0 +1,127 @@
+package api
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+	"strconv"
+	"strings"
+	"testing"
+
+	"strata/engine/internal/crawl"
+)
+
+// Fixtures shaped on the live API probes of 2026-11-22
+// (pages.sfacg.com/api/HttpProxy, actionName=/bookList/1 and .../novel).
+const (
+	booklistItemJSON    = `{"status":{"httpCode":200,"errorCode":200,"msg":null},"data":{"bookListID":1,"title":"测试书单","summary":"简介","markNum":2170,"recommendNum":399,"novelNum":2,"lastUpdateDateTime":"2021-05-11T16:56:45","user":{"nickName":"作者甲","expand":{"avatar":"https://rss.sfacg.com/a.jpg","vipLevel":2}}}}`
+	booklistInvalidJSON = `{"status":{"httpCode":200,"errorCode":200,"msg":null},"data":null}`
+	booklistNovelsJSON  = `{"status":{"httpCode":200,"errorCode":200,"msg":null},"data":{"items":[{"summary":"推荐语一","novels":{"novelId":1006,"novelName":"库内书","authorName":"作者B","novelCover":"https://rss.sfacg.com/c1.jpg","charCount":123456,"viewTimes":234567,"markCount":3456,"isFinish":true,"expand":{"bigNovelCover":"https://rss.sfacg.com/b1.jpg","typeName":"玄幻"}}},{"summary":"推荐语二","novels":{"novelId":999999,"novelName":"库外书","authorName":"作者C","charCount":5000,"viewTimes":6000,"markCount":700,"isFinish":false}}]}}`
+)
+
+// validBooklistJSON renders the item fixture as booklist #id.
+func validBooklistJSON(id int) string {
+	return strings.Replace(booklistItemJSON, `"bookListID":1`,
+		`"bookListID":`+strconv.Itoa(id), 1)
+}
+
+// TestBooklistsWindow: a 10-id window, ids 1..8 valid / 9..10 invalid →
+// 8 items + done=true (short page = end); the second page is fully
+// invalid → empty items + done.
+func TestBooklistsWindow(t *testing.T) {
+	ts, srv := newRosterTestServer(t)
+	srv.booklistFetch = func(ctx context.Context, client *http.Client,
+		l *crawl.Limiter, id int, kind string, foreground bool) (string, error) {
+		if kind != "item" {
+			return "", fmt.Errorf("unexpected kind %q", kind)
+		}
+		if id >= 1 && id <= 8 {
+			return validBooklistJSON(id), nil
+		}
+		return booklistInvalidJSON, nil
+	}
+	body := getJSON(t, ts.URL+"/strata/booklists", http.StatusOK)
+	items := body["items"].([]any)
+	if len(items) != 8 {
+		t.Fatalf("items = %v, want 8 valid of 10", items)
+	}
+	if items[7].(map[string]any)["id"].(float64) != 8 {
+		t.Fatalf("last item = %v, want id 8", items[7])
+	}
+	if body["done"] != true {
+		t.Fatalf("done = %v, want true (short page)", body["done"])
+	}
+	it := items[0].(map[string]any)
+	if it["title"] != "测试书单" || it["vip"] != true ||
+		it["novel_num"].(float64) != 2 || it["updated"] != "2021-05-11" {
+		t.Fatalf("item 0 = %v", it)
+	}
+	// page 2: ids 11..20 all invalid → empty window, done.
+	body2 := getJSON(t, ts.URL+"/strata/booklists?page=2", http.StatusOK)
+	if got := body2["items"].([]any); len(got) != 0 || body2["done"] != true {
+		t.Fatalf("page 2 = %v, want empty items + done", body2)
+	}
+}
+
+// TestBooklistNovelsJoin: the detail endpoint joins the local seed —
+// nid 1006 is in the test seed (in_library + form), 999999 is not
+// (official fields only, nothing fabricated).
+func TestBooklistNovelsJoin(t *testing.T) {
+	ts, srv := newRosterTestServer(t)
+	srv.booklistFetch = func(ctx context.Context, client *http.Client,
+		l *crawl.Limiter, id int, kind string, foreground bool) (string, error) {
+		if id != 1 {
+			return "", fmt.Errorf("unexpected id %d", id)
+		}
+		if kind == "novel" {
+			return booklistNovelsJSON, nil
+		}
+		return booklistItemJSON, nil
+	}
+	body := getJSON(t, ts.URL+"/strata/booklists/1/novels", http.StatusOK)
+	if bl := body["booklist"].(map[string]any); bl["title"] != "测试书单" {
+		t.Fatalf("booklist header = %v", bl)
+	}
+	items := body["items"].([]any)
+	if len(items) != 2 {
+		t.Fatalf("items = %v", items)
+	}
+	in := items[0].(map[string]any)
+	if in["in_library"] != true || in["form"] == nil || in["nid"].(float64) != 1006 {
+		t.Fatalf("in-library row = %v", in)
+	}
+	if in["words"].(float64) != 123456 || in["finish"] != true || in["note"] != "推荐语一" {
+		t.Fatalf("official fields = %v", in)
+	}
+	out := items[1].(map[string]any)
+	if out["in_library"] != false {
+		t.Fatalf("out-of-library row = %v", out)
+	}
+	if _, has := out["form"]; has {
+		t.Fatalf("out-of-library row carries a fabricated form: %v", out)
+	}
+}
+
+// TestBooklistNotFound: an invalid id (data missing) is a 404, not an
+// empty detail.
+func TestBooklistNotFound(t *testing.T) {
+	ts, srv := newRosterTestServer(t)
+	srv.booklistFetch = func(ctx context.Context, client *http.Client,
+		l *crawl.Limiter, id int, kind string, foreground bool) (string, error) {
+		return booklistInvalidJSON, nil
+	}
+	getJSON(t, ts.URL+"/strata/booklists/999/novels", http.StatusNotFound)
+}
+
+// TestParseBooklistDead: malformed bodies and dead interfaces parse to nil.
+func TestParseBooklistDead(t *testing.T) {
+	if crawl.ParseBooklistItem(`{garbage`) != nil {
+		t.Fatal("malformed body parsed")
+	}
+	if crawl.ParseBooklistItem(`{"status":{"errorCode":500},"data":null}`) != nil {
+		t.Fatal("errorCode 500 item parsed")
+	}
+	if crawl.ParseBooklistNovels(`{"status":{"errorCode":500},"data":null}`) != nil {
+		t.Fatal("errorCode 500 novels parsed")
+	}
+}

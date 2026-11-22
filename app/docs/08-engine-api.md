@@ -448,6 +448,62 @@ fav_pctl DESC, nid)`），`per` 限每形态条数（1..50，默认 10）；
   误差至多一页——用户 2026-11-22 裁定：近似即可，不多发请求取精确值）；
   UI 清单页显示「约 N 篇参赛」。
 
+### GET /strata/booklists?page=（**已实现**，2026-11-23 官方书单）
+
+官方书单列表一窗（docs/booklist-in-app.md）。官方 API **无枚举动作**
+（裸 `/bookList` 探针 404），引擎每窗探 10 个连续书单号、**逐个**走共享
+限速器（1s/号，首窗 ≈10 秒）；每号原始响应进程内 24h 缓存
+（key = `booklist:{id}`，与官方榜单共享并发合并——书单会更新，24h 是
+上限），当日再访秒回。无效号（data 缺失）确定性丢弃；窗口有效数 < 10
+= 到底（temp/novly 在真实 id 空间验证的语义）。
+
+- 400 `invalid_argument`：`page` 非 ≥1 整数。
+- 502 `upstream_error`：上游抓取失败（UI 重试；失效响应不入缓存）。
+- 书单官方累计值（mark_num/recommend_num）纯展示（docs/12 红线）。
+
+200：
+
+```json
+{ "page": 1, "done": false,
+  "items": [ { "id": 1, "title": "玄幻无敌养成，女徒弟孝心变质",
+               "summary": "…", "author": "菠萝包编辑部",
+               "avatar": "https://rss.sfacg.com/….jpg", "vip": false,
+               "mark_num": 2170, "recommend_num": 399, "novel_num": 6,
+               "updated": "2021-05-11" } ] }
+```
+
+`done=true` = 已到底（页不满）；UI 停止加载下一页。
+
+### GET /strata/booklists/:id/novels（**已实现**，2026-11-23 官方书单）
+
+书单详情：元数据 + 作品列表（两个上游请求，各缓存 24h，key
+`booklist:{id}` / `booklist:{id}:novel`）+ 本地 join（`BooksByNIDs`）：
+库内作品 `in_library=true` + `form`；库外只带官方字段（不伪造徽标，
+docs/12 红线）。作品列表保持官方返回序，无排序控制、无分页。
+
+- 400 `invalid_argument`：`id` 非正整数。
+- 404 `not_found`：书单号不存在（data 缺失）。
+- 502 `upstream_error`：上游抓取失败。
+- 作品官方累计值（words/clicks/favs）纯展示（docs/12 红线）；库外作品
+  点击走 rankSeed 收录链路（同 roster 行）。
+
+200：
+
+```json
+{ "booklist": { "id": 1, "title": "…", "summary": "…",
+                "author": "菠萝包编辑部", "vip": false,
+                "novel_num": 6, "updated": "2021-05-11" },
+  "items": [ { "nid": 292332, "title": "我的女徒弟们都是未来诸天大佬",
+               "author": "一白均", "cover": "https://rss.sfacg.com/….jpg",
+               "type": "古风", "words": 2748798, "clicks": 38820520,
+               "favs": 166979, "finish": true, "note": "推荐语…",
+               "in_library": true, "form": "long" } ] }
+```
+
+UI：首页长篇 tab 宫格第一格「分类」→「书单」（2026-11-23 裁定：经典
+榜单筛选面板已有题材选择，分类路由冗余）；`/browse?mode=category` 路由
+保留、首页不再提供入口。
+
 ## 草案（Phase 3/4 实现，未落地前 UI 不得依赖）
 
 ### GET /strata/search?q=&limit=（**已实现**）

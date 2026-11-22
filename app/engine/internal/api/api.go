@@ -61,6 +61,11 @@ type Server struct {
 	// shared limiter (foreground lane) via crawl.FetchRoster.
 	rosterFetch func(ctx context.Context, client *http.Client, l *crawl.Limiter,
 		gen string, tag, page, size int) (*crawl.RosterPage, error)
+
+	// Seam for the booklist endpoint tests: the default goes through the
+	// shared limiter (foreground lane) via crawl.FetchBooklist.
+	booklistFetch func(ctx context.Context, client *http.Client, l *crawl.Limiter,
+		id int, kind string, foreground bool) (string, error)
 }
 
 const (
@@ -110,6 +115,10 @@ func NewServer(s *store.Store) *Server {
 			l *crawl.Limiter, gen string, tag, page, size int) (*crawl.RosterPage, error) {
 			return crawl.FetchRoster(ctx, client, l, gen, tag, page, size, true)
 		},
+		booklistFetch: func(ctx context.Context, client *http.Client,
+			l *crawl.Limiter, id int, kind string, foreground bool) (string, error) {
+			return crawl.FetchBooklist(ctx, client, l, id, kind, foreground)
+		},
 	}
 	group := r.Group("/strata")
 	group.GET("/healthz", srv.healthz)
@@ -117,6 +126,8 @@ func NewServer(s *store.Store) *Server {
 	group.GET("/contests", srv.contestArchive)
 	group.GET("/contests/books", srv.contestArchiveBooks)
 	group.GET("/roster", srv.roster)
+	group.GET("/booklists", srv.booklists)
+	group.GET("/booklists/:id/novels", srv.booklistNovels)
 	group.GET("/settings", srv.settings)
 	group.PUT("/settings", srv.updateSettings)
 	group.GET("/books/:nid", srv.book)

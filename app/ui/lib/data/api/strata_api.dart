@@ -416,6 +416,19 @@ class StrataApi {
     return RosterPage.fromJson(body);
   }
 
+  /// 官方书单列表一窗（顺序 id 探测：引擎每窗 10 个、逐个走限速器——
+  /// 首窗 ≈10 秒，当日再访 24h 缓存秒回；docs/booklist-in-app.md）。
+  Future<BooklistPage> booklists({int page = 1}) async {
+    final body = await _get('/booklists', {'page': '$page'});
+    return BooklistPage.fromJson(body);
+  }
+
+  /// 书单详情（元数据 + 作品列表，引擎 24h 缓存 + 本地 join）。
+  Future<BooklistDetail> booklistNovels(int id) async {
+    final body = await _get('/booklists/$id/novels');
+    return BooklistDetail.fromJson(body);
+  }
+
   /// 编辑精选（seed featured=1，构建期人工选定，非"热门"）。
   /// 传 form 时只取该形态的 featured 池，池子不足 limit 时原样返回。
   Future<List<FeaturedItem>> featured({int limit = 6, String? form}) async {
@@ -1012,6 +1025,91 @@ class RosterPage {
         note = m['note'] as String?,
         items = (m['items'] as List)
             .map((e) => RosterItem.fromJson(e as Map<String, dynamic>))
+            .toList();
+}
+
+/// 官方书单（/strata/booklists 窗口项 / 详情头；官方 API 无枚举动作，
+/// 引擎顺序 id 探测 10 个/窗、24h 缓存——docs/booklist-in-app.md）。
+class Booklist {
+  final int id;
+  final String title;
+  final String summary;
+  final String author;
+  final String avatar;
+  final bool vip;
+  final int markNum;
+  final int recommends;
+  final int novelNum;
+  final String updated;
+
+  Booklist.fromJson(Map<String, dynamic> m)
+      : id = (m['id'] as num?)?.toInt() ?? 0,
+        title = m['title'] as String,
+        summary = m['summary'] as String? ?? '',
+        author = m['author'] as String? ?? '',
+        avatar = m['avatar'] as String? ?? '',
+        vip = m['vip'] as bool? ?? false,
+        markNum = (m['mark_num'] as num?)?.toInt() ?? 0,
+        recommends = (m['recommend_num'] as num?)?.toInt() ?? 0,
+        novelNum = (m['novel_num'] as num?)?.toInt() ?? 0,
+        updated = m['updated'] as String? ?? '';
+}
+
+/// 书单内一部作品：官方累计值（字数/点击/收藏）纯展示，永不进推荐
+/// 打分（docs/12 红线）；inLibrary/form 为引擎本地 join，库外不伪造。
+class BooklistNovel {
+  final int nid;
+  final String title;
+  final String author;
+  final String cover;
+  final String type;
+  final int words;
+  final int clicks;
+  final int favs;
+  final bool finish;
+  final String note;
+  final bool inLibrary;
+  final String form;
+
+  BooklistNovel.fromJson(Map<String, dynamic> m)
+      : nid = (m['nid'] as num?)?.toInt() ?? 0,
+        title = m['title'] as String,
+        author = m['author'] as String? ?? '',
+        cover = m['cover'] as String? ?? '',
+        type = m['type'] as String? ?? '',
+        words = (m['words'] as num?)?.toInt() ?? 0,
+        clicks = (m['clicks'] as num?)?.toInt() ?? 0,
+        favs = (m['favs'] as num?)?.toInt() ?? 0,
+        finish = m['finish'] as bool? ?? false,
+        note = m['note'] as String? ?? '',
+        inLibrary = m['in_library'] as bool? ?? false,
+        form = m['form'] as String? ?? '';
+}
+
+/// 书单列表一窗（done=true 表示页不满、已到底）。
+class BooklistPage {
+  final int page;
+  final List<Booklist> items;
+  final bool done;
+
+  BooklistPage.fromJson(Map<String, dynamic> m)
+      : page = (m['page'] as num?)?.toInt() ?? 1,
+        items = (m['items'] as List)
+            .map((e) => Booklist.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        done = m['done'] as bool? ?? true;
+}
+
+/// 书单详情：头部元数据 + 作品列表（官方顺序，本地 join 后）。
+class BooklistDetail {
+  final Booklist booklist;
+  final List<BooklistNovel> items;
+
+  BooklistDetail.fromJson(Map<String, dynamic> m)
+      : booklist =
+            Booklist.fromJson((m['booklist'] as Map).cast<String, dynamic>()),
+        items = (m['items'] as List)
+            .map((e) => BooklistNovel.fromJson(e as Map<String, dynamic>))
             .toList();
 }
 
