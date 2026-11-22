@@ -100,24 +100,49 @@ func TestEarlyRosterTags(t *testing.T) {
 	if tags := RosterTagsFor("三征"); tags != nil {
 		t.Fatalf("三征 has no live roster, got %+v", tags)
 	}
+	// The ledger is now complete for the seed's 99 contest labels: the
+	// once-missing divisions and IP/theme events are all mapped.
+	more := map[string][]struct {
+		div string
+		tag int
+	}{
+		"八征":         {{"长篇", 418}, {"中篇", 419}, {"短篇", 420}},
+		"九征":         {{"长篇", 457}, {"中篇", 458}, {"短篇", 459}, {"对话小说", 462}},
+		"十征":         {{"长篇", 475}, {"中篇", 476}, {"短篇", 477}, {"对话小说", 479}},
+		"龙之谷征文":      {{"", 413}},
+		"失业魔王同人征文":   {{"", 468}},
+		"对话小说青春幻想征文": {{"", 478}},
+		"春节征文短篇":     {{"", 623}},
+	}
+	for event, tags := range more {
+		got := RosterTagsFor(event)
+		if len(got) != len(tags) {
+			t.Fatalf("%s tags = %+v, want %d", event, got, len(tags))
+		}
+		for i, w := range tags {
+			if got[i].Division != w.div || got[i].Tag != w.tag {
+				t.Fatalf("%s tag[%d] = %+v, want %s/%d", event, i, got[i], w.div, w.tag)
+			}
+		}
+	}
 }
 
 func TestContestLane(t *testing.T) {
 	cases := map[string]string{
 		"点鸭秋色回忆征文活动": "dialogue",
-		"对话小说春节征文":     "dialogue",
-		"征文大赛对话小说组":   "dialogue",
-		"春节征文分支对话":     "dialogue",
-		"崩坏3征文":           "ip",
-		"少女前线征文":         "ip",
-		"失业魔王同人征文":     "ip",
+		"对话小说春节征文":   "dialogue",
+		"征文大赛对话小说组":  "dialogue",
+		"春节征文分支对话":   "dialogue",
+		"崩坏3征文":      "ip",
+		"少女前线征文":     "ip",
+		"失业魔王同人征文":   "ip",
 		// edition-level override: dialogue contest despite the IP title
 		// (user-verified 2026-11-22).
-		"星穹小说家征文": "dialogue",
-		"玄幻征文":            "",
-		"少年的无限幻想":       "",
-		"冬季恋曲征文活动":     "",
-		"七征长篇":            "", // lane is caller-gated to other-series
+		"星穹小说家征文":  "dialogue",
+		"玄幻征文":     "",
+		"少年的无限幻想":  "",
+		"冬季恋曲征文活动": "",
+		"七征长篇":     "", // lane is caller-gated to other-series
 	}
 	for in, want := range cases {
 		if got := contestLane(in); got != want {
@@ -128,10 +153,10 @@ func TestContestLane(t *testing.T) {
 
 func TestContestOrdinal(t *testing.T) {
 	cases := map[string]int{
-		"冬季征文":      0,
+		"冬季征文":    0,
 		"第二届冬季征文": 2,
 		"第三届冬季征文": 3,
-		"十征长篇":      0,
+		"十征长篇":    0,
 	}
 	for in, want := range cases {
 		if got := contestOrdinal(in); got != want {

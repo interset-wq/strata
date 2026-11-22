@@ -189,8 +189,8 @@ func TestRosterArchiveFlags(t *testing.T) {
 	if _, has := spring["roster_tracks"]; has {
 		t.Fatalf("single-track event carries roster_tracks: %v", spring)
 	}
-	// 崩坏3征文: no verified tagId → roster false.
-	if ip == nil || ip["roster"] != false {
+	// 崩坏3征文: tag 405 verified 2026-11-22 → roster true.
+	if ip == nil || ip["roster"] != true {
 		t.Fatalf("崩坏3征文 = %v", ip)
 	}
 }
@@ -266,15 +266,15 @@ func TestRosterDead(t *testing.T) {
 
 func TestRosterNoTag(t *testing.T) {
 	ts, _ := newRosterTestServer(t)
-	// 崩坏3征文 has seed books but no verified tagId: straight to the
-	// in-library subset, zero requests.
+	// The tag ledger now covers every seed event; 三征 is an untagged,
+	// out-of-seed event. It still degrades with zero requests.
 	body := getJSON(t,
-		ts.URL+"/strata/roster?contest="+url.QueryEscape("崩坏3征文"),
+		ts.URL+"/strata/roster?contest="+url.QueryEscape("三征"),
 		http.StatusOK)
 	if body["source"] != "degraded" {
 		t.Fatalf("body = %v", body)
 	}
-	if items := body["items"].([]any); len(items) != 2 {
+	if items := body["items"].([]any); len(items) != 0 {
 		t.Fatalf("degraded items = %v", items)
 	}
 }
