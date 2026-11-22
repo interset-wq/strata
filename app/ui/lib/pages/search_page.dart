@@ -86,7 +86,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
         title: TextField(
           controller: _controller,
           decoration: InputDecoration(
-            hintText: '搜索书名 / 作者（内置库）',
+            hintText: '搜索书名 / 作者 / nid（内置库）',
             border: InputBorder.none,
             suffixIcon: _query == null
                 ? null
@@ -122,7 +122,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
           Icon(Icons.search,
               size: 56, color: scheme.onSurfaceVariant.withValues(alpha: .5)),
           const SizedBox(height: 12),
-          Text('搜索书名 / 作者（内置库）',
+          Text('搜索书名 / 作者 / nid（内置库）',
               style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
           const SizedBox(height: 20),
           history.when(
@@ -165,13 +165,69 @@ class _SearchPageState extends ConsumerState<SearchPage> {
 
   Widget _resultList(
       BuildContext context, ColorScheme scheme, List<SearchItem> list) {
+    final nidMiss = list.isEmpty && _isNIDQuery(_query);
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-      itemCount: list.length + _remoteExtraRows(),
+      itemCount: list.length + (nidMiss ? 1 : 0) + _remoteExtraRows(),
       itemBuilder: (_, i) {
         if (i < list.length) return _localCard(context, scheme, list[i]);
-        return _remoteRow(context, scheme, i - list.length, list.length);
+        i -= list.length;
+        if (nidMiss && i == 0) return _nidMissCard(context, scheme, _query!);
+        i -= 1;
+        return _remoteRow(context, scheme, i, list.length);
       },
+    );
+  }
+
+  /// nid 查询判定（与引擎侧同规则：≥4 位纯数字 = 按 id 精确找书；
+  /// 1–3 位数字仍走关键词，避免把「7」当成 id）。
+  bool _isNIDQuery(String? q) {
+    if (q == null || q.length < 4) return false;
+    for (final r in q.runes) {
+      if (r < 0x30 || r > 0x39) return false;
+    }
+    return true;
+  }
+
+  /// 「未收录」行（nid 精确查找未命中）：内置库与已收录库都没有此书——
+  /// 点开走详情页收录链路（与榜单/清单页库外书同路径）。
+  Widget _nidMissCard(BuildContext context, ColorScheme scheme, String nid) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: InkWell(
+        onTap: () => context.push('/book/$nid'),
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: coverImage(null, int.tryParse(nid) ?? 0,
+                    width: 52, height: 72),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('未收录的书',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleLarge
+                            ?.copyWith(fontSize: 13.5)),
+                    const SizedBox(height: 5),
+                    Text(
+                        'nid $nid · 内置库与已收录库都没有，点开收录并查看',
+                        style: TextStyle(
+                            fontSize: 11, color: scheme.onSurfaceVariant)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 

@@ -1637,10 +1637,52 @@ SELECT nid, tag FROM seed.book_tags WHERE nid IN (%s) ORDER BY tag`,
 // Search is the L1 local search over the bundled seed (title/author LIKE).
 // Licensed books are included: they are searchable and detail-visible by
 // design, just excluded from percentile rankings.
+// parseNIDQuery decodes an exact nid search: an all-digit query of 4+ chars
+// (SFACG nids are 4+ digits; 1–3 digit strings stay keyword search — a bare
+// "7" is far more likely a word than an id). 0,false = keyword path.
+func parseNIDQuery(q string) (int64, bool) {
+	if len(q) < 4 {
+		return 0, false
+	}
+	for i := 0; i < len(q); i++ {
+		if q[i] < '0' || q[i] > '9' {
+			return 0, false
+		}
+	}
+	n, err := strconv.ParseInt(q, 10, 64)
+	if err != nil {
+		return 0, false
+	}
+	return n, true
+}
+
 func (s *Store) Search(ctx context.Context, q string, limit int) ([]SearchItem, error) {
-	const esc = `\\`
-	pattern := "%" + strings.NewReplacer("%", esc+"%", "_", esc+"_", "\\", esc+esc).Replace(q) + "%"
-	rows, err := s.DB.QueryContext(ctx, `
+	var (
+		rows *sql.Rows
+		err  error
+	)
+	if n, ok := parseNIDQuery(q); ok {
+		// nid 精确（docs/08 §search）：种子 + 已收录并集，nid = q。
+		rows, err = s.DB.QueryContext(ctx, `
+SELECT nid, title, author, genre, est_year, favs, cover_url, in_seed FROM (
+  SELECT b.nid AS nid, b.title AS title, b.author AS author, b.genre AS genre,
+         b.est_year AS est_year, b.favs AS favs,
+         COALESCE(c.cover, NULLIF(b.cover_url, '')) AS cover_url,
+         1 AS in_seed
+  FROM seed.books b
+  LEFT JOIN covers c ON c.nid = b.nid
+  WHERE b.nid = ?
+  UNION ALL
+  SELECT d.nid, d.title, d.author, d.genre, NULL, d.favs, d.cover_url, 0
+  FROM discovered d
+  WHERE d.nid = ?
+)
+ORDER BY in_seed DESC, nid ASC
+LIMIT ?`, n, n, limit)
+	} else {
+		const esc = `\\`
+		pattern := "%" + strings.NewReplacer("%", esc+"%", "_", esc+"_", "\\", esc+esc).Replace(q) + "%"
+		rows, err = s.DB.QueryContext(ctx, `
 SELECT nid, title, author, genre, est_year, favs, cover_url, in_seed FROM (
   SELECT b.nid AS nid, b.title AS title, b.author AS author, b.genre AS genre,
          b.est_year AS est_year, b.favs AS favs,
@@ -1656,6 +1698,7 @@ SELECT nid, title, author, genre, est_year, favs, cover_url, in_seed FROM (
 )
 ORDER BY favs DESC, nid ASC
 LIMIT ?`, pattern, pattern, pattern, pattern, limit)
+	}
 	if err != nil {
 		return nil, err
 	}
