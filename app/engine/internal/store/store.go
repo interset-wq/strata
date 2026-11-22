@@ -1224,6 +1224,48 @@ type AuthorProfile struct {
 	Works *string
 }
 
+// SeedNIDSet reports which of the given nids are present in seed.books
+// (author works-collection off-library diff, docs/author-profile-on-demand
+// §6). The IN list is batched; the caller preserves page order, this only
+// answers membership.
+func (s *Store) SeedNIDSet(ctx context.Context, nids []int64) (map[int64]bool, error) {
+	out := make(map[int64]bool, len(nids))
+	const batch = 500
+	for start := 0; start < len(nids); start += batch {
+		end := start + batch
+		if end > len(nids) {
+			end = len(nids)
+		}
+		chunk := nids[start:end]
+		ph := make([]string, len(chunk))
+		args := make([]any, len(chunk))
+		for i, n := range chunk {
+			ph[i] = "?"
+			args[i] = n
+		}
+		rows, err := s.DB.QueryContext(ctx,
+			"SELECT nid FROM seed.books WHERE nid IN ("+
+				strings.Join(ph, ",")+")", args...)
+		if err != nil {
+			return nil, err
+		}
+		for rows.Next() {
+			var nid int64
+			if err := rows.Scan(&nid); err != nil {
+				rows.Close()
+				return nil, err
+			}
+			out[nid] = true
+		}
+		rerr := rows.Err()
+		rows.Close()
+		if rerr != nil {
+			return nil, rerr
+		}
+	}
+	return out, nil
+}
+
 // GetAuthorProfile returns the cached row, or nil when the author was
 // never fetched (or the row was evicted).
 func (s *Store) GetAuthorProfile(ctx context.Context, key string) (*AuthorProfile, error) {

@@ -2035,6 +2035,33 @@ func (s *Server) authorBooks(c *gin.Context) {
 	})
 }
 
+// offLibraryWorks diffs the mobile 作品集 (untruncated — the full author
+// works list, user ruling 2026-11-22) against seed membership: the author
+// page's 其他作品 block (docs/author-profile-on-demand §6). Page order is
+// preserved; a membership lookup failure degrades to an empty block rather
+// than failing the profile.
+func (s *Server) offLibraryWorks(ctx context.Context,
+	works []crawl.AuthorWork) []crawl.AuthorWork {
+	if len(works) == 0 {
+		return []crawl.AuthorWork{}
+	}
+	nids := make([]int64, len(works))
+	for i, w := range works {
+		nids[i] = w.NID
+	}
+	inSeed, err := s.store.SeedNIDSet(ctx, nids)
+	if err != nil {
+		return []crawl.AuthorWork{}
+	}
+	out := []crawl.AuthorWork{}
+	for _, w := range works {
+		if !inSeed[w.NID] {
+			out = append(out, w)
+		}
+	}
+	return out
+}
+
 // authorProfileOKTTL / authorProfileDeadTTL: cache lifetimes for the
 // on-demand author profile (docs/author-profile-on-demand §4). Intro
 // and avatar are slow-changing snapshot values, so a week is plenty
@@ -2087,6 +2114,7 @@ func (s *Server) authorProfile(c *gin.Context) {
 					"author_intro":  p.AuthorIntro,
 					"author_avatar": p.AuthorAvatar,
 					"works":         worksResp,
+					"offlibrary":    s.offLibraryWorks(c.Request.Context(), worksResp),
 					"verdict":       p.Verdict,
 					"observed_at":   p.ObservedAt,
 					"source":        "cache",
@@ -2171,6 +2199,7 @@ func (s *Server) authorProfile(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"nid": nid, "author_name": name, "author_intro": intro,
 		"author_avatar": avatar, "works": works,
+		"offlibrary": s.offLibraryWorks(c.Request.Context(), works),
 		"verdict": verdict, "observed_at": fetchStart, "source": "live",
 	})
 }

@@ -1063,6 +1063,9 @@ class AuthorProfile {
   final String? authorIntro;
   final String? authorAvatar;
   final List<AuthorWork> works;
+  // 库外作品 = works − seed（引擎差集，保持页面序）：作者页「其他作品」
+  // 区块（docs/author-profile-on-demand §6）；works 本身仍是官方全量。
+  final List<AuthorWork> offlibrary;
   final String verdict;
   final int observedAt;
   final String source; // 'cache' | 'live'
@@ -1073,6 +1076,9 @@ class AuthorProfile {
       authorIntro = m['author_intro'] as String?,
       authorAvatar = m['author_avatar'] as String?,
       works = ((m['works'] as List?) ?? const [])
+          .map((e) => AuthorWork.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      offlibrary = ((m['offlibrary'] as List?) ?? const [])
           .map((e) => AuthorWork.fromJson(e as Map<String, dynamic>))
           .toList(),
       verdict = m['verdict'] as String? ?? 'error',

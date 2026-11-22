@@ -627,6 +627,7 @@ nid 同向跟随。未知作者返回空列表，不是错误。items 为标准 
 ```json
 { "nid": 48704, "author_name": "无聊看看天", "author_intro": "……" ,
   "author_avatar": "https://rss.sfacg.com/……", "works": [ { "nid": 48704, "title": "……" } ],
+  "offlibrary": [ { "nid": 9001, "title": "……" } ],
   "verdict": "ok", "observed_at": 1763570000, "source": "live" }
 ```
 
@@ -634,9 +635,15 @@ nid 同向跟随。未知作者返回空列表，不是错误。items 为标准 
   数据）。UI 降级：error 时头部回退本地作者名，书目列表照常。
 - `author_intro` 为 null/空是**正常值**（作者没写）——UI 不得伪造、不得拿
   书简介顶替。
-- 缓存：`user.db author_profiles`（schema v7，键 = casefold 显示名），ok 行
-  7 天 / dead 行 1 天 TTL；缓存命中时 `source=cache` 且 `works` 为空（作品
-  列表走 `/author-books`）。只写 user.db，不碰 seed.db。
+- `works` = 移动版 `.book_Author` 作品集（**不截断，作者全部作品**；PC 版
+  作品集截断、不作书目来源——用户 2026-11-22 裁定，
+  `docs/author-profile-on-demand` §2.1）。`offlibrary` = `works` −
+  `seed.books`（引擎实时差集，保持页面序）：作者页「其他作品」区块数据源，
+  点击走 rankSeed 预写 → 详情页收录链路。
+- 缓存：`user.db author_profiles`（schema v8，键 = casefold 显示名），ok 行
+  7 天 / dead 行 1 天 TTL；缓存命中时 `source=cache`，`works` 回放抓取时存的
+  官方全量（v8 起不再为空），`offlibrary` 仍对当前 seed 实时差集。只写
+  user.db，不碰 seed.db。
 - 抓取走全局限速器（foreground 槽），与详情页刷新共享配额。
 
 ## 官方榜单（docs/sfacg-live-ranks.md 三来源；入口 = 首页长篇页内 Tab / 对话直达 m4）
