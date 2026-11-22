@@ -401,7 +401,7 @@ fav_pctl DESC, nid)`），`per` 限每形态条数（1..50，默认 10）；
 
 - 400 `invalid_argument`：`contest` 缺失；多轨赛事 `division` 缺失/未知；
   `page` < 1。
-- tagId 台账是引擎内嵌静态表（29 条，源 docs/contest-roster-harvest.md；
+- tagId 台账是引擎内嵌静态表（102 条，源 docs/contest-roster-harvest.md；
   tagId 只能从每届页面现场取、不能推导——新增届次务必现取后入表）。
 - 两代端点（按 tag 世代选择）：新 SPA（2023+，`api/essay/getNovels`，
   size ≤ 500）/ 旧 H5（2018–22，`Common.ashx?op=getNovelsByTag`，ps ≤ 200，
@@ -411,8 +411,9 @@ fav_pctl DESC, nid)`），`per` 限每形态条数（1..50，默认 10）；
   用 1/4）。
 - **size 边界陷阱**：个别 tag（如 724）size=500 返回空、≤8 正常——首页
   空时引擎按 500→100→10 递减重试后再下结论（旧世代 ps=200 单档）。
-- 缓存：复用 `official_ranks_cache`（user.db v9），key = `roster:{tag}:{page}`；
-  TTL 按 `contest_meta` end 日期判（未结束 24h / 已结束 365d / end 未知 24h）。
+- 缓存：进程内 TTL 缓存（引擎重启即清空；与官方榜单共享并发合并），
+  key = `roster:{tag}:{page}`；TTL 按 `contest_meta` end 日期判（未结束 24h /
+  已结束 10 年——数据不变，用户 2026-11-22 裁定 / end 未知 24h）。
   缓存的是上游原始页；**本地 join 每次响应都做**（覆盖层/种子变化即时反映）。
 - **本地 join**：种子内作品 `in_library=true` + form/fav_pctl/favs/status/
   est_year/words（seed 口径；用户观测覆盖层从不进 form/分位）；库外作品
@@ -430,6 +431,7 @@ fav_pctl DESC, nid)`），`per` 限每形态条数（1..50，默认 10）；
 
 ```json
 { "contest": "十三征", "division": "长篇", "page": 1, "pages": 3,
+  "total_estimate": 1500,
   "source": "official",
   "items": [ { "nid": 713638, "title": "Re：如果成为神明",
                "author": "某NoName", "intro": "…",
@@ -440,7 +442,11 @@ fav_pctl DESC, nid)`），`per` 限每形态条数（1..50，默认 10）；
 ```
 
 降级响应同形：`source="degraded"`、`note`（如「无官方清单，仅显示库内
-作品」）、`page`/`pages` 恒 1，items 为库内子集（无 intro/category_id）。
+作品」）、`page`/`pages` 恒 1，items 为库内子集（无 intro/category_id），
+无 `total_estimate`。
+- `total_estimate` = pages × 实际页大小（官方全量规模近似；末页不满时
+  误差至多一页——用户 2026-11-22 裁定：近似即可，不多发请求取精确值）；
+  UI 清单页显示「约 N 篇参赛」。
 
 ## 草案（Phase 3/4 实现，未落地前 UI 不得依赖）
 

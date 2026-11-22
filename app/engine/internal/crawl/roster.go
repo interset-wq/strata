@@ -24,20 +24,24 @@ import (
 
 // RosterEntry is one row of an official contest roster (six fields only).
 type RosterEntry struct {
-	NID     int64  `json:"nid"`
-	Title   string `json:"title"`
-	Author  string `json:"author,omitempty"`
-	Intro   string `json:"intro,omitempty"`
-	Cover   string `json:"cover,omitempty"`
+	NID    int64  `json:"nid"`
+	Title  string `json:"title"`
+	Author string `json:"author,omitempty"`
+	Intro  string `json:"intro,omitempty"`
+	Cover  string `json:"cover,omitempty"`
 	// CategoryID is a division hint only (0 常规 / 1 对话 / 3 征文短篇赛道 /
 	// 4 沉浸式互动) — never a form truth (E.28 只正向用 1/4).
 	CategoryID int `json:"category_id,omitempty"`
 }
 
 // RosterPage is one fetched page. TotalPage is server-computed for the
-// requested size (not a fixed value) — always page relative to it.
+// requested size (not a fixed value) — always page relative to it. Size
+// records the page length actually served (the handler may downgrade it
+// on the size boundary trap), so the API layer can turn TotalPage into a
+// rough total estimate.
 type RosterPage struct {
 	TotalPage int           `json:"total_page"`
+	Size      int           `json:"size,omitempty"`
 	Entries   []RosterEntry `json:"entries"`
 }
 
@@ -197,6 +201,9 @@ func FetchRoster(ctx context.Context, client *http.Client, l *Limiter,
 	}
 	if perr != nil {
 		return nil, perr
+	}
+	if res != nil {
+		res.Size = size
 	}
 	return res, nil
 }

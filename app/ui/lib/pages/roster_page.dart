@@ -8,7 +8,7 @@ import '../widgets/back_to_top.dart';
 import '../widgets/default_cover.dart';
 
 /// 官方清单浏览页（docs/contest-display-in-app.md 形态二）：按需拉官方
-/// 参赛清单（引擎按 (tag, page) 缓存 24h/365d + 本地 join），无限滚动；
+/// 参赛清单（引擎按 (tag, page) 缓存 24h/10 年 + 本地 join），无限滚动；
 /// 保持官方返回顺序，无排序控件（v1 定案）。
 ///
 /// 库外作品点击复用搜索页链路（/book/{nid} → 详情覆盖层 + 自动收录）。
@@ -35,6 +35,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
   List<RosterItem> _items = const [];
   int _page = 0;
   int _pages = 1;
+  int? _totalEstimate; // 当前 division 的官方全量规模估算（约 N 篇）
   String _source = '';
   String? _note;
   bool _loading = true;
@@ -100,6 +101,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
         }
         _page = r.page;
         _pages = r.pages;
+        _totalEstimate = r.totalEstimate;
         _source = r.source;
         _note = r.note;
         _loading = false;
@@ -121,6 +123,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
       _division = d;
       _filter = 0;
       _items = const [];
+      _totalEstimate = null;
       _loading = true;
       _error = null;
     });
@@ -184,6 +187,15 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                             ),
                           ),
                       ],
+                    ),
+                  ),
+                if (_totalEstimate != null && _source == 'official')
+                  Padding(
+                    padding: const EdgeInsets.only(left: 16, top: 2),
+                    child: Text(
+                      '约 $_totalEstimate 篇参赛',
+                      style: TextStyle(
+                          fontSize: 11, color: scheme.onSurfaceVariant),
                     ),
                   ),
                 Padding(

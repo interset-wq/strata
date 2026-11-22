@@ -400,7 +400,7 @@ class StrataApi {
   }
 
   /// 一届赛事的官方清单一页（形态二，按需）：引擎按 (tag, page) 缓存
-  /// （活跃 24h / 已结束 365d）并 join 本地 seed；接口失效回落库内子集
+  /// （活跃 24h / 已结束 10 年——数据不变）并 join 本地 seed；接口失效回落库内子集
   /// （source=degraded，见 note）。多轨赛事传 division（档案页
   /// rosterTracks），单轨留空。
   Future<RosterPage> roster({
@@ -998,12 +998,16 @@ class RosterPage {
   final String source;
   final String? note;
   final List<RosterItem> items;
+  /// 官方全量参赛规模估算（总页数×实际页大小，误差 ≤ 一页；降级响应无此
+  /// 键）——UI 显示「约 N 篇」（用户 2026-11-22 裁定：近似即可，不多发请求）。
+  final int? totalEstimate;
 
   RosterPage.fromJson(Map<String, dynamic> m)
       : contest = m['contest'] as String,
         division = m['division'] as String? ?? '',
         page = (m['page'] as num?)?.toInt() ?? 1,
         pages = (m['pages'] as num?)?.toInt() ?? 1,
+        totalEstimate = (m['total_estimate'] as num?)?.toInt(),
         source = m['source'] as String? ?? 'official',
         note = m['note'] as String?,
         items = (m['items'] as List)

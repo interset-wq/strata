@@ -907,26 +907,31 @@ func (s *Server) contestArchiveBooks(c *gin.Context) {
 // (docs/contest-display-in-app.md 降级表).
 var errRosterDead = errors.New("api: roster interface dead")
 
-// rosterTTL mirrors the official-ranks rule: an ended event's roster never
-// changes → 365d; an active event (end in the future) → 24h; an unknown
-// end stays short (24h) so a still-collecting roster cannot serve stale
-// data.
+// rosterTTL mirrors the official-ranks rule: an ended event's roster is
+// immutable → 10y (user ruling 2026-11-22: ended events are long-cache —
+// the cache is in-memory and lives for the session, the long TTL documents
+// that re-fetching is never worth it); an active event (end in the future)
+// → 24h; an unknown end stays short (24h) so a still-collecting roster
+// cannot serve stale data.
 func rosterTTL(event string) time.Duration {
 	if m, ok := store.ContestMetaFor(event); ok && m.End != "" {
 		if end, err := time.Parse("2006-01-02", m.End); err == nil {
 			if time.Now().Before(end) {
 				return officialRanksTTL
 			}
-			return officialRanksHistoricalTTL
+			return rosterEndedTTL
 		}
 	}
 	return officialRanksTTL
 }
 
+// rosterEndedTTL — an ended contest's official roster never changes.
+const rosterEndedTTL = 10 * 365 * 24 * time.Hour
+
 // roster serves one page of one event's official contest roster
 // (docs/contest-display-in-app.md 形态二; on-demand — no background batch).
 // The upstream page is cached per (tag, page) through the official-ranks
-// cache (24h active / 365d ended, in-flight coalescing, no retry storm);
+// cache (24h active / 10y ended, in-flight coalescing, no retry storm);
 // the local join runs on every serve, so the badges stay live. A dead or
 // failed upstream degrades to the in-library subset (200, source=degraded)
 // — never blank, never a 502 wall.
@@ -990,14 +995,21 @@ func (s *Server) roster(c *gin.Context) {
 		s.rosterDegrade(c, event, division, "官方清单暂不可用，仅显示库内作品")
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{
+	resp := gin.H{
 		"contest":  event,
 		"division": division,
 		"page":     page,
 		"pages":    rp.TotalPage,
 		"source":   "official",
 		"items":    s.rosterJoin(ctx, &rp),
-	})
+	}
+	if est := rp.TotalPage * rp.Size; est > 0 {
+		// total_estimate = pages × served page length: an upper bound that
+		// overshoots by at most one partial page (approximation accepted —
+		// no extra request for an exact count).
+		resp["total_estimate"] = est
+	}
+	c.JSON(http.StatusOK, resp)
 }
 
 // rosterJoin attaches local enrichment to the official page: in-library

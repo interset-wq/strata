@@ -207,6 +207,7 @@ func TestRosterOfficial(t *testing.T) {
 		}
 		return &crawl.RosterPage{
 			TotalPage: 1,
+			Size:      200, // what FetchRoster stamps (the served page length)
 			Entries: []crawl.RosterEntry{
 				{NID: 3001, Title: "Zheng Long X", Author: "Author X",
 					Cover: "https://rs.sfacg.com/x.jpg"},
@@ -217,7 +218,8 @@ func TestRosterOfficial(t *testing.T) {
 	}
 	u := ts.URL + "/strata/roster?contest=" + url.QueryEscape("七征") + "&division=长篇"
 	body := getJSON(t, u, http.StatusOK)
-	if body["source"] != "official" || body["page"].(float64) != 1 || body["pages"].(float64) != 1 {
+	if body["source"] != "official" || body["page"].(float64) != 1 ||
+		body["pages"].(float64) != 1 || body["total_estimate"].(float64) != 200 {
 		t.Fatalf("body = %v", body)
 	}
 	items := body["items"].([]any)
