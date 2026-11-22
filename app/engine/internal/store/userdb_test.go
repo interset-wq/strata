@@ -17,14 +17,14 @@ func TestWatchlistAddToggleRemove(t *testing.T) {
 	ctx := context.Background()
 	// v6: one list — active=false is the former bookshelf entry
 	// (save-only), active=true is tracked.
-	if err := st.WatchAdd(ctx, 1001, 100, false); err != nil {
+	if err := st.WatchAdd(ctx, 1001, 100, false, "self"); err != nil {
 		t.Fatal(err)
 	}
-	if err := st.WatchAdd(ctx, 1002, 200, true); err != nil {
+	if err := st.WatchAdd(ctx, 1002, 200, true, "self"); err != nil {
 		t.Fatal(err)
 	}
 	// re-adding an existing book must be a no-op, not a duplicate row
-	if err := st.WatchAdd(ctx, 1001, 999, true); err != nil {
+	if err := st.WatchAdd(ctx, 1001, 999, true, "self"); err != nil {
 		t.Fatal(err)
 	}
 	items, err := st.WatchList(ctx)
@@ -184,11 +184,11 @@ func TestWatchlistCycle(t *testing.T) {
 	st := openTestStore(t)
 	ctx := context.Background()
 	now := time.Now().Unix()
-	if err := st.WatchAdd(ctx, 1004, now, true); err != nil {
+	if err := st.WatchAdd(ctx, 1004, now, true, "self"); err != nil {
 		t.Fatal(err)
 	}
 	// re-adding must stay one row
-	if err := st.WatchAdd(ctx, 1004, now+1, true); err != nil {
+	if err := st.WatchAdd(ctx, 1004, now+1, true, "self"); err != nil {
 		t.Fatal(err)
 	}
 	items, err := st.WatchList(ctx)

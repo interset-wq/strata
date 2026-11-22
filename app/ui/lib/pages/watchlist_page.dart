@@ -198,13 +198,37 @@ class _WatchCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(item.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge
-                            ?.copyWith(fontSize: 14)),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(item.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleLarge
+                                  ?.copyWith(fontSize: 14)),
+                        ),
+                        // 对照书徽标（role=peer，docs/07 §1；对照折线在
+                        // 各书数据页「同期对照」区块）
+                        if (item.role == 'peer') ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 1),
+                            decoration: BoxDecoration(
+                                color: scheme.secondary
+                                    .withValues(alpha: .15),
+                                borderRadius: BorderRadius.circular(999)),
+                            child: Text('对照',
+                                style: TextStyle(
+                                    fontSize: 9.5,
+                                    color: scheme.secondary,
+                                    fontWeight: FontWeight.w600)),
+                          ),
+                        ],
+                      ],
+                    ),
                     const SizedBox(height: 3),
                     Text(
                       item.genre != null

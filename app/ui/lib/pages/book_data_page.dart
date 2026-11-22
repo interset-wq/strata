@@ -108,8 +108,15 @@ class _BookDataPageState extends ConsumerState<BookDataPage> {
               // 3. 六指标趋势折线
               MetricTrend(items: items),
               const SizedBox(height: 14),
-              // 4. 同期对照（空态）
-              const PeerCompareEmpty(),
+              // 4. 同期对照（role=peer 对照折线，docs/07 §5）
+              PeerCompare(
+                nid: widget.nid,
+                anchorTitle:
+                    (book?.book['title'] as String?) ?? 'nid ${widget.nid}',
+                anchorEstYear:
+                    (book?.book['est_year'] as num?)?.toInt() ?? 0,
+                items: items,
+              ),
               const SizedBox(height: 14),
               // 5. 观测时序
               Row(

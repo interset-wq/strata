@@ -582,8 +582,8 @@ GET。两项均持久化在 user.db prefs：详情刷新限流默认开；App AP
 | 端点                   | 方法                       | 语义                                                                             |
 | ---------------------- | -------------------------- | -------------------------------------------------------------------------------- |
 | `/strata/watchlist`      | GET（**已实现**）    | 统一列表（激活 + 未激活），`items` 含 `active`（= poll_enabled）                |
-| `/strata/watchlist/:nid` | POST（**已实现**）   | 加入，body `{active?, role?}`；active=false = 原「加入书架」                     |
-| `/strata/watchlist/:nid` | PUT（**已实现**）    | 切换追踪，body `{active: bool}`                                                  |
+| `/strata/watchlist/:nid` | POST（**已实现**）   | 加入，body `{active?, role?}`；active=false = 原「加入书架」，role=peer = 同期对照（缺省 self）；满 100 本上限 → 409 `watchlist_full` |
+| `/strata/watchlist/:nid` | PUT（**已实现**）    | 切换追踪 / 切换 role，body `{active?, role?}`（至少一个，docs/07 §1：role 可改、一列 UPDATE、历史曲线连续） |
 | `/strata/watchlist/:nid` | DELETE（**已实现**） | 移除（观测历史保留）                                                             |
 
 只写 `user.db`；与种子的关联**只用 `nid`**（rowid 每次种子发布都会重排）。

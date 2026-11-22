@@ -1129,9 +1129,11 @@ func (s *Server) watchList(c *gin.Context) {
 }
 
 // watchAdd puts a book on the watchlist (v6: the single user-interest
-// list). Body {active?: bool}: active=false (default) = save-only
-// entry (former bookshelf); active=true = tracked. Idempotent — an
-// existing entry keeps its state.
+// list). Body {active?: bool, role?: 'self'|'peer'}: active=false
+// (default) = save-only entry (former bookshelf); active=true = tracked;
+// role defaults to 'self', 'peer' marks a 同期对照 entry (docs/07 §1).
+// Idempotent — an existing entry keeps its state. At the 100-book cap a
+// new entry is rejected with 409 watchlist_full.
 func (s *Server) watchAdd(c *gin.Context) {
 	nid, err := strconv.ParseInt(c.Param("nid"), 10, 64)
 	if err != nil || nid <= 0 {
@@ -1139,11 +1141,26 @@ func (s *Server) watchAdd(c *gin.Context) {
 		return
 	}
 	var body struct {
-		Active *bool `json:"active"`
+		Active *bool  `json:"active"`
+		Role   string `json:"role"`
 	}
 	_ = c.ShouldBindJSON(&body)
 	active := body.Active != nil && *body.Active
-	if err := s.store.WatchAdd(c.Request.Context(), nid, time.Now().Unix(), active); err != nil {
+	role := body.Role
+	if role == "" {
+		role = "self"
+	}
+	if role != "self" && role != "peer" {
+		fail(c, http.StatusBadRequest, "invalid_argument", "role must be 'self' or 'peer'")
+		return
+	}
+	err = s.store.WatchAdd(c.Request.Context(), nid, time.Now().Unix(), active, role)
+	if errors.Is(err, store.ErrWatchlistFull) {
+		fail(c, http.StatusConflict, "watchlist_full",
+			"watchlist is full (cap 100); remove an entry first")
+		return
+	}
+	if err != nil {
 		fail(c, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
@@ -1151,7 +1168,8 @@ func (s *Server) watchAdd(c *gin.Context) {
 }
 
 // watchSetActive toggles tracking on a watchlist entry (v6):
-// body {active: bool}.
+// body {active?: bool, role?: 'self'|'peer'} — at least one required;
+// role switches self↔peer (docs/07 §1, 一列 UPDATE，历史曲线连续).
 func (s *Server) watchSetActive(c *gin.Context) {
 	nid, err := strconv.ParseInt(c.Param("nid"), 10, 64)
 	if err != nil || nid <= 0 {
@@ -1159,17 +1177,35 @@ func (s *Server) watchSetActive(c *gin.Context) {
 		return
 	}
 	var body struct {
-		Active bool `json:"active"`
+		Active *bool  `json:"active"`
+		Role   string `json:"role"`
 	}
-	if err := c.ShouldBindJSON(&body); err != nil {
-		fail(c, http.StatusBadRequest, "invalid_argument", "body must be {active: bool}")
+	if err := c.ShouldBindJSON(&body); err != nil ||
+		(body.Active == nil && body.Role == "") {
+		fail(c, http.StatusBadRequest, "invalid_argument",
+			"body must include active and/or role")
 		return
 	}
-	if err := s.store.WatchSetActive(c.Request.Context(), nid, body.Active); err != nil {
-		fail(c, http.StatusInternalServerError, "internal", err.Error())
+	if body.Role != "" && body.Role != "self" && body.Role != "peer" {
+		fail(c, http.StatusBadRequest, "invalid_argument", "role must be 'self' or 'peer'")
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"meta": gin.H{"nid": nid, "active": body.Active}})
+	ctx := c.Request.Context()
+	if body.Active != nil {
+		if err := s.store.WatchSetActive(ctx, nid, *body.Active); err != nil {
+			fail(c, http.StatusInternalServerError, "internal", err.Error())
+			return
+		}
+	}
+	if body.Role != "" {
+		if err := s.store.WatchSetRole(ctx, nid, body.Role); err != nil {
+			fail(c, http.StatusInternalServerError, "internal", err.Error())
+			return
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{"meta": gin.H{
+		"nid": nid, "active": body.Active, "role": body.Role,
+	}})
 }
 
 // watchRemove drops a book from the watchlist.

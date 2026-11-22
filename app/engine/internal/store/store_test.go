@@ -486,7 +486,7 @@ INSERT INTO discovered(nid, title, author, cover_url, source, observed_at)
 VALUES (5555, 'Newly Found', 'Author Z', NULL, 'search', 1700000000)`); err != nil {
 		t.Fatal(err)
 	}
-	if err := st.WatchAdd(ctx, 5555, 1700000001, true); err != nil {
+	if err := st.WatchAdd(ctx, 5555, 1700000001, true, "self"); err != nil {
 		t.Fatal(err)
 	}
 	items, err := st.WatchList(ctx)

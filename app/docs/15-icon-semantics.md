@@ -83,6 +83,7 @@
 | 切换排序方向 | `Icons.swap_vert` | 大图精选 gallery AppBar：收藏降序/升序切换（tooltip 显示目标方向） |
 | 打开年月选择器 | `Icons.expand_more` | 日历标题行：标题尾小箭头，点标题打开二维年月选择器（BottomSheet） |
 | 站内全搜 | `Icons.travel_explore` | 搜索页「搜全站」按钮（官方搜索手动触发，L1 结果段尾部；docs/08 §search-remote） |
+| 加入对照作品 | `Icons.person_add_alt_1` | 数据页「同期对照」区块：本地搜索选书加入 watchlist（role=peer，docs/07 §1） |
 
 ## 使用规范
 

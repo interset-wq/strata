@@ -874,18 +874,56 @@ func parseRecommendCursor(cursor string) (*float64, float64, int64, error) {
 	return lqs, fav, nid, nil
 }
 
+// WatchlistCap is the hard watchlist size limit (docs/07 §1: 上限 100 本、
+// 超限提示移除不自动删). self ≤20 / peer ≤80 是建议值，不强制。
+const WatchlistCap = 100
+
+// ErrWatchlistFull: 满员时拒绝新条目（重复加入不受限——幂等 no-op）。
+var ErrWatchlistFull = errors.New("watchlist is full (cap 100); remove an entry first")
+
+func validWatchRole(role string) bool { return role == "self" || role == "peer" }
+
 // WatchAdd puts a book on the watchlist (v6: the single user-interest
 // list). active=true tracks (background polling, former watchlist);
-// active=false saves only (former bookshelf). Idempotent — an existing
-// entry keeps its state (INSERT OR IGNORE).
-func (s *Store) WatchAdd(ctx context.Context, nid int64, addedAt int64, active bool) error {
+// active=false saves only (former bookshelf); role = self（本人作品）|
+// peer（同期对照，docs/07 §1）。Idempotent — an existing entry keeps its
+// state (INSERT OR IGNORE); the cap only blocks genuinely new entries.
+func (s *Store) WatchAdd(ctx context.Context, nid int64, addedAt int64,
+	active bool, role string) error {
+	if !validWatchRole(role) {
+		return fmt.Errorf("invalid watchlist role %q (want 'self' or 'peer')", role)
+	}
+	var count, exists int
+	if err := s.DB.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM watchlist`).Scan(&count); err != nil {
+		return err
+	}
+	if err := s.DB.QueryRowContext(ctx,
+		`SELECT COUNT(*) FROM watchlist WHERE nid = ?`, nid).Scan(&exists); err != nil {
+		return err
+	}
+	if exists == 0 && count >= WatchlistCap {
+		return ErrWatchlistFull
+	}
 	enabled := 0
 	if active {
 		enabled = 1
 	}
 	_, err := s.DB.ExecContext(ctx, `
-INSERT OR IGNORE INTO watchlist(nid, role, added_at, poll_enabled) VALUES (?, 'self', ?, ?)`,
-		nid, addedAt, enabled)
+INSERT OR IGNORE INTO watchlist(nid, role, added_at, poll_enabled) VALUES (?, ?, ?, ?)`,
+		nid, role, addedAt, enabled)
+	return err
+}
+
+// WatchSetRole switches an entry's role (docs/07 §1: role 可改，UPDATE 一
+// 列，历史曲线连续). A missing nid is a no-op (same leniency as
+// WatchSetActive).
+func (s *Store) WatchSetRole(ctx context.Context, nid int64, role string) error {
+	if !validWatchRole(role) {
+		return fmt.Errorf("invalid watchlist role %q (want 'self' or 'peer')", role)
+	}
+	_, err := s.DB.ExecContext(ctx,
+		`UPDATE watchlist SET role = ? WHERE nid = ?`, role, nid)
 	return err
 }
 

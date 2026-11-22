@@ -322,14 +322,22 @@ class StrataApi {
   }
 
   /// 加入 watchlist（v6 统一列表）：[active]=false 只存（原「加入书架」），
-  /// true = 追踪（后台抓取 + 观测时序）。
-  Future<void> watchAdd(int nid, {bool active = false}) async {
-    await _postBody('/watchlist/$nid', {'active': active});
+  /// true = 追踪（后台抓取 + 观测时序）；[role]=self 本人作品 | peer 同期
+  /// 对照（docs/07 §1）；满 100 本上限时 409 watchlist_full。
+  Future<void> watchAdd(int nid,
+      {bool active = false, String role = 'self'}) async {
+    await _postBody('/watchlist/$nid', {'active': active, 'role': role});
   }
 
   /// 切换追踪状态（v6）：PUT /watchlist/:nid {active}。
   Future<void> watchSetActive(int nid, bool active) async {
     await _putBody('/watchlist/$nid', {'active': active});
+  }
+
+  /// 切换 role（docs/07 §1）：self 本人作品 / peer 同期对照（PUT 一列，
+  /// 历史曲线连续）。
+  Future<void> watchSetRole(int nid, String role) async {
+    await _putBody('/watchlist/$nid', {'role': role});
   }
 
   Future<void> watchRemove(int nid) async {
