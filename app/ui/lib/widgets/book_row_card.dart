@@ -95,8 +95,12 @@ class BookRowCard extends StatelessWidget {
                         bookBadge(context, '收藏 ${wanText(item.favs)}',
                             fg: scheme.onSurfaceVariant,
                             icon: MetricIcons.favs),
-                        bookBadge(context, '点击 ${wanText(item.clicks ?? 0)}',
-                            fg: scheme.secondary, icon: MetricIcons.clicks),
+                        // 空值不显示（与 BookRowTile 同口径）：库外/未收录
+                        // 书没有种子点击量，显示 0 会误导（用户 2026-11-22
+                        // 反馈「全是 0」即由此来）。
+                        if (item.clicks != null)
+                          bookBadge(context, '点击 ${wanText(item.clicks!)}',
+                              fg: scheme.secondary, icon: MetricIcons.clicks),
                       ],
                     ),
                   ],

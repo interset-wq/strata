@@ -903,6 +903,12 @@ class ContestGroup {
   final String? start; // 官方启动日（无则 null，UI 只显年份）
   final String? end;
   final String? note; // 公布等后续节点
+  /// 官方活动页 URL（引擎内嵌已验证静态表，源 docs/contest-roster-harvest
+  /// §2）；null = 未验证（页面下线/未取到），档案页隐藏跳转入口、不编造。
+  final String? official;
+  /// other 系列事件的首页 tab 归属（用户裁定 2026-11-22）：'dialogue' /
+  /// 'ip'；'' = 主题类（列表页「其他」tab）。四季系列永无 lane。
+  final String lane;
   /// 可拉取官方清单（引擎有已验证 tagId 静态台账）；
   /// rosterTracks = 已验证赛道（空 = 单轨，roster 请求 division 传空）。
   final bool roster;
@@ -920,6 +926,8 @@ class ContestGroup {
     this.start,
     this.end,
     this.note,
+    this.official,
+    this.lane = '',
     this.roster = false,
     this.rosterTracks = const [],
   });
@@ -937,6 +945,8 @@ class ContestGroup {
         start = m['start'] as String?,
         end = m['end'] as String?,
         note = m['note'] as String?,
+        official = m['official'] as String?,
+        lane = m['lane'] as String? ?? '',
         roster = m['roster'] as bool? ?? false,
         rosterTracks = (m['roster_tracks'] as List? ?? const [])
             .map((e) => e as String)
@@ -1447,39 +1457,15 @@ class Award {
   String get displayAward => award == '待逐档标定' ? '征文获奖' : award;
 }
 
-/// 一届赛事的一条库内获奖作品（档案页获奖区块；行序由引擎 fav_pctl
-/// 同代分位决定，奖项字段不参与排序）。
-class AwardBook {
-  final Award award;
-  final String title;
-  final String author;
-  final int? favs;
-  final double? favPctl;
-  final String? coverUrl;
-  final int estYear;
-
-  AwardBook.fromJson(Map<String, dynamic> m)
-      : award = Award.fromJson(m),
-        title = m['title'] as String,
-        author = m['author'] as String,
-        favs = m['favs'] as int?,
-        favPctl = (m['fav_pctl'] as num?)?.toDouble(),
-        coverUrl = m['cover_url'] as String?,
-        estYear = m['est_year'] as int;
-}
-
-/// /contests/books 响应：代表作（items）+ 获奖作品（awards；映射表外的
-/// 赛事为空列表，页面隐藏获奖区块）。
+/// /contests/books 响应：代表作（items）。获奖清单已从档案页移除（用户
+/// 裁定 2026-11-22：参赛者的 top10 大概就是获奖者；获奖徽标保留在书籍
+/// 详情页）；引擎仍返回 awards 键，端上不再解析。
 class ContestBooks {
   final List<RankItem> items;
-  final List<AwardBook> awards;
 
   ContestBooks.fromJson(Map<String, dynamic> m)
       : items = (m['items'] as List)
             .map((e) => RankItem.fromJson(e as Map<String, dynamic>))
-            .toList(),
-        awards = (m['awards'] as List)
-            .map((e) => AwardBook.fromJson(e as Map<String, dynamic>))
             .toList();
 }
 

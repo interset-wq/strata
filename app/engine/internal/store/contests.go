@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"sort"
 	"strings"
+	"unicode/utf8"
 )
 
 // ContestGroup is one event-level contest aggregated from seed.books — the
@@ -24,6 +25,16 @@ type ContestGroup struct {
 	Start   *string        `json:"start,omitempty"`
 	End     *string        `json:"end,omitempty"`
 	Note    *string        `json:"note,omitempty"`
+	// Official = the official activity-page URL (contest_meta.go, mobile
+	// form); omitted when unverified — the archive page shows its jump
+	// entry only when present and never fabricates URLs.
+	Official *string `json:"official,omitempty"`
+	// Lane classifies other-series events for the home-tab lanes (user
+	// decision 2026-11-22: dialogue archives live in the home dialogue
+	// area, IP archives in the IP area): "dialogue" / "ip"; omitted
+	// (= theme) stays in the archive list's 其他 tab. Never set on the
+	// four season series.
+	Lane string `json:"lane,omitempty"`
 	// Roster = the event has at least one verified tagId (roster_tags.go);
 	// the archive page shows the 「查看官方清单」 entry from this flag.
 	// RosterTracks = the verified divisions for the roster page chips; empty
@@ -72,8 +83,66 @@ func contestSeries(name string) string {
 	}
 }
 
+// seriesOrder = the archive list's tab order (user decision 2026-11-22:
+// 春 / x征 / 秋 / 冬 / 其他), which doubles as the JSON group ordering.
 var seriesOrder = map[string]int{
-	"x": 0, "winter": 1, "spring": 2, "autumn": 3, "other": 4,
+	"spring": 0, "x": 1, "autumn": 2, "winter": 3, "other": 4,
+}
+
+var cnOrdinal = map[rune]int{
+	'一': 1, '二': 2, '三': 3, '四': 4, '五': 5,
+	'六': 6, '七': 7, '八': 8, '九': 9, '十': 10,
+}
+
+// contestOrdinal extracts the 第X届 edition number (0 when the name
+// carries none, e.g. first-edition 冬季征文) so same-year editions sort
+// in launch order — plain unicode order puts 第三届 before 第二届.
+func contestOrdinal(name string) int {
+	j := strings.Index(name, "届")
+	if j <= 1 {
+		return 0
+	}
+	r, _ := utf8.DecodeLastRuneInString(name[:j])
+	if n, ok := cnOrdinal[r]; ok {
+		return n
+	}
+	return 0
+}
+
+// contestLane classifies an other-series event for the home-tab lanes
+// (user decision 2026-11-22: 对话的归档放对话区、IP 的归档放 IP 区):
+// 对话/点鸭 names are the dialogue line (点鸭 is the dialogue product
+// line's contest brand); 同人 and known IP titles are the IP line.
+// "" = theme, stays in the archive list's 其他 tab.
+//
+// Edition-level overrides come first: facts about one specific contest
+// that no name rule can capture — 星穹小说家征文 is a dialogue contest
+// (user-verified 2026-11-22; the IP-titled name would otherwise send it
+// to the IP lane).
+func contestLane(name string) string {
+	switch {
+	case strings.Contains(name, "星穹小说家"):
+		return "dialogue"
+	case strings.Contains(name, "对话"), strings.Contains(name, "点鸭"):
+		return "dialogue"
+	}
+	for _, ip := range []string{"同人", "崩坏3", "少女前线", "龙之谷", "星穹"} {
+		if strings.Contains(name, ip) {
+			return "ip"
+		}
+	}
+	return ""
+}
+
+// startYear is the contest's launch year for the stable ascending sort
+// (user decision 2026-11-22): the official meta year when known (a
+// 2022 spring contest holds 2019-dated books — the launch year is the
+// ordering fact), else the in-library est_year floor.
+func (g ContestGroup) startYear() int {
+	if g.Year != nil {
+		return *g.Year
+	}
+	return g.YearMin
 }
 
 // ContestGroups aggregates seed.books by event-level contest name (the
@@ -143,6 +212,9 @@ GROUP BY contest, form`)
 			return tracks[i] < tracks[j]
 		})
 		a.g.Tracks = tracks
+		if a.g.Series == "other" {
+			a.g.Lane = contestLane(name)
+		}
 		if m, ok := ContestMetaFor(name); ok {
 			if m.Year != 0 {
 				y := m.Year
@@ -160,6 +232,10 @@ GROUP BY contest, form`)
 				v := m.Note
 				a.g.Note = &v
 			}
+			if m.Official != "" {
+				v := m.Official
+				a.g.Official = &v
+			}
 		}
 		if tags := RosterTagsFor(name); tags != nil {
 			a.g.Roster = true
@@ -171,13 +247,21 @@ GROUP BY contest, form`)
 		}
 		out = append(out, a.g)
 	}
+	// Stable ordering (user decision 2026-11-22): tab section, then launch
+	// year ascending, then 第X届 ordinal (same-year winter editions), then
+	// name.
 	sort.Slice(out, func(i, j int) bool {
 		si, sj := seriesOrder[out[i].Series], seriesOrder[out[j].Series]
 		if si != sj {
 			return si < sj
 		}
-		if out[i].YearMin != out[j].YearMin {
-			return out[i].YearMin < out[j].YearMin
+		yi, yj := out[i].startYear(), out[j].startYear()
+		if yi != yj {
+			return yi < yj
+		}
+		oi, oj := contestOrdinal(out[i].Name), contestOrdinal(out[j].Name)
+		if oi != oj {
+			return oi < oj
 		}
 		return out[i].Name < out[j].Name
 	})
@@ -191,12 +275,12 @@ GROUP BY contest, form`)
 func (s *Store) ContestBooks(ctx context.Context, name string, perForm int) ([]RankItem, error) {
 	clause, args := contestEventMatch("b.contest", name)
 	query := `
-SELECT b.nid, b.title, b.author, b.genre, b.est_year, b.favs, b.fav_pctl,
-       b.contest, b.form,
+SELECT b.nid, b.title, b.author, b.genre, b.est_year, b.clicks, b.favs,
+       b.fav_pctl, b.contest, b.form,
        COALESCE(c.cover, NULLIF(b.cover_url, '')) AS cover_url
 FROM (
-  SELECT b.nid, b.title, b.author, b.genre, b.est_year, b.favs, b.fav_pctl,
-         b.contest, b.form, b.cover_url,
+  SELECT b.nid, b.title, b.author, b.genre, b.est_year, b.clicks, b.favs,
+         b.fav_pctl, b.contest, b.form, b.cover_url,
          ROW_NUMBER() OVER (PARTITION BY b.form
            ORDER BY (b.fav_pctl IS NULL) ASC, b.fav_pctl DESC, b.nid) AS rn
   FROM seed.books b
@@ -218,16 +302,19 @@ ORDER BY (b.fav_pctl IS NULL) ASC, b.fav_pctl DESC, b.nid`
 		var (
 			item    RankItem
 			gen     sql.NullString
+			clicks  sql.NullInt64
 			favs    sql.NullInt64
 			pctl    sql.NullFloat64
 			contest sql.NullString
 		)
 		if err := rows.Scan(&item.NID, &item.Title, &item.Author, &gen,
-			&item.EstYear, &favs, &pctl, &contest, &item.Form, &item.CoverURL); err != nil {
+			&item.EstYear, &clicks, &favs, &pctl, &contest, &item.Form,
+			&item.CoverURL); err != nil {
 			return nil, err
 		}
 		item.Rank = len(items) + 1
 		item.Genre = strPtr(gen)
+		item.Clicks = intPtr(clicks)
 		item.Favs = intPtr(favs)
 		item.FavPctl = pctl.Float64
 		item.Contest = contestPtr(contest)

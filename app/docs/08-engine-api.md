@@ -363,8 +363,10 @@ form 过滤即池本身）。
 }
 ```
 
-- `series`：`x`（N征）/ `winter` / `spring` / `autumn` / `other`。分节排序，
-  节内按 cohort 最早 `est_year`、再按名。
+- `series`：`x`（N征）/ `winter` / `spring` / `autumn` / `other`。组序 =
+  档案 tab 序（`spring` / `x` / `autumn` / `winter` / `other`，用户
+  2026-11-22 裁定），节内按开赛年份增序（官方 `year` 优先、缺失落
+  `year_min`）、再按「第X届」届序、再按名（稳定排序）。
 - `count`/`forms`：仅内置库（种子收录）作品，**非官方全量参赛规模**
   （属 P1 清单 API）。`forms` 按 DOM 核实的 `form` 统计，与 `tracks`
   （平台原始赛项标注）不必互洽。
@@ -375,6 +377,15 @@ form 过滤即池本身）。
   时引擎回落库内子集并提示「仅库内作品」（见 `/strata/roster` 降级）。
 - `year`/`start`/`end`/`note`：官方元数据（静态表），无则 null；
   `year_min`/`year_max` 是库内书 `est_year` 区间（在库口径）。
+- `official`：官方活动页 URL（h5/移动版形态），引擎内嵌静态表（源
+  `docs/contest-roster-harvest.md` §2 逐届页面实证，2026-11-22）；未验证
+  （页面下线/未取到）时键省略、不编造，档案页隐藏「查看官方活动页」入口。
+- `lane`：other 系列事件的首页 tab 归属（用户 2026-11-22 裁定：对话的
+  归档放首页对话区、IP 的归档放 IP 区）：`dialogue` / `ip`；键省略 =
+  主题类（档案列表「其他」tab）。引擎侧确定性分类：先届次覆盖（星穹
+  小说家征文 = 对话赛事，用户 2026-11-22 核实——IP 标题但归对话区），
+  再名称规则（含 对话/点鸭 → dialogue；含 同人/崩坏3/少女前线/龙之谷/
+  星穹 → ip）。四季系列永无 lane。
 
 ### GET /strata/contests/books?contest=&per=
 

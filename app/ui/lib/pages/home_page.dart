@@ -11,6 +11,7 @@ import '../widgets/back_to_top.dart';
 import '../widgets/cover_banner.dart';
 import '../widgets/default_cover.dart';
 import '../widgets/book_row_tile.dart';
+import '../widgets/contest_row_card.dart';
 
 /// Classic 排行行卡数据（board 端点），kind: finish / popular。
 final boardProvider = FutureProvider.autoDispose.family<List<RankItem>, String>(
@@ -219,6 +220,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               _featuredCarousel(context, banners),
               const SizedBox(height: 8),
               const IpEntryRow(),
+              _contestArchiveSection(context, 'ip'),
               _sectionTitle(context, '随便看看'),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -306,6 +308,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                 subtitle: '2017-07 起 · 按月可查',
                 route: '/official-ranks/m4',
               ),
+              _contestArchiveSection(context, 'dialogue'),
             ],
           ),
           if (_showTop)
@@ -718,6 +721,22 @@ class _HomePageState extends ConsumerState<HomePage> {
           ],
         ),
       ),
+    );
+  }
+
+  // 对话区 / IP 区赛事归档（用户裁定 2026-11-22：对话的归档放对话区、
+  // IP 的归档放 IP 区；列表页「其他」tab 只留主题类）：按引擎侧 lane
+  // 分类过滤，零请求，空则整区隐藏。
+  Widget _contestArchiveSection(BuildContext context, String lane) {
+    final groups = ref.watch(contestArchiveProvider);
+    final items =
+        groups.value?.where((g) => g.lane == lane).toList() ?? [];
+    if (items.isEmpty) return const SizedBox.shrink();
+    return Column(
+      children: [
+        _sectionTitle(context, '赛事归档'),
+        for (final g in items) ContestRowCard(group: g),
+      ],
     );
   }
 

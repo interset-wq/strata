@@ -42,6 +42,70 @@ func TestContestArchive(t *testing.T) {
 	}
 }
 
+// TestContestOfficialURL: archive groups carry the verified official
+// activity-page URL (contest_meta.go; source docs/contest-roster-harvest.md
+// §2); unverified events omit the key — the UI only shows its jump entry
+// when the URL is present and never fabricates one.
+func TestContestOfficialURL(t *testing.T) {
+	srv, _ := newTestServer(t)
+	body := getJSON(t, srv.URL+"/strata/contests", http.StatusOK)
+	groups := body["groups"].([]any)
+	var zheng, ip map[string]any
+	for _, raw := range groups {
+		g := raw.(map[string]any)
+		switch g["name"] {
+		case "七征":
+			zheng = g
+		case "崩坏3征文":
+			ip = g
+		}
+	}
+	if zheng == nil || zheng["official"] != "https://pages.sfacg.com/h5/act/zw2019/" {
+		t.Fatalf("七征 = %v", zheng)
+	}
+	if ip == nil {
+		t.Fatal("missing 崩坏3征文 group")
+	}
+	if _, has := ip["official"]; has {
+		t.Fatalf("崩坏3征文 carries an unverified official URL: %v", ip)
+	}
+}
+
+// TestContestLaunchYearSort: /strata/contests groups follow the archive
+// tab order (spring, x, autumn, winter, other — user decision 2026-11-22),
+// each section by launch year ascending (official meta year, else the
+// in-library floor) with deterministic tie-breaks; other-series events
+// expose their home-tab lane (dialogue/ip; omitted = theme).
+func TestContestLaunchYearSort(t *testing.T) {
+	srv, _ := newTestServer(t)
+	body := getJSON(t, srv.URL+"/strata/contests", http.StatusOK)
+	groups := body["groups"].([]any)
+	wantSeries := []string{"spring", "x", "x", "other", "other", "other"}
+	if len(groups) != len(wantSeries) {
+		t.Fatalf("groups = %v", groups)
+	}
+	for i, raw := range groups {
+		g := raw.(map[string]any)
+		if g["series"] != wantSeries[i] {
+			t.Fatalf("group %d = %v, want series %s", i, g, wantSeries[i])
+		}
+	}
+	// within the x section: 七征 (2019) before 十三征 (2025).
+	if groups[1].(map[string]any)["name"] != "七征" ||
+		groups[2].(map[string]any)["name"] != "十三征" {
+		t.Fatalf("x order = %v, %v", groups[1], groups[2])
+	}
+	// other section by launch year: 少女前线 (2015) < 龙之谷 (2016) <
+	// 崩坏3 (2019, official meta year); all three carry the ip lane.
+	wantNames := []string{"少女前线征文", "龙之谷征文", "崩坏3征文"}
+	for i, raw := range groups[3:] {
+		g := raw.(map[string]any)
+		if g["name"] != wantNames[i] || g["lane"] != "ip" {
+			t.Fatalf("group %d = %v, want %s (lane ip)", i+3, g, wantNames[i])
+		}
+	}
+}
+
 func TestContestArchiveBooks(t *testing.T) {
 	srv, _ := newTestServer(t)
 	// missing contest → 400
@@ -51,6 +115,14 @@ func TestContestArchiveBooks(t *testing.T) {
 	items := body["items"].([]any)
 	if len(items) != 2 {
 		t.Fatalf("items = %v", items)
+	}
+	// clicks must ride along on list items (user report 2026-11-22: the
+	// archive rows rendered "点击 0" when the engine omitted the column);
+	// testseed pins clicks at 1000.
+	for _, raw := range items {
+		if c := raw.(map[string]any)["clicks"]; c == nil || c.(float64) != 1000 {
+			t.Fatalf("item clicks = %v, want 1000", c)
+		}
 	}
 	// per caps each form: 崩坏3征文's two ip_collab books → one at per=1.
 	body = getJSON(t, srv.URL+"/strata/contests/books?contest="+url.QueryEscape("崩坏3征文")+"&per=1", http.StatusOK)

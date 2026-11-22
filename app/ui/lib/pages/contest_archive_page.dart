@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/providers.dart';
@@ -83,6 +84,21 @@ class _Body extends ConsumerWidget {
     required this.scroll,
   });
 
+  /// 打开官方活动页（外部浏览器；与详情页「打开官方页面」同一
+  /// externalApplication 口径，docs/15 登记图标语义不变——本入口沿用本页
+  /// 整宽文本按钮、不带图标）。
+  Future<void> _openOfficial(BuildContext context, String url) async {
+    var ok = false;
+    try {
+      ok = await launchUrl(Uri.parse(url),
+          mode: LaunchMode.externalApplication);
+    } catch (_) {}
+    if (!context.mounted || ok) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('无法打开官方活动页')),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
@@ -107,6 +123,8 @@ class _Body extends ConsumerWidget {
             break;
           }
         }
+        // final 局部量，供下方闭包安全捕获（group 本身不可跨闭包提升）。
+        final officialUrl = group?.official;
         return ListView(
           controller: scroll,
           padding: const EdgeInsets.only(bottom: 32),
@@ -167,41 +185,9 @@ class _Body extends ConsumerWidget {
                     ),
                   ));
                 }
-                // 获奖作品区块（schema v5，docs §6）：该届库内获奖书，行序
-                // = 引擎 fav_pctl 同代分位；奖项仅徽标展示、不参与排序。
-                // 映射表外赛事返回空列表 → 区块隐藏。
-                if (res.awards.isNotEmpty) {
-                  children.add(Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 2),
-                    child: Row(
-                      children: [
-                        Text(
-                          '获奖作品',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          '${res.awards.length} 本（库内）',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: scheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ));
-                  children.add(Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Column(
-                      children: [
-                        for (final a in res.awards) _AwardRow(a: a),
-                      ],
-                    ),
-                  ));
-                }
+                // 获奖区块已移除（用户裁定 2026-11-22：参赛者的 top10 大概
+                // 就是获奖者，代表作区块按同世代分位已覆盖头部；获奖徽标
+                // 保留在书籍详情页）。
                 return Column(children: children);
               },
             ),
@@ -231,6 +217,20 @@ class _Body extends ConsumerWidget {
                 ),
               ),
             ),
+            // 官方活动页入口：仅当引擎带已验证 URL 时出现（静态表源
+            // contest-roster-harvest §2，页面实证）；未验证赛事隐藏，
+            // 永不编造链接。
+            if (officialUrl != null && officialUrl.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: () => _openOfficial(context, officialUrl),
+                    child: const Text('查看官方活动页'),
+                  ),
+                ),
+              ),
             Padding(
               padding: const EdgeInsets.all(16),
               child: Text(
@@ -310,67 +310,4 @@ class _Header extends StatelessWidget {
       .join(' · ');
 }
 
-/// 获奖区块一行：徽标文案 + 书名/作者 + 收藏。点击 → 详情页（获奖详情在
-/// 详情页徽标完整呈现，行内不重复展开）。
-class _AwardRow extends StatelessWidget {
-  final AwardBook a;
 
-  const _AwardRow({super.key, required this.a});
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return InkWell(
-      onTap: () => context.push('/book/${a.award.nid}'),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: scheme.tertiaryContainer,
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Text(
-                a.award.displayAward,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: scheme.onTertiaryContainer,
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    a.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(
-                    a.author,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (a.favs != null)
-              Text(
-                '藏 ${a.favs}',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: scheme.onSurfaceVariant,
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-}

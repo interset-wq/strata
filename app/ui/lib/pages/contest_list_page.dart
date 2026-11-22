@@ -1,30 +1,48 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/providers.dart';
-import '../data/api/strata_api.dart';
 import '../widgets/back_to_top.dart';
+import '../widgets/contest_row_card.dart';
 
 /// 赛事档案列表（docs/contest-display-in-app.md 形态一）：本地零请求视图。
 ///
-/// 数据源 = seed 内置库的 contest 字段标注（平台标注，非官方全量参赛规模——
-/// 库外规模与获奖属 P1 清单 API）；官方日期来自引擎内嵌的用户核实静态表
-///（analysis/references/contest-editions.md），缺失时只显届次/年份，不编造。
-class ContestListPage extends StatefulWidget {
+/// 2026-11-22 改版（用户裁定）：榜单 tab 同款切换——春季 / x征 / 秋季 /
+/// 冬季 / 其他 五个 tab，与引擎 series 一一对应；「其他」tab 只含主题类
+/// （group.lane 为空）——对话线归档放首页对话区、IP 线归档放 IP 区
+/// （lane 分类在引擎侧）。组序沿用引擎返回：各 tab 按开赛年份增序
+/// （官方元数据年份优先，缺失落在库年份下限），稳定排序。
+///
+/// 数据源 = seed 内置库的 contest 字段标注（平台标注，非官方全量参赛
+/// 规模——库外规模见档案页「查看官方清单」）。
+class ContestListPage extends ConsumerStatefulWidget {
   const ContestListPage({super.key});
 
   @override
-  State<ContestListPage> createState() => _ContestListPageState();
+  ConsumerState<ContestListPage> createState() => _ContestListPageState();
 }
 
-class _ContestListPageState extends State<ContestListPage> {
+class _ContestListPageState extends ConsumerState<ContestListPage>
+    with SingleTickerProviderStateMixin {
+  // tab 顺序 = 用户裁定（春 / x征 / 秋 / 冬 / 其他），与引擎 seriesOrder
+  // 一致；series 值即过滤键。
+  static const _tabs = [
+    ('spring', '春季'),
+    ('x', 'x征'),
+    ('autumn', '秋季'),
+    ('winter', '冬季'),
+    ('other', '其他'),
+  ];
+
+  late final TabController _tabCtrl;
   final _scroll = ScrollController();
   bool _showTop = false;
 
   @override
   void initState() {
     super.initState();
+    _tabCtrl = TabController(length: _tabs.length, vsync: this);
+    _tabCtrl.addListener(() => setState(() {}));
     _scroll.addListener(() {
       final show = _scroll.hasClients && _scroll.offset > 500;
       if (show != _showTop) setState(() => _showTop = show);
@@ -33,17 +51,81 @@ class _ContestListPageState extends State<ContestListPage> {
 
   @override
   void dispose() {
+    _tabCtrl.dispose();
     _scroll.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final groups = ref.watch(contestArchiveProvider);
     return Scaffold(
-      appBar: AppBar(title: const Text('赛事档案')),
+      appBar: AppBar(
+        title: const Text('赛事档案'),
+        bottom: TabBar(
+          controller: _tabCtrl,
+          labelColor: scheme.primary,
+          unselectedLabelColor: scheme.onSurfaceVariant,
+          indicatorColor: scheme.primary,
+          dividerColor: Colors.transparent,
+          labelStyle: const TextStyle(
+            fontSize: 13.5,
+            fontWeight: FontWeight.w600,
+          ),
+          unselectedLabelStyle: const TextStyle(fontSize: 13.5),
+          tabs: [for (final (_, label) in _tabs) Tab(text: label)],
+        ),
+      ),
       body: Stack(
         children: [
-          _Body(scroll: _scroll),
+          groups.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  '赛事档案加载失败：$e',
+                  style: TextStyle(
+                      fontSize: 13, color: scheme.onSurfaceVariant),
+                ),
+              ),
+            ),
+            data: (list) {
+              final series = _tabs[_tabCtrl.index].$1;
+              // 「其他」tab 只含主题类（lane 为空）：对话线/IP 线归档已
+              // 迁往首页对话区与 IP 区（2026-11-22 用户裁定）。
+              final items = list
+                  .where((g) =>
+                      g.series == series &&
+                      (series != 'other' || g.lane.isEmpty))
+                  .toList();
+              if (items.isEmpty) {
+                return Center(
+                  child: Text(
+                    '该分类暂无档案',
+                    style: TextStyle(color: scheme.onSurfaceVariant),
+                  ),
+                );
+              }
+              return ListView(
+                controller: _scroll,
+                padding: const EdgeInsets.only(bottom: 24),
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                    child: Text(
+                      '计数 = 本地内置库中标注该赛事的作品；官方参赛规模见'
+                      '档案页「查看官方清单」。',
+                      style: TextStyle(
+                          fontSize: 11, color: scheme.onSurfaceVariant),
+                    ),
+                  ),
+                  for (final g in items) ContestRowCard(group: g),
+                ],
+              );
+            },
+          ),
           if (_showTop)
             Positioned(
               right: 16,
@@ -59,135 +141,5 @@ class _ContestListPageState extends State<ContestListPage> {
         ],
       ),
     );
-  }
-}
-
-class _Body extends ConsumerWidget {
-  final ScrollController scroll;
-
-  const _Body({required this.scroll});
-
-  static const _seriesLabels = {
-    'x': 'N征系列',
-    'winter': '冬季征文',
-    'spring': '春季征文',
-    'autumn': '秋季征文',
-    'other': '其他赛事',
-  };
-  static const _seriesOrder = ['x', 'winter', 'spring', 'autumn', 'other'];
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final scheme = Theme.of(context).colorScheme;
-    final groups = ref.watch(contestArchiveProvider);
-    return groups.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            '赛事档案加载失败：$e',
-            style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
-          ),
-        ),
-      ),
-      data: (list) {
-        final bySeries = {for (final s in _seriesOrder) s: <ContestGroup>[]};
-        for (final g in list) {
-          bySeries.putIfAbsent(g.series, () => <ContestGroup>[]).add(g);
-        }
-        return ListView(
-          controller: scroll,
-          padding: const EdgeInsets.only(bottom: 24),
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-              child: Text(
-                '本地内置库中标注过该赛事的作品；官方参赛规模与获奖'
-                '信息将在清单 API（P1）接入后补齐。',
-                style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
-              ),
-            ),
-            for (final s in _seriesOrder) ...[
-              if (bySeries[s]!.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 2),
-                  child: Text(
-                    _seriesLabels[s]!,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: scheme.secondary,
-                    ),
-                  ),
-                ),
-              for (final g in bySeries[s]!) _ContestRow(group: g),
-            ],
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _ContestRow extends StatelessWidget {
-  final ContestGroup group;
-
-  const _ContestRow({required this.group});
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return InkWell(
-      onTap: () => context.push('/contests/${Uri.encodeComponent(group.name)}'),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    group.name,
-                    style: const TextStyle(
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    _subtitle(group),
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(right: 2),
-              child: Text(
-                '${group.count}',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontFamily: 'serif',
-                  color: scheme.secondary,
-                ),
-              ),
-            ),
-            Icon(Icons.chevron_right, size: 18, color: scheme.outline),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// 行副题：官方启动年份优先；无元数据时显在库年份区间（不编造日期）。
-  static String _subtitle(ContestGroup g) {
-    if (g.year != null) return '${g.year} 启动';
-    if (g.yearMin == g.yearMax) return '在库 ${g.yearMin}';
-    return '在库 ${g.yearMin}–${g.yearMax}';
   }
 }
