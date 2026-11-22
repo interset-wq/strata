@@ -4,7 +4,7 @@
 > **状态**：分析侧实测定案；`app/` 冻结，未改数据集/种子。是否解禁 `app/` 仅作工程交接事项，本文不执行。
 > **权威范围**：本文唯一维护清单返回字段（名/大小写/取值）与获奖四代形态及提取正则；URL/tagId 见 harvest、逐届获奖见 award，均不复制。
 > **口径**：文中计数/比例/日期均为快照现算值，仅供参考、随页面版本变化，禁止硬编码进代码；数字不新增、不外推。
-> **更新日期**：2026-11-21。
+> **更新日期**：2026-11-22（补获奖端点直接探活证据，确认无 REST 获奖接口）。
 
 ## 结论
 
@@ -146,6 +146,9 @@ GET .../Common.ashx?op=getNovelsByTag&tagId=415&ps=200&pi=0
 一条 GET 拿整份 JS 即拿全量名单，无分页、无鉴权，字段仅 `novelId` + `novelName`。
 全文件 `url:` 字段只有 `/comments/*`、`/getRank`、`/getTrend`、`/getTaskInfo`、`/getOrnaments`、`/user/access`，
 **无任何获奖 HTTP 请求**；`getAwardDataList` 只是 Vue `data` 字段名，不是方法名。
+**直接端点探活（2026-11-22）**：对 `/api/essay/{getAward,getAwardList,award,getAwardDataList,getPrize,getWinners}` 及
+`Common.ashx?op=getAwardByTag` 逐个请求，全部返回 `No HTTP resource was found` / `parameters fatal error`——
+获奖确无 REST 接口，只能从活动页静态数据提取。
 
 **两类陷阱**：① 初审/复审/入围模块（`favs` 中位 4–16）与获奖模块（1112–8372）混在一起，
 须按「奖项图标邻域 + favs 跃升」现场判定；② module id 是 webpack hash、跨届会变（十二征 6870 vs 十三征 6666），不能硬编码。
