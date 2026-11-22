@@ -5,6 +5,7 @@
 | 层 | 选型 |
 | --- | --- |
 | 平台 | Android + iOS |
+| 包名 | `io.github.intersetwq.strata`（2026-11-21 定案；Android applicationId / iOS bundle id，上架后不可更改） |
 | UI | Flutter 3.x / Dart 3，Riverpod + go_router，CustomPainter + fl_chart |
 | 引擎 | 内嵌 Go 服务（in-process，C archive / shared lib 经 `dart:ffi` 挂载） |
 | HTTP | Gin，仅监听 `127.0.0.1`，统一 RoutePrefix `/strata` |

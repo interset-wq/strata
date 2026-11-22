@@ -473,3 +473,35 @@ Never delete or rewrite other agents' entries.
 - **Verified**: `flutter analyze` and `flutter test` pass; rebuilt/installed the
   debug APK. No phone operation.
 - **Next**: user acceptance of the dialogue month range.
+
+---
+
+## 2026-11-21 - Remove adaptation badges from book detail
+
+- **Did**: deleted the derivative-works display proposal and its implementation:
+  the detail-page 「有改编漫画 / 有有声」 badges, the `has_comic`/`has_audio`
+  API fields, the best-effort `/adpworks` + `/comics` enrichment after a
+  refresh, `FetchAdpWorks`/`FetchComic`/`AdpWorks`/`Comic`, `SetAdaptation`, the
+  `BookMeta` adaptation fields, and the `book_meta.comic_id/album_id/
+  comic_folder` schema columns + v9→v10 migration. `userSchemaVersion` stays 10
+  so existing user.db files open without a downgrade. Global endpoint facts
+  remain in `docs/sfacg-app-api.md`; settings copy no longer advertises
+  adaptation labels.
+- **Verified**: `go test ./...`, `flutter analyze`, and `flutter test` pass;
+  `libstrata.so` and the debug APK were rebuilt and installed. No phone
+  operation.
+- **Next**: user acceptance of the cleaned detail page.
+
+---
+
+## 2026-11-21 - Set the formal package id
+
+- **Did**: user chose `io.github.intersetwq.strata` as the permanent package id.
+  Replaced `com.example.strata` in the Android `namespace`/`applicationId`,
+  moved `MainActivity.kt` to `kotlin/io/github/intersetwq/strata/`, and updated
+  its `package`. Recorded the id in `app/docs/01-tech-stack.md`.
+- **Note**: the new id installs as a separate app from the old
+  `com.example.strata`; old debug data is not migrated (debug-only, no prod
+  users).
+- **Verified**: debug APK rebuilt and installed as
+  `io.github.intersetwq.strata`. No phone operation.
