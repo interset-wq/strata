@@ -596,7 +596,9 @@ GET。两项均持久化在 user.db prefs：详情刷新限流默认开；App AP
 （`est_date ASC`，作者页排序按钮切换）。两个方向定年 0001 回填书都沉底，
 nid 同向跟随。未知作者返回空列表，不是错误。items 为标准 RankItem，**额外带
 `est_date`（YYYY-MM-DD，时间轴用；旧端点不返回此字段，RankItem 侧为可选
-字段）**；meta.ordering 回显实际排序（`est_date_desc` / `est_date_asc`）。
+字段）与 `fav_pctl`（同世代收藏分位，2026-11-22 加——作者页质量维度；授权书
+分位恒 NULL→0，docs/17 §3）**；meta.ordering 回显实际排序
+（`est_date_desc` / `est_date_asc`）。
 
 ```json
 { "meta": { "pool": "seed", "ordering": "est_date_desc", "author": "无聊看看天" },

@@ -1164,7 +1164,7 @@ func (s *Store) AuthorBooks(ctx context.Context, author string, limit, offset in
 	query := `
 SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
        seed.books.est_year, seed.books.status, seed.books.words, seed.books.clicks,
-       seed.books.favs, seed.books.praises, seed.books.form,
+       seed.books.favs, seed.books.praises, seed.books.fav_pctl, seed.books.form,
        COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url,
        seed.books.est_date
 FROM seed.books
@@ -1184,10 +1184,12 @@ LIMIT ? OFFSET ?`
 			edate              sql.NullString
 			gen, status, cover sql.NullString
 			words, clicks, favs,
-			praises sql.NullInt64
+			praises   sql.NullInt64
+			favPctl   sql.NullFloat64
 		)
 		if err := rows.Scan(&item.NID, &item.Title, &item.Author, &gen,
-			&item.EstYear, &status, &words, &clicks, &favs, &praises, &item.Form, &cover, &edate); err != nil {
+			&item.EstYear, &status, &words, &clicks, &favs, &praises,
+			&favPctl, &item.Form, &cover, &edate); err != nil {
 			return nil, err
 		}
 		item.Genre = strPtr(gen)
@@ -1196,6 +1198,9 @@ LIMIT ? OFFSET ?`
 		item.Clicks = intPtr(clicks)
 		item.Favs = intPtr(favs)
 		item.Praises = intPtr(praises)
+		if favPctl.Valid {
+			item.FavPctl = favPctl.Float64
+		}
 		item.CoverURL = strPtr(cover)
 		item.EstDate = strPtr(edate)
 		items = append(items, item)

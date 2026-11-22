@@ -7,9 +7,23 @@ import '../data/api/strata_api.dart';
 import '../widgets/back_to_top.dart';
 import '../widgets/default_cover.dart';
 
-/// 作者页（数据就绪版；时间轴 UI 待作者规划后改版，
-/// docs/author-profile-on-demand §1：作品列表 = 本地 db 时间轴，
-/// 头部资料 = 按需抓取 + user.db 7 天缓存）。
+/// 形式中文名与固定序（赛事档案页同款口径，docs/17 §7）。
+const _formLabels = {
+  'long': '长篇',
+  'medium': '中篇',
+  'short': '短篇',
+  'dialogue': '对话',
+  'ip_collab': 'IP 联动',
+};
+const _formOrder = ['long', 'medium', 'short', 'dialogue', 'ip_collab'];
+
+/// 作者页（docs/17 作者维度改版，2026-11-22 定案）：头部资料（按需抓取 +
+/// user.db 7 天缓存，docs/author-profile-on-demand）+ 作者概览卡（在库/
+/// 库外/出道（估）/跨度 + 形式分布 + 收藏分位分布）+ 代表作（各 form 同世
+/// 代分位 Top-1）+ 作品时间轴（年份分组、est_date 序、未知年份置末）+
+/// 库外作品区块（§6）。质量维度全部由 /strata/author-books 全量行端上现算
+/// ——引擎只加了一列 fav_pctl（docs/17 §3）。红线（docs/12/§5）：质量排序
+/// 只许同世代分位；est_year 标注估算；不新增抓取、不写用户数据。
 class AuthorPage extends ConsumerStatefulWidget {
   final String author;
   final int bookNid;
@@ -24,13 +38,12 @@ class _AuthorPageState extends ConsumerState<AuthorPage> {
   AuthorProfile? _profile;
   bool _profileLoading = true;
 
-  final List<RankItem> _books = [];
+  /// 全量书目（单次拉取，docs/17 §4.5）。
+  List<RankItem> _books = const [];
   bool _booksLoading = false;
-  bool _booksDone = false;
   bool _booksFailed = false;
   bool _newestFirst = true;
 
-  static const int _pageSize = 20;
   final ScrollController _scroll = ScrollController();
   bool _showTop = false;
 
@@ -39,7 +52,7 @@ class _AuthorPageState extends ConsumerState<AuthorPage> {
     super.initState();
     _scroll.addListener(_onScroll);
     _loadProfile();
-    _loadMore();
+    _loadBooks();
   }
 
   @override
@@ -51,14 +64,6 @@ class _AuthorPageState extends ConsumerState<AuthorPage> {
   void _onScroll() {
     final show = _scroll.offset > 500;
     if (show != _showTop) setState(() => _showTop = show);
-    _loadMoreAtBottom();
-  }
-
-  void _loadMoreAtBottom() {
-    if (_scroll.hasClients &&
-        _scroll.position.pixels >= _scroll.position.maxScrollExtent - 400) {
-      _loadMore();
-    }
   }
 
   Future<void> _loadProfile() async {
@@ -76,21 +81,22 @@ class _AuthorPageState extends ConsumerState<AuthorPage> {
     }
   }
 
-  Future<void> _loadMore() async {
-    if (_booksLoading || _booksDone || _booksFailed) return;
+  /// 全量书目单次拉取（docs/17 §4.5：limit=200 = 统一契约上限；20260503.26
+  /// 种子实测单作者最多 36 本，一页必够）。概览/代表作需全量，单次取回后
+  /// 即时计算，无「部分数据」中间态。
+  Future<void> _loadBooks() async {
     setState(() => _booksLoading = true);
     try {
       final h = await ref.read(bootProvider.future);
       final page = await h.api.authorBooks(
         author: widget.author,
-        limit: _pageSize,
-        offset: _books.length,
+        limit: 200,
+        offset: 0,
         order: _newestFirst ? 'newest' : 'oldest',
       );
       if (!mounted) return;
       setState(() {
-        _books.addAll(page);
-        _booksDone = page.length < _pageSize;
+        _books = page;
         _booksLoading = false;
       });
     } catch (_) {
@@ -98,15 +104,76 @@ class _AuthorPageState extends ConsumerState<AuthorPage> {
     }
   }
 
-  /// 排序切换（docs/08 §author-books order 参数）：清空重新分页加载。
+  /// 年份未知判定（docs/17 §4.4 统一判定式；20260503.26 种子实测 0 本此类
+  /// 书——防御性，分组非空才渲染）。
+  static bool _unknownYear(RankItem b) =>
+      b.estYear == 0 ||
+      b.estDate == null ||
+      b.estDate!.isEmpty ||
+      b.estDate!.startsWith('0001');
+
+  /// 年份分组键（未知年份自成一组，置于末尾）。
+  String _yearKey(RankItem b) => _unknownYear(b) ? '?' : '${b.estYear}';
+
+  /// 时间轴重排（端上，不发网络——数据已全量取回，docs/17 §4.6）：
+  /// est_date 字符串比较，年份未知书两个方向都沉底（与引擎 ORDER BY 口径
+  /// 一致）。
+  void _sortBooks() {
+    final list = List<RankItem>.from(_books);
+    list.sort((a, b) {
+      final ua = _unknownYear(a), ub = _unknownYear(b);
+      if (ua != ub) return ua ? 1 : -1;
+      final da = a.estDate ?? '', db = b.estDate ?? '';
+      final cmp = da.compareTo(db);
+      final r = _newestFirst ? -cmp : cmp;
+      return r != 0 ? r : a.nid.compareTo(b.nid);
+    });
+    _books = list;
+  }
+
+  /// 排序切换（docs/17 §4.6）：对已取回的全量列表端上重排（不触发网络），
+  /// 年份未知书恒沉底。
   void _toggleOrder() {
     setState(() {
       _newestFirst = !_newestFirst;
-      _books.clear();
-      _booksDone = false;
-      _booksFailed = false;
+      _sortBooks();
     });
-    _loadMore();
+  }
+
+  /// 代表作：各 form 同世代收藏分位 Top-1（docs/12 红线：原始累计值不进
+  /// 排序）；固定形式序，无分位的 form（含全授权书作者）不出卡
+  /// （docs/17 §4.3）。
+  List<RankItem> get _represents {
+    final best = <String, RankItem>{};
+    for (final b in _books) {
+      if (b.favPctl <= 0 || b.form.isEmpty) continue;
+      final cur = best[b.form];
+      if (cur == null || b.favPctl > cur.favPctl) best[b.form] = b;
+    }
+    return _formOrder
+        .where((f) => best.containsKey(f))
+        .map((f) => best[f]!)
+        .toList();
+  }
+
+  /// 库外作品（官方作品集 − seed，引擎差集，docs/author-profile-on-demand
+  /// §6）：移动版作品集不截断（用户 2026-11-22 裁定），覆盖作者全部作品。
+  List<AuthorWork> get _offLibrary => _profile?.offlibrary ?? const [];
+
+  /// 头部区块数（概览卡 + 代表作 + 时间轴注，各自条件渲染，docs/17 §4）。
+  int get _headCount {
+    var n = 0;
+    if (_books.isNotEmpty) n++;
+    if (_represents.isNotEmpty) n++;
+    if (_books.isNotEmpty) n++;
+    return n;
+  }
+
+  int get _itemCount {
+    var n = _headCount + _books.length;
+    if (_offLibrary.isNotEmpty) n += _offLibrary.length + 1;
+    if (_books.length >= 200) n++; // 防御性截断注（实测不会触发）
+    return n;
   }
 
   @override
@@ -142,7 +209,11 @@ class _AuthorPageState extends ConsumerState<AuthorPage> {
   }
 
   Widget _body(BuildContext context, ColorScheme scheme) {
-    if (_books.isEmpty && !_booksLoading) {
+    final off = _offLibrary;
+    if (_booksLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_books.isEmpty && off.isEmpty) {
       return Center(
         child: Text(
           _booksFailed ? '作品列表加载失败' : '该作者在内置库中暂无作品',
@@ -153,30 +224,79 @@ class _AuthorPageState extends ConsumerState<AuthorPage> {
     return ListView.builder(
       controller: _scroll,
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 96),
-      itemCount: _books.length + (_booksLoading && !_booksDone ? 1 : 0),
+      itemCount: _itemCount,
       itemBuilder: (context, i) {
-        if (i >= _books.length) {
-          return const Padding(
-            padding: EdgeInsets.all(16),
-            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+        if (i < _headCount) {
+          return _headItem(context, scheme, i);
+        }
+        final k = i - _headCount;
+        if (k < _books.length) {
+          final b = _books[k];
+          // est_year 分组头：年组变化时插入（未知年份自成一组置末，
+          // docs/17 §4.4）。
+          final showYear =
+              k == 0 || _yearKey(_books[k - 1]) != _yearKey(b);
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (showYear) _yearHeader(context, scheme, b),
+              _bookRow(context, b, scheme),
+            ],
           );
         }
-        final b = _books[i];
-        // est_year 分组头：同年首行前插入（0 年 = 回填沉底书，不分组）。
-        final showYear = b.estYear != 0 &&
-            (i == 0 || _books[i - 1].estYear != b.estYear);
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (showYear) _yearHeader(context, scheme, b.estYear),
-            _bookRow(context, b, scheme),
-          ],
-        );
+        final j = k - _books.length;
+        if (off.isNotEmpty) {
+          if (j == 0) {
+            return _offLibraryHeader(context, scheme, off.length);
+          }
+          if (j <= off.length) {
+            return _OffWorkRow(work: off[j - 1], author: widget.author);
+          }
+        }
+        if (_books.length >= 200) {
+          return Padding(
+            padding: const EdgeInsets.all(16),
+            child: Center(
+              child: Text('在库 >200，仅显示前 200',
+                  style: TextStyle(color: scheme.onSurfaceVariant)),
+            ),
+          );
+        }
+        return const SizedBox.shrink();
       },
     );
   }
 
-  Widget _yearHeader(BuildContext context, ColorScheme scheme, int year) {
+  /// 头部区块分发（概览卡 / 代表作 / 时间轴注，docs/17 §4 顺序）。
+  Widget _headItem(BuildContext context, ColorScheme scheme, int i) {
+    var n = 0;
+    if (_books.isNotEmpty) {
+      if (i == n) {
+        return _OverviewCard(books: _books, offCount: _offLibrary.length);
+      }
+      n++;
+    }
+    if (_represents.isNotEmpty) {
+      if (i == n) {
+        return _RepresentsBlock(reps: _represents);
+      }
+      n++;
+    }
+    if (_books.isNotEmpty && i == n) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(4, 10, 4, 0),
+        child: Text('年份为估算（锚点插值）；未知年份置末',
+            style: TextStyle(
+                fontSize: 10.5, color: scheme.onSurfaceVariant)),
+      );
+    }
+    return const SizedBox.shrink();
+  }
+
+  /// 年份分组头（点 + 标题 + 分隔线，与库外区块头同款样式，docs/16 不新造
+  /// 控件）；未知年份组显示「年份未知」（docs/17 §4.4）。
+  Widget _yearHeader(BuildContext context, ColorScheme scheme, RankItem b) {
+    final label = _unknownYear(b) ? '年份未知' : '${b.estYear}';
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 12, 4, 6),
       child: Row(
@@ -188,7 +308,7 @@ class _AuthorPageState extends ConsumerState<AuthorPage> {
                 BoxDecoration(color: scheme.primary, shape: BoxShape.circle),
           ),
           const SizedBox(width: 8),
-          Text('$year',
+          Text(label,
               style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -197,6 +317,49 @@ class _AuthorPageState extends ConsumerState<AuthorPage> {
           Expanded(
             child: Divider(
                 height: 1, color: scheme.outline.withValues(alpha: .4)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _offLibraryHeader(BuildContext context, ColorScheme scheme, int n) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 16, 4, 2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                    color: scheme.secondary, shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '其他作品（库外 $n）',
+                style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: scheme.secondary),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Divider(
+                    height: 1,
+                    color: scheme.outline.withValues(alpha: .4)),
+              ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.only(left: 16, top: 4),
+            child: Text(
+              '来自官方作品集（移动版不截断）；点开即收录，完整数据后台补全。',
+              style: TextStyle(
+                  fontSize: 11, color: scheme.onSurfaceVariant),
+            ),
           ),
         ],
       ),
@@ -293,6 +456,333 @@ class _AuthorPageState extends ConsumerState<AuthorPage> {
                       style: TextStyle(
                           fontSize: 12, color: scheme.onSurfaceVariant),
                     ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PctBand {
+  final String label;
+  final int count;
+
+  const _PctBand(this.label, this.count);
+}
+
+/// 作者概览卡（docs/17 §4.2）：四个 mini 统计 + 形式分布 + 收藏分位分布。
+/// 全部由全量在库行端上现算；在库 0 本时整卡隐藏（调用方判定）。红线：
+/// 分位段只统计 fav_pctl（同世代分位）；fav_pctl=0（含授权书，分位恒
+/// NULL——docs/17 §5）归「无数据」计数，不进段。
+class _OverviewCard extends StatelessWidget {
+  final List<RankItem> books;
+  final int offCount;
+
+  const _OverviewCard({required this.books, required this.offCount});
+
+  /// 出道年 = 在库非 0 est_year 最小值（估算值，docs/17 §5）。
+  int get _debut {
+    var min = 0;
+    for (final b in books) {
+      if (b.estYear > 0 && (min == 0 || b.estYear < min)) min = b.estYear;
+    }
+    return min;
+  }
+
+  int get _span {
+    final d = _debut;
+    var max = 0;
+    for (final b in books) {
+      if (b.estYear > max) max = b.estYear;
+    }
+    return (d == 0 || max <= d) ? 0 : max - d;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final forms = <String, int>{};
+    for (final b in books) {
+      if (b.form.isNotEmpty) forms[b.form] = (forms[b.form] ?? 0) + 1;
+    }
+    var b99 = 0, b95 = 0, b90 = 0, bLow = 0, none = 0;
+    for (final b in books) {
+      final p = b.favPctl;
+      if (p <= 0) {
+        none++;
+      } else if (p >= 0.99) {
+        b99++;
+      } else if (p >= 0.95) {
+        b95++;
+      } else if (p >= 0.90) {
+        b90++;
+      } else {
+        bLow++;
+      }
+    }
+    final bands = [
+      _PctBand('≥99%', b99),
+      _PctBand('95–99%', b95),
+      _PctBand('90–95%', b90),
+      _PctBand('<90%', bLow),
+    ];
+    var maxBand = 0;
+    for (final band in bands) {
+      if (band.count > maxBand) maxBand = band.count;
+    }
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                _stat(context, '${books.length}', '在库'),
+                _stat(context, '$offCount', '库外'),
+                _stat(context, _debut == 0 ? '—' : '$_debut', '出道（估）'),
+                _stat(context, _span == 0 ? '—' : '$_span 年', '跨度'),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                for (final f in _formOrder)
+                  if (forms[f] != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                            color: scheme.outline.withValues(alpha: .4)),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                          '${_formLabels[f] ?? f} ${forms[f]}',
+                          style: TextStyle(
+                              fontSize: 10.5,
+                              color: scheme.onSurfaceVariant)),
+                    ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                for (final band in bands)
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('${band.label} ${band.count} 本',
+                            style: TextStyle(
+                                fontSize: 10,
+                                color: scheme.onSurfaceVariant)),
+                        const SizedBox(height: 3),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(2),
+                          child: SizedBox(
+                            height: 4,
+                            width: double.infinity,
+                            child: FractionallySizedBox(
+                              alignment: Alignment.centerLeft,
+                              widthFactor: maxBand == 0
+                                  ? 0
+                                  : band.count / maxBand,
+                              child: Container(
+                                  color: scheme.primary
+                                      .withValues(alpha: .7)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+            if (none > 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text('无分位数据 $none 本（含授权书），不进分布',
+                    style: TextStyle(
+                        fontSize: 9.5, color: scheme.onSurfaceVariant)),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _stat(BuildContext context, String value, String label) {
+    final scheme = Theme.of(context).colorScheme;
+    return Expanded(
+      child: Column(
+        children: [
+          Text(value,
+              style: const TextStyle(
+                  fontSize: 15, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 1),
+          Text(label,
+              style: TextStyle(
+                  fontSize: 10, color: scheme.onSurfaceVariant)),
+        ],
+      ),
+    );
+  }
+}
+
+/// 代表作（docs/17 §4.3）：各 form 同世代收藏分位 Top-1（docs/12 红线：
+/// 原始收藏数永不排序）；横向封面行，点击进详情。
+class _RepresentsBlock extends StatelessWidget {
+  final List<RankItem> reps;
+
+  const _RepresentsBlock({required this.reps});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 4, 4, 6),
+          child: Row(
+            children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                    color: scheme.tertiary, shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 8),
+              Text('代表作',
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: scheme.tertiary)),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Divider(
+                    height: 1, color: scheme.outline.withValues(alpha: .4)),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 128,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: reps.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 8),
+            itemBuilder: (context, i) {
+              final b = reps[i];
+              final pct = (1 - b.favPctl) * 100;
+              final pctLabel = pct < 1 ? '前 1%' : '前 ${pct.round()}%';
+              return Material(
+                color: scheme.surface,
+                borderRadius: BorderRadius.circular(10),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: () => context.push('/book/${b.nid}'),
+                  child: Container(
+                    width: 92,
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                          color: scheme.outline.withValues(alpha: .4)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(6),
+                            child: coverImage(b.coverUrl, b.nid,
+                                width: 80, height: 106),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(b.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 10.5,
+                                fontWeight: FontWeight.w600)),
+                        Text('${_formLabels[b.form] ?? b.form}  $pctLabel',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                fontSize: 9.5, color: scheme.tertiary)),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 10),
+      ],
+    );
+  }
+}
+
+/// 库外作品行（作者页「其他作品」区块，docs/author-profile-on-demand §6）：
+/// 官方作品集只有 nid + 标题（无 form/分位），封面走确定性兜底；点击 =
+/// rankSeed 预写 + 进详情页（与官方榜单/清单页同一条库外收录链路）。
+class _OffWorkRow extends ConsumerWidget {
+  final AuthorWork work;
+  final String author;
+
+  const _OffWorkRow({required this.work, required this.author});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+        onTap: () async {
+          try {
+            final h = await ref.read(bootProvider.future);
+            await h.api.rankSeed(
+              nid: work.nid,
+              title: work.title,
+              author: author,
+              coverUrl: '',
+            );
+          } catch (_) {}
+          if (!context.mounted) return;
+          context.push('/book/${work.nid}');
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: coverImage(null, work.nid, width: 44, height: 62),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(work.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodyLarge),
+                    const SizedBox(height: 4),
+                    Text('库外 · ${work.nid}',
+                        style: TextStyle(
+                            fontSize: 12, color: scheme.onSurfaceVariant)),
                   ],
                 ),
               ),
