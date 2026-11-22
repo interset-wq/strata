@@ -56,9 +56,10 @@ from deep_ranks import build_deep_ranks, seed_coverage  # noqa: E402
 ASSETS = REPO / "app" / "assets"
 SCHEMA = Path(__file__).resolve().parent / "schema.sql"
 DATASET = REPO / "dataset" / "out" / "books.jsonl"
+AWARD_CSV = ANALYSIS / "out" / "contest_awards_normalized.csv"
 
-SCHEMA_VERSION = 4
-SEED_VERSION = "20260503.25"  # P10 假完结入种剔除（145 本）+ 用户裁定表生效（86430）
+SCHEMA_VERSION = 5
+SEED_VERSION = "20260503.26"  # .26: v5 contest_awards 表（911 行 / 11 届）；书目集合不变
 CONTENT_END = pd.Timestamp("2026-05-03")
 GEN_MIN, GEN_MAX = 2007, 2025
 
@@ -70,6 +71,17 @@ EXPECT_LICENSED = 47
 EXPECT_ADMITTED = 18_704       # E.28 基线 18,849 再减 P10 假完结 145 本（含裁定 86430）
 EXPECT_SEED = 18_751           # 18,704 + 47 licensed
 EXPECT_COVERAGE_MIN = 0.9640   # P10 剔除后 eligible 分母同步缩小，覆盖率 96.53%，门槛不变
+# v5 contest awards (docs/award-winners-as-seed-source.md): net 911 rows over
+# 11 editions; the 602 shortlist rows are excluded upstream of this CSV.
+# Display-only facts: award never feeds admission or ordering
+# (docs/contest-display-in-app.md §6 red line). Pinned per edition.
+EXPECT_AWARD_ROWS = 911
+AWARD_EDITION_COUNTS = {
+    "十二征": 363, "十三征": 446,
+    "七征冬征": 16, "六征冬征": 16, "八征冬征": 10, "九征冬征": 10,
+    "2024春征": 16, "2024秋征": 11, "2025春征": 10, "2025秋征": 7,
+    "2026春征": 6,
+}
 # E.17 同人短字数条款把 6,012 本同人从 short 移入 dialogue：这些书不再受 E.11
 # 弃书约束，eligible 分母因此多出 0.87% 的收藏，而种子只吸收其中 700 本有质量锚
 # 的书。门槛随分母下调，P3 的同分母对比（vs V0 +0.00pp）才是回归判据。
@@ -196,6 +208,36 @@ def clean_dataset(records: dict[int, dict]) -> tuple[pd.DataFrame, dict, list, d
         dup = df.loc[nonnull, "cover_url"].value_counts()
         raise SystemExit(f"duplicate cover paths after dataset load: {int((dup > 1).sum())}")
     return df, tally, fixes, dropped_info
+
+
+def load_awards() -> pd.DataFrame:
+    """Load the normalized award table (net 911 rows, 11 editions).
+
+    One-shot analysis output (docs/award-winners-as-seed-source.md §8): the
+    602 shortlist rows are already excluded upstream, so this CSV is the only
+    award source. Pinned counts fail loudly if the file moves.
+    """
+    if not AWARD_CSV.exists():
+        raise SystemExit(
+            f"missing {AWARD_CSV}; one-shot analysis output, see "
+            f"docs/award-winners-as-seed-source.md §8"
+        )
+    df = pd.read_csv(AWARD_CSV, encoding="utf-8-sig", dtype={"nid": "int64"})
+    if len(df) != EXPECT_AWARD_ROWS:
+        raise SystemExit(f"award rows {len(df)} != expected {EXPECT_AWARD_ROWS}")
+    if (df["nid"] <= 0).any():
+        raise SystemExit("award rows with non-positive nid")
+    if df.duplicated(subset=["nid", "edition"]).any():
+        raise SystemExit("duplicate (nid, edition) award rows")
+    if (df["award"].isna() | (df["award"].astype(str).str.strip() == "")).any():
+        raise SystemExit("award rows with empty award")
+    edition_counts = df["edition"].value_counts().to_dict()
+    if edition_counts != AWARD_EDITION_COUNTS:
+        raise SystemExit(
+            f"award edition counts {edition_counts} != pinned "
+            f"{AWARD_EDITION_COUNTS}"
+        )
+    return df[["nid", "edition", "award", "category", "source_nid"]]
 
 
 def bind(value):
@@ -412,7 +454,8 @@ def build_frames() -> tuple[pd.DataFrame, dict]:
     return seed, meta
 
 
-def write_db(seed: pd.DataFrame, meta: dict, db_path: Path) -> dict:
+def write_db(seed: pd.DataFrame, meta: dict, db_path: Path,
+             awards: pd.DataFrame) -> dict:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     if db_path.exists():
         db_path.unlink()
@@ -454,7 +497,13 @@ def write_db(seed: pd.DataFrame, meta: dict, db_path: Path) -> dict:
                 "INSERT INTO calendar_universe(day, universe_count) VALUES(?, ?)",
                 [(day, int(count))
                  for day, count in meta["calendar_universe"]
-                                    .itertuples(index=False, name=None)],
+                                     .itertuples(index=False, name=None)],
+            )
+            conn.executemany(
+                "INSERT INTO contest_awards(nid, edition, award, category,"
+                " source_nid) VALUES(?, ?, ?, ?, ?)",
+                [tuple(bind(v) for v in row)
+                 for row in awards.itertuples(index=False, name=None)],
             )
             conn.executemany(
                 "INSERT INTO seed_meta(key, value) VALUES(?, ?)",
@@ -481,6 +530,7 @@ def write_db(seed: pd.DataFrame, meta: dict, db_path: Path) -> dict:
                                               .isin(set(seed["nid"])).sum()))),
                     ("calendar_universe_days",
                      str(len(meta["calendar_universe"]))),
+                    ("award_rows", str(len(awards))),
                 ],
             )
         conn.execute("VACUUM")
@@ -516,17 +566,21 @@ def main() -> int:
         )
 
     seed, meta = build_frames()
+    awards = load_awards()
+    meta["awards"] = awards
     log(f"seed rows: {len(seed)} (quality-anchored admitted {meta['admitted']} + licensed "
         f"{meta['licensed_rows']}; V0 was {V0_SEED})")
     log(f"favs coverage: {meta['favs_coverage']:.2%} | lqs scored in universe: "
         f"{meta['lqs_scored']:,}")
     log(f"deep ranks: {len(meta['deep_ranks'])} rows "
         f"({len(DEEP_METRICS)} metrics x top {DEEP_TOP_N}, full universe)")
+    log(f"contest awards: {len(awards)} rows "
+        f"({len(AWARD_EDITION_COUNTS)} editions, display-only)")
 
     work = REPO / "temp" / "seedbuild"
     work.mkdir(parents=True, exist_ok=True)
     db_path = work / "seed.db"
-    info = write_db(seed, meta, db_path)
+    info = write_db(seed, meta, db_path, awards)
 
     V.check_db(db_path, seed, meta)
 
@@ -553,6 +607,7 @@ def main() -> int:
             "seed": len(seed),
             "deep_rank_rows": len(meta["deep_ranks"]),
             "lqs_scored_universe": meta["lqs_scored"],
+            "award_rows": len(awards),
         },
         "admission_detail": meta["admission_detail"],
         "favs_coverage": round(meta["favs_coverage"], 6),

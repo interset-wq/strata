@@ -38,6 +38,11 @@ CREATE TABLE deep_ranks(
 );
 CREATE TABLE seed_meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE calendar_universe(day TEXT PRIMARY KEY, universe_count INTEGER NOT NULL);
+CREATE TABLE contest_awards(
+  nid INTEGER NOT NULL, edition TEXT NOT NULL, award TEXT NOT NULL,
+  category TEXT, source_nid TEXT NOT NULL,
+  PRIMARY KEY(nid, edition)
+);
 `
 
 type book struct {
@@ -145,6 +150,16 @@ VALUES(?,?,?,?, '免费', ?, NULL, ?, 1000, ?, 10, ?, NULL, '2026-04-01T00:00:00
 		return nil, err
 	}
 	if _, err := db.Exec(`UPDATE books SET form='long', contest='十三征长篇' WHERE nid = 3004`); err != nil {
+		db.Close()
+		return nil, err
+	}
+	// 3003/3004 carry contest awards (schema v5, docs/contest-display-
+	// in-app.md §6): 2025春季征文 maps to edition 2025春征 (a named award),
+	// 十三征 keeps the placeholder the display layer renders as 征文获奖.
+	if _, err := db.Exec(`
+INSERT INTO contest_awards(nid,edition,award,category,source_nid)
+VALUES(3003,'2025春征','金奖','短篇','zw20250301'),
+      (3004,'十三征','待逐档标定',NULL,'zw20250504')`); err != nil {
 		db.Close()
 		return nil, err
 	}

@@ -8,13 +8,13 @@ from pathlib import Path
 
 import pandas as pd
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 EXPECTED_TABLES = {"books", "book_tags", "seed_meta", "deep_ranks",
-                   "calendar_universe"}
+                   "calendar_universe", "contest_awards"}
 EXPECTED_INDEXES = {
     "idx_bt", "idx_updated", "idx_author", "idx_year_favpctl",
     "idx_year_clickpctl", "idx_genre_favs", "idx_favs", "idx_pr", "idx_shortfav",
-    "idx_deep_lookup",
+    "idx_deep_lookup", "idx_awards_edition",
 }
 
 
@@ -94,9 +94,33 @@ def check_db(db_path: Path, seed: pd.DataFrame, meta: dict) -> None:
         if deep_meta_row is None or int(deep_meta_row[0]) != deep_rows:
             _fail(errors, "seed_meta deep_rank_rows mismatch")
 
+        # v5 contest awards: additive display facts (never admission/ordering,
+        # docs/contest-display-in-app.md §6). Pinned total + clean fields.
+        award_rows = conn.execute(
+            "SELECT COUNT(*) FROM contest_awards").fetchone()[0]
+        award_expected = len(meta.get("awards", []))
+        if award_rows == 0 or (award_expected and award_rows != award_expected):
+            _fail(errors, f"contest_awards {award_rows} != expected {award_expected}")
+        bad_award = conn.execute(
+            "SELECT COUNT(*) FROM contest_awards WHERE nid <= 0 OR edition IS NULL"
+            " OR edition='' OR award IS NULL OR award='' OR source_nid IS NULL"
+            " OR source_nid=''").fetchone()[0]
+        if bad_award:
+            _fail(errors, f"{bad_award} award rows with invalid fields")
+        dup_award = conn.execute(
+            "SELECT COUNT(*) - COUNT(DISTINCT nid || '|' || edition)"
+            " FROM contest_awards").fetchone()[0]
+        if dup_award:
+            _fail(errors, f"{dup_award} duplicate (nid, edition) award rows")
+        award_meta_row = conn.execute(
+            "SELECT value FROM seed_meta WHERE key='award_rows'").fetchone()
+        if award_meta_row is None or int(award_meta_row[0]) != award_rows:
+            _fail(errors, "seed_meta award_rows mismatch")
+
         required = {"schema_version", "seed_version", "content_end", "built_at",
                     "book_count", "tag_count", "gen_min", "gen_max", "licensed_count",
-                    "deep_metrics", "deep_top_n", "deep_rank_rows", "deep_seed_hit"}
+                    "deep_metrics", "deep_top_n", "deep_rank_rows", "deep_seed_hit",
+                    "award_rows"}
         meta_keys = {r["key"] for r in conn.execute("SELECT key FROM seed_meta")}
         if not required <= meta_keys:
             _fail(errors, f"seed_meta missing {sorted(required - meta_keys)}")
@@ -206,7 +230,7 @@ def check_db(db_path: Path, seed: pd.DataFrame, meta: dict) -> None:
         print(
             f"validate: books={books} licensed={licensed} tags={tag_rows}/{tag_count}"
             f" universe={meta['universe_rows']} admitted={meta.get('admitted', '?')}"
-            f" v0={meta.get('baseline_v0', '?')}"
+            f" v0={meta.get('baseline_v0', '?')} awards={award_rows}"
         )
     finally:
         conn.close()

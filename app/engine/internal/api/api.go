@@ -416,6 +416,9 @@ func (s *Server) book(c *gin.Context) {
 		"effective": effective(detail),
 		"cover":     cover,
 		"refresh":   refresh,
+		// Seed-side award rows (schema v5, docs/contest-display-in-app.md
+		// §6): display-only badge material, never ordering or scoring.
+		"awards": detail.Awards,
 	})
 }
 
@@ -891,7 +894,15 @@ func (s *Server) contestArchiveBooks(c *gin.Context) {
 		fail(c, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"contest": name, "items": items})
+	// v5 award block (docs/contest-display-in-app.md §6): the event's
+	// in-library award books, fav_pctl-ordered (the award field itself never
+	// orders). Always present — an empty list means "no award block".
+	awards, err := s.store.EditionAwards(c.Request.Context(), name)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"contest": name, "items": items, "awards": awards})
 }
 
 // errRosterDead marks a structurally dead roster interface (errorCode

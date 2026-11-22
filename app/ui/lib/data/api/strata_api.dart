@@ -377,9 +377,10 @@ class StrataApi {
         .toList();
   }
 
-  /// 一届赛事的代表作：各 form 头部按同代收藏分位（fav_pctl，NULL 殿后），
-  /// per 限每形态条数（docs/12 红线：累计原始值不进排序）。
-  Future<List<RankItem>> contestArchiveBooks({
+  /// 一届赛事的代表作 + 该届库内获奖作品（schema v5）：各 form 头部按
+  /// 同代收藏分位（fav_pctl，NULL 殿后），per 限每形态条数（docs/12 红线：
+  /// 累计原始值不进排序；奖项字段同样不参与排序）。
+  Future<ContestBooks> contestArchiveBooks({
     required String contest,
     int per = 10,
   }) async {
@@ -387,9 +388,7 @@ class StrataApi {
       'contest': contest,
       'per': '$per',
     });
-    return (body['items'] as List)
-        .map((e) => RankItem.fromJson(e as Map<String, dynamic>))
-        .toList();
+    return ContestBooks.fromJson(body as Map<String, dynamic>);
   }
 
   /// 一届赛事的官方清单一页（形态二，按需）：引擎按 (tag, page) 缓存
@@ -1415,6 +1414,61 @@ class ObservationRow {
       source = m['source'] as String?;
 }
 
+/// 一条获奖记录（schema v5，docs/contest-display-in-app.md §6）。
+/// award 为表内原值：44 本已标定届次是具体奖项名，其余 867 本为
+/// 「待逐档标定」占位——展示层统一映射为「征文获奖」，不显示占位原文。
+class Award {
+  final int nid;
+  final String edition;
+  final String award;
+  final String? category;
+
+  Award.fromJson(Map<String, dynamic> m)
+      : nid = m['nid'] as int,
+        edition = m['edition'] as String,
+        award = m['award'] as String,
+        category = m['category'] as String?;
+
+  /// 徽标文案（占位 → 征文获奖，docs §6）。
+  String get displayAward => award == '待逐档标定' ? '征文获奖' : award;
+}
+
+/// 一届赛事的一条库内获奖作品（档案页获奖区块；行序由引擎 fav_pctl
+/// 同代分位决定，奖项字段不参与排序）。
+class AwardBook {
+  final Award award;
+  final String title;
+  final String author;
+  final int? favs;
+  final double? favPctl;
+  final String? coverUrl;
+  final int estYear;
+
+  AwardBook.fromJson(Map<String, dynamic> m)
+      : award = Award.fromJson(m),
+        title = m['title'] as String,
+        author = m['author'] as String,
+        favs = m['favs'] as int?,
+        favPctl = (m['fav_pctl'] as num?)?.toDouble(),
+        coverUrl = m['cover_url'] as String?,
+        estYear = m['est_year'] as int;
+}
+
+/// /contests/books 响应：代表作（items）+ 获奖作品（awards；映射表外的
+/// 赛事为空列表，页面隐藏获奖区块）。
+class ContestBooks {
+  final List<RankItem> items;
+  final List<AwardBook> awards;
+
+  ContestBooks.fromJson(Map<String, dynamic> m)
+      : items = (m['items'] as List)
+            .map((e) => RankItem.fromJson(e as Map<String, dynamic>))
+            .toList(),
+        awards = (m['awards'] as List)
+            .map((e) => AwardBook.fromJson(e as Map<String, dynamic>))
+            .toList();
+}
+
 class BookDetail {
   final String source; // seed | local
   final String dataEnd;
@@ -1425,6 +1479,9 @@ class BookDetail {
   // meta 非空；种子书无观测时两者皆空，有观测时 local 非空。
   final Map<String, dynamic>? local;
   final Map<String, dynamic>? meta;
+  // 种子侧获奖记录（schema v5）：仅徽标素材，永不参与排序/打分。
+  // 种子书详情恒有该字段（空列表 = 无获奖）；库外 overlay 无此字段。
+  final List<Award> awards;
 
   BookDetail.fromJson(Map<String, dynamic> m)
     : source = m['source'] as String,
@@ -1433,7 +1490,11 @@ class BookDetail {
       tags = (m['tags'] as List).cast<String>(),
       effective = m['effective'] as Map<String, dynamic>?,
       local = m['local'] as Map<String, dynamic>?,
-      meta = m['meta'] as Map<String, dynamic>?;
+      meta = m['meta'] as Map<String, dynamic>?,
+      awards = (m['awards'] as List?)
+              ?.map((e) => Award.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          const [];
 }
 
 /// 官方榜单一行（三来源共用，docs/sfacg-live-ranks.md）。

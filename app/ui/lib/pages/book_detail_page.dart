@@ -304,6 +304,11 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                                   s(eff['genre'] ?? b['genre'])!),
                             if (s(b['est_year']) != null)
                               _badge(context, '${s(b['est_year'])} 代'),
+                            // 获奖徽标（schema v5，docs §6）：{edition} · {award|征文获奖}，
+                            // edition 原样显示不走映射表，多届并列；永不参与排序/打分。
+                            for (final aw in d.awards)
+                              _badge(context,
+                                  '${aw.edition} · ${aw.displayAward}'),
                           ],
                         ),
                       ],

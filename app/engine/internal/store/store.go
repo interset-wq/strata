@@ -102,6 +102,9 @@ type BookDetail struct {
 	Tags  []string     `json:"tags"`
 	Local *Observation `json:"local"`
 	Meta  *BookMeta    `json:"meta,omitempty"`
+	// Awards are seed-side contest award rows (schema v5). Display-only
+	// badge material; the field is omitted when the book has none.
+	Awards []*Award `json:"awards,omitempty"`
 }
 
 // RefreshAttempt is the last user-triggered detail fetch for one nid.
@@ -235,7 +238,12 @@ FROM seed.books WHERE nid = ?`
 	if err != nil {
 		return nil, err
 	}
-	return &BookDetail{Book: &b, Tags: tagList, Local: local, Meta: meta}, nil
+	awards, err := s.BookAwards(ctx, nid)
+	if err != nil {
+		return nil, err
+	}
+	return &BookDetail{Book: &b, Tags: tagList, Local: local, Meta: meta,
+		Awards: awards}, nil
 }
 
 func (s *Store) bookTags(ctx context.Context, nid int64) ([]string, error) {

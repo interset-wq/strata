@@ -1,8 +1,8 @@
 {
-  "schema_version": 4,
-  "seed_version": "20260503.25",
+  "schema_version": 5,
+  "seed_version": "20260503.26",
   "content_end": "2026-05-03",
-  "built_at": "2026-11-21T07:15:08+00:00",
+  "built_at": "2026-11-22T02:01:31+00:00",
   "book_count": 18751,
   "licensed_count": 47,
   "tag_count": 102,
@@ -16,7 +16,8 @@
     "licensed_added": 47,
     "seed": 18751,
     "deep_rank_rows": 14621,
-    "lqs_scored_universe": 11784
+    "lqs_scored_universe": 11784,
+    "award_rows": 911
   },
   "admission_detail": {
     "top_favs": 20000,
@@ -160,13 +161,13 @@
   "files": {
     "db": {
       "name": "seed.db",
-      "bytes": 15777792,
-      "sha256": "141dd8e8cfe17d8f1b25f051cbf86cf94c0dc10a7bafdd0d51726f5788282096"
+      "bytes": 15876096,
+      "sha256": "0d27ae66cc344eac2f409895cd8836eade858a0ed5dfd4845e7ba04fffe1850e"
     },
     "gz": {
       "name": "seed.db.gz",
-      "bytes": 6953930,
-      "sha256": "b01b7d7625e2b667b233d3ba92360f30972233637d137fda5d9050368056bd29"
+      "bytes": 6979381,
+      "sha256": "1fcfd3be5240e26c20cf162a73359d263ac544cfc3bf5df7c18f8b99e95d7120"
     }
   }
 }

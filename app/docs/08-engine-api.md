@@ -78,7 +78,9 @@ UI 启动轮询即打这个端点（200ms 间隔、15s 超时），`status=="ok"
                  "author_id": …, "type_id": …, "category_id": …,
                  "is_sensitive": …, "allow_down": …,
                  "has_comic": …, "has_audio": … },
-  "cover": "https://…cover…" | null
+  "cover": "https://…cover…" | null,
+  "awards": [ { "nid": …, "edition": "十二征", "award": "金奖",
+                "category": "长篇" | null } ]
 }
 ```
 
@@ -86,6 +88,11 @@ UI 启动轮询即打这个端点（200ms 间隔、15s 超时），`status=="ok"
 `local`（最新观测）覆盖后的展示值；`local != null || meta != null` 即
 `source == "local"`。`cover` 优先取本地封面直链，种子 `cover_url` 大量为空
 或为相对路径，客户端须兼容相对路径并使用官方默认封面兜底。
+`awards` = 种子侧获奖记录（schema v5，`contest_awards` 表）：详情页徽标
+`{edition} · {award|征文获奖}`（「待逐档标定」占位由展示层统一映射为
+「征文获奖」，edition 原样显示、多届并列）；种子书详情恒有该字段
+（空列表 = 无获奖），库外 overlay 详情无此字段。获奖仅作展示素材，
+永不参与排序/打分（docs/12 红线）。
 `POST /strata/books/:nid/refresh` 的 `detail` 同样返回本次请求解析到的全部字段：
 HTML 含书名/作者/分类/签约/封面/简介/收藏/赞/字数/状态/更新时间，外加
 `tickets`（当月月票，`GetTicketNum.ashx` 追加请求，失败为 null）；App API 含
@@ -379,7 +386,13 @@ fav_pctl DESC, nid)`），`per` 限每形态条数（1..50，默认 10）；
 - 400 `invalid_argument`：`contest` 缺失，或 `per` 越界。
 - 匹配语义与榜单筛选一致：N征 事件前缀匹配（含对话类分轨），非 N征 精确匹配。
 
-200：`{ contest, items: [RankItem] }`（`rank` = 该 form 组内名次 1..per）。
+200：`{ contest, items: [RankItem], awards: [AwardBook] }`（`rank` = 该 form
+组内名次 1..per）。`awards` = 该赛事库内获奖作品（schema v5，`contest_awards`
+表 join seed.books；edition → 赛事名由引擎内置静态表映射 11 条，表外赛事
+返回空列表）；行序 = `fav_pctl DESC NULLs last, nid`——奖项字段不参与排序
+（docs/12 红线）。`AwardBook` = award 四字段（nid/edition/award/category）
++ title/author/favs/fav_pctl/cover_url/est_year。140 本库外获奖行无 books
+行可 join，v1 不返回。
 
 ### GET /strata/roster?contest=&division=&page=（**已实现**，2026-11-21 P1 官方清单）
 

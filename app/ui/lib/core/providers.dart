@@ -187,9 +187,10 @@ final contestArchiveProvider =
   return handle.api.contestArchive();
 });
 
-/// 一届赛事的代表作（per-form 窗口，同代收藏分位序）。
+/// 一届赛事的代表作（per-form 窗口，同代收藏分位序）+ 该届库内获奖作品
+/// （schema v5；奖项字段不参与排序，docs/contest-display-in-app.md §6）。
 final contestArchiveBooksProvider =
-    FutureProvider.family<List<RankItem>, String>((ref, contest) async {
+    FutureProvider.family<ContestBooks, String>((ref, contest) async {
   final handle = await ref.watch(bootProvider.future);
   return handle.api.contestArchiveBooks(contest: contest);
 });

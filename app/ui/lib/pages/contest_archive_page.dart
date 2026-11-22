@@ -127,9 +127,9 @@ class _Body extends ConsumerWidget {
                   ),
                 ),
               ),
-              data: (items) {
+              data: (res) {
                 final byForm = <String, List<RankItem>>{};
-                for (final it in items) {
+                for (final it in res.items) {
                   byForm.putIfAbsent(it.form, () => []).add(it);
                 }
                 final children = <Widget>[];
@@ -163,6 +163,41 @@ class _Body extends ConsumerWidget {
                     child: Column(
                       children: [
                         for (final it in section) BookRowCard(item: it),
+                      ],
+                    ),
+                  ));
+                }
+                // 获奖作品区块（schema v5，docs §6）：该届库内获奖书，行序
+                // = 引擎 fav_pctl 同代分位；奖项仅徽标展示、不参与排序。
+                // 映射表外赛事返回空列表 → 区块隐藏。
+                if (res.awards.isNotEmpty) {
+                  children.add(Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 2),
+                    child: Row(
+                      children: [
+                        Text(
+                          '获奖作品',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          '${res.awards.length} 本（库内）',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ));
+                  children.add(Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Column(
+                      children: [
+                        for (final a in res.awards) _AwardRow(a: a),
                       ],
                     ),
                   ));
@@ -273,4 +308,69 @@ class _Header extends StatelessWidget {
       .where((f) => g.forms[f] != null)
       .map((f) => '${_formLabels[f]} ${g.forms[f]}')
       .join(' · ');
+}
+
+/// 获奖区块一行：徽标文案 + 书名/作者 + 收藏。点击 → 详情页（获奖详情在
+/// 详情页徽标完整呈现，行内不重复展开）。
+class _AwardRow extends StatelessWidget {
+  final AwardBook a;
+
+  const _AwardRow({super.key, required this.a});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: () => context.push('/book/${a.award.nid}'),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: scheme.tertiaryContainer,
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: Text(
+                a.award.displayAward,
+                style: TextStyle(
+                  fontSize: 11,
+                  color: scheme.onTertiaryContainer,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    a.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    a.author,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (a.favs != null)
+              Text(
+                '藏 ${a.favs}',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
 }
