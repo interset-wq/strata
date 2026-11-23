@@ -86,17 +86,28 @@ bool carouselIsFixed(String form) {
   return carouselForm == 'medium' || carouselForm == 'ip_collab';
 }
 
-final bannerProvider = FutureProvider.family<List<FeaturedItem>, String>((
-  ref,
-  form,
-) async {
+/// 本地日期键（YYYYMMDD）：轮播随机种子的来源。必须放进 family 键——
+/// 常驻 family 的 `DateTime.now()` 只在进程首次求值时捕获一次，进程活过
+/// 午夜就永远停在昨天的抽签上（2026-11-23 用户报告的回归）。
+String carouselDayKey() {
+  final now = DateTime.now();
+  return '${now.year * 10000 + now.month * 100 + now.day}';
+}
+
+/// 轮播 provider 的 family 键：form + 当日日期键，新的一天产生新键。
+String carouselProviderKey(String form) => '$form@${carouselDayKey()}';
+
+final bannerProvider = FutureProvider.autoDispose
+    .family<List<FeaturedItem>, String>((ref, formDay) async {
+  final at = formDay.indexOf('@');
+  final form = formDay.substring(0, at);
+  final dayKey = formDay.substring(at + 1);
   final handle = await ref.watch(bootProvider.future);
   final carouselForm = carouselFormFor(form);
   if (carouselIsFixed(form)) {
     return handle.api.featured(limit: bannerCarouselCount, form: carouselForm);
   }
-  final now = DateTime.now();
-  final seed = now.year * 10000 + now.month * 100 + now.day;
+  final seed = int.parse(dayKey);
   return handle.api.banners(
     seed: seed,
     limit: bannerCarouselCount,
@@ -111,13 +122,13 @@ const largeImageCount = 6;
 /// 种子每日轮换（与长篇 banner 同款哈希）。没有 featured 定制图的形态
 /// 端上用封面实时合成纸墨 banner（重纸纱 + 衬线书名 + 指标行），见
 /// widgets/cover_banner.dart。按 form 分池。
-final coverCarouselProvider = FutureProvider.family<List<RankItem>, String>((
-  ref,
-  form,
-) async {
+final coverCarouselProvider = FutureProvider.autoDispose
+    .family<List<RankItem>, String>((ref, formDay) async {
+  final at = formDay.indexOf('@');
+  final form = formDay.substring(0, at);
+  final dayKey = formDay.substring(at + 1);
   final handle = await ref.watch(bootProvider.future);
-  final now = DateTime.now();
-  final seed = now.year * 10000 + now.month * 100 + now.day;
+  final seed = int.parse(dayKey);
   return handle.api.coverCarousel(
     seed: seed,
     form: form,

@@ -136,11 +136,11 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final banners = ref.watch(bannerProvider(_form));
+    final banners = ref.watch(bannerProvider(carouselProviderKey(_form)));
     return Scaffold(
       body: RefreshIndicator(
         onRefresh: () async {
-          ref.invalidate(bannerProvider(_form));
+          ref.invalidate(bannerProvider(carouselProviderKey(_form)));
           ref.invalidate(boardProvider);
           ref.invalidate(serialShowcaseProvider(_form));
           ref.invalidate(finishedShowcaseProvider(_form));
@@ -148,7 +148,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           ref.invalidate(contestGroupsProvider);
           ref.invalidate(yearGroupsProvider);
           ref.invalidate(genreGroupsProvider);
-          await ref.read(bannerProvider(_form).future);
+          await ref.read(bannerProvider(carouselProviderKey(_form)).future);
         },
         child: SafeArea(bottom: false, child: _buildBody(context, banners)),
       ),
@@ -462,7 +462,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           height: 150,
           child: Center(
             child: TextButton(
-              onPressed: () => ref.invalidate(bannerProvider(_form)),
+              onPressed: () => ref.invalidate(bannerProvider(carouselProviderKey(_form))),
               child: const Text('轮播加载失败，点按重试'),
             ),
           ),
@@ -1179,7 +1179,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   // 对话/短篇 tab 轮播：无 featured 定制图，封面实时合成纸墨 banner
   // （见 widgets/cover_banner.dart）。静态收藏序（不随日期变），按 form 分池。
   Widget _coverBannerCarousel(String form) {
-    final list = ref.watch(coverCarouselProvider(form));
+    final list = ref.watch(coverCarouselProvider(carouselProviderKey(form)));
     return list.when(
       loading: () => const Padding(
         padding: EdgeInsets.symmetric(horizontal: 16),
