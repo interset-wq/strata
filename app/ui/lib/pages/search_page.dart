@@ -35,8 +35,20 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     super.dispose();
   }
 
+  // 官方 App 分享出的书籍链接形态（PC /Novel/{nid}/、移动版 /b/{nid}/）。
+  static final RegExp _nidLink =
+      RegExp(r'sfacg\.com/(?:Novel|b)/(\d+)', caseSensitive: false);
+
+  /// 查询规范化：粘贴进来的 SFACG 书籍链接自动提取 nid，走 nid 精确找书；
+  /// 纯数字与其余输入原样。
+  String _normalizeQuery(String raw) {
+    if (RegExp(r'^\d+$').hasMatch(raw)) return raw;
+    final m = _nidLink.firstMatch(raw);
+    return m?.group(1) ?? raw;
+  }
+
   void _submit(String v) {
-    final q = v.trim();
+    final q = _normalizeQuery(v.trim());
     setState(() {
       _query = q.isEmpty ? null : q;
       // 新词使全站搜索旧结果失效。
