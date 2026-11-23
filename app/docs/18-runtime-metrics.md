@@ -89,9 +89,19 @@ form≠invalid、words≥2000）上**自含现算**，不依赖报告生成器�
 ## 6. 分期
 
 - **P1（本期）**：种子预计算 + 校准表 + 引擎 cqs/cps/clx + UI。覆盖种子书。
-- **P2（后续）**：库外书运行时现算（discovered 写回后按 §8.3 顺序：
-  定年→定档→cps→cqs→len_norm）。依赖种子内的校准表（本版已带）+ **eras 锚点表入种子**
-  （281 行，待 v7）；锚点表进来之前，库外书不进 cqs/cps 榜，只进搜索/详情。
+- **P2（2026-11-23 细化，实施中）**：库外书运行时现算。定案：
+  - **eras 锚点表入种子 v7**：`eras_anchors(nid INTEGER PRIMARY KEY, day INTEGER)`
+    （281 行，build_seed 从 `eras.load_anchors()` 导出，day = epoch 天数）；引擎 Go
+    移植 `log(nid)↔day` 分段线性插值（边界斜率外推一律 low；两侧锚点日期差
+    gap ≤90 = high / ≤365 = mid / 其余 low；锚点书 = exact；est_year 2026 = provisional）。
+  - **discovered 表加列**（user.db 迁移）：est_year / form / cqs / cqs_state / cps /
+    len_norm——详情抓取写回 words/favs/praises/genre 时**现算一次**并存下。
+  - **form 策略（保守）**：移动版详情页无对话产品标识（2026-11-23 探针实证，
+    nid 617557 正常渲染、无对话提示）→ 库外 form = words 长度带
+    （short/medium/long）；**同人题材的库外书不进 cqs/cps 流**（对话误判污染源，
+    E.17 教训），保持经典口径；form 未知（未抓详情）不进流，只进搜索/详情。
+  - **流集成**：RecommendCQS 以 UNION ALL 并入 discovered 中 cqs 非空、form
+    匹配的行（同 keyset 游标跨两侧）；UI 分位徽标对无 fav_pctl 的行隐藏。
 
 ## 7. 验收断言（validate.py）
 
