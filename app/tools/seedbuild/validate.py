@@ -8,11 +8,11 @@ from pathlib import Path
 
 import pandas as pd
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 EXPECTED_TABLES = {"books", "book_tags", "seed_meta", "deep_ranks",
                    "calendar_universe", "contest_awards",
                    "calib_fav_bounds", "calib_len_anchors",
-                   "calib_cqs_median", "calib_cps_median"}
+                   "calib_cqs_median", "calib_cps_median", "eras_anchors"}
 EXPECTED_INDEXES = {
     "idx_bt", "idx_updated", "idx_author", "idx_year_favpctl",
     "idx_year_clickpctl", "idx_genre_favs", "idx_favs", "idx_pr", "idx_shortfav",
@@ -230,6 +230,18 @@ def check_db(db_path: Path, seed: pd.DataFrame, meta: dict) -> None:
             " OR med IS NULL").fetchone()[0]
         if bad_cell:
             _fail(errors, f"{bad_cell} calib_cqs_median rows below the cell floor")
+        eras_rows = conn.execute("SELECT COUNT(*) FROM eras_anchors").fetchone()[0]
+        if eras_rows < 280:
+            _fail(errors, f"eras_anchors {eras_rows} < 280")
+        eras_mono = conn.execute(
+            "SELECT COUNT(*) FROM (SELECT nid - LAG(nid) OVER (ORDER BY nid)"
+            " AS step FROM eras_anchors) WHERE step <= 0").fetchone()[0]
+        if eras_mono:
+            _fail(errors, f"{eras_mono} non-monotonic eras anchor nids")
+        eras_meta_row = conn.execute(
+            "SELECT value FROM seed_meta WHERE key='eras_anchor_rows'").fetchone()
+        if eras_meta_row is None or int(eras_meta_row[0]) != eras_rows:
+            _fail(errors, "seed_meta eras_anchor_rows mismatch")
 
         ln_range = conn.execute(
             "SELECT COUNT(*) FROM books WHERE is_licensed=0 AND"

@@ -13,6 +13,9 @@
 -- books.cqs/cps/len_norm/cqs_state are precomputed over the calibration
 -- universe; the calib_* tables let the engine band and score discovered books
 -- at runtime (phase 2). Cumulative clicks never enters the formulas (docs/12).
+-- v7 adds eras_anchors: the 281 nid-axis dating anchors (eras.load_anchors,
+-- report 01) so the engine can estimate est_year for discovered books at
+-- runtime (app/docs/18-runtime-metrics.md P2).
 -- Uniqueness: cover_url is unique per book on the platform (NULL for missing
 -- covers); title is unique on the platform but snapshots can carry rename-window
 -- artifacts, so title duplicates are checked in validate.py, not constrained here.
@@ -152,6 +155,15 @@ CREATE TABLE calib_cps_median(
   genre    TEXT    NOT NULL,
   med      REAL    NOT NULL,
   PRIMARY KEY(form, est_year, band, genre)
+);
+
+-- v7: the nid-axis dating anchors (analysis/anchors/nid_anchors.jsonl via
+-- eras.load_anchors; interpolation error median 2 days). day = epoch days.
+-- The engine interpolates log(nid) ↔ day piecewise-linearly to date
+-- discovered books at runtime (app/docs/18-runtime-metrics.md P2).
+CREATE TABLE eras_anchors(
+  nid INTEGER PRIMARY KEY,
+  day INTEGER NOT NULL
 );
 
 -- Eleven indexes; predicates match the engine queries.

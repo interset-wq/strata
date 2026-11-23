@@ -59,8 +59,8 @@ SCHEMA = Path(__file__).resolve().parent / "schema.sql"
 DATASET = REPO / "dataset" / "out" / "books.jsonl"
 AWARD_CSV = ANALYSIS / "out" / "contest_awards_normalized.csv"
 
-SCHEMA_VERSION = 6
-SEED_VERSION = "20260503.27"  # .27: v6 运行时指标列（cqs/cps/len_norm/cqs_state）+ calib_* 校准表；书目集合不变
+SCHEMA_VERSION = 7
+SEED_VERSION = "20260503.28"  # .28: v7 eras_anchors 定年锚点表（281 行，库外书运行时定年）；书目集合不变
 CONTENT_END = pd.Timestamp("2026-05-03")
 GEN_MIN, GEN_MAX = 2007, 2025
 
@@ -394,6 +394,14 @@ def build_frames() -> tuple[pd.DataFrame, dict]:
     scores, rt = RM.build(universe)
     universe = universe.merge(scores, on="id", how="left")
 
+    # v7 eras anchors: the nid-axis dating curve ships with the seed so the
+    # engine can estimate est_year for discovered books at runtime
+    # (app/docs/18-runtime-metrics.md P2).
+    anchors_df = eras.load_anchors()[["nid", "day"]].copy()
+    anchors_df["day"] = anchors_df["day"].astype("int64")
+    if len(anchors_df) < 280:
+        raise SystemExit(f"eras anchors {len(anchors_df)} < 280")
+
     pctl_cols = ["id", "fav_pctl", "click_pctl", "praise_pctl", "pr", "pctl_pr"] \
         + extra + ["cqs", "cqs_state", "cps", "len_norm"]
     seed = df[df["id"].isin(seed_ids)].merge(universe[pctl_cols], on="id", how="left")
@@ -462,6 +470,7 @@ def build_frames() -> tuple[pd.DataFrame, dict]:
         "deep_ranks": deep,
         "calendar_universe": calendar_universe,
         "runtime": rt,
+        "eras_anchors": anchors_df,
     }
     return seed, meta
 
@@ -533,6 +542,11 @@ def write_db(seed: pd.DataFrame, meta: dict, db_path: Path,
                      for row in frame.itertuples(index=False, name=None)],
                 )
             conn.executemany(
+                "INSERT INTO eras_anchors(nid, day) VALUES(?, ?)",
+                [(int(nid), int(day)) for nid, day in
+                 meta["eras_anchors"].itertuples(index=False, name=None)],
+            )
+            conn.executemany(
                 "INSERT INTO seed_meta(key, value) VALUES(?, ?)",
                 [
                     ("schema_version", str(SCHEMA_VERSION)),
@@ -563,6 +577,7 @@ def write_db(seed: pd.DataFrame, meta: dict, db_path: Path,
                     ("cqs_stable", str(meta["runtime"]["cqs_stable"])),
                     ("cps_scored", str(meta["runtime"]["cps_scored"])),
                     ("cqs_mu0", f"{meta['runtime']['mu0']:.6f}"),
+                    ("eras_anchor_rows", str(len(meta["eras_anchors"]))),
                 ],
             )
         conn.execute("VACUUM")
