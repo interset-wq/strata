@@ -252,17 +252,21 @@ Classic 发现流（docs/12 §5）：候选池 = `is_licensed=0` 且**有封面*
 `clicks:nid`，缺省从顶部开始），每批默认 20，stateless。响应含 `next_cursor`
 （批末返回，为空表示到底）。
 
-### GET /strata/recommend?cursor=&form=&limit=（**已实现**，2026-11-21 接入）
+### GET /strata/recommend?cursor=&form=&k=&limit=（**已实现**，2026-11-21 接入；2026-11-23 改 cqs/clx 口径）
 
-量化推荐流（docs/12 §3、docs/lqs-ranking-integration.md）：候选池 =
-`is_licensed=0` + **有封面**（硬门槛）+ `fav_pctl IS NOT NULL`（可推荐门槛代理）。
-**两级排序键**（不合并成一个分）：`lqs` 非空的长篇组在前、组内 `lqs DESC`；
-其余回退 `fav_pctl DESC`（同代收藏分位，位置分）；`nid ASC` 稳定平局键。
-**keyset 游标** = `lqs|favpctl|nid`（lqs 段在回退组为空；浮点全精度往返），
-stateless，每批默认 20。累计原始值（clicks/favs/praises）只出现在 SELECT 展示列，
-**禁入 ORDER BY / WHERE**（docs/12 §3.2 红线）。响应与 `/discover` 同构
-（items + next_cursor），`meta.ordering="lqs|fav_pctl"`、`licensed_excluded=true`。
-发现流 UI（发现页）已切换至本端点；`/discover` 保持 clicks 展示流口径不变
+量化推荐流（docs/12 §3、app/docs/18-runtime-metrics.md，报告 24）：候选池 =
+`is_licensed=0` + **有封面**（硬门槛）+ form 内 `cqs IS NOT NULL`（且 `cps` 落在
+form 内 20–80 分位**中层带**——筛选不发榜）。**排序** = form 内 `cqs DESC`；
+`k>0` 时运行时 **clx** 重排 `cqs×(1−K+K×len_norm)`（篇幅偏好，K∈[0,1] 缺省 0，
+预设 0/0.25/0.60；不落列、不合成分）。**keyset 游标** = `score|nid`（score 为
+排序表达式值，浮点全精度往返），stateless，每批默认 20。items 带 `cqs_state`
+（stable/low 证据强度）。**form 回退**：short/ip_collab 无 cqs 证据（报告 24 §3），
+回退经典 `fav_pctl DESC` 排序（`meta.ordering="fav_pctl"`）。累计原始值
+（clicks/favs/praises）只在 SELECT 展示列，**禁入 ORDER BY / WHERE**
+（docs/12 §3.2 红线）。响应与 `/discover` 同构（items + next_cursor），
+`meta.ordering="cqs"|"clx"|"fav_pctl"`、`licensed_excluded=true`。lqs 两级排序为
+上一版口径（归档不落地，cqs 接任，两者不合并、分数不可比）。发现流 UI（发现页）
+已切换至本端点；`/discover` 保持 clicks 展示流口径不变
 （端点保真、展示层裁剪的同一政策）。
 
 ### GET/POST/PUT/DELETE /strata/watchlist（**已实现**，v6 起统一书架）
