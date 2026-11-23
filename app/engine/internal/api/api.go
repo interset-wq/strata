@@ -127,6 +127,7 @@ func NewServer(s *store.Store) *Server {
 	group.GET("/contests/books", srv.contestArchiveBooks)
 	group.GET("/roster", srv.roster)
 	group.GET("/booklists", srv.booklists)
+	group.GET("/booklists/recommend", srv.booklistsRecommend)
 	group.GET("/booklists/:id/novels", srv.booklistNovels)
 	group.GET("/settings", srv.settings)
 	group.PUT("/settings", srv.updateSettings)

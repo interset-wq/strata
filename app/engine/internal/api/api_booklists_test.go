@@ -125,3 +125,36 @@ func TestParseBooklistDead(t *testing.T) {
 		t.Fatal("errorCode 500 novels parsed")
 	}
 }
+
+// TestBooklistsRecommend: the date-seeded sample returns exactly count
+// distinct booklists; dead ids in the draw (here: the whole lower half of
+// the id space) are topped up without error.
+func TestBooklistsRecommend(t *testing.T) {
+	ts, srv := newRosterTestServer(t)
+	srv.booklistFetch = func(ctx context.Context, client *http.Client,
+		l *crawl.Limiter, id int, kind string, foreground bool) (string, error) {
+		if kind != "item" {
+			return "", fmt.Errorf("unexpected kind %q", kind)
+		}
+		if id <= 600 {
+			return booklistInvalidJSON, nil
+		}
+		return validBooklistJSON(id), nil
+	}
+	body := getJSON(t, ts.URL+"/strata/booklists/recommend", http.StatusOK)
+	items := body["items"].([]any)
+	if len(items) != 3 {
+		t.Fatalf("items = %v, want 3 (default count)", items)
+	}
+	seen := map[float64]bool{}
+	for _, it := range items {
+		id := it.(map[string]any)["id"].(float64)
+		if seen[id] {
+			t.Fatalf("duplicate id %v in sample", id)
+		}
+		seen[id] = true
+		if id < 1 || id > 1272 {
+			t.Fatalf("id %v outside the live space", id)
+		}
+	}
+}

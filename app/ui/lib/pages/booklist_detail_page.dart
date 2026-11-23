@@ -114,7 +114,11 @@ class _BooklistDetailPageState extends ConsumerState<BooklistDetailPage> {
               controller: _scroll,
               padding: const EdgeInsets.symmetric(vertical: 8),
               children: [
-                _header(context, d.booklist),
+                _header(
+                  context,
+                  d.booklist,
+                  inLibrary: d.items.where((n) => n.inLibrary).length,
+                ),
                 for (final n in d.items) _novelRow(context, n),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(0, 16, 0, 24),
@@ -145,7 +149,7 @@ class _BooklistDetailPageState extends ConsumerState<BooklistDetailPage> {
     );
   }
 
-  Widget _header(BuildContext context, Booklist b) {
+  Widget _header(BuildContext context, Booklist b, {required int inLibrary}) {
     final scheme = Theme.of(context).colorScheme;
     return Container(
       margin: const EdgeInsets.all(16),
@@ -204,6 +208,30 @@ class _BooklistDetailPageState extends ConsumerState<BooklistDetailPage> {
                 '${b.novelNum} 部作品${b.updated.isEmpty ? '' : '  ${b.updated}'}',
                 style:
                     TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          // 书单自身统计（recommendNum/markNum 为官方累计值，纯展示，
+          // docs/12 红线）+ 本地 join 的库内占比。
+          Row(
+            children: [
+              Text(
+                '库内 $inLibrary/${b.novelNum}',
+                style:
+                    TextStyle(fontSize: 10.5, color: scheme.onSurfaceVariant),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                '推荐 ${b.recommends}',
+                style:
+                    TextStyle(fontSize: 10.5, color: scheme.onSurfaceVariant),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                '收藏 ${b.markNum}',
+                style:
+                    TextStyle(fontSize: 10.5, color: scheme.onSurfaceVariant),
               ),
             ],
           ),

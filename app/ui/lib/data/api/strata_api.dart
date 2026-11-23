@@ -429,6 +429,15 @@ class StrataApi {
     return BooklistDetail.fromJson(body);
   }
 
+  /// 首页书单推荐行：引擎按 UTC 日期种子随机抽 count 个书单号（当日稳定、
+  /// 24h 缓存；失效号自动补抽——docs/booklist-in-app.md §深化）。
+  Future<List<Booklist>> booklistRecommend({int count = 3}) async {
+    final body = await _get('/booklists/recommend', {'count': '$count'});
+    return (body['items'] as List)
+        .map((e) => Booklist.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   /// 编辑精选（seed featured=1，构建期人工选定，非"热门"）。
   /// 传 form 时只取该形态的 featured 池，池子不足 limit 时原样返回。
   Future<List<FeaturedItem>> featured({int limit = 6, String? form}) async {

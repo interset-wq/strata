@@ -387,6 +387,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               subtitle: '月票 / 新书 / 热销 / 打赏 · 在线',
               route: '/official-ranks',
             ),
+            _booklistRecommendSection(context),
             _sectionTitle(
               context,
               '连载发现',
@@ -824,6 +825,88 @@ class _HomePageState extends ConsumerState<HomePage> {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  // 书单推荐（docs/booklist-in-app.md §深化）：引擎按 UTC 日期种子随机
+  // 抽 3 个官方书单，横排文本卡（#id + 标题 + 作品数 + 作者），点击进
+  // 书单详情。增益区块：加载失败/空结果整行隐藏，不阻塞首页。
+  Widget _booklistRecommendSection(BuildContext context) {
+    final items = ref.watch(booklistRecommendProvider).value;
+    if (items == null || items.isEmpty) return const SizedBox.shrink();
+    return Column(
+      children: [
+        _sectionTitle(
+          context,
+          '书单推荐',
+          onMore: () => context.push('/booklists'),
+        ),
+        SizedBox(
+          height: 88,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            children: [
+              for (final b in items) _booklistCard(context, b),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _booklistCard(BuildContext context, Booklist b) {
+    final scheme = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: () => context.push('/booklists/${b.id}'),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        width: 150,
+        height: 74,
+        margin: const EdgeInsets.only(right: 8),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Text(
+                  '#${b.id}',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: scheme.primary,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '${b.novelNum} 部作品',
+                  style: TextStyle(
+                      fontSize: 10, color: scheme.onSurfaceVariant),
+                ),
+              ],
+            ),
+            Text(
+              b.title,
+              style: const TextStyle(
+                  fontSize: 11.5, fontWeight: FontWeight.w600),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            Text(
+              b.author,
+              style: TextStyle(fontSize: 10, color: scheme.onSurfaceVariant),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
       ),
     );
   }

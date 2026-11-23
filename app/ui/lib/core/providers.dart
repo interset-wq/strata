@@ -168,6 +168,14 @@ final ipGroupsProvider = FutureProvider<IpGroupsResult>((ref) async {
   return handle.api.ipGroups(form: 'ip_collab');
 });
 
+/// 首页书单推荐行（docs/booklist-in-app.md §深化）：引擎按 UTC 日期种子
+/// 随机抽 3 个官方书单（当日稳定、24h 缓存）。增益区块：加载失败/空
+/// 结果整行隐藏，不阻塞首页（home 端 valueOrNull 为空不渲染）。
+final booklistRecommendProvider = FutureProvider<List<Booklist>>((ref) async {
+  final handle = await ref.watch(bootProvider.future);
+  return handle.api.booklistRecommend();
+});
+
 /// 赛道聚合（contest，count DESC）by form：榜单页轴切换的数据源
 /// （短篇比赛榜 Drawer，form 可复用于其他形态）。
 /// 与列表同源（不按 status 过滤，见 docs/form-definitions §4）。

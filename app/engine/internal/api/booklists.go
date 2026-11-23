@@ -10,6 +10,7 @@ package api
 
 import (
 	"context"
+	"math/rand"
 	"net/http"
 	"strconv"
 	"time"
@@ -22,6 +23,11 @@ import (
 const (
 	booklistPageSize = 10
 	booklistTTL      = 24 * time.Hour
+
+	// booklistKnownTotal is the approximate size of the live booklist id
+	// space (temp/novly figure; the sequential probe's upper bound — the
+	// 页不满即到底 semantics keep the list honest if it drifts).
+	booklistKnownTotal = 1272
 )
 
 // booklistFetchFn builds the cache fetch closure for one id/kind (the
@@ -126,4 +132,44 @@ func (s *Server) booklistNovels(c *gin.Context) {
 		"booklist": meta,
 		"items":    items,
 	})
+}
+
+// booklistsRecommend serves a date-seeded random sample of booklists — the
+// home 书单推荐 row (docs/booklist-in-app.md §深化). The seed is the UTC
+// date, so a day's picks are stable and same-day repeats hit the 24h
+// per-id cache (banner 每日洗牌 pattern, seed computed server-side).
+// Invalid ids in the draw are topped up (bounded at 3× count); a fully
+// dead draw degrades to a short/empty list, never an error.
+func (s *Server) booklistsRecommend(c *gin.Context) {
+	count := 3
+	if raw := c.Query("count"); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v >= 1 && v <= 10 {
+			count = v
+		}
+	}
+	// Format("20060102") is always 8 digits — ParseInt cannot fail.
+	seed, _ := strconv.ParseInt(time.Now().UTC().Format("20060102"), 10, 64)
+	rnd := rand.New(rand.NewSource(seed))
+	ctx := c.Request.Context()
+	items := []crawl.BooklistItem{}
+	seen := map[int]bool{}
+	drawn := 0
+	for len(items) < count && drawn < count*3 {
+		id := rnd.Intn(booklistKnownTotal) + 1
+		drawn++
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		body, err := s.officialRanksServed(ctx, "booklist:"+strconv.Itoa(id),
+			booklistTTL, s.booklistFetchFn(ctx, id, "item"))
+		if err != nil {
+			fail(c, http.StatusBadGateway, "upstream_error", err.Error())
+			return
+		}
+		if it := crawl.ParseBooklistItem(string(body)); it != nil {
+			items = append(items, *it)
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{"items": items})
 }

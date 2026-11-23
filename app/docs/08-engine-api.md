@@ -474,6 +474,23 @@ fav_pctl DESC, nid)`），`per` 限每形态条数（1..50，默认 10）；
 
 `done=true` = 已到底（页不满）；UI 停止加载下一页。
 
+### GET /strata/booklists/recommend?count=（**已实现**，2026-11-23 首页推荐行）
+
+以 **UTC 日期为种子**随机抽 count（默认 3、范围 1..10）个官方书单
+（docs/booklist-in-app.md §深化）：seed = `int(yyyymmdd)`，当日稳定——
+同一批号全天一致，再访走 24h 缓存秒回；无效号自动补抽（上限 3×count），
+整批失效则返回短列表/空 `items`（永不报错——增益区块语义）。每号与
+列表/详情共享 `booklist:{id}` 缓存。
+
+```json
+{ "items": [ { "id": 42, "title": "…", "author": "…",
+               "mark_num": 800, "recommend_num": 120, "novel_num": 18,
+               "updated": "2025-06-01" } ] }
+```
+
+UI：首页长篇 tab「书单推荐」横排文本卡（#id + 标题 + N 部作品 + 作者），
+点击进 `/booklists/:id`；加载失败/空结果整行隐藏。
+
 ### GET /strata/booklists/:id/novels（**已实现**，2026-11-23 官方书单）
 
 书单详情：元数据 + 作品列表（两个上游请求，各缓存 24h，key
