@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"strata/engine/internal/appshell"
@@ -74,6 +75,47 @@ func doJSON(t *testing.T, method, url string, status int) map[string]any {
 		t.Fatal(err)
 	}
 	return body
+}
+
+// TestDiscoverKPref pins the persisted length-preference weight (docs/18 §5):
+// PUT validates the three presets, GET /settings echoes it back, default 0.
+func TestDiscoverKPref(t *testing.T) {
+	srv, _ := newTestServer(t)
+	getK := func() string {
+		body := getJSON(t, srv.URL+"/strata/settings", http.StatusOK)
+		return body["discover_k"].(string)
+	}
+	if got := getK(); got != "0" {
+		t.Fatalf("default discover_k = %q, want 0", got)
+	}
+	put := func(raw string) int {
+		req, err := http.NewRequest(http.MethodPut, srv.URL+"/strata/settings",
+			strings.NewReader(`{"discover_k":`+raw+`}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer resp.Body.Close()
+		var body map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&body)
+		return resp.StatusCode
+	}
+	if code := put(`"0.25"`); code != http.StatusOK {
+		t.Fatalf("PUT discover_k status = %d, want 200", code)
+	}
+	if got := getK(); got != "0.25" {
+		t.Fatalf("discover_k = %q, want 0.25", got)
+	}
+	if code := put(`"0.7"`); code != http.StatusBadRequest {
+		t.Fatalf("invalid discover_k status = %d, want 400", code)
+	}
+	if got := getK(); got != "0.25" {
+		t.Fatalf("discover_k after invalid PUT = %q, want 0.25 (unchanged)", got)
+	}
 }
 
 func TestHealthz(t *testing.T) {

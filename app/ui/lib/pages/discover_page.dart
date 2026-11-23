@@ -30,6 +30,7 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
   bool _done = false;
   bool _showTop = false;
   double _k = 0; // 篇幅偏好权重（报告 24 §2.5）：0=纯 cqs
+  bool _kLoaded = false; // 落盘 pref 只在首屏解析一次，切档后以 UI 为准
   final _scroll = ScrollController();
 
   @override
@@ -50,6 +51,14 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
     _loading = true;
     try {
       final handle = await ref.read(bootProvider.future);
+      if (!_kLoaded && _cursor == null) {
+        // 落盘的篇幅偏好（discover_k pref）：首屏解析一次，重启保持。
+        _kLoaded = true;
+        try {
+          final s = await handle.api.settings();
+          _k = double.tryParse(s.discoverK) ?? 0;
+        } catch (_) {}
+      }
       final page = await handle.api.recommend(cursor: _cursor, k: _k);
       setState(() {
         _items.addAll(page.items);
@@ -63,16 +72,26 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
     }
   }
 
-  // 篇幅偏好切档（报告 24 §2.5，clx）：重置流并按新 k 重载。
+  // 篇幅偏好切档（报告 24 §2.5，clx）：重置流并按新 k 重载；落盘保持。
   void _setK(double k) {
     if (k == _k) return;
     setState(() {
       _k = k;
+      _kLoaded = true;
       _items.clear();
       _cursor = null;
       _done = false;
     });
+    _persistK(k);
     _load();
+  }
+
+  // K 档位落盘（user.db prefs discover_k）：切换即写，重启保持。
+  Future<void> _persistK(double k) async {
+    try {
+      final handle = await ref.read(bootProvider.future);
+      await handle.api.setDiscoverK(k == 0 ? '0' : '$k');
+    } catch (_) {}
   }
 
   @override

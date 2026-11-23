@@ -72,6 +72,7 @@ const (
 	detailRefreshWindow = 24 * time.Hour
 	detailRateLimitPref = "detail_rate_limit_enabled"
 	appAPIPref          = "app_api_enabled"
+	discoverKPref       = "discover_k"
 )
 
 // New builds the production HTTP engine (see NewServer for the seams the
@@ -222,23 +223,46 @@ func (s *Server) settings(c *gin.Context) {
 		fail(c, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
+	discoverK := "0"
+	if v, ok, err := s.store.Pref(c.Request.Context(), discoverKPref); err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	} else if ok {
+		discoverK = v
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"detail_rate_limit_enabled":     enabled,
 		"detail_refresh_window_seconds": int64(detailRefreshWindow / time.Second),
 		"app_api_enabled":               appAPI,
+		"discover_k":                    discoverK,
 	})
 }
 
 func (s *Server) updateSettings(c *gin.Context) {
 	var body struct {
-		DetailRateLimitEnabled *bool `json:"detail_rate_limit_enabled"`
-		AppAPIEnabled          *bool `json:"app_api_enabled"`
+		DetailRateLimitEnabled *bool   `json:"detail_rate_limit_enabled"`
+		AppAPIEnabled          *bool   `json:"app_api_enabled"`
+		DiscoverK              *string `json:"discover_k"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil ||
-		(body.DetailRateLimitEnabled == nil && body.AppAPIEnabled == nil) {
+		(body.DetailRateLimitEnabled == nil && body.AppAPIEnabled == nil &&
+			body.DiscoverK == nil) {
 		fail(c, http.StatusBadRequest, "invalid_argument",
-			"detail_rate_limit_enabled or app_api_enabled is required")
+			"detail_rate_limit_enabled, app_api_enabled or discover_k is required")
 		return
+	}
+	if body.DiscoverK != nil {
+		switch *body.DiscoverK {
+		case "0", "0.25", "0.6":
+		default:
+			fail(c, http.StatusBadRequest, "invalid_argument",
+				"discover_k must be 0, 0.25 or 0.6")
+			return
+		}
+		if err := s.store.SetPref(c.Request.Context(), discoverKPref, *body.DiscoverK); err != nil {
+			fail(c, http.StatusInternalServerError, "internal", err.Error())
+			return
+		}
 	}
 	if body.DetailRateLimitEnabled != nil {
 		if err := s.store.SetPref(c.Request.Context(), detailRateLimitPref, boolPref(*body.DetailRateLimitEnabled)); err != nil {

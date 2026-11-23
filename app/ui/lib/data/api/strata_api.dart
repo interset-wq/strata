@@ -108,6 +108,12 @@ class StrataApi {
             as Map<String, dynamic>,
       );
 
+  /// 篇幅偏好 K 档位落盘（user.db prefs）：切换即写，重启保持。
+  Future<EngineSettings> setDiscoverK(String k) async =>
+      EngineSettings.fromJson(
+        await _putBody('/settings', {'discover_k': k}) as Map<String, dynamic>,
+      );
+
   /// 工作台虚构测试书（docs/07 开发辅助，设置页测试开关）：状态读取。
   Future<TestBook> testBook() async =>
       TestBook.fromJson(await _get('/dev/test-book') as Map<String, dynamic>);
@@ -727,17 +733,20 @@ class EngineSettings {
   final bool detailRateLimitEnabled;
   final int windowSeconds;
   final bool appApiEnabled;
+  final String discoverK;
 
   EngineSettings({
     required this.detailRateLimitEnabled,
     required this.windowSeconds,
     this.appApiEnabled = false,
+    this.discoverK = '0',
   });
 
   factory EngineSettings.fromJson(Map<String, dynamic> j) => EngineSettings(
     detailRateLimitEnabled: j['detail_rate_limit_enabled'] as bool? ?? true,
     windowSeconds: j['detail_refresh_window_seconds'] as int? ?? 86400,
     appApiEnabled: j['app_api_enabled'] as bool? ?? false,
+    discoverK: j['discover_k'] as String? ?? '0',
   );
 }
 
