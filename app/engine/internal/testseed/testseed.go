@@ -27,6 +27,7 @@ CREATE TABLE books(
   fav_pctl REAL, click_pctl REAL, praise_pctl REAL, pr REAL, pctl_pr REAL,
   form TEXT NOT NULL DEFAULT 'long',
   lqs REAL,
+  cqs REAL, cqs_state TEXT, cps REAL, len_norm REAL,
   is_licensed INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE book_tags(nid INTEGER NOT NULL, tag TEXT NOT NULL);
@@ -52,25 +53,35 @@ type book struct {
 	pctl                         any
 	licensed, featured           int
 	year                         int
+	// v6 runtime metrics (app/docs/18-runtime-metrics.md): baked in because
+	// the store opens the seed read-only — tests cannot UPDATE it.
+	cqs, cps, ln float64
+	cqsState     string
 }
 
 var books = []book{
-	{nid: 1001, title: "Long A", author: "Author A", genre: "魔幻", status: "连载中", words: 120000, favs: 500, pctl: 0.9, featured: 1, year: 2010},
+	{nid: 1001, title: "Long A", author: "Author A", genre: "魔幻", status: "连载中", words: 120000, favs: 500, pctl: 0.9, featured: 1, year: 2010,
+		cqs: 1.5, cps: 1.0, ln: 0.1, cqsState: "stable"},
 	{nid: 1002, title: "Short B", author: "Author B", genre: "都市", status: "已完结", words: 30000, favs: 100, pctl: 0.5, year: 2010},
-	{nid: 1003, title: "Long C", author: "Author C", genre: "科幻", status: "连载中", words: 200000, favs: 900, pctl: 0.99, featured: 1, year: 2011},
+	{nid: 1003, title: "Long C", author: "Author C", genre: "科幻", status: "连载中", words: 200000, favs: 900, pctl: 0.99, featured: 1, year: 2011,
+		cqs: 1.4, cps: 0.5, ln: 0.9, cqsState: "stable"},
 	{nid: 1004, title: "Short D", author: "Author C", genre: "魔幻", status: "已完结", words: 40000, favs: 50, pctl: 0.6, year: 2010},
-	{nid: 2001, title: "Licensed", author: "天闻角川", genre: "魔幻", status: "已完结", words: 90000, favs: 99999, pctl: nil, licensed: 1, year: 2008},
-	{nid: 1005, title: "New E", author: "Author E", genre: "都市", status: "连载中", words: 150000, favs: 300, pctl: 0.95, year: 2025},
+	{nid: 2001, title: "Licensed", author: "天闻角川", genre: "魔幻", status: "已完结", words: 90000, favs: 99999, pctl: nil, licensed: 1, year: 2008,
+		cqs: 3.0, cps: 1.0, ln: 0.5, cqsState: "stable"},
+	{nid: 1005, title: "New E", author: "Author E", genre: "都市", status: "连载中", words: 150000, favs: 300, pctl: 0.95, year: 2025,
+		cqs: 0.6, cps: 0.1, ln: 0.5, cqsState: "low"},
 	{nid: 1006, title: "IP F", author: "Author F", genre: "都市", status: "连载中", words: 80000, favs: 700, pctl: 0.8, featured: 1, year: 2012},
 	{nid: 1007, title: "Medium G", author: "Author G", genre: "科幻", status: "已完结", words: 120000, favs: 400, pctl: 0.7, featured: 1, year: 2013},
 	{nid: 1008, title: "Dialogue H", author: "Author H", genre: "都市", status: "连载中", words: 50000, favs: 200, pctl: 0.6, year: 2014},
 	{nid: 1009, title: "IP J", author: "Author J", genre: "都市", status: "连载中", words: 30000, favs: 100, pctl: 0.5, year: 2014},
 	{nid: 1010, title: "IP K", author: "Author K", genre: "科幻", status: "已完结", words: 120000, favs: 80, pctl: 0.5, year: 2015},
 	{nid: 1011, title: "IP L", author: "Author L", genre: "奇幻", status: "连载中", words: 20000, favs: 50, pctl: 0.4, year: 2016},
-	{nid: 3001, title: "Zheng Long X", author: "Author X", genre: "魔幻", status: "连载中", words: 1000000, favs: 3000, pctl: 0.99, year: 2019},
+	{nid: 3001, title: "Zheng Long X", author: "Author X", genre: "魔幻", status: "连载中", words: 1000000, favs: 3000, pctl: 0.99, year: 2019,
+		cqs: 0.8, cps: 2.0, ln: 0.95, cqsState: "stable"},
 	{nid: 3002, title: "Zheng Dialogue Y", author: "Author Y", genre: "都市", status: "连载中", words: 40000, favs: 1500, pctl: 0.95, year: 2019},
 	{nid: 3003, title: "Spring Short Z", author: "Author Z", genre: "校园", status: "已完结", words: 30000, favs: 800, pctl: 0.9, year: 2025},
-	{nid: 3004, title: "Thirteen Long W", author: "Author W", genre: "科幻", status: "连载中", words: 800000, favs: 500, pctl: nil, year: 2025},
+	{nid: 3004, title: "Thirteen Long W", author: "Author W", genre: "科幻", status: "连载中", words: 800000, favs: 500, pctl: nil, year: 2025,
+		cqs: 0.4, cps: 9.0, ln: 0.5, cqsState: "low"},
 }
 
 // Build writes assets/seed.db.gz + manifest.json and a user.db with one
@@ -94,15 +105,21 @@ func Build(assetsDir, dataDir string) (*appshell.Manifest, error) {
 		if b.pctl != nil {
 			pctl = b.pctl
 		}
+		var cqs, cps, ln, cqsState any
+		if b.cqsState != "" {
+			cqs, cqsState, cps, ln = b.cqs, b.cqsState, b.cps, b.ln
+		}
 		_, err := db.Exec(`
 INSERT INTO books(nid,title,author,genre,price_type,status,contest,words,clicks,
  favs,praises,featured,cover_url,updated_at,est_year,est_date,est_conf,tags,
- fav_pctl,click_pctl,praise_pctl,pr,pctl_pr,is_licensed)
+ fav_pctl,click_pctl,praise_pctl,pr,pctl_pr,
+ cqs,cqs_state,cps,len_norm,is_licensed)
 VALUES(?,?,?,?, '免费', ?, NULL, ?, 1000, ?, 10, ?, NULL, '2026-04-01T00:00:00',
- ?, ?, 'high', '热血|战斗', ?,?,?,?,?,?)`,
+ ?, ?, 'high', '热血|战斗', ?,?,?,?,?, ?,?,?,?,?)`,
 			b.nid, b.title, b.author, b.genre, b.status, b.words, b.favs,
 			b.featured, b.year, fmt.Sprintf("%d-01-01", b.year),
-			pctl, pctl, pctl, pctl, pctl, b.licensed)
+			pctl, pctl, pctl, pctl, pctl,
+			cqs, cqsState, cps, ln, b.licensed)
 		if err != nil {
 			db.Close()
 			return nil, err

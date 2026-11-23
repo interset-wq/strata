@@ -1104,10 +1104,13 @@ func (s *Server) discover(c *gin.Context) {
 }
 
 // recommend is the quantitative recommendation stream (docs/12 §3,
-// docs/lqs-ranking-integration.md): two-level ordering (lqs group
-// first, fav_pctl fallback), keyset cursor pagination, 20 per batch,
-// stateless. The display fields (clicks/favs/praises) ride along
-// read-only; they never influence ordering (docs/12 §3.2 red line).
+// app/docs/18-runtime-metrics.md): form-isolated cqs ordering — the runtime
+// replacement for the lqs two-level stream — with the cps mid-band as the
+// candidate screen and clx (k, the user's 篇幅偏好 view) re-ranking at
+// runtime. Forms without cqs evidence (short/ip_collab, report 24 §3)
+// fall back to the classic fav_pctl ordering. The display fields
+// (clicks/favs/praises) ride along read-only; they never influence
+// ordering (docs/12 §3.2 red line).
 func (s *Server) recommend(c *gin.Context) {
 	limit, ok := parseLimit(c)
 	if !ok {
@@ -1117,24 +1120,56 @@ func (s *Server) recommend(c *gin.Context) {
 	if !ok {
 		return
 	}
-	items, err := s.store.Recommend(c.Request.Context(), c.Query("cursor"), form, limit)
-	if err != nil {
-		fail(c, http.StatusBadRequest, "invalid_argument", err.Error())
-		return
+	k := 0.0
+	if raw := c.Query("k"); raw != "" {
+		v, err := strconv.ParseFloat(raw, 64)
+		if err != nil || v < 0 || v > 1 {
+			fail(c, http.StatusBadRequest, "invalid_argument",
+				"k must be a number within [0,1]")
+			return
+		}
+		k = v
 	}
-	var nextCursor string
-	if len(items) == limit {
-		last := items[len(items)-1]
-		nextCursor = store.RecommendCursor(last.LQS, last.FavPctl, last.NID)
+	// cqs only exists for long/dialogue/medium (report 24 §3); the other
+	// forms keep the classic position ordering.
+	useCQS := form == "long" || form == "dialogue" || form == "medium"
+	var (
+		items []store.RankItem
+		next  string
+		err   error
+	)
+	ordering := "cqs"
+	if useCQS {
+		items, next, err = s.store.RecommendCQS(c.Request.Context(),
+			c.Query("cursor"), form, k, limit)
+		if err != nil {
+			fail(c, http.StatusBadRequest, "invalid_argument", err.Error())
+			return
+		}
+		if k > 0 {
+			ordering = "clx"
+		}
+	} else {
+		items, err = s.store.Recommend(c.Request.Context(),
+			c.Query("cursor"), form, limit)
+		if err != nil {
+			fail(c, http.StatusBadRequest, "invalid_argument", err.Error())
+			return
+		}
+		ordering = "fav_pctl"
+		if len(items) == limit {
+			last := items[len(items)-1]
+			next = store.RecommendCursor(last.LQS, last.FavPctl, last.NID)
+		}
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"meta": gin.H{
 			"kind": "recommend", "pool": "seed",
-			"ordering": "lqs|fav_pctl", "cover_required": true,
+			"ordering": ordering, "k": k, "cover_required": true,
 			"form": form, "licensed_excluded": true,
 		},
 		"items":       items,
-		"next_cursor": nextCursor,
+		"next_cursor": next,
 	})
 }
 

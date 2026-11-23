@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 
 	"strata/engine/internal/appshell"
@@ -542,6 +543,89 @@ func TestClassicTagPtypeFilters(t *testing.T) {
 	}
 	if len(items) != 2 {
 		t.Fatalf("tag=战斗 + ptype=免费: got %+v", items)
+	}
+}
+
+// TestRecommendCQS pins the cqs-scored quantitative stream (app/docs/
+// 18-runtime-metrics.md): form isolation, the cps mid-band screen, the clx
+// runtime re-rank by k, the evidence label, and the score|nid keyset cursor.
+func TestRecommendCQS(t *testing.T) {
+	st := openTestStore(t)
+	ctx := context.Background()
+	for _, nid := range []int64{1001, 1003, 3001, 1005, 3004} {
+		if _, err := st.DB.ExecContext(ctx,
+			`INSERT INTO covers (nid, cover, fetched_at) VALUES (?, ?, ?)`,
+			nid, "observed-cover.jpg", 1); err != nil {
+			t.Fatal(err)
+		}
+	}
+	updates := []struct {
+		nid          int64
+		cqs, cps, ln float64
+		state        string
+	}{
+		{2001, 3.0, 0, 0, ""}, // licensed canary: excluded even with a score
+	}
+	for _, u := range updates {
+		if u.cqs != 0 {
+			var got float64
+			if err := st.DB.QueryRowContext(ctx,
+				"SELECT cqs FROM seed.books WHERE nid=?", u.nid).Scan(&got); err != nil {
+				t.Fatal(err)
+			}
+			if got != u.cqs {
+				t.Fatalf("nid %d cqs = %v, want %v", u.nid, got, u.cqs)
+			}
+		}
+	}
+
+	// k=0: pure cqs order within the long form's mid-band (five long rows →
+	// band = [2nd smallest, 2nd largest] cps → 1005/3004 screened out).
+	items, next, err := st.RecommendCQS(ctx, "", "long", 0, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ids []int64
+	for _, it := range items {
+		ids = append(ids, it.NID)
+		if it.CQS == nil || it.CQSState == "" {
+			t.Fatalf("item %d missing cqs/evidence label: %+v", it.NID, it)
+		}
+	}
+	want := []int64{1001, 1003, 3001}
+	if !slices.Equal(ids, want) {
+		t.Fatalf("stream = %v, want %v", ids, want)
+	}
+	if items[0].CQSState != "stable" {
+		t.Fatalf("cqs_state = %q, want stable", items[0].CQSState)
+	}
+
+	// keyset pagination: limit 1 then resume — no overlap, no gap.
+	first, next, err := st.RecommendCQS(ctx, "", "long", 0, 1)
+	if err != nil || len(first) != 1 || first[0].NID != 1001 || next == "" {
+		t.Fatalf("first page = %v, next %q", first, next)
+	}
+	rest, _, err := st.RecommendCQS(ctx, next, "long", 0, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(rest) != 2 || rest[0].NID != 1003 || rest[1].NID != 3001 {
+		t.Fatalf("resumed = %v", rest)
+	}
+
+	// k=0.25: clx re-rank flips 1003 (len_norm 0.9) above 1001 (len_norm 0.1).
+	flipped, _, err := st.RecommendCQS(ctx, "", "long", 0.25, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if flipped[0].NID != 1003 || flipped[1].NID != 1001 {
+		t.Fatalf("clx order = %v,%v", flipped[0].NID, flipped[1].NID)
+	}
+
+	// short form: no cqs rows → empty stream (classic ordering serves it).
+	empty, nextEmpty, err := st.RecommendCQS(ctx, "", "short", 0, 100)
+	if err != nil || len(empty) != 0 || nextEmpty != "" {
+		t.Fatalf("short stream = %v, next %q", empty, nextEmpty)
 	}
 }
 

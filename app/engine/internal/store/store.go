@@ -306,6 +306,8 @@ type RankItem struct {
 	Favs     *int64   `json:"favs"`
 	FavPctl  float64  `json:"fav_pctl"`
 	LQS      *float64 `json:"lqs,omitempty"`
+	CQS      *float64 `json:"cqs,omitempty"`
+	CQSState string   `json:"cqs_state,omitempty"`
 	Contest  *string  `json:"contest"`
 	CoverURL *string  `json:"cover_url"`
 	Status   *string  `json:"status"`
@@ -830,6 +832,144 @@ WHERE is_licensed = 0
 		items = append(items, item)
 	}
 	return items, rows.Err()
+}
+
+// RecommendCQS is the quantitative recommendation stream scored by the
+// runtime quality metric cqs (app/docs/18-runtime-metrics.md, report 24):
+// form-isolated, candidates restricted to the form's cps mid-band (20–80
+// percentile — screening only, never a board), ordered by cqs — or by clx
+// (cqs × (1−K+K×len_norm)) when k > 0, the user's 篇幅偏好 view computed
+// at runtime and never stored. Keyset cursor "score|nid"; OFFSET is not
+// used. Cumulative display fields (clicks/favs/praises) ride along
+// read-only and never enter ORDER BY / WHERE (docs/12 §3.2 red line).
+func (s *Store) RecommendCQS(ctx context.Context, cursor, form string, k float64, limit int) ([]RankItem, string, error) {
+	lo, hi, ok := s.cpsMidBand(ctx, form)
+	if !ok {
+		return []RankItem{}, "", nil
+	}
+	scoreExpr := "seed.books.cqs"
+	if k > 0 {
+		scoreExpr = fmt.Sprintf(
+			"seed.books.cqs * (1 - %.17g + %.17g * COALESCE(seed.books.len_norm, 0))",
+			k, k)
+	}
+	q := `
+SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
+       seed.books.est_year, seed.books.status, seed.books.words, seed.books.clicks,
+       seed.books.favs, seed.books.form, seed.books.lqs, seed.books.fav_pctl,
+       seed.books.cqs, seed.books.cqs_state,
+       (` + scoreExpr + `) AS stream_score,
+       COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url
+FROM seed.books
+LEFT JOIN covers c ON c.nid = seed.books.nid
+WHERE is_licensed = 0
+  AND COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) IS NOT NULL
+  AND seed.books.form = ?
+  AND seed.books.cqs IS NOT NULL
+  AND seed.books.cps BETWEEN ? AND ?`
+	args := []any{form, lo, hi}
+	if cursor != "" {
+		score, nid, err := parseScoreCursor(cursor)
+		if err != nil {
+			return nil, "", err
+		}
+		q += " AND (" + scoreExpr + " < ? OR (" + scoreExpr +
+			" = ? AND seed.books.nid < ?))"
+		args = append(args, score, score, nid)
+	}
+	q += " ORDER BY " + scoreExpr + " DESC, seed.books.nid ASC LIMIT ?"
+	args = append(args, limit)
+
+	rows, err := s.DB.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, "", err
+	}
+	defer rows.Close()
+	items := make([]RankItem, 0, limit)
+	var lastScore *float64
+	var lastNID int64
+	for rows.Next() {
+		var (
+			item                RankItem
+			gen, status, cover  sql.NullString
+			words, clicks, favs sql.NullInt64
+			lqs, pctl           sql.NullFloat64
+			cqs, score          sql.NullFloat64
+			state               sql.NullString
+		)
+		if err := rows.Scan(&item.NID, &item.Title, &item.Author, &gen,
+			&item.EstYear, &status, &words, &clicks, &favs, &item.Form,
+			&lqs, &pctl, &cqs, &state, &score, &cover); err != nil {
+			return nil, "", err
+		}
+		item.Rank = len(items) + 1
+		item.Genre = strPtr(gen)
+		item.Status = strPtr(status)
+		item.Words = intPtr(words)
+		item.Clicks = intPtr(clicks)
+		item.Favs = intPtr(favs)
+		item.CoverURL = strPtr(cover)
+		item.LQS = floatPtr(lqs)
+		item.CQS = floatPtr(cqs)
+		item.CQSState = state.String
+		items = append(items, item)
+		if score.Valid {
+			lastScore = &score.Float64
+		}
+		lastNID = item.NID
+	}
+	if err := rows.Err(); err != nil {
+		return nil, "", err
+	}
+	var next string
+	if len(items) == limit && lastScore != nil {
+		next = strconv.FormatFloat(*lastScore, 'g', -1, 64) + "|" +
+			strconv.FormatInt(lastNID, 10)
+	}
+	return items, next, nil
+}
+
+// cpsMidBand returns the form's cps 20–80 percentile bounds (the candidate
+// screen of report 24 §2.2); ok=false when the form has too few scored rows
+// for a meaningful band.
+func (s *Store) cpsMidBand(ctx context.Context, form string) (lo, hi float64, ok bool) {
+	var n int
+	if err := s.DB.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM seed.books WHERE form = ? AND cps IS NOT NULL",
+		form).Scan(&n); err != nil || n < 5 {
+		return 0, 0, false
+	}
+	off := int(float64(n) * 0.20)
+	if err := s.DB.QueryRowContext(ctx,
+		"SELECT cps FROM seed.books WHERE form = ? AND cps IS NOT NULL"+
+			" ORDER BY cps LIMIT 1 OFFSET ?", form, off).Scan(&lo); err != nil {
+		return 0, 0, false
+	}
+	if err := s.DB.QueryRowContext(ctx,
+		"SELECT cps FROM seed.books WHERE form = ? AND cps IS NOT NULL"+
+			" ORDER BY cps DESC LIMIT 1 OFFSET ?", form, off).Scan(&hi); err != nil {
+		return 0, 0, false
+	}
+	return lo, hi, true
+}
+
+// parseScoreCursor decodes the "score|nid" keyset cursor of the cqs/clx
+// stream. cqs is a signed log-scale score, not a percentile — NaN is
+// rejected by self-comparison (NaN != NaN).
+func parseScoreCursor(cursor string) (float64, int64, error) {
+	parts := strings.Split(cursor, "|")
+	if len(parts) != 2 {
+		return 0, 0, fmt.Errorf("invalid recommend cursor %q", cursor)
+	}
+	score, err := strconv.ParseFloat(parts[0], 64)
+	if err != nil || score != score {
+		return 0, 0, fmt.Errorf("invalid score in recommend cursor %q", cursor)
+	}
+	nid, err := strconv.ParseInt(parts[1], 10, 64)
+	if err != nil || nid <= 0 {
+		return 0, 0, fmt.Errorf("invalid nid in recommend cursor %q", cursor)
+	}
+	return score, nid, nil
 }
 
 // RecommendCursor encodes (lqs, fav_pctl, nid) as the keyset cursor for
