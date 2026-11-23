@@ -77,6 +77,7 @@ pctl(x) = rank(x, within=est_year, method=average) / group_size
 - **职责**：长篇区（`form=long` 且 `words>15 万` 且 `favs≥200`）的**排序分**；用「世代 × 收藏档」内 `pr` 分位乘一个有界篇幅先验 `[0.75, 1.00]`，防止推荐池被压到 20 万字量级。其余情况为 NULL。
 - **性质**：秩相关与收藏 −0.01、与 `pr` +0.62——是口碑榜不是热度榜；**只作排序信号，不作质量标签**，展示层沿用 §3.3 的分位并列口径。
 - **权威口径、公式、常量、校准与边界只在** `length-weighted-quality.md`；实现 `analysis/lib/lqs.py`。中篇域 `mqs` 见 `medium-quality-score.md`（与 `lqs` 同指标不同域、不合并）。
+- **2026-11-23 裁定**：推荐层排序分职责由运行时 **cqs** 接任（报告 24 / `app/docs/18-runtime-metrics.md`）；`lqs`/`mqs` 维持归档不落地，定义保留，**不与 cqs 合并、分数不可比**。
 
 ---
 
@@ -100,6 +101,8 @@ pctl(x) = rank(x, within=est_year, method=average) / group_size
 - 绝对累计值只作展示锚点，详情页并列「收藏 531 / 同代分位 99.2%」。
 
 > **白名单 = 可用信号集，不等于核心指标**；量化模式的 2 个核心指标（排序分 + 位置分）见 `quantitative-mode-metrics.md`。
+>
+> **2026-11-23 起，推荐层核心信号换为运行时指标 cqs（排序分）/ cps（中层筛选）/ clx（篇幅偏好视图）**——报告 24 与 `app/docs/18-runtime-metrics.md` 定案：构建期分位继续做展示层（详情页分位、经典榜），库外新书的质量信号走运行时现算（构建期快照算不出新书）；`clicks` 禁入 cqs/cps 公式，红线不变。
 
 ---
 
@@ -124,4 +127,5 @@ pctl(x) = rank(x, within=est_year, method=average) / group_size
 | 锚点密度策略与外推段维护 | `anchor-density-strategy.md` |
 | 深榜 D2 的指标与深度 | `app/docs/10-deep-ranks.md`、报告 21 |
 | 双模式展示/推荐解耦 | `app/docs/12-dual-mode.md` |
+| 运行时指标 cqs/cps/clx（推荐层核心，报告 24 落地） | `app/docs/18-runtime-metrics.md`、`analysis/reports/24_runtime_metrics.md` |
 | 各指标的分析结论与图表 | `analysis/reports/` 对应报告（01–22） |

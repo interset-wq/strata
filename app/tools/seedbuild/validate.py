@@ -8,13 +8,15 @@ from pathlib import Path
 
 import pandas as pd
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 EXPECTED_TABLES = {"books", "book_tags", "seed_meta", "deep_ranks",
-                   "calendar_universe", "contest_awards"}
+                   "calendar_universe", "contest_awards",
+                   "calib_fav_bounds", "calib_len_anchors",
+                   "calib_cqs_median", "calib_cps_median"}
 EXPECTED_INDEXES = {
     "idx_bt", "idx_updated", "idx_author", "idx_year_favpctl",
     "idx_year_clickpctl", "idx_genre_favs", "idx_favs", "idx_pr", "idx_shortfav",
-    "idx_deep_lookup", "idx_awards_edition",
+    "idx_deep_lookup", "idx_awards_edition", "idx_form_cqs",
 }
 
 
@@ -120,7 +122,8 @@ def check_db(db_path: Path, seed: pd.DataFrame, meta: dict) -> None:
         required = {"schema_version", "seed_version", "content_end", "built_at",
                     "book_count", "tag_count", "gen_min", "gen_max", "licensed_count",
                     "deep_metrics", "deep_top_n", "deep_rank_rows", "deep_seed_hit",
-                    "award_rows"}
+                    "award_rows", "calibration_version", "cqs_scored",
+                    "cqs_stable", "cps_scored", "cqs_mu0"}
         meta_keys = {r["key"] for r in conn.execute("SELECT key FROM seed_meta")}
         if not required <= meta_keys:
             _fail(errors, f"seed_meta missing {sorted(required - meta_keys)}")
@@ -186,10 +189,47 @@ def check_db(db_path: Path, seed: pd.DataFrame, meta: dict) -> None:
             _fail(errors, f"{bad_quality} rows have invalid lqs/vel percentiles")
         ln_quality = conn.execute(
             "SELECT COUNT(*) FROM books WHERE is_licensed=1 AND"
-            " (lqs IS NOT NULL OR lqs_pctl IS NOT NULL OR vel_pctl IS NOT NULL)"
+            " (lqs IS NOT NULL OR lqs_pctl IS NOT NULL OR vel_pctl IS NOT NULL"
+            "  OR cqs IS NOT NULL OR cps IS NOT NULL OR len_norm IS NOT NULL"
+            "  OR cqs_state IS NOT NULL)"
         ).fetchone()[0]
         if ln_quality:
             _fail(errors, f"{ln_quality} licensed rows carry quality scores")
+
+        # v6 runtime metrics (app/docs/18-runtime-metrics.md, report 24):
+        # structural gates — form isolation, gates, state consistency.
+        short_cqs = conn.execute(
+            "SELECT COUNT(*) FROM books WHERE form IN ('short','ip_collab')"
+            " AND (cqs IS NOT NULL OR len_norm IS NOT NULL)").fetchone()[0]
+        if short_cqs:
+            _fail(errors, f"{short_cqs} short/ip rows carry cqs/len_norm")
+        cqs_gate = conn.execute(
+            "SELECT COUNT(*) FROM books WHERE cqs IS NOT NULL AND favs < 1000"
+        ).fetchone()[0]
+        if cqs_gate:
+            _fail(errors, f"{cqs_gate} cqs rows violate favs>=1000 gate")
+        bad_state = conn.execute(
+            "SELECT COUNT(*) FROM books WHERE (cqs IS NULL AND cqs_state IS NOT"
+            " NULL) OR (cqs IS NOT NULL AND (cqs_state IS NULL OR cqs_state NOT"
+            " IN ('stable','low')))").fetchone()[0]
+        if bad_state:
+            _fail(errors, f"{bad_state} rows have inconsistent cqs_state")
+        bad_len = conn.execute(
+            "SELECT COUNT(*) FROM books WHERE (cqs IS NULL AND len_norm IS NOT"
+            " NULL) OR (len_norm IS NOT NULL AND (len_norm < 0 OR len_norm > 1))"
+        ).fetchone()[0]
+        if bad_len:
+            _fail(errors, f"{bad_len} rows violate len_norm rule (cqs-coupled, [0,1])")
+        for table in ("calib_fav_bounds", "calib_len_anchors",
+                      "calib_cqs_median", "calib_cps_median"):
+            n = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+            if n == 0:
+                _fail(errors, f"{table} is empty")
+        bad_cell = conn.execute(
+            "SELECT COUNT(*) FROM calib_cqs_median WHERE cell_n < 5"
+            " OR med IS NULL").fetchone()[0]
+        if bad_cell:
+            _fail(errors, f"{bad_cell} calib_cqs_median rows below the cell floor")
 
         ln_range = conn.execute(
             "SELECT COUNT(*) FROM books WHERE is_licensed=0 AND"

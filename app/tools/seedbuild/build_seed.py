@@ -49,6 +49,7 @@ import seed_policy as SP  # noqa: E402
 import validate as V  # noqa: E402
 from lib import forms as FM  # noqa: E402
 from lib import lqs as LQ  # noqa: E402
+import runtime_metrics as RM  # noqa: E402
 from deep_ranks import DEEP_COLUMNS, METRICS as DEEP_METRICS  # noqa: E402
 from deep_ranks import TOP_N as DEEP_TOP_N  # noqa: E402
 from deep_ranks import build_deep_ranks, seed_coverage  # noqa: E402
@@ -58,8 +59,8 @@ SCHEMA = Path(__file__).resolve().parent / "schema.sql"
 DATASET = REPO / "dataset" / "out" / "books.jsonl"
 AWARD_CSV = ANALYSIS / "out" / "contest_awards_normalized.csv"
 
-SCHEMA_VERSION = 5
-SEED_VERSION = "20260503.26"  # .26: v5 contest_awards 表（911 行 / 11 届）；书目集合不变
+SCHEMA_VERSION = 6
+SEED_VERSION = "20260503.27"  # .27: v6 运行时指标列（cqs/cps/len_norm/cqs_state）+ calib_* 校准表；书目集合不变
 CONTENT_END = pd.Timestamp("2026-05-03")
 GEN_MIN, GEN_MAX = 2007, 2025
 
@@ -108,7 +109,8 @@ FINAL_COLUMNS = [
     "words", "clicks", "favs", "praises", "featured", "cover_url", "updated_at",
     "est_year", "est_date", "est_conf", "tags",
     "fav_pctl", "click_pctl", "praise_pctl", "pr", "pctl_pr",
-    "form", "lqs", "lqs_pctl", "vel_pctl", "is_licensed",
+    "form", "lqs", "lqs_pctl", "vel_pctl",
+    "cqs", "cqs_state", "cps", "len_norm", "is_licensed",
 ]
 
 
@@ -384,7 +386,16 @@ def build_frames() -> tuple[pd.DataFrame, dict]:
 
     extra = ["form", "lqs", "lqs_pctl", "vel_pctl"]
     universe[extra] = quality[extra]
-    pctl_cols = ["id", "fav_pctl", "click_pctl", "praise_pctl", "pr", "pctl_pr"] + extra
+
+    # v6 runtime quality metrics (app/docs/18-runtime-metrics.md, report 24):
+    # form-isolated cqs/cps calibration over the analysis universe, precomputed
+    # for seed books; the calib_* tables ship so the engine can band and score
+    # discovered books at runtime (phase 2). Clicks never enters the formulas.
+    scores, rt = RM.build(universe)
+    universe = universe.merge(scores, on="id", how="left")
+
+    pctl_cols = ["id", "fav_pctl", "click_pctl", "praise_pctl", "pr", "pctl_pr"] \
+        + extra + ["cqs", "cqs_state", "cps", "len_norm"]
     seed = df[df["id"].isin(seed_ids)].merge(universe[pctl_cols], on="id", how="left")
     seed["form"] = seed["form"].fillna(seed["id"].map(licensed_form))
     if seed["form"].isna().any():
@@ -450,6 +461,7 @@ def build_frames() -> tuple[pd.DataFrame, dict]:
         "genre_fixes": fixes,
         "deep_ranks": deep,
         "calendar_universe": calendar_universe,
+        "runtime": rt,
     }
     return seed, meta
 
@@ -505,6 +517,21 @@ def write_db(seed: pd.DataFrame, meta: dict, db_path: Path,
                 [tuple(bind(v) for v in row)
                  for row in awards.itertuples(index=False, name=None)],
             )
+            for table, cols in [
+                ("calib_fav_bounds", ("form", "est_year", "p50", "p75", "p90")),
+                ("calib_len_anchors", ("form", "lo", "hi")),
+                ("calib_cqs_median", ("form", "est_year", "genre", "fband",
+                                      "med", "cell_n")),
+                ("calib_cps_median", ("form", "est_year", "band", "genre",
+                                      "med")),
+            ]:
+                frame = meta["runtime"]["tables"][table]
+                conn.executemany(
+                    f"INSERT INTO {table}({','.join(cols)})"
+                    f" VALUES({','.join('?' * len(cols))})",
+                    [tuple(bind(v) for v in row)
+                     for row in frame.itertuples(index=False, name=None)],
+                )
             conn.executemany(
                 "INSERT INTO seed_meta(key, value) VALUES(?, ?)",
                 [
@@ -531,6 +558,11 @@ def write_db(seed: pd.DataFrame, meta: dict, db_path: Path,
                     ("calendar_universe_days",
                      str(len(meta["calendar_universe"]))),
                     ("award_rows", str(len(awards))),
+                    ("calibration_version", SEED_VERSION),
+                    ("cqs_scored", str(meta["runtime"]["cqs_scored"])),
+                    ("cqs_stable", str(meta["runtime"]["cqs_stable"])),
+                    ("cps_scored", str(meta["runtime"]["cps_scored"])),
+                    ("cqs_mu0", f"{meta['runtime']['mu0']:.6f}"),
                 ],
             )
         conn.execute("VACUUM")
@@ -572,6 +604,9 @@ def main() -> int:
         f"{meta['licensed_rows']}; V0 was {V0_SEED})")
     log(f"favs coverage: {meta['favs_coverage']:.2%} | lqs scored in universe: "
         f"{meta['lqs_scored']:,}")
+    log(f"runtime metrics: cqs scored {meta['runtime']['cqs_scored']:,} "
+        f"(stable {meta['runtime']['cqs_stable']:,}) | cps scored "
+        f"{meta['runtime']['cps_scored']:,} | mu0={meta['runtime']['mu0']:.3f}")
     log(f"deep ranks: {len(meta['deep_ranks'])} rows "
         f"({len(DEEP_METRICS)} metrics x top {DEEP_TOP_N}, full universe)")
     log(f"contest awards: {len(awards)} rows "
@@ -608,6 +643,9 @@ def main() -> int:
             "deep_rank_rows": len(meta["deep_ranks"]),
             "lqs_scored_universe": meta["lqs_scored"],
             "award_rows": len(awards),
+            "cqs_scored": meta["runtime"]["cqs_scored"],
+            "cqs_stable": meta["runtime"]["cqs_stable"],
+            "cps_scored": meta["runtime"]["cps_scored"],
         },
         "admission_detail": meta["admission_detail"],
         "favs_coverage": round(meta["favs_coverage"], 6),
