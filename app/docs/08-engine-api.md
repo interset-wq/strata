@@ -265,7 +265,10 @@ form 内 20–80 分位**中层带**——筛选不发榜）。**排序** = form
 （clicks/favs/praises）只在 SELECT 展示列，**禁入 ORDER BY / WHERE**
 （docs/12 §3.2 红线）。响应与 `/discover` 同构（items + next_cursor），
 `meta.ordering="cqs"|"clx"|"fav_pctl"`、`licensed_excluded=true`。lqs 两级排序为
-上一版口径（归档不落地，cqs 接任，两者不合并、分数不可比）。发现流 UI（发现页）
+上一版口径（归档不落地，cqs 接任，两者不合并、分数不可比）。**P2（2026-11-23）**：
+discovered 中已评分的库外书以同键并流——详情抓取写回后运行时现算
+（eras 锚点定年 → 长度带 form → cps/cqs/len_norm，校准表来自种子 v7）；
+同人库外书不评分（E.17 污染源），form 未知不进流。发现流 UI（发现页）
 已切换至本端点；`/discover` 保持 clicks 展示流口径不变
 （端点保真、展示层裁剪的同一政策）。
 

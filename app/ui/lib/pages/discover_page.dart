@@ -223,12 +223,13 @@ class _DiscoverCard extends StatelessWidget {
                             fontSize: 11, color: scheme.onSurfaceVariant)),
                     const SizedBox(height: 5),
                     // 位置分锚点（docs/12 §7.3）：分位永远与绝对值并列；
-                    // 推荐流有 fav_pctl 非空硬门槛，模型里的 0 只可能
-                    // 来自流外数据。
+                    // 库外书（运行时评分，18 P2）无构建期分位，只显示收藏。
                     _badge(
                         context,
-                        '收藏 ${_wan(item.favs)}  '
-                        '分位 ${(item.favPctl * 100).toStringAsFixed(1)}%',
+                        item.favPctl > 0
+                            ? '收藏 ${_wan(item.favs)}  '
+                                '分位 ${(item.favPctl * 100).toStringAsFixed(1)}%'
+                            : '收藏 ${_wan(item.favs)}',
                         fg: scheme.primary,
                         icon: MetricIcons.favs),
                     if (item.cqsState == 'low') ...[
