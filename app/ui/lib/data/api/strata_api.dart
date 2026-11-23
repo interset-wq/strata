@@ -288,6 +288,15 @@ class StrataApi {
     await _post('/history/$nid');
   }
 
+  /// 关注书观测的按日聚合（docs/07 §4 热力图）：day = epoch 天。
+  Future<List<HeatmapDay>> watchHeatmap({int days = 90}) async {
+    final body =
+        await _get('/watchlist/heatmap', {'days': '$days'}) as Map<String, dynamic>;
+    return (body['cells'] as List)
+        .map((c) => HeatmapDay.fromJson(c as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<List<ShortItem>> rankingShort({int limit = 50}) async {
     final body = await _get('/rankings/short', {'limit': '$limit'});
     return (body['items'] as List)
@@ -752,6 +761,20 @@ class EngineSettings {
     windowSeconds: j['detail_refresh_window_seconds'] as int? ?? 86400,
     appApiEnabled: j['app_api_enabled'] as bool? ?? false,
     discoverK: j['discover_k'] as String? ?? '0',
+  );
+}
+
+/// 关注书观测的按日聚合（docs/07 §4 热力图）：day = epoch 天。
+class HeatmapDay {
+  final int day;
+  final int books;
+  final int rows;
+  HeatmapDay({required this.day, required this.books, required this.rows});
+
+  factory HeatmapDay.fromJson(Map<String, dynamic> j) => HeatmapDay(
+    day: (j['day'] as num).toInt(),
+    books: (j['books'] as num).toInt(),
+    rows: (j['rows'] as num).toInt(),
   );
 }
 

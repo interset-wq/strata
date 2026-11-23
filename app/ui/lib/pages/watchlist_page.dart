@@ -113,6 +113,7 @@ class _WatchlistPageState extends ConsumerState<WatchlistPage> {
                       ],
                     ),
                   ),
+                  const _HeatmapCard(),
                   Expanded(
                     child: filtered.isEmpty
                         ? Center(
@@ -289,6 +290,80 @@ class _WatchCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// 更新热力图（docs/07 §4）：关注书观测的按日聚合，90 天格子，
+/// 强度 = 当日有观测的书数。纯聚合视图，不伪造全库时序。
+class _HeatmapCard extends ConsumerWidget {
+  const _HeatmapCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
+    final future =
+        ref.read(bootProvider.future).then((h) => h.api.watchHeatmap());
+    return FutureBuilder<List<HeatmapDay>>(
+      future: future,
+      builder: (context, snap) {
+        Widget body;
+        if (snap.hasError) {
+          body = Text('加载失败：${snap.error}',
+              style: TextStyle(color: scheme.error, fontSize: 12));
+        } else if (snap.connectionState != ConnectionState.done) {
+          body = const Center(
+              child: SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2)));
+        } else {
+          final byDay = {
+            for (final c in snap.data ?? <HeatmapDay>[]) c.day: c,
+          };
+          final today = DateTime.now().millisecondsSinceEpoch ~/ 86400000;
+          final maxBooks = byDay.values
+              .fold<int>(0, (m, c) => c.books > m ? c.books : m);
+          body = Wrap(
+            spacing: 2,
+            runSpacing: 2,
+            children: [
+              for (int d = today - 89; d <= today; d++)
+                Builder(builder: (_) {
+                  final c = byDay[d];
+                  final f =
+                      (c == null || maxBooks == 0) ? 0.0 : c.books / maxBooks;
+                  return Container(
+                    width: 11,
+                    height: 11,
+                    decoration: BoxDecoration(
+                      color: f == 0
+                          ? scheme.surfaceContainerHighest
+                          : scheme.primary.withAlpha((80 + 175 * f).round()),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  );
+                }),
+            ],
+          );
+        }
+        return Card(
+          margin: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('更新动态 · 90 天',
+                    style: TextStyle(
+                        fontSize: 12, color: scheme.onSurfaceVariant)),
+                const SizedBox(height: 8),
+                body,
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

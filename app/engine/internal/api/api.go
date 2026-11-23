@@ -137,6 +137,7 @@ func NewServer(s *store.Store) *Server {
 	group.POST("/books/:nid/rank-seed", srv.bookRankSeed)
 	group.GET("/books/:nid/observations", srv.observations)
 	group.GET("/watchlist", srv.watchList)
+	group.GET("/watchlist/heatmap", srv.watchHeatmap)
 	group.POST("/watchlist/:nid", srv.watchAdd)
 	group.PUT("/watchlist/:nid", srv.watchSetActive)
 	group.DELETE("/watchlist/:nid", srv.watchRemove)
@@ -1218,6 +1219,29 @@ func (s *Server) watchList(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"meta": gin.H{"pool": "user"}, "items": items})
+}
+
+// watchHeatmap serves the tracked-books activity calendar: per-day
+// observation aggregates for the last `days` days, aggregate only
+// (docs/07 §4 — no fabricated full-library series).
+func (s *Server) watchHeatmap(c *gin.Context) {
+	days := 90
+	if raw := c.Query("days"); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n <= 0 || n > 365 {
+			fail(c, http.StatusBadRequest, "invalid_argument",
+				"days must be an integer in 1..365")
+			return
+		}
+		days = n
+	}
+	since := time.Now().Unix() - int64(days)*86400
+	cells, err := s.store.WatchHeatmap(c.Request.Context(), since)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"meta": gin.H{"days": days}, "cells": cells})
 }
 
 // watchAdd puts a book on the watchlist (v6: the single user-interest

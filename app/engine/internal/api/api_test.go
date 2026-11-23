@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"strata/engine/internal/appshell"
 	"strata/engine/internal/crawl"
@@ -141,6 +142,48 @@ func TestExport(t *testing.T) {
 	if row["nid"].(float64) != 1001 {
 		t.Fatalf("browsing_history nid = %v, want 1001", row["nid"])
 	}
+}
+
+// TestWatchHeatmap pins the tracked-books activity calendar (docs/07 §4):
+// only watchlist books' observations aggregate into the cells, days are
+// epoch-day keys, and the days parameter is validated.
+func TestWatchHeatmap(t *testing.T) {
+	srv, st := newTestServer(t)
+	ctx := context.Background()
+	now := time.Now().Unix()
+	if err := st.WatchAdd(ctx, 1001, now-1, true, "self"); err != nil {
+		t.Fatal(err)
+	}
+	if err := st.WatchAdd(ctx, 1002, now-1, true, "self"); err != nil {
+		t.Fatal(err)
+	}
+	// Two books observed today, one of them twice; plus a non-tracked
+	// book whose observations must stay out of the cells.
+	seed := func(nid, at int64) {
+		if _, err := st.DB.ExecContext(ctx, `
+INSERT INTO observations(nid, observed_at, favs, source)
+VALUES (?, ?, 10, 'poll')`, nid, at); err != nil {
+			t.Fatal(err)
+		}
+	}
+	seed(1001, now)
+	seed(1002, now)
+	seed(1002, now-30)
+	seed(1004, now) // not on the watchlist
+
+	body := getJSON(t, srv.URL+"/strata/watchlist/heatmap", http.StatusOK)
+	cells := body["cells"].([]any)
+	if len(cells) != 1 {
+		t.Fatalf("cells = %d, want 1 (today only)", len(cells))
+	}
+	cell := cells[0].(map[string]any)
+	if cell["books"].(float64) != 2 || cell["rows"].(float64) != 3 {
+		t.Fatalf("cell = %v, want books=2 rows=3", cell)
+	}
+
+	// Invalid days rejected.
+	getJSON(t, srv.URL+"/strata/watchlist/heatmap?days=0", http.StatusBadRequest)
+	getJSON(t, srv.URL+"/strata/watchlist/heatmap?days=999", http.StatusBadRequest)
 }
 
 func TestHealthz(t *testing.T) {
