@@ -192,7 +192,16 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
     )));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('发书日历')),
+      appBar: AppBar(
+        title: const Text('发书日历'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.insights),
+            tooltip: '世代探索',
+            onPressed: () => context.push('/eras-explorer'),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

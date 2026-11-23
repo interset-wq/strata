@@ -15,6 +15,7 @@ import '../pages/classic_list_page.dart';
 import '../pages/discover_page.dart';
 import '../pages/featured_gallery_page.dart';
 import '../pages/history_page.dart';
+import '../pages/eras_explorer_page.dart';
 import '../pages/home_page.dart';
 import '../pages/ip_books_page.dart';
 import '../pages/rankings_page.dart';
@@ -176,6 +177,9 @@ final router = GoRouter(
       },
     ),
     GoRoute(path: '/history', builder: (_, _) => const HistoryPage()),
+    GoRoute(
+        path: '/eras-explorer',
+        builder: (_, _) => const ErasExplorerPage()),
     GoRoute(
       path: '/serial-random',
       builder: (_, _) =>

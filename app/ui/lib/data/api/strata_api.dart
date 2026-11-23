@@ -297,6 +297,14 @@ class StrataApi {
         .toList();
   }
 
+  /// 世代探索（est_year × genre 离线聚合，纯种子数据）。
+  Future<List<ErasExploreRow>> erasExplorer() async {
+    final body = await _get('/eras-explorer') as Map<String, dynamic>;
+    return (body['rows'] as List)
+        .map((r) => ErasExploreRow.fromJson(r as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<List<ShortItem>> rankingShort({int limit = 50}) async {
     final body = await _get('/rankings/short', {'limit': '$limit'});
     return (body['items'] as List)
@@ -775,6 +783,27 @@ class HeatmapDay {
     day: (j['day'] as num).toInt(),
     books: (j['books'] as num).toInt(),
     rows: (j['rows'] as num).toInt(),
+  );
+}
+
+/// 世代探索的一格（est_year × genre 聚合，纯种子数据）。
+class ErasExploreRow {
+  final int estYear;
+  final String genre;
+  final int books;
+  final double? medianFavs;
+  ErasExploreRow({
+    required this.estYear,
+    required this.genre,
+    required this.books,
+    this.medianFavs,
+  });
+
+  factory ErasExploreRow.fromJson(Map<String, dynamic> j) => ErasExploreRow(
+    estYear: (j['est_year'] as num).toInt(),
+    genre: j['genre'] as String,
+    books: (j['books'] as num).toInt(),
+    medianFavs: (j['median_favs'] as num?)?.toDouble(),
   );
 }
 

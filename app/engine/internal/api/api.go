@@ -138,6 +138,7 @@ func NewServer(s *store.Store) *Server {
 	group.GET("/books/:nid/observations", srv.observations)
 	group.GET("/watchlist", srv.watchList)
 	group.GET("/watchlist/heatmap", srv.watchHeatmap)
+	group.GET("/eras-explorer", srv.erasExplorer)
 	group.POST("/watchlist/:nid", srv.watchAdd)
 	group.PUT("/watchlist/:nid", srv.watchSetActive)
 	group.DELETE("/watchlist/:nid", srv.watchRemove)
@@ -1219,6 +1220,17 @@ func (s *Server) watchList(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"meta": gin.H{"pool": "user"}, "items": items})
+}
+
+// erasExplorer serves the offline generation aggregates (est_year × genre
+// books and same-generation P50 favourites) — pure seed data, no network.
+func (s *Server) erasExplorer(c *gin.Context) {
+	rows, err := s.store.ErasExplore(c.Request.Context())
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"meta": gin.H{"pool": "seed"}, "rows": rows})
 }
 
 // watchHeatmap serves the tracked-books activity calendar: per-day

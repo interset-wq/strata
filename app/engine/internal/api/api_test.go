@@ -186,6 +186,28 @@ VALUES (?, ?, 10, 'poll')`, nid, at); err != nil {
 	getJSON(t, srv.URL+"/strata/watchlist/heatmap?days=999", http.StatusBadRequest)
 }
 
+// TestErasExplorer pins the generation aggregates: universe-only rows
+// (no licensed, 2007..2025, non-empty genre) with the P50-band favourite
+// figure present wherever books exist.
+func TestErasExplorer(t *testing.T) {
+	srv, _ := newTestServer(t)
+	body := getJSON(t, srv.URL+"/strata/eras-explorer", http.StatusOK)
+	rows := body["rows"].([]any)
+	if len(rows) == 0 {
+		t.Fatal("eras-explorer rows empty")
+	}
+	for _, r := range rows {
+		row := r.(map[string]any)
+		year := int(row["est_year"].(float64))
+		if year < 2007 || year > 2025 {
+			t.Fatalf("est_year %d outside 2007..2025", year)
+		}
+		if genre := row["genre"].(string); genre == "" {
+			t.Fatal("empty genre cell in explorer rows")
+		}
+	}
+}
+
 func TestHealthz(t *testing.T) {
 	srv, _ := newTestServer(t)
 	body := getJSON(t, srv.URL+"/strata/healthz", http.StatusOK)
