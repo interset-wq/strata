@@ -118,6 +118,31 @@ func TestDiscoverKPref(t *testing.T) {
 	}
 }
 
+// TestExport pins the local-data dump shape: three user tables plus the
+// export stamp (docs/01 §9 — the v1 replacement for cloud sync).
+func TestExport(t *testing.T) {
+	srv, st := newTestServer(t)
+	ctx := context.Background()
+	if err := st.RecordBrowsing(ctx, 1001, 1700000000); err != nil {
+		t.Fatal(err)
+	}
+	body := getJSON(t, srv.URL+"/strata/export", http.StatusOK)
+	for _, k := range []string{"exported_at", "observations", "watchlist",
+		"browsing_history"} {
+		if _, ok := body[k]; !ok {
+			t.Fatalf("export missing %q", k)
+		}
+	}
+	hist := body["browsing_history"].([]any)
+	if len(hist) != 1 {
+		t.Fatalf("browsing_history rows = %d, want 1", len(hist))
+	}
+	row := hist[0].(map[string]any)
+	if row["nid"].(float64) != 1001 {
+		t.Fatalf("browsing_history nid = %v, want 1001", row["nid"])
+	}
+}
+
 func TestHealthz(t *testing.T) {
 	srv, _ := newTestServer(t)
 	body := getJSON(t, srv.URL+"/strata/healthz", http.StatusOK)

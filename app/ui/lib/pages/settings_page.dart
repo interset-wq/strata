@@ -1,9 +1,33 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../core/providers.dart';
 import '../data/api/strata_api.dart';
+
+/// 导出用户本地数据：引擎 /export 全量 dump → 临时 JSON → 系统分享面板。
+Future<void> _exportData(BuildContext context, WidgetRef ref) async {
+  final messenger = ScaffoldMessenger.of(context);
+  try {
+    final h = await ref.read(bootProvider.future);
+    final data = await h.api.exportData();
+    final dir = await getTemporaryDirectory();
+    final file = File(
+        '${dir.path}/strata-export-${DateTime.now().millisecondsSinceEpoch}.json');
+    await file
+        .writeAsString(const JsonEncoder.withIndent('  ').convert(data));
+    await SharePlus.instance.share(
+      ShareParams(files: [XFile(file.path)], subject: 'Strata 数据备份'),
+    );
+  } catch (e) {
+    messenger.showSnackBar(SnackBar(content: Text('导出失败：$e')));
+  }
+}
 
 /// 详情刷新限流开关的数据源：引擎 /settings。
 final detailRateLimitProvider =
@@ -150,6 +174,19 @@ class SettingsPage extends ConsumerWidget {
                     ],
                   ),
                 ),
+          ),
+          const SizedBox(height: 16),
+          Text('数据', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 8),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.ios_share),
+              title: const Text('导出数据'),
+              subtitle: const Text(
+                  '观察 / 关注 / 浏览足迹 → JSON 文件分享出去备份（无云同步）',
+                  style: TextStyle(fontSize: 12)),
+              onTap: () => _exportData(context, ref),
+            ),
           ),
           const SizedBox(height: 16),
           Text('测试工具', style: Theme.of(context).textTheme.titleLarge),

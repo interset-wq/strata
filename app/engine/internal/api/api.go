@@ -161,6 +161,7 @@ func NewServer(s *store.Store) *Server {
 	group.GET("/licensed", srv.licensed)
 	group.GET("/moe-goddess", srv.moeGoddess)
 	group.GET("/history", srv.history)
+	group.GET("/export", srv.exportData)
 	group.POST("/history/:nid", srv.recordHistory)
 	group.GET("/featured", srv.featured)
 	group.GET("/featured-all", srv.featuredAll)
@@ -732,6 +733,18 @@ func (s *Server) recordHistory(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"recorded": true})
+}
+
+// exportData dumps the user-local tables as one JSON document — the v1
+// replacement for cloud sync (docs/01 §6: no server, no account): the
+// client saves or shares the file out of the device.
+func (s *Server) exportData(c *gin.Context) {
+	data, err := s.store.ExportUserData(c.Request.Context(), time.Now().Unix())
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, data)
 }
 
 // history returns the most recently opened books for the home reading

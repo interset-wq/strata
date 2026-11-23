@@ -114,6 +114,11 @@ class StrataApi {
         await _putBody('/settings', {'discover_k': k}) as Map<String, dynamic>,
       );
 
+  /// 本地数据导出（observations/watchlist/browsing_history 全量 dump）：
+  /// v1 无云同步，设置页「导出数据」用它生成交付 JSON。
+  Future<Map<String, dynamic>> exportData() async =>
+      (await _get('/export') as Map<String, dynamic>);
+
   /// 工作台虚构测试书（docs/07 开发辅助，设置页测试开关）：状态读取。
   Future<TestBook> testBook() async =>
       TestBook.fromJson(await _get('/dev/test-book') as Map<String, dynamic>);
