@@ -117,3 +117,28 @@ app/
 
 > 运行时 ATS：iOS 需开 `NSAllowsLocalNetworking`（回环明文 HTTP 要求，与审核无关），
 > 列入集成测试。
+
+## 9. 硬化实测（2026-11-23，v0.1.0-pre.11 release 构建实测）
+
+**体积**：release APK 53,287,272 B ≈ 50.8 MB（arm64-only）。分解：
+
+| 组件 | 大小 | 占比 |
+| --- | --- | --- |
+| `libstrata.so`（Go 引擎，`-s -w`） | 24.7 MB | 48.5% |
+| `libflutter.so`（Flutter arm64） | 11.2 MB | 22.0% |
+| `libapp.so`（Dart AOT） | 7.1 MB | 14.0% |
+| `seed.db.gz`（捆绑种子 18,751 本） | 7.0 MB | 13.8% |
+| `classes.dex` + 其余 | ~0.6 MB | ~1.1% |
+
+> 最大单件是 `libstrata.so`：Go runtime + 纯 Go SQLite（modernc.org/sqlite，
+> cgo 会破坏 iOS 交叉编译的既定裁定）。压缩空间有限（Go 深度裁剪/加壳不做，
+> 兼容风险大于收益）；`libflutter.so` 由 Flutter SDK 决定。debug APK
+> 220 MB（含 armeabi-v7a/x86_64 三份 `libflutter.so` + 未裁剪引擎），仅装机调试用。
+
+**启动耗时**（真机 `am start -W` 冷启动 TotalTime，×3）：
+
+- release：3536 / 3405 / 3356 ms（中位 ≈ 3.4 s）
+- debug：4154 / 3372 / 3431 ms（对照组）
+
+> release 与 debug 差距小：大头是引擎 FFI 初始化 + seed.db 解压挂载 +
+> 首屏 HTTP，不是 AOT 编译差。iOS 无数据（无 Xcode）。
