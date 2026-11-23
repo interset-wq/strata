@@ -26,6 +26,10 @@ class _BooklistsPageState extends ConsumerState<BooklistsPage> {
   List<Booklist> _items = const [];
   bool _loading = true;
   bool _loadingMore = false;
+  // 防并发在途标志：与 _loading 分开——_loading 初始即 true（首屏
+  // spinner 语义），若拿它当"已在加载"守卫，首次加载会被直接跳过，
+  // 页面永远转圈（2026-11-23 真机转圈的真正根因）。
+  bool _busy = false;
   bool _moreFailed = false;
   bool _done = false;
   String? _error;
@@ -55,47 +59,52 @@ class _BooklistsPageState extends ConsumerState<BooklistsPage> {
   }
 
   Future<void> _loadPage(int page, {required bool reset}) async {
-    final handle = await ref.read(bootProvider.future);
-    if (!mounted) return;
-    if (reset) {
-      if (_loading) return;
-      setState(() {
-        _loading = true;
-        _error = null;
-        _items = const [];
-        _page = 0;
-        _done = false;
-        _moreFailed = false;
-      });
-    } else {
-      if (_loadingMore) return;
-      setState(() => _loadingMore = true);
-    }
+    if (_busy) return;
+    _busy = true;
     try {
-      final r = await handle.api.booklists(page: page);
+      final handle = await ref.read(bootProvider.future);
       if (!mounted) return;
-      setState(() {
-        if (reset) {
-          _items = r.items;
-        } else {
-          _items = [..._items, ...r.items];
-        }
-        _page = r.page;
-        _done = r.done;
-        _loading = false;
-        _loadingMore = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _loadingMore = false;
-        if (reset) {
-          _error = '书单加载失败：$e';
-        } else {
-          _moreFailed = true;
-        }
-      });
+      if (reset) {
+        setState(() {
+          _loading = true;
+          _error = null;
+          _items = const [];
+          _page = 0;
+          _done = false;
+          _moreFailed = false;
+          _loadingMore = false;
+        });
+      } else {
+        setState(() => _loadingMore = true);
+      }
+      try {
+        final r = await handle.api.booklists(page: page);
+        if (!mounted) return;
+        setState(() {
+          if (reset) {
+            _items = r.items;
+          } else {
+            _items = [..._items, ...r.items];
+          }
+          _page = r.page;
+          _done = r.done;
+          _loading = false;
+          _loadingMore = false;
+        });
+      } catch (e) {
+        if (!mounted) return;
+        setState(() {
+          _loading = false;
+          _loadingMore = false;
+          if (reset) {
+            _error = '书单加载失败：$e';
+          } else {
+            _moreFailed = true;
+          }
+        });
+      }
+    } finally {
+      _busy = false;
     }
   }
 
