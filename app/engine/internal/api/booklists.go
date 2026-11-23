@@ -30,6 +30,16 @@ const (
 	booklistKnownTotal = 1272
 )
 
+// probe-loop deadlines (2026-11-23 device report: a black-holed mobile
+// request burns the full 30s client timeout, so a serial 10-id window
+// spun for minutes with no error). They bound each endpoint; the per-id
+// cache makes the UI retry cheap — only the ids that failed re-fetch.
+var (
+	booklistWindowTimeout    = 30 * time.Second
+	booklistRecommendTimeout = 20 * time.Second
+	booklistDetailTimeout    = 25 * time.Second
+)
+
 // booklistFetchFn builds the cache fetch closure for one id/kind (the
 // default seam goes through the shared limiter, foreground lane).
 func (s *Server) booklistFetchFn(ctx context.Context, id int, kind string) func() ([]byte, error) {
@@ -56,6 +66,8 @@ func (s *Server) booklists(c *gin.Context) {
 		page = v
 	}
 	ctx := c.Request.Context()
+	ctx, cancel := context.WithTimeout(ctx, booklistWindowTimeout)
+	defer cancel()
 	items := []crawl.BooklistItem{}
 	for i := 0; i < booklistPageSize; i++ {
 		id := (page-1)*booklistPageSize + i + 1
@@ -95,6 +107,8 @@ func (s *Server) booklistNovels(c *gin.Context) {
 		return
 	}
 	ctx := c.Request.Context()
+	ctx, cancel := context.WithTimeout(ctx, booklistDetailTimeout)
+	defer cancel()
 	key := "booklist:" + strconv.Itoa(id)
 	metaBody, err := s.officialRanksServed(ctx, key, booklistTTL,
 		s.booklistFetchFn(ctx, id, "item"))
@@ -151,6 +165,8 @@ func (s *Server) booklistsRecommend(c *gin.Context) {
 	seed, _ := strconv.ParseInt(time.Now().UTC().Format("20060102"), 10, 64)
 	rnd := rand.New(rand.NewSource(seed))
 	ctx := c.Request.Context()
+	ctx, cancel := context.WithTimeout(ctx, booklistRecommendTimeout)
+	defer cancel()
 	items := []crawl.BooklistItem{}
 	seen := map[int]bool{}
 	drawn := 0

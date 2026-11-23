@@ -14,9 +14,18 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"time"
 )
 
-const booklistAPI = "https://pages.sfacg.com/api/HttpProxy"
+// booklistAPI is the upstream base URL (a var so tests can point it at a
+// stub; production is the pages.sfacg.com HttpProxy).
+var booklistAPI = "https://pages.sfacg.com/api/HttpProxy"
+
+// booklistTimeout bounds one probe. The shared client's 30s timeout alone
+// would let a serial 10-id window spin for minutes on a black-holed mobile
+// network (2026-11-23 device report); 15s is already generous for a small
+// JSON metadata call.
+var booklistTimeout = 15 * time.Second
 
 // expand parameters (the fields the app rows actually display).
 const (
@@ -60,6 +69,8 @@ type BooklistNovel struct {
 // local join stays live — the same pattern as the roster endpoint.
 func FetchBooklist(ctx context.Context, client *http.Client, l *Limiter,
 	id int, kind string, foreground bool) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, booklistTimeout)
+	defer cancel()
 	var (
 		body string
 		ferr error

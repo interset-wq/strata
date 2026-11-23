@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"strata/engine/internal/crawl"
 )
@@ -156,5 +157,39 @@ func TestBooklistsRecommend(t *testing.T) {
 		if id < 1 || id > 1272 {
 			t.Fatalf("id %v outside the live space", id)
 		}
+	}
+}
+
+// TestBooklistsWindowDeadline: a slow (not dead) upstream must not let the
+// serial 10-id window spin for minutes — the window deadline bounds it and
+// surfaces as 502 (the UI retries; the per-id cache keeps the retry cheap).
+// The seam is ctx-aware, mirroring the production request abort.
+func TestBooklistsWindowDeadline(t *testing.T) {
+	ts, srv := newRosterTestServer(t)
+	srv.booklistFetch = func(ctx context.Context, client *http.Client,
+		l *crawl.Limiter, id int, kind string, foreground bool) (string, error) {
+		select {
+		case <-time.After(80 * time.Millisecond):
+			return validBooklistJSON(id), nil
+		case <-ctx.Done():
+			return "", ctx.Err()
+		}
+	}
+	old := booklistWindowTimeout
+	booklistWindowTimeout = 200 * time.Millisecond
+	defer func() { booklistWindowTimeout = old }()
+
+	start := time.Now()
+	req, _ := http.NewRequest("GET", ts.URL+"/strata/booklists?page=1", nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadGateway {
+		t.Fatalf("status = %d, want 502 (window deadline)", resp.StatusCode)
+	}
+	if elapsed := time.Since(start); elapsed > 500*time.Millisecond {
+		t.Fatalf("window took %v, deadline should bound it near 200ms", elapsed)
 	}
 }

@@ -459,6 +459,8 @@ fav_pctl DESC, nid)`），`per` 限每形态条数（1..50，默认 10）；
 
 - 400 `invalid_argument`：`page` 非 ≥1 整数。
 - 502 `upstream_error`：上游抓取失败（UI 重试；失效响应不入缓存）。
+  超时边界三层（2026-11-23 真机转圈修复）：逐探测 15s / 窗口 deadline
+  30s（详情 25s、推荐 20s）/ UI 45s——详见 docs/booklist-in-app.md §深化 5。
 - 书单官方累计值（mark_num/recommend_num）纯展示（docs/12 红线）。
 
 200：

@@ -73,6 +73,20 @@ class StrataApi {
     return jsonDecode(body);
   }
 
+  /// 官方在线数据 UI 侧最后兜底（2026-11-23 真机转圈报告）：引擎已有
+  /// 逐请求 15s / 窗口 30s deadline，这里保证用户可见的"转圈"必然有
+  /// 尽头；超时转友好文案，页面进错误态 + 重试。
+  Future<dynamic> _getOnline(String path, [Map<String, String>? query]) async {
+    try {
+      return await _get(path, query).timeout(const Duration(seconds: 45));
+    } on TimeoutException {
+      throw StrataApiException(
+          status: 0,
+          code: 'timeout',
+          message: '官方数据加载超时，请检查网络后重试');
+    }
+  }
+
   Future<Healthz> healthz() async =>
       Healthz.fromJson(await _get('/healthz') as Map<String, dynamic>);
 
@@ -419,20 +433,20 @@ class StrataApi {
   /// 官方书单列表一窗（顺序 id 探测：引擎每窗 10 个、逐个走限速器——
   /// 首窗 ≈10 秒，当日再访 24h 缓存秒回；docs/booklist-in-app.md）。
   Future<BooklistPage> booklists({int page = 1}) async {
-    final body = await _get('/booklists', {'page': '$page'});
+    final body = await _getOnline('/booklists', {'page': '$page'});
     return BooklistPage.fromJson(body);
   }
 
   /// 书单详情（元数据 + 作品列表，引擎 24h 缓存 + 本地 join）。
   Future<BooklistDetail> booklistNovels(int id) async {
-    final body = await _get('/booklists/$id/novels');
+    final body = await _getOnline('/booklists/$id/novels');
     return BooklistDetail.fromJson(body);
   }
 
   /// 首页书单推荐行：引擎按 UTC 日期种子随机抽 count 个书单号（当日稳定、
   /// 24h 缓存；失效号自动补抽——docs/booklist-in-app.md §深化）。
   Future<List<Booklist>> booklistRecommend({int count = 3}) async {
-    final body = await _get('/booklists/recommend', {'count': '$count'});
+    final body = await _getOnline('/booklists/recommend', {'count': '$count'});
     return (body['items'] as List)
         .map((e) => Booklist.fromJson(e as Map<String, dynamic>))
         .toList();
