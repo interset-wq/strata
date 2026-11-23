@@ -44,6 +44,30 @@ CREATE TABLE contest_awards(
   category TEXT, source_nid TEXT NOT NULL,
   PRIMARY KEY(nid, edition)
 );
+CREATE TABLE eras_anchors(nid INTEGER PRIMARY KEY, day INTEGER NOT NULL);
+CREATE TABLE calib_fav_bounds(
+  form TEXT, est_year INTEGER, p50 REAL, p75 REAL, p90 REAL,
+  PRIMARY KEY(form, est_year)
+);
+CREATE TABLE calib_len_anchors(form TEXT PRIMARY KEY, lo REAL, hi REAL);
+CREATE TABLE calib_cqs_median(
+  form TEXT, est_year INTEGER, genre TEXT, fband TEXT,
+  med REAL, cell_n INTEGER,
+  PRIMARY KEY(form, est_year, genre, fband)
+);
+CREATE TABLE calib_cps_median(
+  form TEXT, est_year INTEGER, band TEXT, genre TEXT, med REAL,
+  PRIMARY KEY(form, est_year, band, genre)
+);
+INSERT INTO seed_meta(key, value) VALUES('cqs_mu0', '0.232');
+INSERT INTO eras_anchors(nid, day) VALUES(400000, 17000), (600000, 17600);
+INSERT INTO calib_fav_bounds(form, est_year, p50, p75, p90)
+  VALUES('long', 1999, 100, 2000, 10000);
+INSERT INTO calib_len_anchors(form, lo, hi) VALUES('long', 263561, 2128618);
+INSERT INTO calib_cqs_median(form, est_year, genre, fband, med, cell_n)
+  VALUES('long', 1999, '魔幻', 'P75-90', 0.0, 25);
+INSERT INTO calib_cps_median(form, est_year, band, genre, med)
+  VALUES('long', 1999, 'long', '魔幻', 7.0);
 `
 
 type book struct {

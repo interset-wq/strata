@@ -847,37 +847,62 @@ func (s *Store) RecommendCQS(ctx context.Context, cursor, form string, k float64
 	if !ok {
 		return []RankItem{}, "", nil
 	}
-	scoreExpr := "seed.books.cqs"
+	seedScore := "seed.books.cqs"
+	discScore := "discovered.cqs"
 	if k > 0 {
-		scoreExpr = fmt.Sprintf(
+		seedScore = fmt.Sprintf(
 			"seed.books.cqs * (1 - %.17g + %.17g * COALESCE(seed.books.len_norm, 0))",
 			k, k)
+		discScore = fmt.Sprintf(
+			"discovered.cqs * (1 - %.17g + %.17g * COALESCE(discovered.len_norm, 0))",
+			k, k)
 	}
-	q := `
-SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
-       seed.books.est_year, seed.books.status, seed.books.words, seed.books.clicks,
-       seed.books.favs, seed.books.form, seed.books.lqs, seed.books.fav_pctl,
-       seed.books.cqs, seed.books.cqs_state,
-       (` + scoreExpr + `) AS stream_score,
-       COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url
-FROM seed.books
-LEFT JOIN covers c ON c.nid = seed.books.nid
-WHERE is_licensed = 0
-  AND COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) IS NOT NULL
-  AND seed.books.form = ?
-  AND seed.books.cqs IS NOT NULL
-  AND seed.books.cps BETWEEN ? AND ?`
-	args := []any{form, lo, hi}
+	// Phase 2: score discovered rows that gained detail numbers, then fold
+	// them into the same stream (app/docs/18-runtime-metrics.md P2). The
+	// cps mid-band bounds come from the seed's own per-form percentiles.
+	if err := s.scorePendingDiscovered(ctx); err != nil {
+		return nil, "", err
+	}
+	q := `SELECT * FROM (
+  SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
+         seed.books.est_year, seed.books.status, seed.books.words, seed.books.clicks,
+         seed.books.favs, seed.books.form, seed.books.lqs, seed.books.fav_pctl,
+         seed.books.cqs, seed.books.cqs_state,
+         (` + seedScore + `) AS stream_score,
+         COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url
+  FROM seed.books
+  LEFT JOIN covers c ON c.nid = seed.books.nid
+  WHERE is_licensed = 0
+    AND COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) IS NOT NULL
+    AND seed.books.form = ?
+    AND seed.books.cqs IS NOT NULL
+    AND seed.books.cps BETWEEN ? AND ?
+  UNION ALL
+  SELECT discovered.nid, discovered.title, discovered.author, discovered.genre,
+         discovered.est_year, NULL, discovered.words, NULL,
+         discovered.favs, discovered.form, NULL, NULL,
+         discovered.cqs, discovered.cqs_state,
+         (` + discScore + `) AS stream_score,
+         COALESCE(c.cover, NULLIF(discovered.cover_url, '')) AS cover_url
+  FROM discovered
+  LEFT JOIN covers c ON c.nid = discovered.nid
+  WHERE COALESCE(c.cover, NULLIF(discovered.cover_url, '')) IS NOT NULL
+    AND discovered.form = ?
+    AND discovered.cqs IS NOT NULL
+    AND discovered.cps BETWEEN ? AND ?)
+WHERE `
+	args := []any{form, lo, hi, form, lo, hi}
 	if cursor != "" {
 		score, nid, err := parseScoreCursor(cursor)
 		if err != nil {
 			return nil, "", err
 		}
-		q += " AND (" + scoreExpr + " < ? OR (" + scoreExpr +
-			" = ? AND seed.books.nid < ?))"
+		q += "stream_score < ? OR (stream_score = ? AND nid < ?)"
 		args = append(args, score, score, nid)
+	} else {
+		q += "1 = 1"
 	}
-	q += " ORDER BY " + scoreExpr + " DESC, seed.books.nid ASC LIMIT ?"
+	q += " ORDER BY stream_score DESC, nid ASC LIMIT ?"
 	args = append(args, limit)
 
 	rows, err := s.DB.QueryContext(ctx, q, args...)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strconv"
 	"testing"
 
 	"strata/engine/internal/appshell"
@@ -581,7 +582,7 @@ func TestRecommendCQS(t *testing.T) {
 
 	// k=0: pure cqs order within the long form's mid-band (five long rows →
 	// band = [2nd smallest, 2nd largest] cps → 1005/3004 screened out).
-	items, next, err := st.RecommendCQS(ctx, "", "long", 0, 100)
+	items, _, err := st.RecommendCQS(ctx, "", "long", 0, 100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -626,6 +627,59 @@ func TestRecommendCQS(t *testing.T) {
 	empty, nextEmpty, err := st.RecommendCQS(ctx, "", "short", 0, 100)
 	if err != nil || len(empty) != 0 || nextEmpty != "" {
 		t.Fatalf("short stream = %v, next %q", empty, nextEmpty)
+	}
+}
+
+// TestDiscoveredCQS pins the phase-2 discovered-book flow (app/docs/
+// 18-runtime-metrics.md P2): rows that gained detail numbers are scored
+// once (est_year via the eras anchors, conservative length-band form) and
+// fold into the cqs stream; 同人 rows stay unscored (E.17 pollution).
+func TestDiscoveredCQS(t *testing.T) {
+	st := openTestStore(t)
+	ctx := context.Background()
+	for _, nid := range []int64{1001, 1003, 3001, 5556, 5557} {
+		if _, err := st.DB.ExecContext(ctx, `
+INSERT INTO discovered(nid, title, author, genre, words, favs, praises,
+ cover_url, summary, source, observed_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, 'search', 1700000000)`,
+			nid, "Discovered "+strconv.FormatInt(nid, 10), "Author R",
+			map[int64]string{5556: "魔幻", 5557: "同人"}[nid],
+			800000, 3000, 1500, nil); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := st.DB.ExecContext(ctx,
+			`INSERT INTO covers (nid, cover, fetched_at) VALUES (?, ?, ?)`,
+			nid, "observed-cover.jpg", 1); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	items, _, err := st.RecommendCQS(ctx, "", "long", 0, 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var ids []int64
+	for _, it := range items {
+		ids = append(ids, it.NID)
+	}
+	want := []int64{1001, 1003, 3001, 5556} // 5557 (同人) excluded
+	if !slices.Equal(ids, want) {
+		t.Fatalf("stream = %v, want %v", ids, want)
+	}
+	for _, it := range items {
+		if it.NID == 5556 {
+			if it.CQS == nil || it.CQSState != "stable" {
+				t.Fatalf("discovered item missing cqs/evidence: %+v", it)
+			}
+		}
+	}
+	var unscored any
+	if err := st.DB.QueryRowContext(ctx,
+		"SELECT cqs FROM discovered WHERE nid = 5557").Scan(&unscored); err != nil {
+		t.Fatal(err)
+	}
+	if unscored != nil {
+		t.Fatalf("同人 discovered row must stay unscored, got %v", unscored)
 	}
 }
 

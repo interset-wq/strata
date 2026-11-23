@@ -7,13 +7,16 @@ import (
 	"path/filepath"
 )
 
-// userSchemaVersion: v7 adds author_profiles (on-demand author data,
-// docs/author-profile-on-demand §4) — purely additive, created by the
-// idempotent DDL replay in EnsureUserDB. v8 adds the works cache
-// column to author_profiles (official works list replays on cache hits).
-// v9/v10 were the retired adaptation-works columns; the number stays at 10
-// so existing user.db files keep opening without a downgrade.
-const userSchemaVersion = 10
+// userSchemaVersion: v11 adds the runtime-metric columns to discovered
+// (est_year/form/cqs/cps/len_norm — app/docs/18-runtime-metrics.md P2,
+// computed once when a discovered row gains detail numbers). v7 adds
+// author_profiles (on-demand author data, docs/author-profile-on-demand
+// §4) — purely additive, created by the idempotent DDL replay in
+// EnsureUserDB. v8 adds the works cache column to author_profiles (official
+// works list replays on cache hits). v9/v10 were the retired
+// adaptation-works columns; the number stays at 10 so existing user.db
+// files keep opening without a downgrade.
+const userSchemaVersion = 11
 
 // userSchemaV5 is the v5-era full user.db DDL: additive across
 // versions (v1 → v5), replayed idempotently on every schema pass — a
@@ -47,7 +50,13 @@ CREATE TABLE IF NOT EXISTS discovered(
   cover_url   TEXT,
   summary     TEXT,
   source      TEXT NOT NULL,
-  observed_at INTEGER NOT NULL
+  observed_at INTEGER NOT NULL,
+  est_year    INTEGER,
+  form        TEXT,
+  cqs         REAL,
+  cqs_state   TEXT,
+  cps         REAL,
+  len_norm    REAL
 );
 
 CREATE TABLE IF NOT EXISTS shelf(
@@ -221,6 +230,9 @@ func EnsureUserDB(path string) error {
 	if err := migrateV7toV8(db); err != nil {
 		return fmt.Errorf("migrate v7→v8: %w", err)
 	}
+	if err := migrateDiscoveredMetrics(db); err != nil {
+		return fmt.Errorf("migrate discovered metrics: %w", err)
+	}
 	if _, err := db.Exec(fmt.Sprintf("PRAGMA user_version=%d", userSchemaVersion)); err != nil {
 		return err
 	}
@@ -262,6 +274,26 @@ func migrateV7toV8(db *sql.DB) error {
 	}
 	_, err = db.Exec("ALTER TABLE author_profiles ADD COLUMN works TEXT")
 	return err
+}
+
+// migrateDiscoveredMetrics adds the runtime-metric columns to discovered
+// (app/docs/18-runtime-metrics.md P2): est_year/form/cqs/cps/len_norm are
+// computed once when a discovered row gains detail numbers. Idempotent
+// per-column check, mirroring migrateV7toV8.
+func migrateDiscoveredMetrics(db *sql.DB) error {
+	cols := []struct{ name, typ string }{
+		{"est_year", "INTEGER"}, {"form", "TEXT"}, {"cqs", "REAL"},
+		{"cqs_state", "TEXT"}, {"cps", "REAL"}, {"len_norm", "REAL"},
+	}
+	for _, c := range cols {
+		if !hasColumn(db, "discovered", c.name) {
+			if _, err := db.Exec("ALTER TABLE discovered ADD COLUMN " +
+				c.name + " " + c.typ); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // migrateV5toV6 folds the legacy bookshelf into the watchlist
