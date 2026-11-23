@@ -250,18 +250,20 @@ class StrataApi {
     return DiscoverPage.fromJson(body as Map<String, dynamic>);
   }
 
-  /// 量化推荐流（docs/12 §3、docs/lqs-ranking-integration.md）：两级排序
-  /// （lqs 长篇口碑组在前，其余按同代收藏分位兜底），游标分页。
-  /// 响应形状与 discover 同构（items + next_cursor），复用同一模型。
+  /// 量化推荐流（docs/12 §3、app/docs/18-runtime-metrics.md）：form 内 cqs
+  /// 排序（长篇/对话/中篇；cps 中层带筛选），k 为篇幅偏好权重（0=纯 cqs，
+  /// >0 运行时 clx 重排），游标分页。响应形状与 discover 同构，复用同一模型。
   Future<DiscoverPage> recommend({
     String? cursor,
     String? form,
     int limit = 20,
+    double k = 0,
   }) async {
     final body = await _get('/recommend', {
       'limit': '$limit',
       'form': ?form,
       if (cursor != null && cursor.isNotEmpty) 'cursor': cursor,
+      if (k > 0) 'k': '$k',
     });
     return DiscoverPage.fromJson(body as Map<String, dynamic>);
   }
@@ -1157,6 +1159,10 @@ class RankItem {
   /// 定年日期（YYYY-MM-DD）：作者页时间轴用（est_date）；旧端点不返回此字段。
   final String? estDate;
 
+  /// 证据强度（app/docs/18-runtime-metrics.md）：'stable'/'low'，仅 cqs 流
+  /// 返回；其余端点为空串。
+  final String cqsState;
+
   RankItem.fromJson(Map<String, dynamic> m)
     : rank = m['rank'] as int,
       nid = m['nid'] as int,
@@ -1174,6 +1180,7 @@ class RankItem {
       praises = (m['praises'] as num?)?.toInt(),
       form = m['form'] as String? ?? '',
       estDate = m['est_date'] as String?,
+      cqsState = m['cqs_state'] as String? ?? '',
       tags = ((m['tags'] as List?) ?? const [])
           .map((e) => e.toString())
           .toList();

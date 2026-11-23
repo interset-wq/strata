@@ -8,9 +8,10 @@ import '../widgets/default_cover.dart';
 import '../widgets/metric_badge.dart';
 import '../data/api/strata_api.dart';
 
-/// 发现流 = 推荐层落点（docs/12 §2/§3、docs/lqs-ranking-integration.md）：
-/// 量化推荐流 /recommend（两级排序：lqs 长篇口碑组在前，其余按同代收藏
-/// 分位兜底），游标分页每批 20 本，上滑自动加载，back-to-top。展示层
+/// 发现流 = 推荐层落点（docs/12 §2/§3、app/docs/18-runtime-metrics.md）：
+/// 量化推荐流 /recommend（form 内 cqs 排序、cps 中层带筛选；k 为篇幅偏好
+/// 权重，>0 时运行时 clx 重排），游标分页每批 20 本，上滑自动加载，
+/// back-to-top。展示层
 /// 与推荐层解耦——本流恒走量化信号，平台累计值只作展示锚点、不参与
 /// 排序（docs/12 §3.2 红线）。文案按「你可能错过的书」口径
 /// （docs/12 §7.2）；mockup 期的 "Classic" tab 行与 swap 占位按钮已
@@ -28,6 +29,7 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
   bool _loading = false;
   bool _done = false;
   bool _showTop = false;
+  double _k = 0; // 篇幅偏好权重（报告 24 §2.5）：0=纯 cqs
   final _scroll = ScrollController();
 
   @override
@@ -48,7 +50,7 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
     _loading = true;
     try {
       final handle = await ref.read(bootProvider.future);
-      final page = await handle.api.recommend(cursor: _cursor);
+      final page = await handle.api.recommend(cursor: _cursor, k: _k);
       setState(() {
         _items.addAll(page.items);
         _cursor = page.nextCursor;
@@ -59,6 +61,18 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
     } finally {
       _loading = false;
     }
+  }
+
+  // 篇幅偏好切档（报告 24 §2.5，clx）：重置流并按新 k 重载。
+  void _setK(double k) {
+    if (k == _k) return;
+    setState(() {
+      _k = k;
+      _items.clear();
+      _cursor = null;
+      _done = false;
+    });
+    _load();
   }
 
   @override
@@ -79,6 +93,32 @@ class _DiscoverPageState extends ConsumerState<DiscoverPage> {
             child: Text('你可能错过的书 · 上滑不断翻',
                 style: TextStyle(
                     fontSize: 11, color: scheme.onSurfaceVariant)),
+          ),
+          // 篇幅偏好（app/docs/18-runtime-metrics.md §5）：clx 运行时
+          // 重排，文案不叫「排名」；三档预设 K=0/0.25/0.60，会话内记忆。
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+            child: Wrap(
+              spacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Text('篇幅偏好',
+                    style: TextStyle(
+                        fontSize: 11, color: scheme.onSurfaceVariant)),
+                for (final (k, label) in const [
+                  (0.0, '不加权'),
+                  (0.25, '偏厚'),
+                  (0.60, '厚书优先'),
+                ])
+                  ChoiceChip(
+                    label: Text(label, style: const TextStyle(fontSize: 11)),
+                    selected: _k == k,
+                    showCheckmark: false,
+                    visualDensity: VisualDensity.compact,
+                    onSelected: (_) => _setK(k),
+                  ),
+              ],
+            ),
           ),
           Expanded(
             child: Stack(
@@ -191,6 +231,11 @@ class _DiscoverCard extends StatelessWidget {
                         '分位 ${(item.favPctl * 100).toStringAsFixed(1)}%',
                         fg: scheme.primary,
                         icon: MetricIcons.favs),
+                    if (item.cqsState == 'low') ...[
+                      const SizedBox(height: 3),
+                      _badge(context, '低置信',
+                          fg: scheme.onSurfaceVariant),
+                    ],
                   ],
                 ),
               ),
