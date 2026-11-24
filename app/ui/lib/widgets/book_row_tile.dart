@@ -12,7 +12,7 @@ class BookRowTile extends StatelessWidget {
   final RankItem item;
 
   /// IP 徽标（tag 行首位，比普通 tag 更重）：列表混排多个联动 IP 时
-  /// 每本需要 IP 标识（IP tab“随便看看”、“其他”长尾页）。
+  /// 每本需要 IP 标识（IP 二级页的“其他”旧深链）。
   final String? ipLabel;
 
   const BookRowTile({super.key, required this.item, this.ipLabel});
@@ -59,8 +59,7 @@ class BookRowTile extends StatelessWidget {
         decoration: BoxDecoration(
           color: scheme.surface,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-              color: scheme.outline.withValues(alpha: .25)),
+          border: Border.all(color: scheme.outline.withValues(alpha: .25)),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -80,17 +79,22 @@ class BookRowTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(item.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w600)),
+                  Text(
+                    item.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                   const SizedBox(height: 3),
-                  Text(item.author,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style:
-                          TextStyle(fontSize: 11, color: scheme.secondary)),
+                  Text(
+                    item.author,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 11, color: scheme.secondary),
+                  ),
                   if (tags.isNotEmpty) ...[
                     const SizedBox(height: 6),
                     Wrap(
@@ -100,33 +104,43 @@ class BookRowTile extends StatelessWidget {
                         if (ip != null && ip.isNotEmpty)
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: scheme.primary.withValues(alpha: .16),
                               borderRadius: BorderRadius.circular(4),
                               border: Border.all(
-                                  color:
-                                      scheme.primary.withValues(alpha: .5)),
+                                color: scheme.primary.withValues(alpha: .5),
+                              ),
                             ),
-                            child: Text(ip,
-                                style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                    fontFamily: StrataTokens.serif,
-                                    color: scheme.primary)),
+                            child: Text(
+                              ip,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                fontFamily: StrataTokens.serif,
+                                color: scheme.primary,
+                              ),
+                            ),
                           ),
                         for (final t in tags.take(3))
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: scheme.primary.withValues(alpha: .08),
                               borderRadius: BorderRadius.circular(4),
                             ),
-                            child: Text(t,
-                                style: TextStyle(
-                                    fontSize: 10,
-                                    color: scheme.primary)),
+                            child: Text(
+                              t,
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: scheme.primary,
+                              ),
+                            ),
                           ),
                       ],
                     ),
@@ -143,7 +157,9 @@ class BookRowTile extends StatelessWidget {
                           for (var i = 0; i < metrics.length; i++) ...[
                             if (i > 0) const SizedBox(width: 10),
                             MetricBadge(
-                                icon: metrics[i].$1, text: metrics[i].$2),
+                              icon: metrics[i].$1,
+                              text: metrics[i].$2,
+                            ),
                           ],
                         ],
                       ),

@@ -41,7 +41,10 @@ class StrataApi {
     if (!internet) return;
     if (!await isOnline()) {
       throw StrataApiException(
-          status: 0, code: 'offline', message: '当前离线，请检查网络连接');
+        status: 0,
+        code: 'offline',
+        message: '当前离线，请检查网络连接',
+      );
     }
   }
 
@@ -81,9 +84,10 @@ class StrataApi {
       return await _get(path, query).timeout(const Duration(seconds: 45));
     } on TimeoutException {
       throw StrataApiException(
-          status: 0,
-          code: 'timeout',
-          message: '官方数据加载超时，请检查网络后重试');
+        status: 0,
+        code: 'timeout',
+        message: '官方数据加载超时，请检查网络后重试',
+      );
     }
   }
 
@@ -124,9 +128,9 @@ class StrataApi {
       TestBook.fromJson(await _get('/dev/test-book') as Map<String, dynamic>);
 
   /// 注入虚构测试书：60 天模拟观测 + 详情 overlay + 关注条目（不追踪）。
-  Future<TestBook> injectTestBook({int days = 60}) async =>
-      TestBook.fromJson(
-          await _post('/dev/test-book?days=$days') as Map<String, dynamic>);
+  Future<TestBook> injectTestBook({int days = 60}) async => TestBook.fromJson(
+    await _post('/dev/test-book?days=$days') as Map<String, dynamic>,
+  );
 
   /// 移除虚构测试书（overlay / 收录 / 关注 / 观测一并清理）。
   Future<void> removeTestBook() => _delete('/dev/test-book');
@@ -179,8 +183,10 @@ class StrataApi {
     required String month,
     int rank = 0,
   }) async {
-    final body = await _get('/official-ranks/monthly',
-        {'date': month, 'rank': '$rank'}, true);
+    final body = await _get('/official-ranks/monthly', {
+      'date': month,
+      'rank': '$rank',
+    }, true);
     return (body['items'] as List)
         .map((e) => OfficialRankEntry.fromJson(e as Map<String, dynamic>))
         .toList();
@@ -290,8 +296,9 @@ class StrataApi {
 
   /// 关注书观测的按日聚合（docs/07 §4 热力图）：day = epoch 天。
   Future<List<HeatmapDay>> watchHeatmap({int days = 90}) async {
-    final body =
-        await _get('/watchlist/heatmap', {'days': '$days'}) as Map<String, dynamic>;
+    final body = await _get('/watchlist/heatmap', {
+      'days': '$days',
+    }) as Map<String, dynamic>;
     return (body['cells'] as List)
         .map((c) => HeatmapDay.fromJson(c as Map<String, dynamic>))
         .toList();
@@ -368,8 +375,11 @@ class StrataApi {
   /// 加入 watchlist（v6 统一列表）：[active]=false 只存（原「加入书架」），
   /// true = 追踪（后台抓取 + 观测时序）；[role]=self 本人作品 | peer 同期
   /// 对照（docs/07 §1）；满 100 本上限时 409 watchlist_full。
-  Future<void> watchAdd(int nid,
-      {bool active = false, String role = 'self'}) async {
+  Future<void> watchAdd(
+    int nid, {
+    bool active = false,
+    String role = 'self',
+  }) async {
     await _postBody('/watchlist/$nid', {'active': active, 'role': role});
   }
 
@@ -627,8 +637,8 @@ class StrataApi {
     return CalendarResponse.fromJson(body as Map<String, dynamic>);
   }
 
-  /// IP tab 入口行：一个 form 的书按征文（contest）聚合，
-  /// count DESC（引擎侧稳定排序）；total 用于端上折出“其他”入口。
+  /// IP tab 分组网格：一个 form 的书按征文（contest）聚合，
+  /// count DESC（引擎侧稳定排序）；每组 top_* 是收藏最高的一本。
   Future<IpGroupsResult> ipGroups({
     String form = 'ip_collab',
     String? status,
@@ -824,12 +834,12 @@ class TestBook {
   });
 
   factory TestBook.fromJson(Map<String, dynamic> j) => TestBook(
-        nid: j['nid'] as int? ?? 0,
-        present: j['present'] as bool? ?? false,
-        title: j['title'] as String?,
-        days: j['days'] as int?,
-        rows: j['rows'] as int?,
-      );
+    nid: j['nid'] as int? ?? 0,
+    present: j['present'] as bool? ?? false,
+    title: j['title'] as String?,
+    days: j['days'] as int?,
+    rows: j['rows'] as int?,
+  );
 }
 
 /// 浏览足迹：纯本地 user.db 数据。
@@ -1010,9 +1020,11 @@ class ContestGroup {
   /// 官方活动页 URL（引擎内嵌已验证静态表，源 docs/contest-roster-harvest
   /// §2）；null = 未验证（页面下线/未取到），档案页隐藏跳转入口、不编造。
   final String? official;
+
   /// other 系列事件的首页 tab 归属（用户裁定 2026-11-22）：'dialogue' /
   /// 'ip'；'' = 主题类（列表页「其他」tab）。四季系列永无 lane。
   final String lane;
+
   /// 可拉取官方清单（引擎有已验证 tagId 静态台账）；
   /// rosterTracks = 已验证赛道（空 = 单轨，roster 请求 division 传空）。
   final bool roster;
@@ -1037,24 +1049,25 @@ class ContestGroup {
   });
 
   ContestGroup.fromJson(Map<String, dynamic> m)
-      : name = m['name'] as String,
-        series = m['series'] as String,
-        count = (m['count'] as num).toInt(),
-        forms = (m['forms'] as Map<String, dynamic>)
-            .map((k, v) => MapEntry(k, (v as num).toInt())),
-        tracks = (m['tracks'] as List).map((e) => e as String).toList(),
-        yearMin = (m['year_min'] as num).toInt(),
-        yearMax = (m['year_max'] as num).toInt(),
-        year = (m['year'] as num?)?.toInt(),
-        start = m['start'] as String?,
-        end = m['end'] as String?,
-        note = m['note'] as String?,
-        official = m['official'] as String?,
-        lane = m['lane'] as String? ?? '',
-        roster = m['roster'] as bool? ?? false,
-        rosterTracks = (m['roster_tracks'] as List? ?? const [])
-            .map((e) => e as String)
-            .toList();
+    : name = m['name'] as String,
+      series = m['series'] as String,
+      count = (m['count'] as num).toInt(),
+      forms = (m['forms'] as Map<String, dynamic>).map(
+        (k, v) => MapEntry(k, (v as num).toInt()),
+      ),
+      tracks = (m['tracks'] as List).map((e) => e as String).toList(),
+      yearMin = (m['year_min'] as num).toInt(),
+      yearMax = (m['year_max'] as num).toInt(),
+      year = (m['year'] as num?)?.toInt(),
+      start = m['start'] as String?,
+      end = m['end'] as String?,
+      note = m['note'] as String?,
+      official = m['official'] as String?,
+      lane = m['lane'] as String? ?? '',
+      roster = m['roster'] as bool? ?? false,
+      rosterTracks = (m['roster_tracks'] as List? ?? const [])
+          .map((e) => e as String)
+          .toList();
 }
 
 /// 官方清单条目（/strata/roster）：清单 6 字段（nid/标题/作者/简介/封面/
@@ -1076,18 +1089,18 @@ class RosterItem {
   final int? words;
 
   RosterItem.fromJson(Map<String, dynamic> m)
-      : nid = m['nid'] as int,
-        title = m['title'] as String,
-        author = m['author'] as String? ?? '',
-        intro = m['intro'] as String? ?? '',
-        coverUrl = m['cover'] as String?,
-        categoryId = (m['category_id'] as num?)?.toInt() ?? 0,
-        inLibrary = m['in_library'] as bool? ?? false,
-        form = m['form'] as String?,
-        favs = (m['favs'] as num?)?.toInt(),
-        status = m['status'] as String?,
-        estYear = (m['est_year'] as num?)?.toInt(),
-        words = (m['words'] as num?)?.toInt();
+    : nid = m['nid'] as int,
+      title = m['title'] as String,
+      author = m['author'] as String? ?? '',
+      intro = m['intro'] as String? ?? '',
+      coverUrl = m['cover'] as String?,
+      categoryId = (m['category_id'] as num?)?.toInt() ?? 0,
+      inLibrary = m['in_library'] as bool? ?? false,
+      form = m['form'] as String?,
+      favs = (m['favs'] as num?)?.toInt(),
+      status = m['status'] as String?,
+      estYear = (m['est_year'] as num?)?.toInt(),
+      words = (m['words'] as num?)?.toInt();
 }
 
 /// 官方清单页：source=official（上游清单）| degraded（引擎回落库内子集，
@@ -1100,21 +1113,22 @@ class RosterPage {
   final String source;
   final String? note;
   final List<RosterItem> items;
+
   /// 官方全量参赛规模估算（总页数×实际页大小，误差 ≤ 一页；降级响应无此
   /// 键）——UI 显示「约 N 篇」（用户 2026-11-22 裁定：近似即可，不多发请求）。
   final int? totalEstimate;
 
   RosterPage.fromJson(Map<String, dynamic> m)
-      : contest = m['contest'] as String,
-        division = m['division'] as String? ?? '',
-        page = (m['page'] as num?)?.toInt() ?? 1,
-        pages = (m['pages'] as num?)?.toInt() ?? 1,
-        totalEstimate = (m['total_estimate'] as num?)?.toInt(),
-        source = m['source'] as String? ?? 'official',
-        note = m['note'] as String?,
-        items = (m['items'] as List)
-            .map((e) => RosterItem.fromJson(e as Map<String, dynamic>))
-            .toList();
+    : contest = m['contest'] as String,
+      division = m['division'] as String? ?? '',
+      page = (m['page'] as num?)?.toInt() ?? 1,
+      pages = (m['pages'] as num?)?.toInt() ?? 1,
+      totalEstimate = (m['total_estimate'] as num?)?.toInt(),
+      source = m['source'] as String? ?? 'official',
+      note = m['note'] as String?,
+      items = (m['items'] as List)
+          .map((e) => RosterItem.fromJson(e as Map<String, dynamic>))
+          .toList();
 }
 
 /// 官方书单（/strata/booklists 窗口项 / 详情头；官方 API 无枚举动作，
@@ -1132,16 +1146,16 @@ class Booklist {
   final String updated;
 
   Booklist.fromJson(Map<String, dynamic> m)
-      : id = (m['id'] as num?)?.toInt() ?? 0,
-        title = m['title'] as String,
-        summary = m['summary'] as String? ?? '',
-        author = m['author'] as String? ?? '',
-        avatar = m['avatar'] as String? ?? '',
-        vip = m['vip'] as bool? ?? false,
-        markNum = (m['mark_num'] as num?)?.toInt() ?? 0,
-        recommends = (m['recommend_num'] as num?)?.toInt() ?? 0,
-        novelNum = (m['novel_num'] as num?)?.toInt() ?? 0,
-        updated = m['updated'] as String? ?? '';
+    : id = (m['id'] as num?)?.toInt() ?? 0,
+      title = m['title'] as String,
+      summary = m['summary'] as String? ?? '',
+      author = m['author'] as String? ?? '',
+      avatar = m['avatar'] as String? ?? '',
+      vip = m['vip'] as bool? ?? false,
+      markNum = (m['mark_num'] as num?)?.toInt() ?? 0,
+      recommends = (m['recommend_num'] as num?)?.toInt() ?? 0,
+      novelNum = (m['novel_num'] as num?)?.toInt() ?? 0,
+      updated = m['updated'] as String? ?? '';
 }
 
 /// 书单内一部作品：官方累计值（字数/点击/收藏）纯展示，永不进推荐
@@ -1161,18 +1175,18 @@ class BooklistNovel {
   final String form;
 
   BooklistNovel.fromJson(Map<String, dynamic> m)
-      : nid = (m['nid'] as num?)?.toInt() ?? 0,
-        title = m['title'] as String,
-        author = m['author'] as String? ?? '',
-        cover = m['cover'] as String? ?? '',
-        type = m['type'] as String? ?? '',
-        words = (m['words'] as num?)?.toInt() ?? 0,
-        clicks = (m['clicks'] as num?)?.toInt() ?? 0,
-        favs = (m['favs'] as num?)?.toInt() ?? 0,
-        finish = m['finish'] as bool? ?? false,
-        note = m['note'] as String? ?? '',
-        inLibrary = m['in_library'] as bool? ?? false,
-        form = m['form'] as String? ?? '';
+    : nid = (m['nid'] as num?)?.toInt() ?? 0,
+      title = m['title'] as String,
+      author = m['author'] as String? ?? '',
+      cover = m['cover'] as String? ?? '',
+      type = m['type'] as String? ?? '',
+      words = (m['words'] as num?)?.toInt() ?? 0,
+      clicks = (m['clicks'] as num?)?.toInt() ?? 0,
+      favs = (m['favs'] as num?)?.toInt() ?? 0,
+      finish = m['finish'] as bool? ?? false,
+      note = m['note'] as String? ?? '',
+      inLibrary = m['in_library'] as bool? ?? false,
+      form = m['form'] as String? ?? '';
 }
 
 /// 书单列表一窗（done=true 表示页不满、已到底）。
@@ -1182,11 +1196,11 @@ class BooklistPage {
   final bool done;
 
   BooklistPage.fromJson(Map<String, dynamic> m)
-      : page = (m['page'] as num?)?.toInt() ?? 1,
-        items = (m['items'] as List)
-            .map((e) => Booklist.fromJson(e as Map<String, dynamic>))
-            .toList(),
-        done = m['done'] as bool? ?? true;
+    : page = (m['page'] as num?)?.toInt() ?? 1,
+      items = (m['items'] as List)
+          .map((e) => Booklist.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      done = m['done'] as bool? ?? true;
 }
 
 /// 书单详情：头部元数据 + 作品列表（官方顺序，本地 join 后）。
@@ -1195,11 +1209,12 @@ class BooklistDetail {
   final List<BooklistNovel> items;
 
   BooklistDetail.fromJson(Map<String, dynamic> m)
-      : booklist =
-            Booklist.fromJson((m['booklist'] as Map).cast<String, dynamic>()),
-        items = (m['items'] as List)
-            .map((e) => BooklistNovel.fromJson(e as Map<String, dynamic>))
-            .toList();
+    : booklist = Booklist.fromJson(
+        (m['booklist'] as Map).cast<String, dynamic>(),
+      ),
+      items = (m['items'] as List)
+          .map((e) => BooklistNovel.fromJson(e as Map<String, dynamic>))
+          .toList();
 }
 
 class RankItem {
@@ -1438,24 +1453,38 @@ String contestChipLabel(String contest) {
   return s.isEmpty ? contest : s;
 }
 
-/// IP 入口行的一个分组：contest（征文）→ 联动 IP，count 本数。
+/// IP 分组卡片：contest（征文）→ 联动 IP，count 本数，
+/// top_* 是该组收藏最高的一本；IP tab 只用 topTitle 做卡片文案，
+/// 不展示封面（IP 书封面质量参差）。
 class IpGroup {
   final String contest;
   final int count;
+  final int topNid;
+  final String topTitle;
+  final String? topCover;
 
-  const IpGroup({required this.contest, required this.count});
+  const IpGroup({
+    required this.contest,
+    required this.count,
+    this.topNid = 0,
+    this.topTitle = '',
+    this.topCover,
+  });
 
   factory IpGroup.fromJson(Map<String, dynamic> j) => IpGroup(
     contest: j['contest'] as String,
     count: (j['count'] as num).toInt(),
+    topNid: (j['top_nid'] as num?)?.toInt() ?? 0,
+    topTitle: j['top_title'] as String? ?? '',
+    topCover: j['top_cover'] as String?,
   );
 
   /// 展示名：由 contest 推导（崩坏3征文 → 崩坏3）。
   String get label => contestIpLabel(contest) ?? contest;
 }
 
-/// IP 入口行结果：total = 池总量（用于端上折出“其他”），
-/// groups = 按征文（contest）聚合、count DESC 的分组。
+/// IP 分组结果：total = 池总量，groups = 按征文（contest）聚合、
+/// count DESC 的分组；首页展示全部组，不再折出“其他”。
 class IpGroupsResult {
   final int total;
   final List<IpGroup> groups;
@@ -1470,10 +1499,8 @@ class FacetValue {
 
   const FacetValue({required this.name, required this.count});
 
-  factory FacetValue.fromJson(Map<String, dynamic> j) => FacetValue(
-    name: j['name'] as String,
-    count: (j['count'] as num).toInt(),
-  );
+  factory FacetValue.fromJson(Map<String, dynamic> j) =>
+      FacetValue(name: j['name'] as String, count: (j['count'] as num).toInt());
 }
 
 /// 年份 facet：est_year → 本数（年份降序）。
@@ -1582,9 +1609,9 @@ class RefreshResult {
   final Map<String, dynamic>? detail;
 
   RefreshResult.fromJson(Map<String, dynamic> m)
-      : state = m['state'] as String,
-        written = m['written'] as bool,
-        detail = m['detail'] as Map<String, dynamic>?;
+    : state = m['state'] as String,
+      written = m['written'] as bool,
+      detail = m['detail'] as Map<String, dynamic>?;
 }
 
 /// 自动收录的库外书一行（user.db discovered，docs/08 §discovered）。
@@ -1598,13 +1625,13 @@ class DiscoveredItem {
   final int observedAt;
 
   DiscoveredItem.fromJson(Map<String, dynamic> m)
-      : nid = m['nid'] as int,
-        title = m['title'] as String,
-        author = m['author'] as String?,
-        coverUrl = m['cover_url'] as String?,
-        summary = m['summary'] as String?,
-        source = m['source'] as String? ?? 'search',
-        observedAt = m['observed_at'] as int? ?? 0;
+    : nid = m['nid'] as int,
+      title = m['title'] as String,
+      author = m['author'] as String?,
+      coverUrl = m['cover_url'] as String?,
+      summary = m['summary'] as String?,
+      source = m['source'] as String? ?? 'search',
+      observedAt = m['observed_at'] as int? ?? 0;
 }
 
 class ObservationRow {
@@ -1642,10 +1669,10 @@ class Award {
   final String? category;
 
   Award.fromJson(Map<String, dynamic> m)
-      : nid = m['nid'] as int,
-        edition = m['edition'] as String,
-        award = m['award'] as String,
-        category = m['category'] as String?;
+    : nid = m['nid'] as int,
+      edition = m['edition'] as String,
+      award = m['award'] as String,
+      category = m['category'] as String?;
 
   /// 徽标文案（占位 → 征文获奖，docs §6）。
   String get displayAward => award == '待逐档标定' ? '征文获奖' : award;
@@ -1658,9 +1685,9 @@ class ContestBooks {
   final List<RankItem> items;
 
   ContestBooks.fromJson(Map<String, dynamic> m)
-      : items = (m['items'] as List)
-            .map((e) => RankItem.fromJson(e as Map<String, dynamic>))
-            .toList();
+    : items = (m['items'] as List)
+          .map((e) => RankItem.fromJson(e as Map<String, dynamic>))
+          .toList();
 }
 
 class BookDetail {
@@ -1685,7 +1712,8 @@ class BookDetail {
       effective = m['effective'] as Map<String, dynamic>?,
       local = m['local'] as Map<String, dynamic>?,
       meta = m['meta'] as Map<String, dynamic>?,
-      awards = (m['awards'] as List?)
+      awards =
+          (m['awards'] as List?)
               ?.map((e) => Award.fromJson(e as Map<String, dynamic>))
               .toList() ??
           const [];

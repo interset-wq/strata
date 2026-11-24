@@ -2297,9 +2297,9 @@ func (s *Server) authorProfile(c *gin.Context) {
 	})
 }
 
-// ipGroups serves the IP tab's entry row: one form's books aggregated by
-// contest (征文) — named IPs count DESC, total for the client's "other"
-// fold. form=ip_collab is the intended caller.
+// ipGroups serves the IP tab's group grid: one form's books aggregated by
+// contest (征文), count DESC, with each group's top book data for card copy.
+// form=ip_collab is the intended caller.
 func (s *Server) ipGroups(c *gin.Context) {
 	form, ok := parseForm(c)
 	if !ok || form == "" {

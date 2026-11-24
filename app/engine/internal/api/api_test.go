@@ -385,8 +385,9 @@ func TestCoverCarousel(t *testing.T) {
 	}
 }
 
-// TestIpGroups: the IP tab's entry row — one form's books aggregated by
-// contest (征文), count DESC with a stable contest ASC tie-break.
+// TestIpGroups: the IP tab's group grid — one form's books aggregated by
+// contest (征文), count DESC with a stable contest ASC tie-break, plus the
+// favourite leader used for each card's cover.
 func TestIpGroups(t *testing.T) {
 	srv, _ := newTestServer(t)
 	body := getJSON(t, srv.URL+"/strata/ip-groups?form=ip_collab",
@@ -396,17 +397,23 @@ func TestIpGroups(t *testing.T) {
 	}
 	groups := body["groups"].([]any)
 	want := []struct {
-		contest string
-		count   int
+		contest  string
+		count    int
+		topNID   int
+		topTitle string
 	}{
-		{"崩坏3征文", 2}, {"少女前线征文", 1}, {"龙之谷征文", 1},
+		{"崩坏3征文", 2, 1006, "IP F"},
+		{"少女前线征文", 1, 1010, "IP K"},
+		{"龙之谷征文", 1, 1011, "IP L"},
 	}
 	if len(groups) != len(want) {
 		t.Fatalf("groups = %v", groups)
 	}
 	for i, w := range want {
 		g := groups[i].(map[string]any)
-		if g["contest"] != w.contest || int(g["count"].(float64)) != w.count {
+		if g["contest"] != w.contest || int(g["count"].(float64)) != w.count ||
+			int(g["top_nid"].(float64)) != w.topNID ||
+			g["top_title"] != w.topTitle {
 			t.Fatalf("groups[%d] = %v, want %v", i, g, w)
 		}
 	}

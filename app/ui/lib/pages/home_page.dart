@@ -10,7 +10,6 @@ import '../widgets/banner_large_card.dart';
 import '../widgets/back_to_top.dart';
 import '../widgets/cover_banner.dart';
 import '../widgets/default_cover.dart';
-import '../widgets/book_row_tile.dart';
 import '../widgets/contest_row_card.dart';
 
 /// Classic 排行行卡数据（board 端点），kind: finish / popular。
@@ -66,18 +65,14 @@ class _HomePageState extends ConsumerState<HomePage> {
   ];
   String _form = 'long';
 
-  // IP tab“随便看看”：ip_collab 全池（收藏降序），20 本/页，接近底部
-  // 上滑加载下一页。确定性列表，只有它能做 load-more。
-  List<RankItem> _ipItems = const [];
-  bool _ipLoading = false;
-  bool _ipDone = false;
-  String? _ipError;
+  // IP tab：小池（seed 只有 62 本/6 个征文），首页只做分组卡片，
+  // 不再把全池 62 行倒进“随便看看”；二级页看单 IP 全部作品。
 
   // 中篇 tab（小池，words 5万–15万，池规模随种子版本变化）：入口网格
   // 门户（总榜/年份/比赛/题材/优质/随机）。原页内单列表信息量低
   // （用户 2026-11-19 反馈），榜单落点复用 ClassicListPage，随机走
   // /medium-random。与长篇=分区首页、短篇=入口列表、对话=篇幅+榜单
-  // 3×3、IP=入口行+列表刻意区分（docs/16）。
+  // 3×3、IP=分组封面卡片刻意区分（docs/16）。
 
   // 对话 tab（大类，无完结条款，E.22 口径）：字数从 3 万到上百万，
   // 单一收藏榜会被长篇占满。入口网格按短/中/长篇幅 + 榜单分流；
@@ -89,12 +84,6 @@ class _HomePageState extends ConsumerState<HomePage> {
     _scroll.addListener(() {
       final show = _scroll.hasClients && _scroll.offset > 500;
       if (show != _showTop) setState(() => _showTop = show);
-      if (_scroll.hasClients &&
-          _scroll.offset >= _scroll.position.maxScrollExtent - 300) {
-        if (_form == 'ip_collab') {
-          _loadIpMore();
-        }
-      }
     });
   }
 
@@ -102,36 +91,6 @@ class _HomePageState extends ConsumerState<HomePage> {
   void dispose() {
     _scroll.dispose();
     super.dispose();
-  }
-
-  // IP tab“随便看看”下一页：classic 端点 form=ip_collab（收藏降序 +
-  // offset 分页），失败显示重试而不是静默吞掉。
-  Future<void> _loadIpMore() async {
-    if (_ipLoading || _ipDone) return;
-    setState(() {
-      _ipLoading = true;
-      _ipError = null;
-    });
-    try {
-      final handle = await ref.read(bootProvider.future);
-      final page = await handle.api.rankingClassic(
-        form: 'ip_collab',
-        limit: 20,
-        offset: _ipItems.length,
-      );
-      if (!mounted) return;
-      setState(() {
-        _ipItems = [..._ipItems, ...page];
-        _ipDone = page.length < 20;
-        _ipLoading = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _ipError = '$e';
-        _ipLoading = false;
-      });
-    }
   }
 
   @override
@@ -145,6 +104,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           ref.invalidate(serialShowcaseProvider(_form));
           ref.invalidate(finishedShowcaseProvider(_form));
           ref.invalidate(browseShowcaseProvider(_form));
+          ref.invalidate(ipGroupsProvider);
           ref.invalidate(contestGroupsProvider);
           ref.invalidate(yearGroupsProvider);
           ref.invalidate(genreGroupsProvider);
@@ -203,12 +163,9 @@ class _HomePageState extends ConsumerState<HomePage> {
         ],
       );
     }
-    // IP tab 书少（54 本），不需要多个分区：轮播 + IP 入口行 +
-    // “随便看看”（全池列表，上滑加载更多），无 showcase 分区。
+    // IP tab 书少（seed 只有 62 本/6 个征文），不做全池列表：
+    // 轮播保持一致 + 6 张 IP 分组封面卡片；单 IP 的全部作品进二级页。
     if (_form == 'ip_collab') {
-      if (_ipItems.isEmpty && !_ipLoading) {
-        WidgetsBinding.instance.addPostFrameCallback((_) => _loadIpMore());
-      }
       return Stack(
         children: [
           ListView(
@@ -219,53 +176,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               _searchRow(context),
               _featuredCarousel(context, banners),
               const SizedBox(height: 8),
-              const IpEntryRow(),
-              _contestArchiveSection(context, 'ip'),
-              _sectionTitle(context, '随便看看'),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  children: [
-                    for (final it in _ipItems)
-                      BookRowTile(
-                        item: it,
-                        ipLabel: contestIpLabel(it.contest),
-                      ),
-                    if (_ipError != null)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 24),
-                        child: Center(
-                          child: TextButton(
-                            onPressed: _loadIpMore,
-                            child: const Text('加载失败，点按重试'),
-                          ),
-                        ),
-                      )
-                    else if (_ipLoading)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 24),
-                        child: Center(
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        ),
-                      )
-                    else if (_ipDone && _ipItems.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(0, 8, 0, 24),
-                        child: Center(
-                          child: Text(
-                            '— 共 ${_ipItems.length} 本 —',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
+              const IpGroupGrid(),
             ],
           ),
           if (_showTop)
@@ -329,7 +240,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     // 中篇 tab（小池）：固定轮播 + 2×3 入口网格（总榜/年份/
     // 比赛/题材/优质/随机）。原页内单列表信息量低（用户
     // 2026-11-19 反馈）；与长篇=分区首页、短篇=入口列表、
-    // IP=入口行+列表刻意区分（docs/16）。
+    // IP=分组封面卡片刻意区分（docs/16）。
     if (_form == 'medium') {
       return Stack(
         children: [
@@ -462,7 +373,8 @@ class _HomePageState extends ConsumerState<HomePage> {
           height: 150,
           child: Center(
             child: TextButton(
-              onPressed: () => ref.invalidate(bannerProvider(carouselProviderKey(_form))),
+              onPressed: () =>
+                  ref.invalidate(bannerProvider(carouselProviderKey(_form))),
               child: const Text('轮播加载失败，点按重试'),
             ),
           ),
@@ -730,8 +642,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   // 分类过滤，零请求，空则整区隐藏。
   Widget _contestArchiveSection(BuildContext context, String lane) {
     final groups = ref.watch(contestArchiveProvider);
-    final items =
-        groups.value?.where((g) => g.lane == lane).toList() ?? [];
+    final items = groups.value?.where((g) => g.lane == lane).toList() ?? [];
     if (items.isEmpty) return const SizedBox.shrink();
     return Column(
       children: [
@@ -794,8 +705,11 @@ class _HomePageState extends ConsumerState<HomePage> {
       (Icons.bookmarks, '书单', '/booklists'),
       (Icons.update, '状态', '/browse?mode=status'),
       (Icons.emoji_events, '比赛', '/contests'),
-      (Icons.leaderboard, '经典榜单',
-          '/classic-list?title=经典榜单&form=long&metric-switchable=1'),
+      (
+        Icons.leaderboard,
+        '经典榜单',
+        '/classic-list?title=经典榜单&form=long&metric-switchable=1',
+      ),
     ];
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -847,9 +761,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           child: ListView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            children: [
-              for (final b in items) _booklistCard(context, b),
-            ],
+            children: [for (final b in items) _booklistCard(context, b)],
           ),
         ),
       ],
@@ -888,14 +800,18 @@ class _HomePageState extends ConsumerState<HomePage> {
                 Text(
                   '${b.novelNum} 部作品',
                   style: TextStyle(
-                      fontSize: 10, color: scheme.onSurfaceVariant),
+                    fontSize: 10,
+                    color: scheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
             Text(
               b.title,
               style: const TextStyle(
-                  fontSize: 11.5, fontWeight: FontWeight.w600),
+                fontSize: 11.5,
+                fontWeight: FontWeight.w600,
+              ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -962,7 +878,12 @@ class _HomePageState extends ConsumerState<HomePage> {
     String listPath(String title, String extra) =>
         '/classic-list?title=${Uri.encodeComponent(title)}&form=dialogue$extra';
     return [
-      (Icons.leaderboard, '经典榜单', '点击/收藏/点赞/字数', listPath('经典榜单', '&metric-switchable=1')),
+      (
+        Icons.leaderboard,
+        '经典榜单',
+        '点击/收藏/点赞/字数',
+        listPath('经典榜单', '&metric-switchable=1'),
+      ),
       (Icons.short_text, '短对话', '≤5 万字', listPath('短对话', '&words-band=short')),
       (
         Icons.menu_book,
@@ -976,24 +897,14 @@ class _HomePageState extends ConsumerState<HomePage> {
         '>15 万字',
         listPath('长对话', '&words-band=long'),
       ),
-      (
-        Icons.calendar_month,
-        '年份榜',
-        '筛选面板里选年份',
-        listPath('年份榜', ''),
-      ),
+      (Icons.calendar_month, '年份榜', '筛选面板里选年份', listPath('年份榜', '')),
       (
         Icons.emoji_events,
         '比赛榜',
         '按征文赛道筛选',
         listPath('比赛榜', '&contest-switchable=1'),
       ),
-      (
-        Icons.category,
-        '题材榜',
-        '筛选面板里选题材',
-        listPath('题材榜', ''),
-      ),
+      (Icons.category, '题材榜', '筛选面板里选题材', listPath('题材榜', '')),
       (Icons.star, '优质对话', '同代分位头部', listPath('优质对话', '&order=pct')),
       (Icons.shuffle, '随机对话', '随机 100 本', '/dialogue-random'),
     ];
@@ -1090,12 +1001,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         '侧滑面板切换赛道',
         '/classic-list?title=比赛榜&form=short&contest-switchable=1',
       ),
-      (
-        Icons.category,
-        '题材榜',
-        '筛选面板里选题材',
-        '/classic-list?title=题材榜&form=short',
-      ),
+      (Icons.category, '题材榜', '筛选面板里选题材', '/classic-list?title=题材榜&form=short'),
       (
         Icons.star,
         '优质短篇',
@@ -1200,10 +1106,11 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 }
 
-/// IP tab 入口行：命名 IP（收藏数前 2 的征文）+ 其他（长尾）。
-/// contest 即联动 IP 轴（崩坏3征文 → 崩坏3）；文字卡无 icon（docs/15）。
-class IpEntryRow extends ConsumerWidget {
-  const IpEntryRow({super.key});
+/// IP tab 分组网格：全部征文分组都露出（seed 当前 6 组），每组用
+/// 纯文字卡片（IP 名 + 本数 + 收藏最高一本），点进该 IP 的二级列表。
+/// contest 即联动 IP 轴（崩坏3征文 → 崩坏3）；不再把长尾折进“其他”。
+class IpGroupGrid extends ConsumerWidget {
+  const IpGroupGrid({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1212,11 +1119,8 @@ class IpEntryRow extends ConsumerWidget {
         .watch(ipGroupsProvider)
         .when(
           loading: () => const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 16),
-            child: SizedBox(
-              height: 56,
-              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-            ),
+            padding: EdgeInsets.symmetric(vertical: 32),
+            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
           ),
           error: (e, _) => Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1225,69 +1129,166 @@ class IpEntryRow extends ConsumerWidget {
             ),
           ),
           data: (r) {
-            final named = r.groups.take(2).toList();
-            final otherCount = r.total - named.fold(0, (s, g) => s + g.count);
-            final entries = [
-              for (final g in named) (g.label, g.contest, g.count),
-              if (otherCount > 0) ('其他', 'other', otherCount),
-            ];
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: SizedBox(
-                height: 56,
-                child: Row(
-                  children: [
-                    for (final (label, group, count) in entries)
-                      Expanded(
-                        child: Padding(
-                          padding: EdgeInsets.only(
-                            right: label == entries.last.$1 ? 0 : 8,
-                          ),
-                          child: InkWell(
-                            onTap: () => context.push(
-                              '/ip-books?group=${Uri.encodeComponent(group)}'
-                              '&label=${Uri.encodeComponent(label)}',
-                            ),
-                            borderRadius: BorderRadius.circular(12),
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: scheme.primary.withValues(alpha: .12),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              alignment: Alignment.center,
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    label,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontFamily: StrataTokens.serif,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    '$count 本',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      color: scheme.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
+            if (r.groups.isEmpty) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(vertical: 32),
+                child: Center(
+                  child: Text('暂无 IP 合作作品', style: TextStyle(fontSize: 12)),
+                ),
+              );
+            }
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      Text(
+                        'IP 合集',
+                        style: TextStyle(
+                          fontFamily: StrataTokens.serif,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: scheme.onSurface,
                         ),
                       ),
-                  ],
+                      const Spacer(),
+                      Text(
+                        '${r.groups.length} 个征文 · ${r.total} 本',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
+                const SizedBox(height: 10),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final width = (constraints.maxWidth - 12) / 2;
+                      return Wrap(
+                        spacing: 12,
+                        runSpacing: 16,
+                        children: [
+                          for (final g in r.groups)
+                            SizedBox(
+                              width: width,
+                              child: _IpGroupCard(group: g),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+              ],
             );
           },
         );
+  }
+}
+
+class _IpGroupCard extends StatelessWidget {
+  final IpGroup group;
+
+  const _IpGroupCard({required this.group});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: () => context.push(
+        '/ip-books?group=${Uri.encodeComponent(group.contest)}'
+        '&label=${Uri.encodeComponent(group.label)}',
+      ),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        height: 148,
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        decoration: BoxDecoration(
+          color: scheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: scheme.outline.withValues(alpha: .55)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 3,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: scheme.primary,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'IP 合作',
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 1.2,
+                    color: scheme.primary,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '${group.count} 本',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              group.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontFamily: StrataTokens.serif,
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: scheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Expanded(
+              child: Text(
+                group.topTitle.isEmpty ? '暂无作品' : group.topTitle,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11,
+                  height: 1.35,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+            Row(
+              children: [
+                Text(
+                  '查看作品',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: scheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 3),
+                Icon(Icons.arrow_forward, size: 12, color: scheme.primary),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

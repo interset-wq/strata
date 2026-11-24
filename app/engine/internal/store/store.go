@@ -1465,14 +1465,20 @@ LIMIT ?`
 // IpGroup is one contest (征文) cluster of an IP pool: the IP tab groups
 // books by which IP they collab with, and in the seed that axis is the
 // contest field (崩坏3征文 → 崩坏3, 少女前线征文 → 少女前线, …).
+//
+// TopNID/TopTitle/TopCover describe the group's favourite leader so the
+// IP tab can render its text card without one /ip-books request per group.
 type IpGroup struct {
-	Contest string `json:"contest"`
-	Count   int    `json:"count"`
+	Contest  string `json:"contest"`
+	Count    int    `json:"count"`
+	TopNID   int64  `json:"top_nid"`
+	TopTitle string `json:"top_title"`
+	TopCover string `json:"top_cover"`
 }
 
-// IpGroups aggregates one form's books by contest for the IP tab's entry
-// row: named IPs by count DESC (stable contest ASC tie-break) plus the
-// pool total, so the client can fold the tail into an "other" entry.
+// IpGroups aggregates one form's books by contest for the IP tab's group
+// grid: named IPs by count DESC (stable contest ASC tie-break) plus the
+// pool total and each group's favourite leader for the card copy.
 func (s *Store) IpGroups(ctx context.Context, form, status string) (int,
 	[]IpGroup, error) {
 	where := "WHERE form = ?"
@@ -1505,7 +1511,54 @@ GROUP BY contest ORDER BY c DESC, contest ASC`, args...)
 	if err := rows.Err(); err != nil {
 		return 0, nil, err
 	}
-	return total, mergeContestGroups(groups), nil
+	merged := mergeContestGroups(groups)
+	for i := range merged {
+		nid, title, cover, err := s.ipGroupTopBook(ctx, form, status,
+			merged[i].Contest)
+		if err != nil {
+			return 0, nil, err
+		}
+		merged[i].TopNID = nid
+		merged[i].TopTitle = title
+		merged[i].TopCover = cover
+	}
+	return total, merged, nil
+}
+
+// ipGroupTopBook returns the favourite leader of one merged contest group,
+// matching every raw division spelling of an N届 event. Empty fields mean
+// the group has no book (should not happen for a merged group).
+func (s *Store) ipGroupTopBook(ctx context.Context, form, status,
+	contest string) (int64, string, string, error) {
+	where := "seed.books.form = ?"
+	args := []any{form}
+	if status != "" {
+		where += " AND seed.books.status = ?"
+		args = append(args, status)
+	}
+	clause, ca := contestMatchClause("seed.books.contest", contest)
+	where += " AND " + clause
+	args = append(args, ca...)
+	var (
+		nid   int64
+		title string
+		cover sql.NullString
+	)
+	err := s.DB.QueryRowContext(ctx, `
+SELECT seed.books.nid, seed.books.title,
+       COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url
+FROM seed.books
+LEFT JOIN covers c ON c.nid = seed.books.nid
+WHERE `+where+`
+ORDER BY seed.books.favs DESC, seed.books.nid ASC LIMIT 1`, args...).
+		Scan(&nid, &title, &cover)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, "", "", nil
+	}
+	if err != nil {
+		return 0, "", "", err
+	}
+	return nid, title, cover.String, nil
 }
 
 // FacetValue is one selectable value of a filter dimension with its pool

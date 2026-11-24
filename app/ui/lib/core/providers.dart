@@ -13,8 +13,9 @@ import 'ffi/engine_ffi.dart';
 
 /// Live network paths (connectivity_plus). Empty list or all-`none` =
 /// offline; seed browsing keeps working, upstream-proxying endpoints do not.
-final connectivityProvider =
-    StreamProvider<List<ConnectivityResult>>((ref) async* {
+final connectivityProvider = StreamProvider<List<ConnectivityResult>>((
+  ref,
+) async* {
   final connectivity = Connectivity();
   yield await connectivity.checkConnectivity();
   yield* connectivity.onConnectivityChanged;
@@ -99,21 +100,24 @@ String carouselProviderKey(String form) => '$form@${carouselDayKey()}';
 
 final bannerProvider = FutureProvider.autoDispose
     .family<List<FeaturedItem>, String>((ref, formDay) async {
-  final at = formDay.indexOf('@');
-  final form = formDay.substring(0, at);
-  final dayKey = formDay.substring(at + 1);
-  final handle = await ref.watch(bootProvider.future);
-  final carouselForm = carouselFormFor(form);
-  if (carouselIsFixed(form)) {
-    return handle.api.featured(limit: bannerCarouselCount, form: carouselForm);
-  }
-  final seed = int.parse(dayKey);
-  return handle.api.banners(
-    seed: seed,
-    limit: bannerCarouselCount,
-    form: carouselForm,
-  );
-});
+      final at = formDay.indexOf('@');
+      final form = formDay.substring(0, at);
+      final dayKey = formDay.substring(at + 1);
+      final handle = await ref.watch(bootProvider.future);
+      final carouselForm = carouselFormFor(form);
+      if (carouselIsFixed(form)) {
+        return handle.api.featured(
+          limit: bannerCarouselCount,
+          form: carouselForm,
+        );
+      }
+      final seed = int.parse(dayKey);
+      return handle.api.banners(
+        seed: seed,
+        limit: bannerCarouselCount,
+        form: carouselForm,
+      );
+    });
 
 const bannerCarouselCount = 6;
 const largeImageCount = 6;
@@ -124,17 +128,17 @@ const largeImageCount = 6;
 /// widgets/cover_banner.dart。按 form 分池。
 final coverCarouselProvider = FutureProvider.autoDispose
     .family<List<RankItem>, String>((ref, formDay) async {
-  final at = formDay.indexOf('@');
-  final form = formDay.substring(0, at);
-  final dayKey = formDay.substring(at + 1);
-  final handle = await ref.watch(bootProvider.future);
-  final seed = int.parse(dayKey);
-  return handle.api.coverCarousel(
-    seed: seed,
-    form: form,
-    limit: bannerCarouselCount,
-  );
-});
+      final at = formDay.indexOf('@');
+      final form = formDay.substring(0, at);
+      final dayKey = formDay.substring(at + 1);
+      final handle = await ref.watch(bootProvider.future);
+      final seed = int.parse(dayKey);
+      return handle.api.coverCarousel(
+        seed: seed,
+        form: form,
+        limit: bannerCarouselCount,
+      );
+    });
 
 /// 发书日历查询参数（family 键）：粒度 + 锚点日 + 每格条目上限。
 class CalendarQuery {
@@ -172,8 +176,8 @@ final calendarProvider = FutureProvider.family<CalendarResponse, CalendarQuery>(
   },
 );
 
-/// IP tab 入口行：ip_collab 池按征文（contest）聚合（count DESC）。
-/// 端上取前 2 组作命名 IP 入口，其余折成“其他”。
+/// IP tab 分组网格：ip_collab 池按征文（contest）聚合（count DESC），
+/// 端上展示全部组，每组带收藏最高一本的 top_* 做封面卡片。
 final ipGroupsProvider = FutureProvider<IpGroupsResult>((ref) async {
   final handle = await ref.watch(bootProvider.future);
   return handle.api.ipGroups(form: 'ip_collab');
@@ -200,19 +204,19 @@ final contestGroupsProvider = FutureProvider.family<IpGroupsResult, String>((
 
 /// 赛事档案列表（docs/contest-display-in-app.md 形态一）：seed 内置库按
 /// 赛事聚合 + 引擎内嵌官方日期（用户核实）。零请求。
-final contestArchiveProvider =
-    FutureProvider<List<ContestGroup>>((ref) async {
+final contestArchiveProvider = FutureProvider<List<ContestGroup>>((ref) async {
   final handle = await ref.watch(bootProvider.future);
   return handle.api.contestArchive();
 });
 
 /// 一届赛事的代表作（per-form 窗口，同代收藏分位序）+ 该届库内获奖作品
 /// （schema v5；奖项字段不参与排序，docs/contest-display-in-app.md §6）。
-final contestArchiveBooksProvider =
-    FutureProvider.family<ContestBooks, String>((ref, contest) async {
-  final handle = await ref.watch(bootProvider.future);
-  return handle.api.contestArchiveBooks(contest: contest);
-});
+final contestArchiveBooksProvider = FutureProvider.family<ContestBooks, String>(
+  (ref, contest) async {
+    final handle = await ref.watch(bootProvider.future);
+    return handle.api.contestArchiveBooks(contest: contest);
+  },
+);
 
 /// 筛选 facet（经典榜单筛选面板）：form 池的状态外五维度值列表
 /// （状态为固定枚举，不在 facet 里）。

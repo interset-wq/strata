@@ -135,10 +135,14 @@ contest 聚合端点：`form` 必填，池按征文（`contest`，非空）`GROU
 `count DESC, contest ASC` 稳定序。组名已归一化（`NormalizeContest`，用户
 2026-11-21）：仅 N征 系列是多赛项赛事（六征长篇/中篇/短篇 → 六征），其他
 征文名原样返回。返回 `total`（池总量，含无 contest 的书）+
-`groups: [{contest, count}]`。
+`groups: [{contest, count, top_nid, top_title, top_cover}]`；`top_*`
+是该组收藏最高的一本，供 IP tab 卡片文案直接渲染，避免每组再发
+`/ip-books` 请求（`top_cover` 保留在契约里，当前 UI 不展示封面）。
 
-- IP tab 入口行（`form=ip_collab`）：端上取前 2 组作命名 IP 入口
-  （崩坏3征文 → 崩坏3，去“征文”后缀），其余折成“其他”（total − 前 2 之和）。
+- IP tab 分组网格（`form=ip_collab`）：端上展示全部组（seed 当前 6 组），
+  不再取前 2 组 + “其他”；每组是纯文字卡片（`top_title` 做副文案），
+  点击进 `/ip-books?group=` 二级页。2026-11-24 用户定：IP 封面质量参差，
+  不用封面。
 - 短篇 tab 比赛榜入口（`form=short`）：`status` 可选（精确匹配，缺省
   不过滤；短篇池本身经种子完结条款已干净，UI 不传 status）。用途 =
   `/classic-list` 比赛榜页的**赛道 Drawer**（AppBar 汉堡/左缘右滑打开，
@@ -147,9 +151,10 @@ contest 聚合端点：`form` 必填，池按征文（`contest`，非空）`GROU
 ### GET /strata/ip-books?form=&group=&limit=&offset=（**已实现**）
 
 一个 IP 入口的列表：`group` 必填——征文名（归一化匹配：母赛事名命中其
-全部篇幅赛项，归一化规则见聚合端点）或 `'other'`
-（归一化后收藏数前 2 名征文之外的长尾，引擎内部算 top-2）。组内 `favs DESC,
+全部篇幅赛项，归一化规则见聚合端点）。组内 `favs DESC,
 nid ASC`，分页同 `/rankings/classic`。未知征文名返回空列表不报错。
+`'other'` 仍保留为兼容旧深链（归一化后收藏数前 2 名征文之外的长尾，
+引擎内部算 top-2），但 IP tab 分组网格已不再生成该入口。
 
 ### GET /strata/cover-carousel?form=&limit=&seed=（**已实现**）
 
