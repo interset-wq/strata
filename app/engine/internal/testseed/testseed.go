@@ -26,7 +26,6 @@ CREATE TABLE books(
   est_date TEXT NOT NULL, est_conf TEXT NOT NULL, tags TEXT,
   fav_pctl REAL, click_pctl REAL, praise_pctl REAL, pr REAL, pctl_pr REAL,
   form TEXT NOT NULL DEFAULT 'long',
-  lqs REAL,
   cqs REAL, cqs_state TEXT, cps REAL, len_norm REAL,
   is_licensed INTEGER NOT NULL DEFAULT 0
 );
@@ -211,22 +210,6 @@ VALUES(3003,'2025春征','金奖','短篇','zw20250301'),
 	// 1008 feeds the cover-composed 对话 carousel: a dialogue-form book
 	// with a cover (cover-less books are invisible in that pool).
 	if _, err := db.Exec(`UPDATE books SET form='dialogue', cover_url='cover-1008.jpg' WHERE nid = 1008`); err != nil {
-		db.Close()
-		return nil, err
-	}
-	// lqs fixture values for the recommend stream (docs/lqs-ranking-
-	// integration.md): long-zone books 1001/1003 carry scores, the
-	// licensed 2001 carries 1.0 as an exclusion canary — it must never
-	// surface in /recommend despite the top score.
-	if _, err := db.Exec(`UPDATE books SET lqs = 0.9 WHERE nid = 1001`); err != nil {
-		db.Close()
-		return nil, err
-	}
-	if _, err := db.Exec(`UPDATE books SET lqs = 0.7 WHERE nid = 1003`); err != nil {
-		db.Close()
-		return nil, err
-	}
-	if _, err := db.Exec(`UPDATE books SET lqs = 1.0 WHERE nid = 2001`); err != nil {
 		db.Close()
 		return nil, err
 	}

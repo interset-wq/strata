@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pandas as pd
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 EXPECTED_TABLES = {"books", "book_tags", "seed_meta", "deep_ranks",
                    "calendar_universe", "contest_awards",
                    "calib_fav_bounds", "calib_len_anchors",
@@ -198,18 +198,11 @@ def check_db(db_path: Path, seed: pd.DataFrame, meta: dict) -> None:
         blacklist_hits = seed.loc[seed["nid"].isin(blacklist), "nid"].tolist()
         if blacklist_hits:
             _fail(errors, f"blacklisted nids in seed: {blacklist_hits[:10]}")
-        bad_quality = conn.execute(
-            "SELECT COUNT(*) FROM books WHERE"
-            " (lqs IS NOT NULL AND (lqs <= 0 OR lqs > 1)) OR"
-            " (lqs_pctl IS NOT NULL AND (lqs_pctl <= 0 OR lqs_pctl > 1)) OR"
-            " (vel_pctl IS NOT NULL AND (vel_pctl <= 0 OR vel_pctl > 1))"
-        ).fetchone()[0]
-        if bad_quality:
-            _fail(errors, f"{bad_quality} rows have invalid lqs/vel percentiles")
+        # v8: lqs/lqs_pctl/vel_pctl are no longer columns (archived,
+        # report lineage only); licensed rows still carry no runtime scores.
         ln_quality = conn.execute(
             "SELECT COUNT(*) FROM books WHERE is_licensed=1 AND"
-            " (lqs IS NOT NULL OR lqs_pctl IS NOT NULL OR vel_pctl IS NOT NULL"
-            "  OR cqs IS NOT NULL OR cps IS NOT NULL OR len_norm IS NOT NULL"
+            " (cqs IS NOT NULL OR cps IS NOT NULL OR len_norm IS NOT NULL"
             "  OR cqs_state IS NOT NULL)"
         ).fetchone()[0]
         if ln_quality:

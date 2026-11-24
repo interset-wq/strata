@@ -1,10 +1,10 @@
 # APP 设计文档 02：数据模型与种子构建
-> **状态（随版本变化，数字仅供参考）**：`schema_version=4`（发书日历 `calendar_universe`，见 14）、
-> `books` 28 列；当前 `seed_version` / 书数列数见 `manifest.json`。收录与形态条款：
+> **状态（随版本变化，数字仅供参考）**：`schema_version=8`（v6 运行时质量指标 / v7 定年锚点 / v8 删 lqs 族列）、
+> `books` 29 列；当前 `seed_version` / 书数列数见 `manifest.json`。收录与形态条款：
 > 取消新书发现渠道（09 附录 E.8）、征文保底 E.9、封面补全 E.10、弃书+invalid E.11/E.12、
 > 弃书质量豁免+对话判据 v2 E.13、同人字数判形态+短篇三天花板 E.17、对话体时间下界+标题 IP E.18、
 > 越天花板僵尸/假短篇归 invalid E.19、中篇必须完结 E.20、正文征文否决形态估计 E.21、
-> Web 死链剔除 E.25、App `categoryId` 正向判对话 E.28（形态口径见 `docs/form-definitions.md`）。
+> Web 死链剔除 E.25、App `categoryId` 正向判对话 E.28、删 lqs 族列+推荐回退纯 fav_pctl 流 E.29（形态口径见 `docs/form-definitions.md`）。
 > 文中具体计数/比例/体积为各版实测快照、仅供参考，随数据集变化；表格结构以 `schema.sql` 为准。
 
 > 上游约束见 01 §2；搜索口径见 04。
@@ -56,8 +56,8 @@
 | 18     | `tags`                                                               | TEXT       | 管道串，仅展示与兜底；查询走 `book_tags`                                                          |
 | 19–23 | `fav_pctl` / `click_pctl` / `praise_pctl` / `pr` / `pctl_pr` | REAL       | 世代内分位 + 赞藏比（`favs<10` 时 `pr`/`pctl_pr` NULL）                                       |
 | 24     | `form`                                                               | TEXT       | 六值形态标签，见 `docs/form-definitions.md`；种子已无估计值                                   |
-| 25–27 | `lqs` / `lqs_pctl` / `vel_pctl`                                       | REAL       | 长度加权质量分、同代分位、更新速度分位；`lqs` 仅 long 档计分                                   |
-| 28     | `is_licensed`                                                        | INTEGER    | 正版日轻 47 本；为 1 时五列分位全 NULL，不进 A 类榜与统计                                           |
+| 25–28 | `cqs` / `cqs_state` / `cps` / `len_norm`                              | REAL/TEXT  | 运行时质量分（v6，见 18）；v8 删除原 25–27 位 `lqs`/`lqs_pctl`/`vel_pctl`（归档不落地，引擎零读方）|
+| 29     | `is_licensed`                                                        | INTEGER    | 正版日轻 47 本；为 1 时五列分位全 NULL，不进 A 类榜与统计                                           |
 
 类型决定：枚举存 TEXT（INTEGER 码 gzip 后只省 0.49 MB，不值码表+JOIN）；
 时间存 TEXT（字典序可直接比较，代价 12 B/本）；分位存连续 REAL（不预存六档，
@@ -228,10 +228,10 @@ UI 必须区分 `src`（种子基线 vs 本地刷新时间）。`user_stats` 是
 ```
 dataset/out/books.jsonl (自有 15 列书目，含 108 本 E.14 月榜遗漏补充)
   ① 清洗成分析口径（剔除 47 本正版日轻）→ ② 定年 eras.estimate → 过滤 est_year∈[2007,2025]
-  ③ 分位：全 universe × est_year（不在种子池内算）→ ④ pr / pctl_pr / lqs
+  ③ 分位：全 universe × est_year（不在种子池内算）→ ④ pr / pctl_pr
   ⑤ 选种（V3，质量锚，无时间渠道）：favs Top20k ∪ 月榜归档 ∪ banner 全集
        ∪ 每个具名征文 ≥3 本保底；再剔除弃书/invalid/僵尸/Web 死链
-  ⑥ 补回正版 47 本（is_licensed=1，分位 NULL）→ ⑦ form / lqs 落列
+  ⑥ 补回正版 47 本（is_licensed=1，分位 NULL）→ ⑦ form / cqs 族落列
   ⑧ 建表建索引（含 calendar_universe） → ⑨ VACUUM + ANALYZE → seed.db.gz 随包
 ```
 
@@ -257,7 +257,7 @@ short 不越点击/收藏/点赞三天花板、连载中篇零入种、Web 死�
 | 版本               | 影响                                                                                      |
 | ------------------ | ----------------------------------------------------------------------------------------- |
 | `user_version`   | **user.db** 迁移（事务内，失败回滚；迁移前备份 `.bak`；向前兼容一个版本；v6 = 书架并入 watchlist） |
-| `schema_version` | **seed.db** 表结构版本（v4 = 发书日历 `calendar_universe`；随整文件替换生效）               |
+| `schema_version` | **seed.db** 表结构版本（v8 = 删 lqs 族列；随整文件替换生效）               |
 | `seed_version`   | seed.db 整文件替换，不迁移                                                                |
 | `content_end`    | UI 显示的数据时点                                                                         |
 

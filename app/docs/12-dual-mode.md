@@ -46,18 +46,19 @@
 ### 3.2 信号白名单（红线）
 
 推荐打分只能用：`fav_pctl` / `click_pctl` / `praise_pctl` / `pr` / `pctl_pr` /
-`deep_ranks` / `books.form`（附录 D 实施后）/ `lqs`（篇幅加权口碑分，见 `docs/length-weighted-quality.md`）。
+`deep_ranks` / `books.form`（附录 D 实施后）/ `cqs`（运行时质量分，见 18）。
 
-`lqs` 只由 `pr` 的「世代 × 收藏档」分位与归一化篇幅构成，不含任何原始累计值；
-收藏量只用于分档归一（与分位分母同性质），不作打分项。
-引擎接入规格（排序键、游标、验收）见 `/docs/lqs-ranking-integration.md`。
+`lqs` 已随 schema v8（2026-11-24）物理删列——原只由 `pr` 的「世代 × 收藏档」分位与
+归一化篇幅构成、不含任何原始累计值；接入规格见 `/docs/lqs-ranking-integration.md`
+（历史归档），现行推荐口径见 18。
 
-> **实施状态（2026-11-21）**：app 开发主线仍是**经典模式**（展示层只读平台
+> **实施状态（2026-11-24）**：app 开发主线仍是**经典模式**（展示层只读平台
 > 累计值，经典榜排序键 `clicks` 不变）；推荐层已按最小完备接入
-> （quantitative-mode-metrics §4 首期档）：发现流 = `GET /strata/recommend`
-> 两级排序（lqs 长篇口碑组 → `fav_pctl` 兜底，排序键/游标/验收断言见
-> `/docs/lqs-ranking-integration.md`，当前种子验收全绿）。`mqs` 归档未接线
-> （中篇域回退 `fav_pctl` 排序），`/docs/medium-quality-score.md` 保留备查；
+> （quantitative-mode-metrics §4 首期档）：发现流 = `GET /strata/recommend` ——
+> long/dialogue/medium 走 cqs 流（见 18），short/ip_collab 回退纯 `fav_pctl` 流
+> （两级 lqs 流已随 schema v8 移除；游标保持 3 段 "0|favpctl|nid" 语法，历史规格
+> `/docs/lqs-ranking-integration.md` 归档）。`mqs` 归档未接线
+> （中篇域由 cqs 流覆盖），`/docs/medium-quality-score.md` 保留备查；
 > `ref_pctl` 未启动。
 
 **严禁** `clicks` / `favs` / `praises` 原始累计值进入推荐打分——否则马太效应从后门渗入。

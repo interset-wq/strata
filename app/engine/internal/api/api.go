@@ -1198,7 +1198,7 @@ func (s *Server) recommend(c *gin.Context) {
 		ordering = "fav_pctl"
 		if len(items) == limit {
 			last := items[len(items)-1]
-			next = store.RecommendCursor(last.LQS, last.FavPctl, last.NID)
+			next = store.RecommendCursor(last.FavPctl, last.NID)
 		}
 	}
 	c.JSON(http.StatusOK, gin.H{

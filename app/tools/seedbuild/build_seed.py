@@ -17,8 +17,7 @@ moves without the calibre being re-decided.
 
 V3 (2026-11-19): the book source is `dataset/out/books.jsonl` (our own 15-column
 catalogue, App-verified covers), admission is `seed_policy.admit()` (quality
-anchors + every deep-rank book, **no new-book discovery channel**), and `form` /
-`lqs` are build-time columns. The 2026-11-19 follow-up removed the time channels
+anchors + every deep-rank book, **no new-book discovery channel**), and `form` is a build-time column. The 2026-11-19 follow-up removed the time channels
 entirely: new books are structurally disadvantaged by cumulative favourites, so
 a dedicated channel for them is unfair to the older library. E.31 replaces the
 old automatic per-contest floor with a human-curated floor list and removes all
@@ -52,7 +51,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import seed_policy as SP  # noqa: E402
 import validate as V  # noqa: E402
 from lib import forms as FM  # noqa: E402
-from lib import lqs as LQ  # noqa: E402
 import runtime_metrics as RM  # noqa: E402
 from deep_ranks import DEEP_COLUMNS, METRICS as DEEP_METRICS  # noqa: E402
 from deep_ranks import TOP_N as DEEP_TOP_N  # noqa: E402
@@ -63,7 +61,7 @@ SCHEMA = Path(__file__).resolve().parent / "schema.sql"
 DATASET = REPO / "dataset" / "out" / "books.jsonl"
 AWARD_CSV = ANALYSIS / "out" / "contest_awards_normalized.csv"
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8  # v8: dropped archived build-only metrics lqs/lqs_pctl/vel_pctl (see schema.sql)
 SEED_VERSION = "20261124.32"  # .32: E.32 新增人工黑名单（假短/假中篇），优先级高于人工豁免
 CONTENT_END = pd.Timestamp("2026-11-24")  # 数据集从不全量刷新：标注最近一次部分更新时间，非快照上界
 GEN_MIN, GEN_MAX = 2007, 2026  # E.30: 2026 由"出界"改为正常世代，与其他年份一样走 admit 渠道筛选
@@ -113,7 +111,7 @@ FINAL_COLUMNS = [
     "words", "clicks", "favs", "praises", "featured", "cover_url", "updated_at",
     "est_year", "est_date", "est_conf", "tags",
     "fav_pctl", "click_pctl", "praise_pctl", "pr", "pctl_pr",
-    "form", "lqs", "lqs_pctl", "vel_pctl",
+    "form",
     "cqs", "cqs_state", "cps", "len_norm", "is_licensed",
 ]
 
@@ -374,7 +372,6 @@ def build_frames() -> tuple[pd.DataFrame, dict]:
     # Time channels are retired (diagnostic only); V0 kept for audit trail.
     universe["upd"] = pd.to_datetime(universe["updated_at"], errors="coerce")
     universe = SP.add_velocity(universe, CONTENT_END)
-    quality = LQ.compute(universe)
     res = SP.admit(universe, CONTENT_END, deep=set(deep["nid"]))
     checks = SP.postconditions(universe, res)
     for name, ok, detail in checks:
@@ -388,8 +385,7 @@ def build_frames() -> tuple[pd.DataFrame, dict]:
     if len(seed_ids) != EXPECT_SEED:
         raise SystemExit(f"seed {len(seed_ids)} != {EXPECT_SEED}")
 
-    extra = ["form", "lqs", "lqs_pctl", "vel_pctl"]
-    universe[extra] = quality[extra]
+    universe["form"] = FM.classify(universe)
 
     # v6 runtime quality metrics (app/docs/18-runtime-metrics.md, report 24):
     # form-isolated cqs/cps calibration over the analysis universe, precomputed
@@ -407,7 +403,7 @@ def build_frames() -> tuple[pd.DataFrame, dict]:
         raise SystemExit(f"eras anchors {len(anchors_df)} < 280")
 
     pctl_cols = ["id", "fav_pctl", "click_pctl", "praise_pctl", "pr", "pctl_pr"] \
-        + extra + ["cqs", "cqs_state", "cps", "len_norm"]
+        + ["form"] + ["cqs", "cqs_state", "cps", "len_norm"]
     seed = df[df["id"].isin(seed_ids)].merge(universe[pctl_cols], on="id", how="left")
     seed["form"] = seed["form"].fillna(seed["id"].map(licensed_form))
     if seed["form"].isna().any():
@@ -469,7 +465,6 @@ def build_frames() -> tuple[pd.DataFrame, dict]:
         "manual_exempt": res["manual_exempt"],
         "manual_blacklist": res["manual_blacklist"],
         "favs_coverage": coverage,
-        "lqs_scored": int(quality["lqs"].notna().sum()),
         "seed_rows": len(seed),
         "licensed_ids": ln_ids,
         "licensed_banner": int((ln_df["featured"] == 1).sum()),
@@ -571,7 +566,6 @@ def write_db(seed: pd.DataFrame, meta: dict, db_path: Path,
                     ("baseline_v0", str(meta["baseline_v0"])),
                     ("stats_universe", str(meta["universe_rows"])),
                     ("favs_coverage", f"{meta['favs_coverage']:.6f}"),
-                    ("lqs_scored", str(meta["lqs_scored"])),
                     ("deep_metrics", ",".join(DEEP_METRICS)),
                     ("deep_top_n", str(DEEP_TOP_N)),
                     ("deep_rank_rows", str(len(meta["deep_ranks"]))),
@@ -625,8 +619,7 @@ def main() -> int:
     meta["awards"] = awards
     log(f"seed rows: {len(seed)} (quality-anchored admitted {meta['admitted']} + licensed "
         f"{meta['licensed_rows']}; V0 was {V0_SEED})")
-    log(f"favs coverage: {meta['favs_coverage']:.2%} | lqs scored in universe: "
-        f"{meta['lqs_scored']:,}")
+    log(f"favs coverage: {meta['favs_coverage']:.2%}")
     log(f"runtime metrics: cqs scored {meta['runtime']['cqs_scored']:,} "
         f"(stable {meta['runtime']['cqs_stable']:,}) | cps scored "
         f"{meta['runtime']['cps_scored']:,} | mu0={meta['runtime']['mu0']:.3f}")
@@ -664,7 +657,6 @@ def main() -> int:
             "licensed_added": meta["licensed_rows"],
             "seed": len(seed),
             "deep_rank_rows": len(meta["deep_ranks"]),
-            "lqs_scored_universe": meta["lqs_scored"],
             "award_rows": len(awards),
             "cqs_scored": meta["runtime"]["cqs_scored"],
             "cqs_stable": meta["runtime"]["cqs_stable"],
