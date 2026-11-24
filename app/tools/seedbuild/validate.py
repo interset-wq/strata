@@ -8,14 +8,14 @@ from pathlib import Path
 
 import pandas as pd
 
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 EXPECTED_TABLES = {"books", "book_tags", "seed_meta", "deep_ranks",
                    "calendar_universe", "contest_awards",
                    "calib_fav_bounds", "calib_len_anchors",
                    "calib_cqs_median", "calib_cps_median", "eras_anchors"}
 EXPECTED_INDEXES = {
-    "idx_bt", "idx_updated", "idx_author", "idx_year_favpctl",
-    "idx_year_clickpctl", "idx_genre_favs", "idx_favs", "idx_pr", "idx_shortfav",
+    "idx_bt", "idx_updated", "idx_author", "idx_year_favs",
+    "idx_genre_favs", "idx_favs", "idx_pr", "idx_shortfav",
     "idx_deep_lookup", "idx_awards_edition", "idx_form_cqs",
 }
 
@@ -142,29 +142,14 @@ def check_db(db_path: Path, seed: pd.DataFrame, meta: dict) -> None:
         if dating:
             _fail(errors, f"{dating} rows without dating")
 
-        non_ln_missing = conn.execute(
-            "SELECT COUNT(*) FROM books WHERE is_licensed=0 AND"
-            " (fav_pctl IS NULL OR click_pctl IS NULL OR praise_pctl IS NULL)"
-        ).fetchone()[0]
-        if non_ln_missing:
-            _fail(errors, f"{non_ln_missing} non-licensed rows missing percentiles")
-
+        # v9 (E.30): universe percentile columns no longer ship; only pr
+        # (device-recomputable) is a per-book score, and licensed rows carry
+        # none.
         ln_pctl = conn.execute(
-            "SELECT COUNT(*) FROM books WHERE is_licensed=1 AND"
-            " (fav_pctl IS NOT NULL OR click_pctl IS NOT NULL"
-            "  OR praise_pctl IS NOT NULL OR pr IS NOT NULL OR pctl_pr IS NOT NULL)"
+            "SELECT COUNT(*) FROM books WHERE is_licensed=1 AND pr IS NOT NULL"
         ).fetchone()[0]
         if ln_pctl:
-            _fail(errors, f"{ln_pctl} licensed rows carry percentiles")
-
-        bad_range = conn.execute(
-            "SELECT COUNT(*) FROM books WHERE is_licensed=0 AND ("
-            " fav_pctl <= 0 OR fav_pctl > 1 OR click_pctl <= 0 OR click_pctl > 1"
-            " OR praise_pctl <= 0 OR praise_pctl > 1"
-            " OR (pctl_pr IS NOT NULL AND (pctl_pr <= 0 OR pctl_pr > 1)))"
-        ).fetchone()[0]
-        if bad_range:
-            _fail(errors, f"{bad_range} rows have percentiles outside (0,1]")
+            _fail(errors, f"{ln_pctl} licensed rows carry pr")
 
         bad_pr = conn.execute(
             "SELECT COUNT(*) FROM books WHERE is_licensed=0 AND ("
@@ -262,8 +247,8 @@ def check_db(db_path: Path, seed: pd.DataFrame, meta: dict) -> None:
             _fail(errors, f"{ln_range} non-licensed rows outside 2007..2026")
 
         sample = conn.execute(
-            "SELECT nid, is_licensed, fav_pctl FROM books WHERE nid=2242").fetchone()
-        if sample is None or sample["is_licensed"] != 1 or sample["fav_pctl"] is not None:
+            "SELECT nid, is_licensed, pr FROM books WHERE nid=2242").fetchone()
+        if sample is None or sample["is_licensed"] != 1 or sample["pr"] is not None:
             _fail(errors, "known licensed book nid=2242 is missing or not excluded")
 
         dup = conn.execute(

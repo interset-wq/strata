@@ -61,19 +61,19 @@ SCHEMA = Path(__file__).resolve().parent / "schema.sql"
 DATASET = REPO / "dataset" / "out" / "books.jsonl"
 AWARD_CSV = ANALYSIS / "out" / "contest_awards_normalized.csv"
 
-SCHEMA_VERSION = 8  # v8: dropped archived build-only metrics lqs/lqs_pctl/vel_pctl (see schema.sql)
-SEED_VERSION = "20261124.32"  # .32: E.32 新增人工黑名单（假短/假中篇），优先级高于人工豁免
+SCHEMA_VERSION = 9  # v9: dropped the four universe percentile columns — device-irrecomputable, no user.db mirror (see schema.sql)
+SEED_VERSION = "20261124.33"  # .33: E.33 补采 2026 春征（tag 789）369 本，按正常世代筛选
 CONTENT_END = pd.Timestamp("2026-11-24")  # 数据集从不全量刷新：标注最近一次部分更新时间，非快照上界
 GEN_MIN, GEN_MAX = 2007, 2026  # E.30: 2026 由"出界"改为正常世代，与其他年份一样走 admit 渠道筛选
 
 # Pinned calibre (see AGENTS.md and app/docs/02-data-model.md).
-EXPECT_UNIVERSE = 249_885       # 241,864 + 8,021 本 2026（库内 4,023 + 征文新书 3,998）
-EXPECT_ANALYSIS_ROWS = 249_885  # 245,887 + 3,998 征文新书（E.29 部分更新）
-EXPECT_DATASET_ROWS = 252_336   # v20261124.8: 248,338 + 3,998 征文新书（14 征 793/794）
+EXPECT_UNIVERSE = 250_254       # 249,885 + 369 本 2026 春征新书（E.33）
+EXPECT_ANALYSIS_ROWS = 250_254  # 245,887 + 4,367 征文新书（14 征 3,998 + 2026 春征 369）
+EXPECT_DATASET_ROWS = 252_705   # v20261124.9: 248,338 + 4,367 征文新书
 EXPECT_LICENSED = 47
-EXPECT_ADMITTED = 18_837       # E.31: 取消自动保底/自动豁免后 18,880 → 18,837（剔除 43 本）
-EXPECT_SEED = 18_884           # 18,837 + 47 licensed
-EXPECT_COVERAGE_MIN = 0.9640   # 覆盖率仍 96.40%（合格书分母同步缩小），门槛不变
+EXPECT_ADMITTED = 18_834       # 2026 春征 369 本按正常世代筛选后净增 -3（短/中篇完结规则等）
+EXPECT_SEED = 18_881           # 18,834 + 47 licensed
+EXPECT_COVERAGE_MIN = 0.9639   # E.33: 分母纳入 369 本春征文（多数未入种），覆盖率 96.3937%
 # v5 contest awards (docs/award-winners-as-seed-source.md): net 911 rows over
 # 11 editions; the 602 shortlist rows are excluded upstream of this CSV.
 # Display-only facts: award never feeds admission or ordering
@@ -110,7 +110,7 @@ FINAL_COLUMNS = [
     "nid", "title", "author", "genre", "price_type", "status", "contest",
     "words", "clicks", "favs", "praises", "featured", "cover_url", "updated_at",
     "est_year", "est_date", "est_conf", "tags",
-    "fav_pctl", "click_pctl", "praise_pctl", "pr", "pctl_pr",
+    "pr",
     "form",
     "cqs", "cqs_state", "cps", "len_norm", "is_licensed",
 ]
@@ -358,11 +358,10 @@ def build_frames() -> tuple[pd.DataFrame, dict]:
         universe["praises"] / universe["favs"].replace(0, np.nan),
         np.nan,
     )
-    denom = universe.groupby("est_year")["pr"].transform("count")
-    universe["pctl_pr"] = (
-        universe.groupby("est_year")["pr"].rank(ascending=True, method="average")
-        / denom
-    )
+    # pctl_pr: build-time only — the deep_ranks `pr` board fills its `pctl`
+    # column from it. E.30: universe percentiles are no longer persisted to
+    # the books table (device-irrecomputable, no user.db mirror).
+    universe["pctl_pr"] = pctl_within(universe, "est_year", "pr")
 
     # D2 deep ranks: full-universe Top-200 per generation and metric.
     deep = build_deep_ranks(universe, DEEP_TOP_N)
@@ -402,7 +401,7 @@ def build_frames() -> tuple[pd.DataFrame, dict]:
     if len(anchors_df) < 280:
         raise SystemExit(f"eras anchors {len(anchors_df)} < 280")
 
-    pctl_cols = ["id", "fav_pctl", "click_pctl", "praise_pctl", "pr", "pctl_pr"] \
+    pctl_cols = ["id", "pr"] \
         + ["form"] + ["cqs", "cqs_state", "cps", "len_norm"]
     seed = df[df["id"].isin(seed_ids)].merge(universe[pctl_cols], on="id", how="left")
     seed["form"] = seed["form"].fillna(seed["id"].map(licensed_form))

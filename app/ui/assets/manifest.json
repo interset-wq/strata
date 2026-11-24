@@ -1,34 +1,34 @@
 {
-  "schema_version": 8,
-  "seed_version": "20261124.32",
+  "schema_version": 9,
+  "seed_version": "20261124.33",
   "content_end": "2026-11-24",
-  "built_at": "2026-11-24T06:04:12+00:00",
-  "book_count": 18884,
+  "built_at": "2026-11-24T09:13:05+00:00",
+  "book_count": 18881,
   "licensed_count": 47,
   "tag_count": 102,
-  "tag_rows": 61725,
+  "tag_rows": 61678,
   "gen_min": 2007,
   "gen_max": 2026,
   "counts": {
-    "stats_universe": 249885,
-    "baseline_v0": 30294,
-    "admitted_v3": 18837,
+    "stats_universe": 250254,
+    "baseline_v0": 30648,
+    "admitted_v3": 18834,
     "licensed_added": 47,
-    "seed": 18884,
+    "seed": 18881,
     "deep_rank_rows": 15421,
     "award_rows": 911,
-    "cqs_scored": 5682,
-    "cqs_stable": 4207,
-    "cps_scored": 105326
+    "cqs_scored": 5684,
+    "cqs_stable": 4208,
+    "cps_scored": 105427
   },
   "admission_detail": {
     "top_favs": 20000,
     "monthly": 1762,
     "featured": 620,
     "short": 2000,
-    "time_excluded": 8679,
-    "time_gated_diagnostic": 3567,
-    "time_cut_diagnostic": 4826,
+    "time_excluded": 9038,
+    "time_gated_diagnostic": 3695,
+    "time_cut_diagnostic": 5051,
     "deep": 8278,
     "contest_floor": {
       "manual_only": true,
@@ -37,13 +37,13 @@
       "shortfalls": {}
     },
     "abandoned": {
-      "total": 137105,
+      "total": 137318,
       "in_seed": 0,
       "manual_exempt": 0,
       "manual_blacklist": 0
     },
     "invalid": {
-      "total": 21488,
+      "total": 21580,
       "in_seed": 0
     },
     "fake_complete_p10": {
@@ -51,12 +51,12 @@
       "in_seed": 0
     }
   },
-  "favs_coverage": 0.964004,
+  "favs_coverage": 0.963937,
   "postconditions": [
     {
       "name": "P1 合格深榜书全部在种子内",
       "pass": true,
-      "detail": "4,777 本合格深榜书，缺 0"
+      "detail": "4,778 本合格深榜书，缺 0"
     },
     {
       "name": "P2 favs<5 且字数<1万必须有外部锚",
@@ -66,7 +66,7 @@
     {
       "name": "P3 收藏覆盖回退 ≤ 时间渠道放弃量（合格书口径）",
       "pass": true,
-      "detail": "新 96.40% vs V0 96.37%，差 +0.03pp（容差 0.2pp）"
+      "detail": "新 96.39% vs V0 96.37%，差 +0.03pp（容差 0.2pp）"
     },
     {
       "name": "P4 人工保底清单内征文达到设定本数",
@@ -76,22 +76,22 @@
     {
       "name": "P5 连载 short/medium 零入种（仅人工豁免例外）",
       "pass": true,
-      "detail": "全世代连载短/中篇 137,105 本（已剔除 0 本人工豁免），入种 0 本"
+      "detail": "全世代连载短/中篇 137,318 本（已剔除 0 本人工豁免），入种 0 本"
     },
     {
       "name": "P6 invalid（僵尸/假短篇）零入种",
       "pass": true,
-      "detail": "invalid 21,488 本，入种 0 本"
+      "detail": "invalid 21,580 本，入种 0 本"
     },
     {
       "name": "P7 short 层不越短篇三条天花板",
       "pass": true,
-      "detail": "short 544 本；越点击 0、越收藏 0、越点赞 0"
+      "detail": "short 546 本；越点击 0、越收藏 0、越点赞 0"
     },
     {
       "name": "P8 全世代 short/medium 必须已完结（仅人工豁免例外）",
       "pass": true,
-      "detail": "全世代连载短/中篇 137,105 本，人工豁免 0 本，入种 0 本"
+      "detail": "全世代连载短/中篇 137,318 本，人工豁免 0 本，入种 0 本"
     },
     {
       "name": "P9 Web 死链零入种（详情页「小说不存在」）",
@@ -111,8 +111,8 @@
   ],
   "source": {
     "dataset": "local:dataset/out/books.jsonl",
-    "dataset_sha256": "fe172dc7e49273424e680207d7258f6065f7e73aeef0baff53b9b7557e9a5504",
-    "analysis_rows": 249885,
+    "dataset_sha256": "f3e4e0af222fd52b6d3dfd9f4093d1729721129395f61f96b562770eeb7cbee7",
+    "analysis_rows": 250254,
     "dropped_rows": 2451,
     "upstream": "light-nook-labs/novel_hub",
     "upstream_asset": "dataset.7z"
@@ -120,13 +120,13 @@
   "files": {
     "db": {
       "name": "seed.db",
-      "bytes": 16494592,
-      "sha256": "095ecca23f632e5fe2591de92e64e48082c93ac33d5ff604631a4947728bf844"
+      "bytes": 15269888,
+      "sha256": "be4665e40bad2c535cc49d830a32b36d69eb1af3b8ae8af34358473ed08c4675"
     },
     "gz": {
       "name": "seed.db.gz",
-      "bytes": 7166633,
-      "sha256": "b086c84a20cb3244fd036f0afd5f5fa6d39ba857b27fba8272ab943251984300"
+      "bytes": 6379529,
+      "sha256": "042a570e01d774450069ab11f73409c30ec33673d890b5f71a74095726038ef1"
     }
   }
 }
