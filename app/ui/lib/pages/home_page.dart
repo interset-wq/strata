@@ -22,7 +22,10 @@ final boardProvider = FutureProvider.autoDispose.family<List<RankItem>, String>(
 
 /// 连载发现：从全库连载书中均匀抽样（ORDER BY RANDOM，等概率），
 /// 每次下拉刷新重掷一批。
-final serialShowcaseProvider = FutureProvider.autoDispose
+/// 三个 showcase 均不 autoDispose：ListView 懒构建下分区滚出视口缓存区
+/// 即卸载子树，autoDispose 会在滚回时重抽随机批（2026-11-24 用户报告
+/// 的滑动换批回归）；常驻后重掷只走下拉刷新的 invalidate。
+final serialShowcaseProvider = FutureProvider
     .family<List<RankItem>, String>((ref, form) async {
       final handle = await ref.watch(bootProvider.future);
       return handle.api.randomBooks(limit: 8, status: 'serial', form: form);
@@ -30,7 +33,7 @@ final serialShowcaseProvider = FutureProvider.autoDispose
 
 /// 完结精选：形态照搬连载发现——从完结长篇中均匀抽样 8 本，
 /// 下拉刷新换一批，更多入口进 100 本二级页。
-final finishedShowcaseProvider = FutureProvider.autoDispose
+final finishedShowcaseProvider = FutureProvider
     .family<List<RankItem>, String>((ref, form) async {
       final handle = await ref.watch(bootProvider.future);
       return handle.api.randomBooks(limit: 8, status: 'finished', form: form);
@@ -38,7 +41,7 @@ final finishedShowcaseProvider = FutureProvider.autoDispose
 
 /// 随便看看：形态照搬连载发现——从 60 万字以上的大书中均匀抽样 8 本
 ///（不限连载/完结），下拉刷新换一批，更多入口进 100 本二级页。
-final browseShowcaseProvider = FutureProvider.autoDispose
+final browseShowcaseProvider = FutureProvider
     .family<List<RankItem>, String>((ref, form) async {
       final handle = await ref.watch(bootProvider.future);
       return handle.api.randomBooks(limit: 8, status: 'browse', form: form);
