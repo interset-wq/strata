@@ -24,7 +24,7 @@ CREATE TABLE books(
   clicks INTEGER, favs INTEGER, praises INTEGER, featured INTEGER,
   cover_url TEXT, updated_at TEXT, est_year INTEGER NOT NULL,
   est_date TEXT NOT NULL, est_conf TEXT NOT NULL, tags TEXT,
-  fav_pctl REAL, click_pctl REAL, praise_pctl REAL, pr REAL, pctl_pr REAL,
+  pr REAL,
   form TEXT NOT NULL DEFAULT 'long',
   cqs REAL, cqs_state TEXT, cps REAL, len_norm REAL,
   is_licensed INTEGER NOT NULL DEFAULT 0
@@ -135,13 +135,13 @@ func Build(assetsDir, dataDir string) (*appshell.Manifest, error) {
 		_, err := db.Exec(`
 INSERT INTO books(nid,title,author,genre,price_type,status,contest,words,clicks,
  favs,praises,featured,cover_url,updated_at,est_year,est_date,est_conf,tags,
- fav_pctl,click_pctl,praise_pctl,pr,pctl_pr,
+ pr,
  cqs,cqs_state,cps,len_norm,is_licensed)
 VALUES(?,?,?,?, '免费', ?, NULL, ?, 1000, ?, 10, ?, NULL, '2026-04-01T00:00:00',
- ?, ?, 'high', '热血|战斗', ?,?,?,?,?, ?,?,?,?,?)`,
+ ?, ?, 'high', '热血|战斗', ?, ?,?,?,?,?)`,
 			b.nid, b.title, b.author, b.genre, b.status, b.words, b.favs,
 			b.featured, b.year, fmt.Sprintf("%d-01-01", b.year),
-			pctl, pctl, pctl, pctl, pctl,
+			pctl,
 			cqs, cqsState, cps, ln, b.licensed)
 		if err != nil {
 			db.Close()
@@ -176,7 +176,8 @@ VALUES(?,?,?,?, '免费', ?, NULL, ?, 1000, ?, 10, ?, NULL, '2026-04-01T00:00:00
 	// 3001–3004 feed the contest archive endpoints (docs/contest-
 	// display-in-app.md 形态一): a N征 event with two divisions (incl. the
 	// 对话类 spelling the fixed-suffix matcher used to miss), a spring
-	// contest, and a 十三征 long book with NULL fav_pctl.
+	// contest, and a 十三征 long book with NULL pr (the v9 favourite for
+	// the NULLs-last ordering).
 	if _, err := db.Exec(`UPDATE books SET form='long', contest='七征长篇' WHERE nid = 3001`); err != nil {
 		db.Close()
 		return nil, err

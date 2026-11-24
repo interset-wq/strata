@@ -241,14 +241,8 @@ class _DiscoverCard extends StatelessWidget {
                         style: TextStyle(
                             fontSize: 11, color: scheme.onSurfaceVariant)),
                     const SizedBox(height: 5),
-                    // 位置分锚点（docs/12 §7.3）：分位永远与绝对值并列；
-                    // 库外书（运行时评分，18 P2）无构建期分位，只显示收藏。
-                    _badge(
-                        context,
-                        item.favPctl > 0
-                            ? '收藏 ${_wan(item.favs)}  '
-                                '分位 ${(item.favPctl * 100).toStringAsFixed(1)}%'
-                            : '收藏 ${_wan(item.favs)}',
+                    // E.30：分位列退役，徽标只显收藏（端上可刷新累计值）。
+                    _badge(context, '收藏 ${_wan(item.favs)}',
                         fg: scheme.primary,
                         icon: MetricIcons.favs),
                     if (item.cqsState == 'low') ...[

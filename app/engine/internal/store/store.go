@@ -43,11 +43,7 @@ type Book struct {
 	EstDate    string   `json:"est_date"`
 	EstConf    string   `json:"est_conf"`
 	Tags       *string  `json:"tags"`
-	FavPctl    *float64 `json:"fav_pctl"`
-	ClickPctl  *float64 `json:"click_pctl"`
-	PraisePctl *float64 `json:"praise_pctl"`
 	PR         *float64 `json:"pr"`
-	PctlPR     *float64 `json:"pctl_pr"`
 	Form       string   `json:"form"`
 	IsLicensed bool     `json:"is_licensed"`
 }
@@ -178,24 +174,24 @@ func (s *Store) Book(ctx context.Context, nid int64) (*BookDetail, error) {
 	const q = `
 SELECT nid, title, author, genre, price_type, status, contest, words, clicks,
        favs, praises, featured, cover_url, updated_at, est_year, est_date,
-       est_conf, tags, fav_pctl, click_pctl, praise_pctl, pr, pctl_pr, form,
+       est_conf, tags, pr, form,
        is_licensed
 FROM seed.books WHERE nid = ?`
 
 	var (
-		b                                          Book
-		genre, priceType, status, contest, cover   sql.NullString
-		words, clicks, favs, praises, featured     sql.NullInt64
-		updatedAt, tags                            sql.NullString
-		favPctl, clickPctl, praisePctl, pr, pctlPR sql.NullFloat64
-		form                                       string
-		isLicensed                                 sql.NullInt64
+		b                                        Book
+		genre, priceType, status, contest, cover sql.NullString
+		words, clicks, favs, praises, featured   sql.NullInt64
+		updatedAt, tags                          sql.NullString
+		pr                                       sql.NullFloat64
+		form                                     string
+		isLicensed                               sql.NullInt64
 	)
 	err := s.DB.QueryRowContext(ctx, q, nid).Scan(
 		&b.NID, &b.Title, &b.Author, &genre, &priceType, &status, &contest,
 		&words, &clicks, &favs, &praises, &featured, &cover, &updatedAt,
 		&b.EstYear, &b.EstDate, &b.EstConf, &tags,
-		&favPctl, &clickPctl, &praisePctl, &pr, &pctlPR, &form, &isLicensed,
+		&pr, &form, &isLicensed,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
@@ -215,11 +211,7 @@ FROM seed.books WHERE nid = ?`
 	b.CoverURL = strPtr(cover)
 	b.UpdatedAt = strPtr(updatedAt)
 	b.Tags = strPtr(tags)
-	b.FavPctl = floatPtr(favPctl)
-	b.ClickPctl = floatPtr(clickPctl)
-	b.PraisePctl = floatPtr(praisePctl)
 	b.PR = floatPtr(pr)
-	b.PctlPR = floatPtr(pctlPR)
 	b.Form = form
 	b.IsLicensed = isLicensed.Valid && isLicensed.Int64 != 0
 
@@ -304,7 +296,6 @@ type RankItem struct {
 	EstYear  int      `json:"est_year"`
 	EstDate  *string  `json:"est_date,omitempty"`
 	Favs     *int64   `json:"favs"`
-	FavPctl  float64  `json:"fav_pctl"`
 	CQS      *float64 `json:"cqs,omitempty"`
 	CQSState string   `json:"cqs_state,omitempty"`
 	Contest  *string  `json:"contest"`
@@ -320,12 +311,12 @@ type RankItem struct {
 func (s *Store) RankingFavs(ctx context.Context, year int, genre, status, contest string, limit int) ([]RankItem, error) {
 	query := `
 SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
-       seed.books.est_year, seed.books.favs, seed.books.fav_pctl, seed.books.contest,
+       seed.books.est_year, seed.books.favs, seed.books.contest,
        seed.books.form,
        COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url
 FROM seed.books
 LEFT JOIN covers c ON c.nid = seed.books.nid
-WHERE est_year = ? AND is_licensed = 0 AND fav_pctl IS NOT NULL`
+WHERE est_year = ? AND is_licensed = 0`
 	args := []any{year}
 	if genre != "" {
 		query += " AND genre = ?"
@@ -346,7 +337,7 @@ WHERE est_year = ? AND is_licensed = 0 AND fav_pctl IS NOT NULL`
 			args = append(args, ca...)
 		}
 	}
-	query += " ORDER BY fav_pctl DESC, seed.books.nid ASC LIMIT ?"
+	query += " ORDER BY seed.books.favs DESC, seed.books.nid ASC LIMIT ?"
 	args = append(args, limit)
 
 	rows, err := s.DB.QueryContext(ctx, query, args...)
@@ -360,17 +351,15 @@ WHERE est_year = ? AND is_licensed = 0 AND fav_pctl IS NOT NULL`
 			item    RankItem
 			gen     sql.NullString
 			favs    sql.NullInt64
-			pctl    float64
 			contest sql.NullString
 		)
 		if err := rows.Scan(&item.NID, &item.Title, &item.Author, &gen,
-			&item.EstYear, &favs, &pctl, &contest, &item.Form, &item.CoverURL); err != nil {
+			&item.EstYear, &favs, &contest, &item.Form, &item.CoverURL); err != nil {
 			return nil, err
 		}
 		item.Rank = len(items) + 1
 		item.Genre = strPtr(gen)
 		item.Favs = intPtr(favs)
-		item.FavPctl = pctl
 		item.Contest = contestPtr(contest)
 		items = append(items, item)
 	}
@@ -444,10 +433,6 @@ WHERE seed.books.is_licensed = 0`
 		args = append(args, targs...)
 	}
 	switch order {
-	case "pct":
-		// 优质短篇榜：同代收藏分位（docs/form-definitions §6）；SQLite
-		// NULL 按最小值，DESC 排末尾。pct 升序无产品含义，忽略 dir。
-		query += " ORDER BY seed.books.fav_pctl DESC, seed.books.favs DESC, seed.books.nid ASC LIMIT ? OFFSET ?"
 	case "clicks", "praises", "words":
 		// 经典榜（平台累计值，展示层，docs/12）：次级键 favs 保证平局
 		// 可复现；dir=asc 为逆序（用户 2026-11-21），NULL 仍排末尾
@@ -738,62 +723,63 @@ WHERE is_licensed = 0 AND COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) IS
 	return items, rows.Err()
 }
 
-// Recommend is the classic position stream (docs/12 §3): same-generation
-// position ordering by fav_pctl DESC, then nid for a stable tie-break.
-// Keyset cursor "0|favpctl|nid" — the leading zero is the retired lqs
-// slot, kept so the 3-segment cursor grammar stays parseable (schema v8
-// dropped the archived lqs column and its two-level stream). OFFSET is
-// not used.
+// Recommend is the classic fallback stream (docs/12 §3, E.30): ordering by
+// pr DESC (the praises/favs ratio — device-recomputable, never a raw
+// cumulative), then nid for a stable tie-break. Keyset cursor "0|pr|nid"
+// — the leading zero is the retired lqs slot, kept so the 3-segment
+// cursor grammar stays parseable. OFFSET is not used.
 //
-// Hard gates: is_licensed = 0, cover-bearing, fav_pctl NOT NULL
-// (recommendable-threshold proxy, docs/12 §3.3). Raw cumulative
-// values (clicks/favs/praises) ride along as display fields only —
-// they never appear in ORDER BY / WHERE (docs/12 §3.2 red line).
-func (s *Store) Recommend(ctx context.Context, cursor, form string, limit int) ([]RankItem, error) {
+// Hard gates: is_licensed = 0, cover-bearing, pr NOT NULL (favs ≥ 10 —
+// the same evidence proxy the retired fav_pctl gate provided). Raw
+// cumulative values (clicks/favs/praises) ride along as display fields
+// only — they never appear in ORDER BY (docs/12 §3.2 red line).
+func (s *Store) Recommend(ctx context.Context, cursor, form string, limit int) ([]RankItem, string, error) {
 	q := `
 SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
        seed.books.est_year, seed.books.status, seed.books.words, seed.books.clicks,
-       seed.books.favs, seed.books.form, seed.books.fav_pctl,
+       seed.books.favs, seed.books.form, seed.books.pr,
        COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url
 FROM seed.books
 LEFT JOIN covers c ON c.nid = seed.books.nid
 WHERE is_licensed = 0
   AND COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) IS NOT NULL
-  AND seed.books.fav_pctl IS NOT NULL`
+  AND seed.books.pr IS NOT NULL`
 	args := []any{}
 	if form != "" {
 		q += " AND seed.books.form = ?"
 		args = append(args, form)
 	}
 	if cursor != "" {
-		fav, nid, err := parseRecommendCursor(cursor)
+		pr, nid, err := parseRecommendCursor(cursor)
 		if err != nil {
-			return nil, err
+			return nil, "", err
 		}
-		q += ` AND (seed.books.fav_pctl < ?
-  OR (seed.books.fav_pctl = ? AND seed.books.nid > ?))`
-		args = append(args, fav, fav, nid)
+		q += ` AND (seed.books.pr < ?
+  OR (seed.books.pr = ? AND seed.books.nid > ?))`
+		args = append(args, pr, pr, nid)
 	}
-	q += ` ORDER BY seed.books.fav_pctl DESC, seed.books.nid ASC LIMIT ?`
+	q += ` ORDER BY seed.books.pr DESC, seed.books.nid ASC LIMIT ?`
 	args = append(args, limit)
 
 	rows, err := s.DB.QueryContext(ctx, q, args...)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	defer rows.Close()
 	items := make([]RankItem, 0, limit)
+	var lastPr float64
+	var lastNID int64
 	for rows.Next() {
 		var (
 			item                RankItem
 			gen, status, cover  sql.NullString
 			words, clicks, favs sql.NullInt64
-			pctl                sql.NullFloat64
+			pr                  sql.NullFloat64
 		)
 		if err := rows.Scan(&item.NID, &item.Title, &item.Author, &gen,
 			&item.EstYear, &status, &words, &clicks, &favs, &item.Form,
-			&pctl, &cover); err != nil {
-			return nil, err
+			&pr, &cover); err != nil {
+			return nil, "", err
 		}
 		item.Rank = len(items) + 1
 		item.Genre = strPtr(gen)
@@ -802,10 +788,15 @@ WHERE is_licensed = 0
 		item.Clicks = intPtr(clicks)
 		item.Favs = intPtr(favs)
 		item.CoverURL = strPtr(cover)
-		item.FavPctl = pctl.Float64
+		lastPr = pr.Float64
+		lastNID = item.NID
 		items = append(items, item)
 	}
-	return items, rows.Err()
+	next := ""
+	if len(items) == limit {
+		next = RecommendCursor(lastPr, lastNID)
+	}
+	return items, next, rows.Err()
 }
 
 // RecommendCQS is the quantitative recommendation stream scored by the
@@ -840,7 +831,7 @@ func (s *Store) RecommendCQS(ctx context.Context, cursor, form string, k float64
 	q := `SELECT * FROM (
   SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
          seed.books.est_year, seed.books.status, seed.books.words, seed.books.clicks,
-         seed.books.favs, seed.books.form, seed.books.fav_pctl,
+         seed.books.favs, seed.books.form,
          seed.books.cqs, seed.books.cqs_state,
          (` + seedScore + `) AS stream_score,
          COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url
@@ -854,7 +845,7 @@ func (s *Store) RecommendCQS(ctx context.Context, cursor, form string, k float64
   UNION ALL
   SELECT discovered.nid, discovered.title, discovered.author, discovered.genre,
          discovered.est_year, NULL, discovered.words, NULL,
-         discovered.favs, discovered.form, NULL,
+         discovered.favs, discovered.form,
          discovered.cqs, discovered.cqs_state,
          (` + discScore + `) AS stream_score,
          COALESCE(c.cover, NULLIF(discovered.cover_url, '')) AS cover_url
@@ -892,13 +883,12 @@ WHERE `
 			item                RankItem
 			gen, status, cover  sql.NullString
 			words, clicks, favs sql.NullInt64
-			pctl                sql.NullFloat64
 			cqs, score          sql.NullFloat64
 			state               sql.NullString
 		)
 		if err := rows.Scan(&item.NID, &item.Title, &item.Author, &gen,
 			&item.EstYear, &status, &words, &clicks, &favs, &item.Form,
-			&pctl, &cqs, &state, &score, &cover); err != nil {
+			&cqs, &state, &score, &cover); err != nil {
 			return nil, "", err
 		}
 		item.Rank = len(items) + 1
@@ -970,20 +960,21 @@ func parseScoreCursor(cursor string) (float64, int64, error) {
 	return score, nid, nil
 }
 
-// RecommendCursor encodes (fav_pctl, nid) as the keyset cursor for
-// Recommend; parseRecommendCursor is the inverse. The output keeps the
-// legacy 3-segment grammar "0|favpctl|nid" — the leading zero is the
-// retired lqs slot. Floats are formatted with minimal full precision so
-// the round trip is exact.
-func RecommendCursor(favPctl float64, nid int64) string {
-	return "0|" + strconv.FormatFloat(favPctl, 'g', -1, 64) + "|" +
+// RecommendCursor encodes (pr, nid) as the keyset cursor for Recommend;
+// parseRecommendCursor is the inverse. The output keeps the legacy
+// 3-segment grammar "0|pr|nid" — the leading zero is the retired lqs
+// slot. Floats are formatted with minimal full precision so the round
+// trip is exact.
+func RecommendCursor(pr float64, nid int64) string {
+	return "0|" + strconv.FormatFloat(pr, 'g', -1, 64) + "|" +
 		strconv.FormatInt(nid, 10)
 }
 
-// parseRecommendCursor decodes the "0|favpctl|nid" keyset cursor. The
-// first segment is the retired lqs slot: it must be empty or "0" (both
-// parse, so cursors minted by older builds keep working); its value is
-// otherwise ignored.
+// parseRecommendCursor decodes the "0|pr|nid" keyset cursor. The first
+// segment is the retired lqs slot: it must be empty or "0" (both parse,
+// so cursors minted by older builds keep working); its value is
+// otherwise ignored. pr is a ratio, not a percentile: unbounded above,
+// and legitimately 0 (praises 0 with favs ≥ 10).
 func parseRecommendCursor(cursor string) (float64, int64, error) {
 	parts := strings.Split(cursor, "|")
 	if len(parts) != 3 {
@@ -992,15 +983,15 @@ func parseRecommendCursor(cursor string) (float64, int64, error) {
 	if parts[0] != "" && parts[0] != "0" {
 		return 0, 0, fmt.Errorf("legacy lqs cursor %q is no longer accepted", cursor)
 	}
-	fav, err := strconv.ParseFloat(parts[1], 64)
-	if err != nil || fav <= 0 || fav > 1 {
-		return 0, 0, fmt.Errorf("invalid fav_pctl in recommend cursor %q", cursor)
+	pr, err := strconv.ParseFloat(parts[1], 64)
+	if err != nil || pr < 0 {
+		return 0, 0, fmt.Errorf("invalid pr in recommend cursor %q", cursor)
 	}
 	nid, err := strconv.ParseInt(parts[2], 10, 64)
 	if err != nil || nid <= 0 {
 		return 0, 0, fmt.Errorf("invalid nid in recommend cursor %q", cursor)
 	}
-	return fav, nid, nil
+	return pr, nid, nil
 }
 
 // WatchlistCap is the hard watchlist size limit (docs/07 §1: 上限 100 本、
@@ -1293,7 +1284,7 @@ func (s *Store) AuthorBooks(ctx context.Context, author string, limit, offset in
 	query := `
 SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
        seed.books.est_year, seed.books.status, seed.books.words, seed.books.clicks,
-       seed.books.favs, seed.books.praises, seed.books.fav_pctl, seed.books.form,
+       seed.books.favs, seed.books.praises, seed.books.form,
        COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url,
        seed.books.est_date
 FROM seed.books
@@ -1314,11 +1305,10 @@ LIMIT ? OFFSET ?`
 			gen, status, cover sql.NullString
 			words, clicks, favs,
 			praises sql.NullInt64
-			favPctl sql.NullFloat64
 		)
 		if err := rows.Scan(&item.NID, &item.Title, &item.Author, &gen,
 			&item.EstYear, &status, &words, &clicks, &favs, &praises,
-			&favPctl, &item.Form, &cover, &edate); err != nil {
+			&item.Form, &cover, &edate); err != nil {
 			return nil, err
 		}
 		item.Genre = strPtr(gen)
@@ -1327,9 +1317,6 @@ LIMIT ? OFFSET ?`
 		item.Clicks = intPtr(clicks)
 		item.Favs = intPtr(favs)
 		item.Praises = intPtr(praises)
-		if favPctl.Valid {
-			item.FavPctl = favPctl.Float64
-		}
 		item.CoverURL = strPtr(cover)
 		item.EstDate = strPtr(edate)
 		items = append(items, item)
@@ -2090,14 +2077,15 @@ func (s *Store) DeleteDiscovered(ctx context.Context, nid int64) error {
 }
 
 // RankingNew is the new-work ranking: last two generations (est_year >=
-// gen_max-1) ordered by same-generation percentile, per docs/03. Licensed
-// books are excluded.
+// gen_max-1) ordered by favs (classic cumulative — the universe
+// percentile columns no longer ship, E.30; the cross-generation order is
+// an approximation, per docs/03). Licensed books are excluded.
 func (s *Store) RankingNew(ctx context.Context, limit int) ([]RankItem, error) {
 	rows, err := s.DB.QueryContext(ctx, `
-SELECT nid, title, author, genre, est_year, favs, fav_pctl
+SELECT nid, title, author, genre, est_year, favs
 FROM seed.books
-WHERE est_year >= ? AND is_licensed = 0 AND fav_pctl IS NOT NULL
-ORDER BY fav_pctl DESC, est_date DESC, seed.books.nid ASC
+WHERE est_year >= ? AND is_licensed = 0
+ORDER BY favs DESC, est_date DESC, seed.books.nid ASC
 LIMIT ?`, s.Manifest.GenMax-1, limit)
 	if err != nil {
 		return nil, err
@@ -2109,16 +2097,14 @@ LIMIT ?`, s.Manifest.GenMax-1, limit)
 			item RankItem
 			gen  sql.NullString
 			favs sql.NullInt64
-			pctl float64
 		)
 		if err := rows.Scan(&item.NID, &item.Title, &item.Author, &gen,
-			&item.EstYear, &favs, &pctl); err != nil {
+			&item.EstYear, &favs); err != nil {
 			return nil, err
 		}
 		item.Rank = len(items) + 1
 		item.Genre = strPtr(gen)
 		item.Favs = intPtr(favs)
-		item.FavPctl = pctl
 		items = append(items, item)
 	}
 	return items, rows.Err()

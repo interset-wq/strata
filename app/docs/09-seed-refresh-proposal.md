@@ -786,6 +786,29 @@ E.1–E.8 的书数与版本由本节取代；时间渠道取消的决定不变�
   种子不需改动。
 - **结论**：form 侧不再投入精度工程；后续再遇到错判，走裁定表一次解决。
 
+#### E.28 App `categoryId` 正向判对话（2026-11-21，用户定；判据全文见 `docs/form-definitions.md` §2.5）
+
+- **判据**：`cat=1`（对话小说）或 `cat=4`（沉浸式互动小说）→ `dialogue`，可救回 `invalid`。锚点 `analysis/anchors/app_categories.jsonl`，`lib/forms.py::app_categories()` 加载；级 3.6（低于用户裁定 -1 与 DOM 3.5，高于确定性条款）。
+- **只正向、不反向**：`cat=0` 不撤销 dialogue（早期对话书约 5,666 本仍是 cat=0，反向撤销会毁掉一半对话库）；`cat=3` 是征文赛道，不据它判形态或篇幅。
+- **覆盖边界**：App API 快照只覆盖约 45% 的书（随版本变化），缺席不作推断——大幅收敛误判，但不是全库金标。
+- **效果**：universe 中 `cat=1/4` 误判清零；种子重建救回 241 本被形态资格挡在门外的 cat=1 对话书（`dialogue` 6,189 → 6,430）；随后 P10 假完结剔除再清 145 本 short/medium。
+
+#### E.29 删 lqs 族列 + 推荐回退纯 fav_pctl 流（2026-11-24，用户定）
+
+- **问题**：lqs 自 E.26 起「归档不落地」（推荐层已被 cqs 取代）且无引擎读方；`vel_pctl` 自始零消费者。列留在 books 里是死重。
+- **落地**：schema **v7→v8**（32→29 列）物理删除 `lqs`/`lqs_pctl`/`vel_pctl`。`/recommend` 回退流（short/ip_collab）从两级 lqs 流简化为**纯 fav_pctl 流**（ORDER BY fav_pctl DESC, nid）；游标保持 3 段语法 "0|favpctl|nid"（前导位恒 0，旧游标仍可解析，非零前导位拒绝）。`docs/lqs-ranking-integration.md` 标记为历史归档。
+- **结果**：种子内容不变（20261124.32，18,884 本，P1–P11 全 PASS）。
+
+#### E.30 删四个 universe 分位列：两库均等原则（2026-11-24，用户定）
+
+- **原则**：端上不可重算、无 user.db 镜像的字段必须删——否则冻结后在端上是死数据；seed.db 与 user.db 地位均等。`fav_pctl`/`click_pctl`/`praise_pctl`/`pctl_pr` 四列只能在完整 universe（249,885 行）上构建期现算，落入种子即在端上失效 → 物理删除（schema **v8→v9**，29→25 列）。`pr`（praises/favs，端上可重算）是唯一留存的比率列。
+- **替代口径**（02/03/08/12/14/17/18 与 metrics-definitions 已同步）：
+  - `/recommend` 回退 = `pr DESC, nid`（门 `pr NOT NULL` = 同一 favs≥10 证据代理；游标 3 段 "0|pr|nid"，pr≥0 无上限）；
+  - 同代收藏榜 / 获奖 / 赛事代表作 / roster 降级 → `favs DESC NULLs last`（同代内单调等价、榜序不变；跨代为近似，文档注明）；
+  - browse `order=pct` 删除；era 探索器 P50 → 种子池 favs 中位数（ROW_NUMBER rank (n+1)/2）；
+  - universe 分位仅构建期（选种 + 深榜 `pctl` 列 + 优质判定）；deep_ranks 表自带 `pctl` 列保留（构建期值、端上展示，E.30 范围外）。
+- **结果**：种子内容不变（20261124.32，18,884 本，P1–P11 全 PASS），`schema_version=9`，db.gz 6.38 MB；UI 分位展示（detail 三条 bar / discover 徽标 / author 分位段）同步移除。
+
 #### E.31 取消自动保底与自动豁免、短/中篇强制完结（2026-11-24，用户定）
 
 - **口径变化**：2026 起 sfacg 把中篇并入短篇（`docs/form-definitions.md` 附录 D 的观察）；
@@ -821,3 +844,17 @@ E.1–E.8 的书数与版本由本节取代；时间渠道取消的决定不变�
   `validate.py` 复核（含授权书）保证零入种。
 - **结果**：`seed_version=20261124.32`，种子仍 18,884（黑名单为空，无内容变化），
   P1–P11 全 PASS，两份资产 sha256 一致。
+
+#### E.33 补采 2026 春征新书（2026-11-24，用户定）
+
+- **数据**：tag 789 清单 1,679 nid，与既有库去重后 369 本新书；`harvest_contest.py`
+  详情补采 369/369（368 mobile 赞、1 zero fallback；2 本首轮 App API 失败后重试成功）。
+  与 14 征 3,998 本合并，`dataset/contest_new.jsonl` 共 4,367 本。
+- **口径**：沿用 E.30——2026 是正常世代，与其他年份一样走 admit 渠道筛选；
+  E.31 的短/中篇完结硬约束同样生效，不因征文身份放行。`dataset` v20261124.9，
+  `content_upper_bound` 仍 2026-05-03，计数为 2026-11 当期观测。
+- **结果**：`seed_version=20261124.33`，universe 249,885 → **250,254**，合格入种
+  18,837 → **18,834**（新书多数尚未积累质量锚，且短/中篇未完结被剔除，净 -3），
+  种子 **18,881**。P1–P11 全 PASS；2026 春征入种 **10 本**（long 7 / medium 2 /
+  short 1，收藏 13–1,493）。收藏覆盖 96.3937%，门槛随分母从 96.40% 调到 96.39%。
+  两份资产 sha256 一致，`go build ./...` 与 `go test ./...` 全过（schema v9）。

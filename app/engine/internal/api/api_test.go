@@ -244,9 +244,6 @@ func TestLicensedBookDetail(t *testing.T) {
 	if book["is_licensed"] != true {
 		t.Fatalf("is_licensed = %v", book["is_licensed"])
 	}
-	if book["fav_pctl"] != nil {
-		t.Fatalf("fav_pctl = %v", book["fav_pctl"])
-	}
 	if body["source"] != "seed" {
 		t.Fatalf("source = %v", body["source"])
 	}
@@ -536,7 +533,7 @@ func TestRankingFavs(t *testing.T) {
 		t.Fatalf("items = %d", len(items))
 	}
 	first := items[0].(map[string]any)
-	if first["nid"].(float64) != 1001 || first["fav_pctl"].(float64) != 0.9 {
+	if first["nid"].(float64) != 1001 {
 		t.Fatalf("first = %v", first)
 	}
 	if body["meta"].(map[string]any)["licensed_excluded"] != true {
@@ -692,11 +689,11 @@ func TestRankingNew(t *testing.T) {
 		t.Fatalf("min_est_year = %v", meta["min_est_year"])
 	}
 	items := body["items"].([]any)
-	if len(items) != 2 {
-		t.Fatalf("items = %d, want nid 1005 and 3003", len(items))
+	if len(items) != 3 {
+		t.Fatalf("items = %d, want nid 3003, 3004 and 1005", len(items))
 	}
 	first := items[0].(map[string]any)
-	if first["nid"].(float64) != 1005 || first["fav_pctl"].(float64) != 0.95 {
+	if first["nid"].(float64) != 3003 {
 		t.Fatalf("first = %v", first)
 	}
 }
@@ -884,27 +881,19 @@ func TestGenreGroups(t *testing.T) {
 	getJSON(t, srv.URL+"/strata/genre-groups", http.StatusBadRequest)
 }
 
-// TestRankingClassicOrderPct: order=pct ranks by same-generation favorite
-// percentile (docs/form-definitions §6 quality short books) and inverts a
-// favs order; the default stays favs DESC; invalid order is rejected.
+// TestRankingClassicOrderPct: order=pct (same-generation percentile) is
+// retired with the universe percentile columns (E.30) and now rejected;
+// the default stays favs DESC; invalid order is rejected.
 func TestRankingClassicOrderPct(t *testing.T) {
 	srv, _ := newTestServer(t)
-	// testseed: 1004 (pctl 0.6, favs 50) outranks 1002 (pctl 0.5, favs 100)
-	// on percentile — pct order must invert the favs order.
-	body := getJSON(t,
+	// E.30: order=pct no longer exists — the engine rejects it.
+	getJSON(t,
 		srv.URL+"/strata/rankings/classic?form=short&limit=10&order=pct",
+		http.StatusBadRequest)
+	// Default ordering is still favs DESC.
+	body := getJSON(t, srv.URL+"/strata/rankings/classic?form=short&limit=10",
 		http.StatusOK)
 	items := body["items"].([]any)
-	if len(items) != 3 ||
-		items[0].(map[string]any)["nid"] != 3003.0 ||
-		items[1].(map[string]any)["nid"] != 1004.0 ||
-		items[2].(map[string]any)["nid"] != 1002.0 {
-		t.Fatalf("pct items = %v, want [3003 1004 1002]", items)
-	}
-	// Default ordering is still favs DESC.
-	body = getJSON(t, srv.URL+"/strata/rankings/classic?form=short&limit=10",
-		http.StatusOK)
-	items = body["items"].([]any)
 	if items[0].(map[string]any)["nid"] != 3003.0 ||
 		items[1].(map[string]any)["nid"] != 1002.0 {
 		t.Fatalf("favs items = %v, want [3003 1002 1004]", items)

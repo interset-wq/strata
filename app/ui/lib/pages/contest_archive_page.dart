@@ -11,8 +11,8 @@ import '../widgets/book_row_card.dart';
 /// 单届赛事档案（docs/contest-display-in-app.md 形态一）：本地零请求视图。
 ///
 /// 头部 = 官方赛程（引擎内嵌用户核实静态表；缺失只显届次/年份，不编造）+
-/// 在库 form 分布；代表作 = 各 form 头部窗口，按同世代收藏分位（fav_pctl）
-/// 排序（docs/12 红线：累计原始值不进排序）。
+/// 在库 form 分布；代表作 = 各 form 头部窗口，按 favs 排序（经典累计，
+/// E.30）。
 class ContestArchivePage extends StatefulWidget {
   const ContestArchivePage({super.key, required this.name});
 

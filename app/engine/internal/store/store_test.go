@@ -70,9 +70,6 @@ func TestLicensedBookHasNoPercentiles(t *testing.T) {
 	if !detail.Book.IsLicensed {
 		t.Fatal("nid 2001 should be licensed")
 	}
-	if detail.Book.FavPctl != nil || detail.Book.PctlPR != nil {
-		t.Fatalf("licensed percentiles = %v / %v", detail.Book.FavPctl, detail.Book.PctlPR)
-	}
 	if detail.Local != nil {
 		t.Fatal("unexpected local observation")
 	}
@@ -95,7 +92,7 @@ func TestRankingFavsExcludesLicensedAndOtherYears(t *testing.T) {
 	if len(items) != 3 {
 		t.Fatalf("items = %d, want 3", len(items))
 	}
-	if items[0].NID != 1001 || items[0].FavPctl != 0.9 || items[0].Rank != 1 {
+	if items[0].NID != 1001 || items[0].Rank != 1 {
 		t.Fatalf("first = %+v", items[0])
 	}
 	for _, item := range items {
@@ -700,10 +697,11 @@ func TestRecommend(t *testing.T) {
 		}
 	}
 
-	// Full stream (fav_pctl DESC, nid ASC): 1003 (0.99), 1005 (0.95),
-	// 1001 (0.9), 1007 (0.7), 1008 (0.6, seed cover). Excluded: 1004/1006
-	// cover-less, 2001 licensed, 1002/1009–1011 cover-less.
-	items, err := st.Recommend(ctx, "", "", 100)
+	// Full stream (pr DESC, nid ASC; fixture pr = the old pctl values):
+	// 1003 (0.99), 1005 (0.95), 1001 (0.9), 1007 (0.7), 1008 (0.6, seed
+	// cover). Excluded: 1004/1006 cover-less, 2001 licensed,
+	// 1002/1009–1011 cover-less.
+	items, _, err := st.Recommend(ctx, "", "", 100)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -717,21 +715,20 @@ func TestRecommend(t *testing.T) {
 		}
 	}
 	// Page 1 (limit 2): the two top position books.
-	page, err := st.Recommend(ctx, "", "", 2)
+	page, cur, err := st.Recommend(ctx, "", "", 2)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(page) != 2 || page[0].NID != 1003 || page[1].NID != 1005 {
 		t.Fatalf("page1 = %+v", page)
 	}
-	cur := RecommendCursor(page[1].FavPctl, page[1].NID)
 	if cur != "0|0.95|1005" {
 		t.Fatalf("cursor = %q, want 0|0.95|1005", cur)
 	}
 
-	// Page 2 (cursor after 1005): strictly later on (fav_pctl, nid) —
+	// Page 2 (cursor after 1005): strictly later on (pr, nid) —
 	// no skip, no repeat.
-	page, err = st.Recommend(ctx, cur, "", 2)
+	page, cur, err = st.Recommend(ctx, cur, "", 2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -740,11 +737,10 @@ func TestRecommend(t *testing.T) {
 	}
 
 	// Page 3 (cursor mid-stream): the last book follows.
-	cur = RecommendCursor(page[1].FavPctl, page[1].NID)
 	if cur != "0|0.7|1007" {
 		t.Fatalf("cursor = %q, want 0|0.7|1007", cur)
 	}
-	page, err = st.Recommend(ctx, cur, "", 2)
+	page, _, err = st.Recommend(ctx, cur, "", 2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -753,7 +749,7 @@ func TestRecommend(t *testing.T) {
 	}
 
 	// form=medium: only 1007 carries that form with a cover.
-	page, err = st.Recommend(ctx, "", "medium", 10)
+	page, _, err = st.Recommend(ctx, "", "medium", 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -764,7 +760,7 @@ func TestRecommend(t *testing.T) {
 	// Invalid cursors.
 	for _, bad := range []string{"abc", "0.95|1005", "0.9|0.9|1001",
 		"0|-1|1001", "0|0.9|0"} {
-		if _, err := st.Recommend(ctx, bad, "", 10); err == nil {
+		if _, _, err := st.Recommend(ctx, bad, "", 10); err == nil {
 			t.Fatalf("cursor %q: want error", bad)
 		}
 	}

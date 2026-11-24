@@ -168,7 +168,7 @@ func TestContestOrdinal(t *testing.T) {
 func TestContestBooks(t *testing.T) {
 	st := openTestStore(t)
 	// per-form window: 七征 has one long + one dialogue book, both are the
-	// head of their form, and fav_pctl orders them 3001 → 3002.
+	// head of their form, and favs orders them 3001 → 3002.
 	items, err := st.ContestBooks(context.Background(), "七征", 10)
 	if err != nil {
 		t.Fatal(err)
@@ -182,7 +182,7 @@ func TestContestBooks(t *testing.T) {
 	if items[0].Clicks == nil || *items[0].Clicks != 1000 {
 		t.Fatalf("items[0].Clicks = %v, want 1000", items[0].Clicks)
 	}
-	// window cap: 崩坏3征文 has two ip_collab books (pctl .8 > .5);
+	// window cap: 崩坏3征文 has two ip_collab books (favs 700 > 100);
 	// per=1 keeps only the head of the form.
 	items, err = st.ContestBooks(context.Background(), "崩坏3征文", 1)
 	if err != nil {
@@ -191,7 +191,7 @@ func TestContestBooks(t *testing.T) {
 	if len(items) != 1 || items[0].NID != 1006 {
 		t.Fatalf("items = %+v", items)
 	}
-	// NULL fav_pctl sorts last but is still returned when alone.
+	// 十三征 has a single book; it is returned when alone.
 	items, err = st.ContestBooks(context.Background(), "十三征", 10)
 	if err != nil {
 		t.Fatal(err)

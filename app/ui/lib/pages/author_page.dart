@@ -17,13 +17,14 @@ const _formLabels = {
 };
 const _formOrder = ['long', 'medium', 'short', 'dialogue', 'ip_collab'];
 
-/// 作者页（docs/17 作者维度改版，2026-11-22 定案）：头部资料（按需抓取 +
+/// 作者页（docs/17 作者维度改版，2026-11-22 定案；2026-11-24 E.30 分位退役）：
+/// 头部资料（按需抓取 +
 /// user.db 7 天缓存，docs/author-profile-on-demand）+ 作者概览卡（在库/
-/// 库外/出道（估）/跨度 + 形式分布 + 收藏分位分布）+ 代表作（各 form 同世
-/// 代分位 Top-1）+ 作品时间轴（年份分组、est_date 序、未知年份置末）+
-/// 库外作品区块（§6）。质量维度全部由 /strata/author-books 全量行端上现算
-/// ——引擎只加了一列 fav_pctl（docs/17 §3）。红线（docs/12/§5）：质量排序
-/// 只许同世代分位；est_year 标注估算；不新增抓取、不写用户数据。
+/// 库外/出道（估）/跨度 + 形式分布）+ 代表作（各 form favs Top-1，
+/// E.30）+ 作品时间轴（年份分组、est_date 序、未知年份置末）+
+/// 库外作品区块（§6）。全部统计由 /strata/author-books 全量行端上现算
+/// （E.30：分位列已退役，代表作按 favs）。红线：est_year 标注估算；
+/// 不新增抓取、不写用户数据。
 class AuthorPage extends ConsumerStatefulWidget {
   final String author;
   final int bookNid;
@@ -140,15 +141,14 @@ class _AuthorPageState extends ConsumerState<AuthorPage> {
     });
   }
 
-  /// 代表作：各 form 同世代收藏分位 Top-1（docs/12 红线：原始累计值不进
-  /// 排序）；固定形式序，无分位的 form（含全授权书作者）不出卡
-  /// （docs/17 §4.3）。
+  /// 代表作：各 form favs Top-1（E.30：分位退役，展示层用经典累计；
+  /// docs/17 §4.3）；固定形式序，无作品的 form（含全授权书作者）不出卡。
   List<RankItem> get _represents {
     final best = <String, RankItem>{};
     for (final b in _books) {
-      if (b.favPctl <= 0 || b.form.isEmpty) continue;
+      if (b.favs <= 0 || b.form.isEmpty) continue;
       final cur = best[b.form];
-      if (cur == null || b.favPctl > cur.favPctl) best[b.form] = b;
+      if (cur == null || b.favs > cur.favs) best[b.form] = b;
     }
     return _formOrder
         .where((f) => best.containsKey(f))
@@ -467,17 +467,8 @@ class _AuthorPageState extends ConsumerState<AuthorPage> {
   }
 }
 
-class _PctBand {
-  final String label;
-  final int count;
-
-  const _PctBand(this.label, this.count);
-}
-
-/// 作者概览卡（docs/17 §4.2）：四个 mini 统计 + 形式分布 + 收藏分位分布。
-/// 全部由全量在库行端上现算；在库 0 本时整卡隐藏（调用方判定）。红线：
-/// 分位段只统计 fav_pctl（同世代分位）；fav_pctl=0（含授权书，分位恒
-/// NULL——docs/17 §5）归「无数据」计数，不进段。
+/// 作者概览卡（docs/17 §4.2）：四个 mini 统计 + 形式分布。
+/// 全部由全量在库行端上现算；在库 0 本时整卡隐藏（调用方判定）。
 class _OverviewCard extends StatelessWidget {
   final List<RankItem> books;
   final int offCount;
@@ -508,31 +499,6 @@ class _OverviewCard extends StatelessWidget {
     final forms = <String, int>{};
     for (final b in books) {
       if (b.form.isNotEmpty) forms[b.form] = (forms[b.form] ?? 0) + 1;
-    }
-    var b99 = 0, b95 = 0, b90 = 0, bLow = 0, none = 0;
-    for (final b in books) {
-      final p = b.favPctl;
-      if (p <= 0) {
-        none++;
-      } else if (p >= 0.99) {
-        b99++;
-      } else if (p >= 0.95) {
-        b95++;
-      } else if (p >= 0.90) {
-        b90++;
-      } else {
-        bLow++;
-      }
-    }
-    final bands = [
-      _PctBand('≥99%', b99),
-      _PctBand('95–99%', b95),
-      _PctBand('90–95%', b90),
-      _PctBand('<90%', bLow),
-    ];
-    var maxBand = 0;
-    for (final band in bands) {
-      if (band.count > maxBand) maxBand = band.count;
     }
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
@@ -572,47 +538,6 @@ class _OverviewCard extends StatelessWidget {
                     ),
               ],
             ),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                for (final band in bands)
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('${band.label} ${band.count} 本',
-                            style: TextStyle(
-                                fontSize: 10,
-                                color: scheme.onSurfaceVariant)),
-                        const SizedBox(height: 3),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(2),
-                          child: SizedBox(
-                            height: 4,
-                            width: double.infinity,
-                            child: FractionallySizedBox(
-                              alignment: Alignment.centerLeft,
-                              widthFactor: maxBand == 0
-                                  ? 0
-                                  : band.count / maxBand,
-                              child: Container(
-                                  color: scheme.primary
-                                      .withValues(alpha: .7)),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-            if (none > 0)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text('无分位数据 $none 本（含授权书），不进分布',
-                    style: TextStyle(
-                        fontSize: 9.5, color: scheme.onSurfaceVariant)),
-              ),
           ],
         ),
       ),
@@ -682,8 +607,6 @@ class _RepresentsBlock extends StatelessWidget {
             separatorBuilder: (_, _) => const SizedBox(width: 8),
             itemBuilder: (context, i) {
               final b = reps[i];
-              final pct = (1 - b.favPctl) * 100;
-              final pctLabel = pct < 1 ? '前 1%' : '前 ${pct.round()}%';
               return Material(
                 color: scheme.surface,
                 borderRadius: BorderRadius.circular(10),
@@ -715,7 +638,7 @@ class _RepresentsBlock extends StatelessWidget {
                             style: const TextStyle(
                                 fontSize: 10.5,
                                 fontWeight: FontWeight.w600)),
-                        Text('${_formLabels[b.form] ?? b.form}  $pctLabel',
+                        Text(_formLabels[b.form] ?? b.form,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(

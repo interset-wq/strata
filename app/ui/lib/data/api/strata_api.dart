@@ -430,8 +430,8 @@ class StrataApi {
   }
 
   /// 一届赛事的代表作 + 该届库内获奖作品（schema v5）：各 form 头部按
-  /// 同代收藏分位（fav_pctl，NULL 殿后），per 限每形态条数（docs/12 红线：
-  /// 累计原始值不进排序；奖项字段同样不参与排序）。
+  /// favs（经典累计，NULL 殿后，E.30），per 限每形态条数；奖项字段
+  /// 同样不参与排序。
   Future<ContestBooks> contestArchiveBooks({
     required String contest,
     int per = 10,
@@ -1058,8 +1058,8 @@ class ContestGroup {
 }
 
 /// 官方清单条目（/strata/roster）：清单 6 字段（nid/标题/作者/简介/封面/
-/// categoryID）+ 本地 join。库内作品带 form/同世代分位/累计展示字段；库外
-/// 作品只有清单字段——不伪造徽标（docs/12 红线）。categoryID 是赛道提示
+/// categoryID）+ 本地 join。库内作品带 form/累计展示字段；库外作品只有
+/// 清单字段——不伪造徽标（docs/12 红线）。categoryID 是赛道提示
 /// （0 常规/1 对话/3 短篇/4 沉浸式），不是 form 真值（E.28）。
 class RosterItem {
   final int nid;
@@ -1070,7 +1070,6 @@ class RosterItem {
   final int categoryId;
   final bool inLibrary;
   final String? form;
-  final double? favPctl;
   final int? favs;
   final String? status;
   final int? estYear;
@@ -1085,7 +1084,6 @@ class RosterItem {
         categoryId = (m['category_id'] as num?)?.toInt() ?? 0,
         inLibrary = m['in_library'] as bool? ?? false,
         form = m['form'] as String?,
-        favPctl = (m['fav_pctl'] as num?)?.toDouble(),
         favs = (m['favs'] as num?)?.toInt(),
         status = m['status'] as String?,
         estYear = (m['est_year'] as num?)?.toInt(),
@@ -1212,7 +1210,6 @@ class RankItem {
   final String? genre;
   final int estYear;
   final int favs;
-  final double favPctl;
   final String? contest;
   final String? coverUrl;
   final String? status;
@@ -1237,7 +1234,6 @@ class RankItem {
       genre = m['genre'] as String?,
       estYear = m['est_year'] as int,
       favs = m['favs'] as int,
-      favPctl = (m['fav_pctl'] as num?)?.toDouble() ?? 0,
       contest = m['contest'] as String?,
       coverUrl = m['cover_url'] as String?,
       status = m['status'] as String?,

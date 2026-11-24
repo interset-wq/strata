@@ -269,26 +269,27 @@ GROUP BY contest, form`)
 }
 
 // ContestBooks lists one contest's representative books: the per-form head
-// by fav_pctl (same-generation percentile, NULLs last), so long-form volume
+// by favs (classic cumulative, NULLs last — cross-generation approximation
+// since the universe percentiles no longer ship, E.30), so long-form volume
 // cannot drown the short/dialogue tracks (docs/contest-display-in-app.md
 // 形态一). perForm caps each form; the covers overlay applies (docs/05 §3).
 func (s *Store) ContestBooks(ctx context.Context, name string, perForm int) ([]RankItem, error) {
 	clause, args := contestEventMatch("b.contest", name)
 	query := `
 SELECT b.nid, b.title, b.author, b.genre, b.est_year, b.clicks, b.favs,
-       b.fav_pctl, b.contest, b.form,
+       b.contest, b.form,
        COALESCE(c.cover, NULLIF(b.cover_url, '')) AS cover_url
 FROM (
   SELECT b.nid, b.title, b.author, b.genre, b.est_year, b.clicks, b.favs,
-         b.fav_pctl, b.contest, b.form, b.cover_url,
+         b.contest, b.form, b.cover_url,
          ROW_NUMBER() OVER (PARTITION BY b.form
-           ORDER BY (b.fav_pctl IS NULL) ASC, b.fav_pctl DESC, b.nid) AS rn
+           ORDER BY (b.favs IS NULL) ASC, b.favs DESC, b.nid) AS rn
   FROM seed.books b
   WHERE b.is_licensed = 0 AND ` + clause + `
 ) b
 LEFT JOIN covers c ON c.nid = b.nid
 WHERE b.rn <= ?
-ORDER BY (b.fav_pctl IS NULL) ASC, b.fav_pctl DESC, b.nid`
+ORDER BY (b.favs IS NULL) ASC, b.favs DESC, b.nid`
 	all := append([]any{}, args...)
 	all = append(all, perForm)
 
@@ -304,11 +305,10 @@ ORDER BY (b.fav_pctl IS NULL) ASC, b.fav_pctl DESC, b.nid`
 			gen     sql.NullString
 			clicks  sql.NullInt64
 			favs    sql.NullInt64
-			pctl    sql.NullFloat64
 			contest sql.NullString
 		)
 		if err := rows.Scan(&item.NID, &item.Title, &item.Author, &gen,
-			&item.EstYear, &clicks, &favs, &pctl, &contest, &item.Form,
+			&item.EstYear, &clicks, &favs, &contest, &item.Form,
 			&item.CoverURL); err != nil {
 			return nil, err
 		}
@@ -316,7 +316,6 @@ ORDER BY (b.fav_pctl IS NULL) ASC, b.fav_pctl DESC, b.nid`
 		item.Genre = strPtr(gen)
 		item.Clicks = intPtr(clicks)
 		item.Favs = intPtr(favs)
-		item.FavPctl = pctl.Float64
 		item.Contest = contestPtr(contest)
 		items = append(items, item)
 	}

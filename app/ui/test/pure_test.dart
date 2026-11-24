@@ -83,7 +83,6 @@ void main() {
         'genre': '魔幻',
         'est_year': 2020,
         'favs': 123,
-        'fav_pctl': 0.8,
         'contest': '崩坏3征文',
         'cover_url': '2020/1/x.jpg',
         'status': '连载中',
@@ -94,7 +93,6 @@ void main() {
         'tags': ['标签A', '标签B'],
       });
       expect(it.nid, 1001);
-      expect(it.favPctl, 0.8);
       expect(it.coverUrl, '2020/1/x.jpg');
       expect(it.tags, ['标签A', '标签B']);
       expect(it.contest, '崩坏3征文');
@@ -111,7 +109,6 @@ void main() {
         'form': 'short',
       });
       expect(it.genre, isNull);
-      expect(it.favPctl, 0);
       expect(it.words, isNull);
       expect(it.praises, isNull);
       expect(it.tags, isEmpty);

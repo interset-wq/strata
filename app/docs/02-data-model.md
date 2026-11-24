@@ -1,10 +1,11 @@
 # APP 设计文档 02：数据模型与种子构建
-> **状态（随版本变化，数字仅供参考）**：`schema_version=8`（v6 运行时质量指标 / v7 定年锚点 / v8 删 lqs 族列）、
-> `books` 29 列；当前 `seed_version` / 书数列数见 `manifest.json`。收录与形态条款：
+> **状态（随版本变化，数字仅供参考）**：`schema_version=9`（v6 运行时质量指标 / v7 定年锚点 / v8 删 lqs 族列 / v9 删四个 universe 分位列）、
+> `books` 25 列；当前 `seed_version` / 书数列数见 `manifest.json`。收录与形态条款：
 > 取消新书发现渠道（09 附录 E.8）、征文保底 E.9、封面补全 E.10、弃书+invalid E.11/E.12、
 > 弃书质量豁免+对话判据 v2 E.13、同人字数判形态+短篇三天花板 E.17、对话体时间下界+标题 IP E.18、
 > 越天花板僵尸/假短篇归 invalid E.19、中篇必须完结 E.20、正文征文否决形态估计 E.21、
-> Web 死链剔除 E.25、App `categoryId` 正向判对话 E.28、删 lqs 族列+推荐回退纯 fav_pctl 流 E.29（形态口径见 `docs/form-definitions.md`）。
+> Web 死链剔除 E.25、App `categoryId` 正向判对话 E.28、删 lqs 族列+推荐回退纯 fav_pctl 流 E.29、
+> 删四个 universe 分位列（两库均等原则）+推荐回退 pr 流 E.30（形态口径见 `docs/form-definitions.md`）。
 > 文中具体计数/比例/体积为各版实测快照、仅供参考，随数据集变化；表格结构以 `schema.sql` 为准。
 
 > 上游约束见 01 §2；搜索口径见 04。
@@ -17,7 +18,7 @@
 | seed.db      | v4：`books` 28 列 + `book_tags` + `deep_ranks` + `calendar_universe` + `seed_meta`，6 表 10 索引；唯一约束：`UNIQUE(cover_url)`、`book_tags` 主键 `(nid,tag)`、`deep_ranks` `UNIQUE(est_year,metric,nid)`；发书日历表见 14 |
 | seed.db 体积 | 随种子版本变化（现算见 `manifest.json`），早期实测约 519 B/本、索引占约 38%                                                                                                        |
 | user.db      | `observations` / `book_meta` / `covers` / `discovered` / `watchlist` / `watch_lists` / `novel_chapters` / `annotations` / `search_history` / `prefs` / `user_stats` / `refresh_attempts` / `browsing_history`；书架已并入 `watchlist`（激活=追踪 / 未激活=只存），原 `shelf`/`shelf_lists` 由 v6 迁移丢弃。实际表集合以 `userdb.go` 为准 |
-| 预计算       | 五列分位/比率随种子携带（+25 B/本）；`pr` 预计算使赞藏比榜 44.9ms→0.056ms（800×）                                                                                                        |
+| 预计算       | `pr`（赞藏比）随种子携带；预计算使赞藏比榜 44.9ms→0.056ms（800×）；四个 universe 分位列随 v9 退役（构建期现算——端上不可重算且无 user.db 镜像，两库均等）                                        |
 | 不建         | `tags`/`authors`/`contests` 维度表；枚举码表；FTS5；分片；STRICT 表                                                                                                                    |
 | 字符串       | 全 `TEXT`，不用 `VARCHAR(n)`（`n` 被 SQLite 忽略，零约束零信息）；不加长度/CHECK 约束——CHECK 逐行求值使 10 万行写入 58→201ms，超长标题会整批回滚；合法性由 Go 侧常量 + 逐条降级保证 |
 
@@ -50,18 +51,17 @@
 | 12     | `featured`                                                           | INTEGER    | banner 位 667 本（含正版 47）；图上无书名，UI 叠字                                                  |
 | 13     | `cover_url`                                                          | TEXT       | v3 当前 17,932/18,703 非空（95.9%，非授权口径）；UNIQUE——平台每书唯一路径，`rs`/`rss` 视为同一图床；默认封面为 NULL   |
 | 14     | `updated_at`                                                         | TEXT       | 只可作时长用，不可作时间轴                                                                          |
-| 15     | `est_year`                                                           | INTEGER    | 定年（log-nid，281 锚点）；分位与世代榜分组键                                                       |
+| 15     | `est_year`                                                           | INTEGER    | 定年（log-nid，281 锚点）；世代榜分组键                                                       |
 | 16     | `est_date`                                                           | TEXT       | 定年日期                                                                                            |
 | 17     | `est_conf`                                                           | TEXT       | exact/high/mid/low（exact=App API `addTime` 直接核实的锚点书；high/mid/low=锚点间隔 ≤90/≤365/更远）|
 | 18     | `tags`                                                               | TEXT       | 管道串，仅展示与兜底；查询走 `book_tags`                                                          |
-| 19–23 | `fav_pctl` / `click_pctl` / `praise_pctl` / `pr` / `pctl_pr` | REAL       | 世代内分位 + 赞藏比（`favs<10` 时 `pr`/`pctl_pr` NULL）                                       |
-| 24     | `form`                                                               | TEXT       | 六值形态标签，见 `docs/form-definitions.md`；种子已无估计值                                   |
-| 25–28 | `cqs` / `cqs_state` / `cps` / `len_norm`                              | REAL/TEXT  | 运行时质量分（v6，见 18）；v8 删除原 25–27 位 `lqs`/`lqs_pctl`/`vel_pctl`（归档不落地，引擎零读方）|
-| 29     | `is_licensed`                                                        | INTEGER    | 正版日轻 47 本；为 1 时五列分位全 NULL，不进 A 类榜与统计                                           |
+| 19     | `pr`                                                                 | REAL       | 赞藏比（`favs<10` 时 NULL）；端上可重算（praises/favs），分位族的唯一留存者（E.30）            |
+| 20     | `form`                                                               | TEXT       | 六值形态标签，见 `docs/form-definitions.md`；种子已无估计值                                   |
+| 21–24 | `cqs` / `cqs_state` / `cps` / `len_norm`                              | REAL/TEXT  | 运行时质量分（v6，见 18）；v8 删除原 `lqs`/`lqs_pctl`/`vel_pctl`（归档不落地，引擎零读方），v9 删除原 `fav_pctl`/`click_pctl`/`praise_pctl`/`pctl_pr` |
+| 25     | `is_licensed`                                                        | INTEGER    | 正版日轻 47 本；为 1 时 `pr` 为 NULL，不进 A 类榜与统计                                          |
 
 类型决定：枚举存 TEXT（INTEGER 码 gzip 后只省 0.49 MB，不值码表+JOIN）；
-时间存 TEXT（字典序可直接比较，代价 12 B/本）；分位存连续 REAL（不预存六档，
-档位端上派生）。
+时间存 TEXT（字典序可直接比较，代价 12 B/本）。
 
 ### 2.2 `book_tags` 与索引
 
@@ -82,8 +82,7 @@ CREATE TABLE book_tags(
 | `idx_bt(tag, nid)`                                                                 | 2.12 MB | 标签筛选   | 22×（全库） |
 | `idx_updated(updated_at)`                                                          | 0.84 MB | 断更榜     | 118×        |
 | `idx_author(author)`                                                               | 0.64 MB | 作者查询   | 104×        |
-| `idx_year_favpctl(est_year, fav_pctl DESC)`                                        | 0.59 MB | 世代收藏榜 | 98.6×       |
-| `idx_year_clickpctl(est_year, click_pctl DESC)`                                    | 0.59 MB | 世代点击榜 | ≈100×      |
+| `idx_year_favs(est_year, favs DESC)`                                             | —       | 世代收藏榜 | —           |
 | `idx_genre_favs(genre, favs DESC)`                                                 | 0.52 MB | 题材榜     | 88.6×       |
 | `idx_favs(favs DESC)`                                                              | 0.32 MB | 收藏榜     | 89.7×       |
 | `idx_pr(pr DESC)`                                                                  | 0.46 MB | 赞藏比榜   | 800×        |
@@ -154,7 +153,7 @@ CREATE TABLE discovered(
   nid INTEGER PRIMARY KEY, title TEXT NOT NULL, author TEXT, genre TEXT,
   words INTEGER, favs INTEGER, praises INTEGER, cover_url TEXT, summary TEXT,
   source TEXT NOT NULL, observed_at INTEGER NOT NULL
-);  -- 收录 ≠ 进入统计：无定年无分位，不参与榜单，UI 标「官方目录，无统计数据」
+);  -- 收录 ≠ 进入统计：无定年无 pr，不参与榜单，UI 标「官方目录，无统计数据」
 
 -- watchlist 分组（v6 由 shelf_lists 改名而来，数据保留）
 CREATE TABLE watch_lists(id INTEGER PRIMARY KEY, name TEXT NOT NULL, created_at INTEGER NOT NULL);
@@ -228,16 +227,16 @@ UI 必须区分 `src`（种子基线 vs 本地刷新时间）。`user_stats` 是
 ```
 dataset/out/books.jsonl (自有 15 列书目，含 108 本 E.14 月榜遗漏补充)
   ① 清洗成分析口径（剔除 47 本正版日轻）→ ② 定年 eras.estimate → 过滤 est_year∈[2007,2025]
-  ③ 分位：全 universe × est_year（不在种子池内算）→ ④ pr / pctl_pr
+  ③ 分位（仅构建期现算：选种/深榜 pctl 列/优质判定；v9 起不写种子列，E.30）→ ④ pr
   ⑤ 选种（V3，质量锚，无时间渠道）：favs Top20k ∪ 月榜归档 ∪ banner 全集
        ∪ 每个具名征文 ≥3 本保底；再剔除弃书/invalid/僵尸/Web 死链
-  ⑥ 补回正版 47 本（is_licensed=1，分位 NULL）→ ⑦ form / cqs 族落列
+  ⑥ 补回正版 47 本（is_licensed=1，pr NULL）→ ⑦ form / cqs 族落列
   ⑧ 建表建索引（含 calendar_universe） → ⑨ VACUUM + ANALYZE → seed.db.gz 随包
 ```
 
 构建规则（不可违背）：
 
-1. **分位在全库算**（现算参照系为完整 universe），种子池内重算会改分母、不可跨版本比较；
+1. **分位在全库算**（参照系为完整 universe；v9 起只供构建期——选种、深榜 `pctl` 列、优质判定——不写种子列），种子池内重算会改分母、不可跨版本比较；
 2. **定年构建期完成**，端上不插值；
 3. **无时间渠道**：新书结构性吃亏于累计收藏，专门给它开渠道不公平（09 附录 E.8）；
 4. **正版日轻只进检索不进统计**（nid 复用旧条目、定年不可信；A 类榜必须带 `is_licensed=0`）。
@@ -248,8 +247,8 @@ short 不越点击/收藏/点赞三天花板、连载中篇零入种、Web 死�
 具体数量随版本变化（现算见 `manifest.json`）。
 
 构建期自校验：行数==book_count、nid 唯一、title 重名阻断并列出 nid 对（站内唯一，
-重名必为改名/删书快照伪影，人工裁定保留行）、分位∈(0,1]、正版分位全 NULL、
-抽样 20 本分位重算误差 <1e-6、`book_tags` 行数一致、索引清单比对、`integrity_check`、
+重名必为改名/删书快照伪影，人工裁定保留行）、`pr` 规则（`favs<10` → NULL）、正版 `pr` 全 NULL、
+`book_tags` 行数一致、索引清单比对、`integrity_check`、
 体积阈值告警。
 
 ## 6. 版本策略
@@ -257,7 +256,7 @@ short 不越点击/收藏/点赞三天花板、连载中篇零入种、Web 死�
 | 版本               | 影响                                                                                      |
 | ------------------ | ----------------------------------------------------------------------------------------- |
 | `user_version`   | **user.db** 迁移（事务内，失败回滚；迁移前备份 `.bak`；向前兼容一个版本；v6 = 书架并入 watchlist） |
-| `schema_version` | **seed.db** 表结构版本（v8 = 删 lqs 族列；随整文件替换生效）               |
+| `schema_version` | **seed.db** 表结构版本（v9 = 删四个 universe 分位列；随整文件替换生效）               |
 | `seed_version`   | seed.db 整文件替换，不迁移                                                                |
 | `content_end`    | UI 显示的数据时点                                                                         |
 

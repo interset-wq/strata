@@ -599,7 +599,7 @@ func (s *Server) rankingFavs(c *gin.Context) {
 		"meta": gin.H{
 			"kind":              "favs",
 			"pool":              "seed",
-			"ordering":          "fav_pctl",
+			"ordering":          "favs",
 			"content_end":       s.store.Manifest.ContentEnd,
 			"year":              year,
 			"genre":             genreOut,
@@ -648,7 +648,7 @@ func (s *Server) rankingNew(c *gin.Context) {
 		"meta": gin.H{
 			"kind":              "new",
 			"pool":              "seed",
-			"ordering":          "fav_pctl",
+			"ordering":          "favs",
 			"content_end":       s.store.Manifest.ContentEnd,
 			"min_est_year":      s.store.Manifest.GenMax - 1,
 			"limit":             limit,
@@ -852,10 +852,10 @@ func (s *Server) rankingClassic(c *gin.Context) {
 		}
 	}
 	order := c.Query("order")
-	if order != "" && order != "favs" && order != "pct" && order != "clicks" &&
+	if order != "" && order != "favs" && order != "clicks" &&
 		order != "praises" && order != "words" {
 		fail(c, http.StatusBadRequest, "invalid_argument",
-			"order must be one of \"favs\", \"pct\", \"clicks\", \"praises\", \"words\"")
+			"order must be one of \"favs\", \"clicks\", \"praises\", \"words\"")
 		return
 	}
 	dir := c.Query("dir")
@@ -888,9 +888,6 @@ func (s *Server) rankingClassic(c *gin.Context) {
 	if ordering == "" {
 		ordering = "favs"
 	}
-	if order == "pct" {
-		ordering = "fav_pctl"
-	}
 	dirEcho := "desc"
 	if dir == "asc" {
 		dirEcho = "asc"
@@ -919,8 +916,7 @@ func (s *Server) contestArchive(c *gin.Context) {
 }
 
 // contestArchiveBooks lists one contest's per-form representative books by
-// fav_pctl (same-generation percentile, NULLs last; docs/12 red line:
-// cumulative raw values never enter ORDER BY).
+// favs (classic cumulative, NULLs last — display-layer board, E.30).
 func (s *Server) contestArchiveBooks(c *gin.Context) {
 	name := c.Query("contest")
 	if name == "" {
@@ -942,7 +938,7 @@ func (s *Server) contestArchiveBooks(c *gin.Context) {
 		return
 	}
 	// v5 award block (docs/contest-display-in-app.md §6): the event's
-	// in-library award books, fav_pctl-ordered (the award field itself never
+	// in-library award books, favs-ordered (the award field itself never
 	// orders). Always present — an empty list means "no award block".
 	awards, err := s.store.EditionAwards(c.Request.Context(), name)
 	if err != nil {
@@ -1082,7 +1078,6 @@ func (s *Server) rosterJoin(ctx context.Context, rp *crawl.RosterPage) []store.R
 		if b, ok := local[e.NID]; ok {
 			it.InLibrary = true
 			it.Form = b.Form
-			it.FavPctl = b.FavPctl
 			it.Favs = b.Favs
 			it.Status = b.Status
 			it.EstYear = b.EstYear
@@ -1147,7 +1142,8 @@ func (s *Server) discover(c *gin.Context) {
 // replacement for the lqs two-level stream — with the cps mid-band as the
 // candidate screen and clx (k, the user's 篇幅偏好 view) re-ranking at
 // runtime. Forms without cqs evidence (short/ip_collab, report 24 §3)
-// fall back to the classic fav_pctl ordering. The display fields
+// fall back to the classic pr (praises/favs ratio) ordering (E.30).
+// The display fields
 // (clicks/favs/praises) ride along read-only; they never influence
 // ordering (docs/12 §3.2 red line).
 func (s *Server) recommend(c *gin.Context) {
@@ -1189,17 +1185,13 @@ func (s *Server) recommend(c *gin.Context) {
 			ordering = "clx"
 		}
 	} else {
-		items, err = s.store.Recommend(c.Request.Context(),
+		items, next, err = s.store.Recommend(c.Request.Context(),
 			c.Query("cursor"), form, limit)
 		if err != nil {
 			fail(c, http.StatusBadRequest, "invalid_argument", err.Error())
 			return
 		}
-		ordering = "fav_pctl"
-		if len(items) == limit {
-			last := items[len(items)-1]
-			next = store.RecommendCursor(last.FavPctl, last.NID)
-		}
+		ordering = "pr"
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"meta": gin.H{

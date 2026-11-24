@@ -578,66 +578,27 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
     );
   }
 
-  /// 同代分位对照条（种子的 fav/click/praise 分位 + PR 复合指标）。
+  /// PR 指标卡（E.30：同代分位列已退役；PR = 赞/藏，端上可重算的比值
+  /// 信号）。favs < 10 时 PR 为 NULL，整卡隐藏。
   Widget _pctlCard(BuildContext context, Map<String, dynamic> b) {
     final scheme = Theme.of(context).colorScheme;
-    double? pct(Object? v) {
-      final d = double.tryParse(v?.toString() ?? '');
-      return d;
-    }
-
-    Widget bar(String label, double? p) {
-      final shown = p == null ? null : (p.clamp(0, 1) * 100);
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(label,
-                  style: TextStyle(
-                      fontSize: 11, color: scheme.onSurfaceVariant)),
-              Text(shown == null ? '—' : '${shown.toStringAsFixed(1)}%',
-                  style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: scheme.primary)),
-            ],
-          ),
-          const SizedBox(height: 4),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              value: shown == null ? 0 : shown / 100,
-              minHeight: 6,
-              backgroundColor: scheme.primary.withValues(alpha: .12),
-            ),
-          ),
-          const SizedBox(height: 10),
-        ],
-      );
-    }
-
-    final pr = pct(b['pr']);
+    final pr = double.tryParse(b['pr']?.toString() ?? '');
+    if (pr == null) return const SizedBox.shrink();
     return Card(
       margin: const EdgeInsets.only(top: 12),
       child: Padding(
         padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('同代分位（est_year 参照系）',
-                style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
-            const SizedBox(height: 10),
-            bar('收藏分位', pct(b['fav_pctl'])),
-            bar('点击分位', pct(b['click_pctl'])),
-            bar('点赞分位', pct(b['praise_pctl'])),
-            if (pr != null)
-              Text('PR（赞/藏）${pr.toStringAsFixed(3)}',
-                  style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: scheme.secondary)),
+            Text('PR（赞/藏）',
+                style:
+                    TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+            Text(pr.toStringAsFixed(3),
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: scheme.secondary)),
           ],
         ),
       ),

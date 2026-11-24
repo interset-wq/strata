@@ -63,6 +63,11 @@ pctl(x) = rank(x, within=est_year, method=average) / group_size
 | `pr` | **赞藏比** `praises / favs` | `favs ≥ 10` | `favs<10` 置 NULL（避免小分母抖动） |
 | `pctl_pr` | `pr` 在世代内的分位 | `pr` 非空 | `pr` 为 NULL 则为 NULL |
 
+> **E.30（2026-11-24）**：`fav_pctl`/`click_pctl`/`praise_pctl`/`pctl_pr` 四列不再随
+> 种子携带（schema v9）——只能在完整 universe 上构建期现算、端上不可重算、无 user.db
+> 镜像（两库均等原则）；定义保留供构建期选种/优质判定/深榜 `pctl` 列使用。`pr` 是唯一
+> 随种子携带的比率列（端上可重算 praises/favs）。
+
 > **命名陷阱**：`pr` 在本项目**永远是赞藏比**（praises/favs），不是评分。App API 的 `point`（0–10 评分）与本字段无关，**禁止用它覆盖 `pr`**。2026-11-18 定案：`point`（读者水军刷差评，作者要求官方删除，样本 2020 年后 90.9% 为 6.0、2021+ 为 93.5%）为废弃字段，采集层直接丢弃；取值比例见 `api-field-mapping.md`。
 
 ### 3.3 用途与边界
@@ -95,7 +100,7 @@ pctl(x) = rank(x, within=est_year, method=average) / group_size
 
 展示层与推荐层**解耦**：用户即使以 novly 模式浏览（展示官方累计值），后台推荐仍统一走量化信号。
 
-- **信号白名单（可用）**：`fav_pctl` / `click_pctl` / `praise_pctl` / `pr` / `pctl_pr` 等同代分位与口碑效率信号，以及长篇区的 `lqs`。
+- **信号白名单（可用）**：`pr`（赞藏比）与 cqs/cps 等口碑效率信号（见 `app/docs/18`）；同代分位族随种子 v9 退役（E.30，仅构建期现算）；`lqs` 归档不落地（E.26）。
 - **红线（禁止回流打分）**：平台累计 `clicks`/`favs` 原始值、书龄、`form` 外的运营位——防马太效应后门（头部永久高曝光）。
 - 推荐为**口碑驱动、非协同过滤**（无用户行为日志）。
 - 绝对累计值只作展示锚点，详情页并列「收藏 531 / 同代分位 99.2%」。

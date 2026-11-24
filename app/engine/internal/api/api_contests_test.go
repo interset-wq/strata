@@ -227,7 +227,7 @@ func TestRosterOfficial(t *testing.T) {
 		t.Fatalf("items = %v", items)
 	}
 	in := items[0].(map[string]any)
-	if in["in_library"] != true || in["form"] != "long" || in["fav_pctl"].(float64) != 0.99 {
+	if in["in_library"] != true || in["form"] != "long" {
 		t.Fatalf("in-library item = %v", in)
 	}
 	out := items[1].(map[string]any)
@@ -237,9 +237,6 @@ func TestRosterOfficial(t *testing.T) {
 	// out-of-library books carry no local badges (nothing fabricated).
 	if _, has := out["form"]; has {
 		t.Fatalf("out-of-library carries form: %v", out)
-	}
-	if _, has := out["fav_pctl"]; has {
-		t.Fatalf("out-of-library carries fav_pctl: %v", out)
 	}
 	// cached: a second serve hits the page cache, no new fetch.
 	getJSON(t, u, http.StatusOK)

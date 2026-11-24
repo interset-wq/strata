@@ -195,20 +195,20 @@ bottom sheet**（用户 2026-11-19 定）；2026-11-21 筛选面板化后经典�
 
 ```json
 {
-  "meta": { "kind": "favs", "pool": "seed", "ordering": "fav_pctl",
+  "meta": { "kind": "favs", "pool": "seed", "ordering": "favs",
             "content_end": "…", "year": 2019, "genre": null|"魔幻",
             "limit": 50, "licensed_excluded": true },
   "items": [ { "nid": 123, "title": "…", "author": "…", "genre": "…",
-               "est_year": 2019, "favs": 12345, "fav_pctl": 99.7 } ]
+               "est_year": 2019, "favs": 12345 } ]
 }
 ```
 
-分位只按种子池（`is_licensed=0`）计算；`licensed_excluded` 恒为 true，榜单永不出现授权书。
+榜单按同代收藏降序（`favs DESC, nid`；E.30：分位列退役，同代内与分位序单调等价）；`licensed_excluded` 恒为 true，榜单永不出现授权书。
 
 **二级页过滤参数（宫格入口，已实现）**：`status=已完结|连载中`（精确匹配，非法值 400）、
 `contest=1`（全部参赛作品）或 `contest=具体届次名`（如 `2025春季征文`；
 归一化匹配：`六征` 这类母赛事名命中其 长篇/中篇/短篇 三个赛项）。
-与 `genre` 可组合，均在分位榜口径内过滤。`contest` 取值在端上从 `contest=1` 结果
+与 `genre` 可组合，均在榜口径内过滤。`contest` 取值在端上从 `contest=1` 结果
 聚合（items 的 `contest` 字段，已是归一化赛事名），不单独提供枚举端点。
 
 ### GET /strata/rankings/board?kind=&form=&limit=&offset=（**已实现**）
@@ -227,16 +227,16 @@ Classic 主线分类/状态/大赛列表：默认按平台累计 `favs` 降序�
 `ptype` 单值精确匹配 price_type；未知值匹配不到。facets 返回的
 count 不参与面板展示（用户 2026-11-21：筛选不显示计数）。
 `order` 可选：
-`favs`（默认）、`pct`（同代收藏分位 `fav_pctl DESC`、NULL 末尾——
-docs/form-definitions §6 优质短篇口径）与三个经典榜指标 `clicks`/`praises`/`words`
+`favs`（默认）与三个经典榜指标 `clicks`/`praises`/`words`（`pct` 原同代收藏分位
+排序，E.30 退役——分位列已出种子）。
 （平台累计值 `DESC, favs DESC, nid ASC`、NULL 末尾——展示层，docs/12）；
 非法值 400。`dir` 可选 `asc`（逆序，用户 2026-11-21；累计值四榜升序、
 NULL 仍排末尾，`pct` 忽略；缺省 `desc`），`meta.dir` 回显。`items` 为
 RankItem（含 `form`），`meta.ordering` 回显实际排序
-（`favs`/`fav_pctl`/`clicks`/`praises`/`words`）。
+（`favs`/`clicks`/`praises`/`words`）。
 
 短篇 tab（docs/form-definitions §4 收录资格）的年份榜/比赛榜/题材榜/优质榜
-以 `form=short[&year=Y|&contest=X|&genre=G|&order=pct]` 调本端点（不带
+以 `form=short[&year=Y|&contest=X|&genre=G]` 调本端点（不带
 status——种子层已实施完结条款，池本身已干净）。入口**不做中间页**：
 直达 `/classic-list` 榜单页，页内两类控件——比赛赛道 = Drawer（侧滑
 面板，大池要搜索），五维筛选（状态/价格/年份/题材/标签）= 统一筛选
@@ -261,10 +261,11 @@ form 内 20–80 分位**中层带**——筛选不发榜）。**排序** = form
 预设 0/0.25/0.60；不落列、不合成分）。**keyset 游标** = `score|nid`（score 为
 排序表达式值，浮点全精度往返），stateless，每批默认 20。items 带 `cqs_state`
 （stable/low 证据强度）。**form 回退**：short/ip_collab 无 cqs 证据（报告 24 §3），
-回退经典 `fav_pctl DESC` 排序（`meta.ordering="fav_pctl"`）。累计原始值
+回退经典 `pr DESC` 排序（赞藏比，E.30；门 `pr NOT NULL` = 同一 favs≥10
+证据代理；`meta.ordering="pr"`；游标保持 3 段 "0|pr|nid" 语法）。累计原始值
 （clicks/favs/praises）只在 SELECT 展示列，**禁入 ORDER BY / WHERE**
 （docs/12 §3.2 红线）。响应与 `/discover` 同构（items + next_cursor），
-`meta.ordering="cqs"|"clx"|"fav_pctl"`、`licensed_excluded=true`。lqs 两级排序为
+`meta.ordering="cqs"|"clx"|"pr"`、`licensed_excluded=true`。lqs 两级排序为
 上一版口径（归档不落地，cqs 接任，两者不合并、分数不可比）。**P2（2026-11-23）**：
 discovered 中已评分的库外书以同键并流——详情抓取写回后运行时现算
 （eras 锚点定年 → 长度带 form → cps/cqs/len_norm，校准表来自种子 v7）；
@@ -383,9 +384,9 @@ form 过滤即池本身）。
 ### GET /strata/contests/books?contest=&per=
 
 一届赛事的代表作：per-form 窗口
-（`ROW_NUMBER() OVER (PARTITION BY form ORDER BY (fav_pctl IS NULL) ASC,
-fav_pctl DESC, nid)`），`per` 限每形态条数（1..50，默认 10）；
-累计原始值不进排序（docs/12 红线）。covers 覆盖层适用。
+（`ROW_NUMBER() OVER (PARTITION BY form ORDER BY (favs IS NULL) ASC,
+favs DESC, nid)`），`per` 限每形态条数（1..50，默认 10）；
+跨代 favs 近似（E.30：分位列退役）。covers 覆盖层适用。
 
 - 400 `invalid_argument`：`contest` 缺失，或 `per` 越界。
 - 匹配语义与榜单筛选一致：N征 事件前缀匹配（含对话类分轨），非 N征 精确匹配。
@@ -393,9 +394,9 @@ fav_pctl DESC, nid)`），`per` 限每形态条数（1..50，默认 10）；
 200：`{ contest, items: [RankItem], awards: [AwardBook] }`（`rank` = 该 form
 组内名次 1..per）。`awards` = 该赛事库内获奖作品（schema v5，`contest_awards`
 表 join seed.books；edition → 赛事名由引擎内置静态表映射 11 条，表外赛事
-返回空列表）；行序 = `fav_pctl DESC NULLs last, nid`——奖项字段不参与排序
-（docs/12 红线）。`AwardBook` = award 四字段（nid/edition/award/category）
-+ title/author/favs/fav_pctl/cover_url/est_year。140 本库外获奖行无 books
+返回空列表）；行序 = `favs DESC NULLs last, nid`（E.30）——奖项字段不参与排序。
+`AwardBook` = award 四字段（nid/edition/award/category）
++ title/author/favs/cover_url/est_year。140 本库外获奖行无 books
 行可 join，v1 不返回。
 
 ### GET /strata/roster?contest=&division=&page=（**已实现**，2026-11-21 P1 官方清单）
@@ -422,8 +423,8 @@ fav_pctl DESC, nid)`），`per` 限每形态条数（1..50，默认 10）；
   key = `roster:{tag}:{page}`；TTL 按 `contest_meta` end 日期判（未结束 24h /
   已结束 10 年——数据不变，用户 2026-11-22 裁定 / end 未知 24h）。
   缓存的是上游原始页；**本地 join 每次响应都做**（覆盖层/种子变化即时反映）。
-- **本地 join**：种子内作品 `in_library=true` + form/fav_pctl/favs/status/
-  est_year/words（seed 口径；用户观测覆盖层从不进 form/分位）；库外作品
+- **本地 join**：种子内作品 `in_library=true` + form/favs/status/
+  est_year/words（seed 口径；用户观测覆盖层从不进 form）；库外作品
   只带清单 6 字段——不伪造徽标（docs/12 红线）。
 - **降级恒 200（无 502 墙）**：赛事无 tagId / 接口失效（新 API
   `errorCode≠200`、旧 API 裸 `status≠200`、结构缺失、响应体畸形）/ 上游
@@ -444,7 +445,7 @@ fav_pctl DESC, nid)`），`per` 限每形态条数（1..50，默认 10）；
                "author": "某NoName", "intro": "…",
                "cover": "https://rs.sfacg.com/web/novel/images/NovelCover/Big/2024/08/….jpg",
                "category_id": 3, "in_library": true, "form": "short",
-               "fav_pctl": 0.93, "favs": 412, "status": "连载中",
+               "favs": 412, "status": "连载中",
                "est_year": 2024, "words": 38000 } ] }
 ```
 
@@ -585,16 +586,16 @@ L1 本地搜索：种子库内 `title`/`author` LIKE 匹配（v1 无 FTS5）。
 
 ### GET /strata/rankings/new?limit=
 
-新书/新作榜（**已实现**）：近两代（`est_year >= gen_max-1`）按同代分位
-`fav_pctl DESC` 排序（docs/03「按代查询再合并」的等价单查询），
+新书/新作榜（**已实现**）：近两代（`est_year >= gen_max-1`）按
+`favs DESC, est_date DESC, nid` 排序（E.30：分位列退役，跨代近似），
 `is_licensed=0`。
 
 ```json
 {
-  "meta": { "kind": "new", "pool": "seed", "ordering": "fav_pctl",
+  "meta": { "kind": "new", "pool": "seed", "ordering": "favs",
             "content_end": "…", "min_est_year": 2024, "limit": 50,
             "licensed_excluded": true },
-  "items": [ <RankItem 同分位榜> ]
+  "items": [ <RankItem 同 favs 榜> ]
 }
 ```
 
@@ -681,8 +682,8 @@ GET。两项均持久化在 user.db prefs：详情刷新限流默认开；App AP
 （`est_date ASC`，作者页排序按钮切换）。两个方向定年 0001 回填书都沉底，
 nid 同向跟随。未知作者返回空列表，不是错误。items 为标准 RankItem，**额外带
 `est_date`（YYYY-MM-DD，时间轴用；旧端点不返回此字段，RankItem 侧为可选
-字段）与 `fav_pctl`（同世代收藏分位，2026-11-22 加——作者页质量维度；授权书
-分位恒 NULL→0，docs/17 §3）**；meta.ordering 回显实际排序
+字段）**。（E.30：原额外字段 `fav_pctl` 退役——分位列已不在种子，作者页代表作改各
+form favs Top-1，docs/17 §3）。meta.ordering 回显实际排序
 （`est_date_desc` / `est_date_asc`）。
 
 ```json

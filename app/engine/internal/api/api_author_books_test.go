@@ -6,10 +6,10 @@ import (
 	"testing"
 )
 
-// TestAuthorBooksFavPctl: author-books rows now carry the same-generation
-// favourite percentile (docs/17 §3: the only engine change) — seed books
-// real values, licensed (NULL pctl in seed) degrade to 0.
-func TestAuthorBooksFavPctl(t *testing.T) {
+// TestAuthorBooks: author-books rows carry the seed display fields in
+// est_date timeline order (docs/17 §3). The retired universe percentile
+// column is no longer part of the row (E.30 — the two-DB equality rule).
+func TestAuthorBooks(t *testing.T) {
 	srv, _ := newTestServer(t)
 	body := getJSON(t,
 		srv.URL+"/strata/author-books?author="+url.QueryEscape("Author C")+"&limit=200",
@@ -18,25 +18,28 @@ func TestAuthorBooksFavPctl(t *testing.T) {
 	if len(items) != 2 {
 		t.Fatalf("items = %v", items)
 	}
-	byNID := map[int]float64{}
+	seen := map[int]bool{}
 	for _, raw := range items {
 		m := raw.(map[string]any)
-		byNID[int(m["nid"].(float64))] = m["fav_pctl"].(float64)
+		seen[int(m["nid"].(float64))] = true
+		if _, has := m["fav_pctl"]; has {
+			t.Fatalf("book %v still carries fav_pctl: %v", m["nid"], m)
+		}
 	}
-	if byNID[1003] != 0.99 || byNID[1004] != 0.6 {
-		t.Fatalf("fav_pctl = %v, want 1003:0.99 1004:0.6", byNID)
+	if !seen[1003] || !seen[1004] {
+		t.Fatalf("want 1003 and 1004, got %v", seen)
 	}
 
-	// Licensed author: NULL percentile degrades to 0 (docs/17 §5: licensed
-	// books stay out of quality modules).
+	// Licensed author: the row is still served (searchable/detail-visible),
+	// just without any score fields.
 	body = getJSON(t,
 		srv.URL+"/strata/author-books?author="+url.QueryEscape("天闻角川")+"&limit=200",
 		http.StatusOK)
 	items = body["items"].([]any)
 	if len(items) != 1 {
-		t.Fatalf("items = %v", items)
+		t.Fatalf("licensed author items = %v", items)
 	}
-	if got := items[0].(map[string]any)["fav_pctl"].(float64); got != 0 {
-		t.Fatalf("licensed fav_pctl = %v, want 0", got)
+	if m := items[0].(map[string]any); m["nid"].(float64) != 2001 {
+		t.Fatalf("licensed author book = %v", m)
 	}
 }

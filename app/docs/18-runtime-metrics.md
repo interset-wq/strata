@@ -24,8 +24,10 @@
   schema v8（2026-11-24）已物理删除 `lqs` 族列（`lqs`/`lqs_pctl`/`vel_pctl`，
   引擎零读方）；
   定义文档（16-length-weighted-quality 等）保留作历史，**不与 cqs 合并、分数不可比**（报告 §8.4）。
-- `fav_pctl` 等五个构建期分位**保留**：种子已有、详情页分位展示与经典榜仍用；
-  但它们是构建期快照，**库外新书永远算不出**——库外书的质量信号走运行时 cqs/cps（二期）。
+- 四个构建期分位列已**退役**（E.30，种子 v9）：只能在完整 universe 上构建期
+  现算、端上不可重算、无 user.db 镜像，故不再随种子携带（定义保留供构建期
+  选种/优质判定/深榜 `pctl` 列）；`pr` 是唯一随种子的比率列。
+  **库外新书**的质量信号走运行时 cqs/cps（二期）。
 - 经典榜单继续用原始 `favs/clicks/praises` 排序，不受影响。
 
 ## 2. 硬边界（报告 §9 全条继承，重点五条）
@@ -78,7 +80,7 @@ form≠invalid、words≥2000）上**自含现算**，不依赖报告生成器�
 - `clx`：端点接受 `k` 参数（0/0.25/0.60，缺省 0），运行时
   `ORDER BY cqs*(1-K+K*len_norm)`；K=0 走纯 cqs 索引路径。
 - 响应带 `cqs_state`（stable/low），UI 据此标注证据强度。
-- 经典模式端点（fav_pctl/clicks 排序）零改动。
+- 经典模式端点（favs/clicks 排序）零改动。
 
 ## 5. UI 形态
 
@@ -103,7 +105,7 @@ form≠invalid、words≥2000）上**自含现算**，不依赖报告生成器�
     （short/medium/long）；**同人题材的库外书不进 cqs/cps 流**（对话误判污染源，
     E.17 教训），保持经典口径；form 未知（未抓详情）不进流，只进搜索/详情。
   - **流集成**：RecommendCQS 以 UNION ALL 并入 discovered 中 cqs 非空、form
-    匹配的行（同 keyset 游标跨两侧）；UI 分位徽标对无 fav_pctl 的行隐藏。
+    匹配的行（同 keyset 游标跨两侧）；（E.30：UI 分位徽标已退役，库外行一律无分位）。
 
 ## 7. 验收断言（validate.py）
 
