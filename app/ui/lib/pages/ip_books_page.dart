@@ -7,9 +7,8 @@ import '../widgets/back_to_top.dart';
 import '../widgets/book_row_tile.dart';
 
 /// 一个 IP 入口的完整列表：收藏降序，一次性取全（最大 IP 组 36 本）。
-final ipBooksProvider =
-    FutureProvider.autoDispose.family<List<RankItem>, String>((ref, group)
-        async {
+final ipBooksProvider = FutureProvider.autoDispose
+    .family<List<RankItem>, String>((ref, group) async {
   final api = (await ref.watch(bootProvider.future)).api;
   return api.ipBooks(form: 'ip_collab', group: group);
 });
@@ -60,26 +59,32 @@ class _IpBooksPageState extends ConsumerState<IpBooksPage> {
       body: items.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(
-            child: Text('加载失败：$e',
-                style: TextStyle(fontSize: 12, color: scheme.error))),
+          child: Text(
+            '加载失败：$e',
+            style: TextStyle(fontSize: 12, color: scheme.error),
+          ),
+        ),
         data: (list) => list.isEmpty
             ? const Center(
-                child: Text('这个 IP 下暂无作品',
-                    style: TextStyle(fontSize: 12)))
+                child: Text('这个 IP 下暂无作品', style: TextStyle(fontSize: 12)),
+              )
             : Stack(
                 children: [
                   ListView.builder(
                     controller: _scroll,
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
                     itemCount: list.length,
-                    itemBuilder: (context, i) => BookRowTile(
-                      item: list[i],
-                      // “其他”长尾混排多个 IP，需要徽标；单一 IP 页全页同 IP，
-                      // 与页面标题重复，不显示。
-                      ipLabel: widget.group == 'other'
-                          ? contestIpLabel(list[i].contest)
-                          : null,
-                    ),
+                    itemBuilder: (context, i) {
+                      final item = list[i];
+                      return BookRowTile(
+                        item: item,
+                        // “其他”长尾混排多个 IP，需要徽标；单一 IP 页全页同 IP，
+                        // 与页面标题重复，不显示。
+                        ipLabel: widget.group == 'other'
+                            ? contestIpLabel(item.contest)
+                            : null,
+                      );
+                    },
                   ),
                   if (_showTop)
                     Positioned(
@@ -87,9 +92,10 @@ class _IpBooksPageState extends ConsumerState<IpBooksPage> {
                       bottom: 24,
                       child: BackToTop(
                         onTap: () => _scroll.animateTo(
-                            0,
-                            duration: const Duration(milliseconds: 400),
-                            curve: Curves.easeOut),
+                          0,
+                          duration: const Duration(milliseconds: 400),
+                          curve: Curves.easeOut,
+                        ),
                       ),
                     ),
                 ],
