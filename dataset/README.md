@@ -28,22 +28,22 @@ cd dataset && uv run python build.py
 
 产物体积：`books.jsonl` 96 MB / `books.csv` 45 MB，**不入库**，由源 jsonl 重建。
 
-## 2. 当前批次（`version: 20261124.8`）
+## 2. 当前批次（`version: 20261124.9`）
 
 > 数据集从不全量刷新：批次版本标记**最近一次部分更新**，不代表全站快照日期。
 > 快照本身仍止于 2026-05-03（`content_upper_bound` 由主源计算，排除所有补充书）。
 
 | 指标 | 值 |
 |---|---:|
-| 输入 | 22 个 jsonl / **249,832 行** + App API 全字段样本 114,381 行 + 逐本采集 11,367 行 + authorId 证据 55 行 + **月榜遗漏书 108 行（E.14）** + **征文新书 3,998 行（E.29）**（sha256 见 `manifest.json`） |
-| 书籍 | **252,336 本**（= 248,338 + 3,998 征文新书；新书 `nid` 774k–788k，`est_year=2026`） |
+| 输入 | 22 个 jsonl / **249,832 行** + App API 全字段样本 114,381 行 + 逐本采集 11,367 行 + authorId 证据 55 行 + **月榜遗漏书 108 行（E.14）** + **征文新书 4,367 行（E.29/E.33）**（sha256 见 `manifest.json`） |
+| 书籍 | **252,705 本**（= 248,338 + 4,367 征文新书；新书 `nid` 770k–788k，`est_year=2026`） |
 | 合并的重复行 | 1,602 行（1,525 个 `nid` 被抓过多次） |
 | 有标签的书 | 234,883 |
-| **有封面** | **171,579 本（68.00%）** |
-| 封面为空 | 80,757 本 = 快照默认图 + 共享伪影置空（两类有交集，明细见 `out/manifest.json` 的 `counts`） |
+| **有封面** | **171,841 本（68.00%）** |
+| 封面为空 | 80,864 本 = 快照默认图 + 共享伪影置空（两类有交集，明细见 `out/manifest.json` 的 `counts`） |
 | 授权封面覆盖 | 47 本 |
 | 月榜遗漏书（E.14） | 108 本：月榜（2013-03 起）上榜但缺失于 5 月快照；计数为 **2026-11 App API 当期值**（`observed_at` 逐本记录，不计入 `content_upper_bound`）；由 `analysis/fetchers/build_rank_missing_supplement.py` 产出 `rank_missing.jsonl` |
-| 征文新书（E.29） | 3,998 本：14 征（tag 793/794）清单 API 发现、App API + mobile web 详情补采；`observed_at=2026-11-23`，计数为当期值（不计入 `content_upper_bound`）。由 `analysis/fetchers/harvest_contest.py` 产出 `contest_new.jsonl`。**不进分析口径与种子推荐池**（est_year=2026 出界），只进全量目录供 app 搜索/看详情与运行时发现 |
+| 征文新书（E.29/E.33） | 4,367 本：14 征（tag 793/794）3,998 本 `observed_at=2026-11-23`，2026 春征（tag 789）369 本 `observed_at=2026-11-24`；均由清单 API 发现、App API + mobile web 详情补采。计数为当期值（不计入 `content_upper_bound`），由 `analysis/fetchers/harvest_contest.py` 产出 `contest_new.jsonl`。**E.30 起 2026 为正常世代**，与其他年份一样走种子筛选，不是全量直接进入 |
 
 ## 3. 字段（15 个，字段名沿用源 jsonl，不改名）
 
@@ -119,7 +119,7 @@ cd dataset && uv run python build.py
 逐本探测后每组单一 `authorId`，确认是**账号改名**（如 `永夜殇辰`→`十二重渊` 同为 337552、
 `鱼小沫`/`酸汤咸鱼` 同为 340770），故按同账号归还封面；旧版把这类组整组置空是错的。
 
-`authorId` 覆盖度（本批 **125,775 本**，占 50.7%）= App API 全字段样本
+`authorId` 覆盖度（本批 **125,775 本**，占 49.8%）= App API 全字段样本
 （`authorId`）+ 逐本采集快照（`snapshot.authorId`）+ 探测证据 55
 （`dataset/author_ids.jsonl`，`nids` 见 `analysis/fetchers/probe_author_ids.py`）。
 判定优先级：**已知识别冲突 > 全员已知且同 id > 名字同键 > 未知（保守置空）**。
@@ -145,10 +145,10 @@ CSV 前 2,000 行与 JSONL 逐字段一致。
   自己按 `docs/sfacg-endpoints.md` §11.5 的三态判据处理。
 - **累计值不可比**：`click_num`/`like_num` 是平台累计，混杂书龄与曝光分母，
   排序/推荐须用分位口径（`docs/metrics-definitions.md`）。
-- **`cover` 空 ≠ 无书**：80,259 本为空，包含快照默认图已置空（36,212 本，部分后来又被
-  App API 真图覆盖）与共享伪影置空（47,635 本），两类有交集。UI 需要默认占位。
+- **`cover` 空 ≠ 无书**：80,864 本为空，包含快照默认图已置空（36,739 本，部分后来又被
+  App API 真图覆盖）与共享伪影置空（47,713 本），两类有交集。UI 需要默认占位。
 - **唯一可信的封面来源是 App API**（114,381 条全字段样本 + 11,367 本逐本采集，
-  本批应用 105,927 张真实封面）；种子 v3 的 `covers` 表只应从采集结果与本数据集的
+  本批应用 105,932 张真实封面）；种子 v3 的 `covers` 表只应从采集结果与本数据集的
   **唯一**封面取数，不要再从原始 jsonl 取 `cover` 字段。
 - 本数据集**不含**形式（`form`）、定年（`est_date`）、分位等派生列——那些由下游构建
   （`app/tools/seedbuild/`）在种子阶段计算。

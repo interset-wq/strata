@@ -30,13 +30,13 @@
   当期值**（快照里没有这批书、无 5 月值），`observed_at` 逐本记录，manifest 记
   `rank_missing_observed`。这批书天然带月榜质量锚（`seed_policy.monthly_ids`）。
 
-- **征文新书并入**（2026-11-24，用户定）：14 征（tag 793/794）清单 API 发现、详情
-  补采的 3,998 本库外新书，由 `analysis/fetchers/harvest_contest.py` 产出
-  `dataset/contest_new.jsonl`（15 字段同构 + addTime/authorId/tag/tag_name/series/
-  observed_at/praises_source 溯源）。这批书建档在 2026-05 上界之后、est_year=2026，
-  属**新增数据/运行时发现池**，不并入分析口径与种子推荐池（2007–2025）。并入只为
-  让目录全量、app 可搜索/看详情；计数为 2026-11 当期值，`observed_at` 逐本记录，
-  manifest 记 `contest_new_observed`。
+- **征文新书并入**（2026-11-24，用户定）：征文清单 API 发现、详情补采的库外新书，
+  由 `analysis/fetchers/harvest_contest.py` 产出 `dataset/contest_new.jsonl`
+  （15 字段同构 + addTime/authorId/tag/tag_name/series/observed_at/praises_source 溯源）。
+  14 征（tag 793/794）3,998 本于 11-23 采集，2026 春征（tag 789）369 本于 11-24
+  补采，合计 4,367 本。这批书建档在 2026-05 上界之后、est_year=2026，属**新增数据/
+  运行时发现池**，并入只为让目录全量、app 可搜索/看详情；计数为 2026-11 当期值，
+  `observed_at` 逐本记录，manifest 记 `contest_new_observed`。
 
 用法：
     cd dataset && uv run python build.py [--src GLOB] [--covers PATH] [--crawl PATH]
@@ -436,7 +436,7 @@ def main() -> None:
     ap.add_argument("--contest-new", default=str(CONTEST_NEW_DEFAULT),
                     help="征文清单新书补充 jsonl（传空串禁用）")
     ap.add_argument("--out", default=str(OUT_DEFAULT), help="产物目录")
-    ap.add_argument("--version", default="20261124.8", help="数据集版本号")
+    ap.add_argument("--version", default="20261124.9", help="数据集版本号")
     args = ap.parse_args()
 
     records, inputs, audit = load_records(args.src)
@@ -502,9 +502,10 @@ def main() -> None:
                 records.append(rec)
         inputs.append({"path": str(contest_path.resolve().relative_to(ROOT)).replace("\\", "/"),
                        "lines": n, "sha256": digest, "role": "contest_new",
-                       "observed_at": "2026-11-23",
-                       "note": "14 征文（tag 793/794）清单发现、App API + mobile web 详情补采；"
-                               "计数为 2026-11 当期值，est_year=2026 不进分析/推荐池"})
+                       "observed_at": "2026-11-24",
+                       "note": "征文清单发现、App API + mobile web 详情补采：14 征（tag 793/794）"
+                               "3,998 本 11-23、2026 春征（tag 789）369 本 11-24；"
+                               "计数为 2026-11 当期值，est_year=2026 按正常世代筛选"})
     lines_read = sum(i["lines"] for i in inputs)
     books = dedupe(records)
     crawl_path = Path(args.crawl) if args.crawl else None
@@ -546,7 +547,7 @@ def main() -> None:
         # 补充书的 last_update 是 2026-11 观测值（晚于快照上界），不计入上界；
         # 数值仍保留在行内，属事实记录而非快照内容。
         "rank_missing_observed": ("2026-11-19" if rank_nids else None),
-        "contest_new_observed": ("2026-11-23" if contest_nids else None),
+        "contest_new_observed": ("2026-11-24" if contest_nids else None),
         "scope": "全量书籍目录，不做授权剔除与存活判定；不用于分析口径",
         "fields": FIELDS,
         "inputs": inputs,

@@ -22,7 +22,8 @@
 ## 目标清单
 
 `contest_harvest_targets.json`（从权威台账 docs/contest-roster-harvest.md §2 抽取，
-100 个 tag 覆盖四季主线/少年/对话/34 个独立赛事）。本次默认只跑 14 征：--tags 793,794。
+100 个 tag 覆盖四季主线/少年/对话/34 个独立赛事）。默认 `--tags 793,794`（14 征）；
+已补采 2026 春征 `--tags 789`（369 本新书，2026-11-24）。进度见 `CONTEST_TASKLIST.md`。
 
 ## 约束
 
@@ -75,6 +76,7 @@ SIGN_MAP = {"VIP": "VIP", "签约": "签约", "普通": "免费"}
 OBSERVED_AT = time.strftime("%Y-%m-%d")
 
 # 默认只跑 14 征（2026，参赛最多的 X 征、一次性拿到大量新书 nid）
+# 2026 春征用 --tags 789 单独补采（2026-11-24，369 本新书）
 DEFAULT_TAGS = "793,794"
 
 
