@@ -18,14 +18,15 @@ type ErasExploreRow struct {
 	MedianFavs *float64 `json:"median_favs"` // same-generation P50 band mean
 }
 
-// ErasExplore returns every universe cell (2007..2025 × non-empty genre).
+// ErasExplore returns every universe cell (2007..2026 × non-empty genre).
+// Upper bound mirrors build_seed.GEN_MAX (E.30: 2026 is a normal generation).
 func (s *Store) ErasExplore(ctx context.Context) ([]ErasExploreRow, error) {
 	rows, err := s.DB.QueryContext(ctx, `
 SELECT est_year, genre, COUNT(*) AS books,
        AVG(CASE WHEN fav_pctl BETWEEN 0.45 AND 0.55 THEN favs END) AS median_favs
 FROM seed.books
 WHERE is_licensed = 0
-  AND est_year BETWEEN 2007 AND 2025
+  AND est_year BETWEEN 2007 AND 2026
   AND genre IS NOT NULL AND genre != ''
 GROUP BY est_year, genre
 ORDER BY est_year, genre`)

@@ -9,16 +9,20 @@ Usage (from anywhere):
     cd analysis
     uv run python ../app/tools/seedbuild/build_seed.py
 
-The build is pinned to the 2026-05-03 content boundary; count assertions below
-fail loudly if the upstream dataset moves without the calibre being re-decided.
+The snapshot boundary is 2026-05-03, but the catalogue is only ever partially
+refreshed (rank_missing + contest_new carry 2026-11 observations), so the seed
+version / content_end mark the last partial update (2026-11-24) rather than a
+full snapshot date. Count assertions below fail loudly if the upstream dataset
+moves without the calibre being re-decided.
 
 V3 (2026-11-19): the book source is `dataset/out/books.jsonl` (our own 15-column
 catalogue, App-verified covers), admission is `seed_policy.admit()` (quality
 anchors + every deep-rank book, **no new-book discovery channel**), and `form` /
 `lqs` are build-time columns. The 2026-11-19 follow-up removed the time channels
 entirely: new books are structurally disadvantaged by cumulative favourites, so
-a dedicated channel for them is unfair to the older library. E.9 adds a
-per-contest floor (every named contest keeps >= 3 qualifying books).
+a dedicated channel for them is unfair to the older library. E.31 replaces the
+old automatic per-contest floor with a human-curated floor list and removes all
+automatic exemptions from the `short/medium` completion rule.
 """
 
 from __future__ import annotations
@@ -60,18 +64,18 @@ DATASET = REPO / "dataset" / "out" / "books.jsonl"
 AWARD_CSV = ANALYSIS / "out" / "contest_awards_normalized.csv"
 
 SCHEMA_VERSION = 7
-SEED_VERSION = "20260503.28"  # .28: v7 eras_anchors 定年锚点表（281 行，库外书运行时定年）；书目集合不变
-CONTENT_END = pd.Timestamp("2026-05-03")
-GEN_MIN, GEN_MAX = 2007, 2025
+SEED_VERSION = "20261124.32"  # .32: E.32 新增人工黑名单（假短/假中篇），优先级高于人工豁免
+CONTENT_END = pd.Timestamp("2026-11-24")  # 数据集从不全量刷新：标注最近一次部分更新时间，非快照上界
+GEN_MIN, GEN_MAX = 2007, 2026  # E.30: 2026 由"出界"改为正常世代，与其他年份一样走 admit 渠道筛选
 
 # Pinned calibre (see AGENTS.md and app/docs/02-data-model.md).
-EXPECT_UNIVERSE = 241_864       # 241,758 + 108（E.14 补充书，est_year 全部落 2007–2025）
-EXPECT_ANALYSIS_ROWS = 245_887  # 245,779 + 108 月榜遗漏书（E.14）
-EXPECT_DATASET_ROWS = 248_338   # v20260503.7: 248,230 + 108 月榜遗漏书（E.14）
+EXPECT_UNIVERSE = 249_885       # 241,864 + 8,021 本 2026（库内 4,023 + 征文新书 3,998）
+EXPECT_ANALYSIS_ROWS = 249_885  # 245,887 + 3,998 征文新书（E.29 部分更新）
+EXPECT_DATASET_ROWS = 252_336   # v20261124.8: 248,338 + 3,998 征文新书（14 征 793/794）
 EXPECT_LICENSED = 47
-EXPECT_ADMITTED = 18_704       # E.28 基线 18,849 再减 P10 假完结 145 本（含裁定 86430）
-EXPECT_SEED = 18_751           # 18,704 + 47 licensed
-EXPECT_COVERAGE_MIN = 0.9640   # P10 剔除后 eligible 分母同步缩小，覆盖率 96.53%，门槛不变
+EXPECT_ADMITTED = 18_837       # E.31: 取消自动保底/自动豁免后 18,880 → 18,837（剔除 43 本）
+EXPECT_SEED = 18_884           # 18,837 + 47 licensed
+EXPECT_COVERAGE_MIN = 0.9640   # 覆盖率仍 96.40%（合格书分母同步缩小），门槛不变
 # v5 contest awards (docs/award-winners-as-seed-source.md): net 911 rows over
 # 11 editions; the 602 shortlist rows are excluded upstream of this CSV.
 # Display-only facts: award never feeds admission or ordering
@@ -366,7 +370,7 @@ def build_frames() -> tuple[pd.DataFrame, dict]:
     deep = build_deep_ranks(universe, DEEP_TOP_N)
 
     # V3 admission: four clean anchors (favs Top-20k, monthly, banner,
-    # short dual-percentile) + every deep-rank book + E.9 contest floor.
+    # short dual-percentile) + every deep-rank book + E.31 manual contest floor.
     # Time channels are retired (diagnostic only); V0 kept for audit trail.
     universe["upd"] = pd.to_datetime(universe["updated_at"], errors="coerce")
     universe = SP.add_velocity(universe, CONTENT_END)
@@ -440,6 +444,7 @@ def build_frames() -> tuple[pd.DataFrame, dict]:
             "time_cut_diagnostic": len(res["cut"]),
             "deep": len(res["deep"]),
             "contest_floor": {
+                "manual_only": True,
                 "contests": len(res["contest_detail"]),
                 "added": len(res["contest_added"]),
                 "shortfalls": {k: v for k, v in res["contest_detail"].items()
@@ -447,8 +452,9 @@ def build_frames() -> tuple[pd.DataFrame, dict]:
             },
             "abandoned": {
                 "total": len(res["abandoned"]),
-                "in_seed": len(res["abandoned_in_seed"]),  # 仅征文保底豁免
-                "exempt_pctl_098": len(res["abandon_exempt"]),  # E.13 经质量锚入种
+                "in_seed": len(res["abandoned_in_seed"]),  # 恒为 0（P5）
+                "manual_exempt": len(res["manual_exempt"]),  # 人工清单逐本放行
+                "manual_blacklist": len(res["manual_blacklist"]),  # E.32 优先于豁免
             },
             "invalid": {
                 "total": len(res["invalid"]),
@@ -460,6 +466,8 @@ def build_frames() -> tuple[pd.DataFrame, dict]:
             },
         },
         "postconditions": checks,
+        "manual_exempt": res["manual_exempt"],
+        "manual_blacklist": res["manual_blacklist"],
         "favs_coverage": coverage,
         "lqs_scored": int(quality["lqs"].notna().sum()),
         "seed_rows": len(seed),

@@ -25,15 +25,23 @@
 
 - **月榜遗漏书并入**（2026-11-19，用户定）：月榜（2013-03 起）上榜但缺失于 5 月快照
   的 108 本（报告 10 §A；快照后建档/已删除的不算遗漏）。由
-  `analysis/fetchers/build_rank_missing_supplement.py` 产出 `rank_missing.jsonl`
+  `analysis/fetchers/build_rank_missing_supplement.py` 产出    `rank_missing.jsonl`
   （15 字段同构 + addTime/authorId/上榜记录等溯源字段）。**计数为 2026-11 App API
   当期值**（快照里没有这批书、无 5 月值），`observed_at` 逐本记录，manifest 记
   `rank_missing_observed`。这批书天然带月榜质量锚（`seed_policy.monthly_ids`）。
 
+- **征文新书并入**（2026-11-24，用户定）：14 征（tag 793/794）清单 API 发现、详情
+  补采的 3,998 本库外新书，由 `analysis/fetchers/harvest_contest.py` 产出
+  `dataset/contest_new.jsonl`（15 字段同构 + addTime/authorId/tag/tag_name/series/
+  observed_at/praises_source 溯源）。这批书建档在 2026-05 上界之后、est_year=2026，
+  属**新增数据/运行时发现池**，不并入分析口径与种子推荐池（2007–2025）。并入只为
+  让目录全量、app 可搜索/看详情；计数为 2026-11 当期值，`observed_at` 逐本记录，
+  manifest 记 `contest_new_observed`。
+
 用法：
     cd dataset && uv run python build.py [--src GLOB] [--covers PATH] [--crawl PATH]
                                          [--api-novels PATH] [--author-ids PATH]
-                                         [--rank-missing PATH] [--out DIR]
+                                         [--rank-missing PATH] [--contest-new PATH] [--out DIR]
 
 产物（`dataset/out/`，不入库）：
     books.jsonl     每行一本书，15 字段，tags 仍是数组
@@ -62,6 +70,7 @@ CRAWL_DEFAULT = ROOT / "analysis" / "out" / "cover_urls.jsonl"
 API_NOVELS_DEFAULT = ROOT / "analysis" / "out" / "app_api_novels.jsonl"
 AUTHOR_IDS_DEFAULT = Path(__file__).resolve().parent / "author_ids.jsonl"
 RANK_MISSING_DEFAULT = Path(__file__).resolve().parent / "rank_missing.jsonl"
+CONTEST_NEW_DEFAULT = Path(__file__).resolve().parent / "contest_new.jsonl"
 OUT_DEFAULT = Path(__file__).resolve().parent / "out"
 
 FIELDS = [
@@ -424,8 +433,10 @@ def main() -> None:
                     help="authorId 探测证据 jsonl（nid→authorId，用于同账号判定）")
     ap.add_argument("--rank-missing", default=str(RANK_MISSING_DEFAULT),
                     help="月榜遗漏书补充 jsonl（传空串禁用）")
+    ap.add_argument("--contest-new", default=str(CONTEST_NEW_DEFAULT),
+                    help="征文清单新书补充 jsonl（传空串禁用）")
     ap.add_argument("--out", default=str(OUT_DEFAULT), help="产物目录")
-    ap.add_argument("--version", default="20260503.7", help="数据集版本号")
+    ap.add_argument("--version", default="20261124.8", help="数据集版本号")
     args = ap.parse_args()
 
     records, inputs, audit = load_records(args.src)
@@ -459,6 +470,41 @@ def main() -> None:
                        "observed_at": "2026-11-19",
                        "note": "月榜遗漏书（报告10 §A）；计数为 2026-11 App API 当期值，"
                                "晚于 2026-05-03 快照上界，见 build.py 文档头"})
+
+    # 征文清单新书：est_year=2026 出界，只进全量目录供 app 搜索/看详情，不进分析口径与推荐池。
+    contest_path = Path(args.contest_new) if args.contest_new else None
+    contest_nids: set[int] = set()
+    if contest_path is not None and contest_path.exists():
+        digest = hashlib.sha256(contest_path.read_bytes()).hexdigest()
+        n = 0
+        existing = {r["nid"] for r in records}   # 预建一次，避免逐本重建 O(n²)
+        with contest_path.open(encoding="utf-8") as fh:
+            for line in fh:
+                if not line.strip():
+                    continue
+                n += 1
+                raw = json.loads(line)
+                nid = int(raw["nid"])
+                if nid in existing:
+                    raise SystemExit(
+                        f"contest_new nid {nid} 与主源冲突（roster 去重应已排除在库书）")
+                existing.add(nid)
+                contest_nids.add(nid)
+                rec = {"nid": nid}
+                for f in TEXT_FIELDS:
+                    rec[f] = clean_text(raw.get(f), f, audit, nid)
+                for f in INT_FIELDS:
+                    rec[f] = clean_int(raw.get(f), f, audit, nid)
+                rec["cover"] = clean_text(raw.get("cover"), "cover", audit, nid)
+                rec["banner"] = bool(raw.get("banner"))
+                rec["tags"] = [ct for t in (raw.get("tags") or [])
+                               if (ct := clean_text(t, "tags", audit, nid))]
+                records.append(rec)
+        inputs.append({"path": str(contest_path.resolve().relative_to(ROOT)).replace("\\", "/"),
+                       "lines": n, "sha256": digest, "role": "contest_new",
+                       "observed_at": "2026-11-23",
+                       "note": "14 征文（tag 793/794）清单发现、App API + mobile web 详情补采；"
+                               "计数为 2026-11 当期值，est_year=2026 不进分析/推荐池"})
     lines_read = sum(i["lines"] for i in inputs)
     books = dedupe(records)
     crawl_path = Path(args.crawl) if args.crawl else None
@@ -493,12 +539,14 @@ def main() -> None:
         "generated_at": datetime.now(timezone.utc).astimezone().isoformat(timespec="seconds"),
         "content_upper_bound": max(
             (r["last_update"] for r in books
-             if r["last_update"] and r["nid"] not in rank_nids),
+             if r["last_update"] and r["nid"] not in rank_nids
+             and r["nid"] not in contest_nids),
             default="",
         ),
         # 补充书的 last_update 是 2026-11 观测值（晚于快照上界），不计入上界；
         # 数值仍保留在行内，属事实记录而非快照内容。
         "rank_missing_observed": ("2026-11-19" if rank_nids else None),
+        "contest_new_observed": ("2026-11-23" if contest_nids else None),
         "scope": "全量书籍目录，不做授权剔除与存活判定；不用于分析口径",
         "fields": FIELDS,
         "inputs": inputs,

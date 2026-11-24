@@ -31,7 +31,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
 
   String _granularity = 'month'; // month|week|day
   late DateTime _focus = DateTime(2025, 1, 1); // 用户当前聚焦日（统一锚点）
-  int _genMin = 2007, _genMax = 2025; // manifest 右删失边界（initState 加载）
+  int _genMin = 2007, _genMax = 2026; // manifest 右删失边界（initState 加载）
 
   final _dayScroll = ScrollController();
   bool _showTop = false;
@@ -158,7 +158,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
         if (_focus.isAfter(_maxDate)) _focus = _maxDate;
       });
     } catch (_) {
-      // 失败保留默认边界（当前种子内容上界 2007..2025）
+      // 失败保留默认边界（当前种子内容上界 2007..2026）
     }
   }
 

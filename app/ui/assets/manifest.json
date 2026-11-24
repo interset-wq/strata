@@ -1,111 +1,63 @@
 {
   "schema_version": 7,
-  "seed_version": "20260503.28",
-  "content_end": "2026-05-03",
-  "built_at": "2026-11-23T07:06:01+00:00",
-  "book_count": 18751,
+  "seed_version": "20261124.32",
+  "content_end": "2026-11-24",
+  "built_at": "2026-11-24T00:29:55+00:00",
+  "book_count": 18884,
   "licensed_count": 47,
   "tag_count": 102,
-  "tag_rows": 61845,
+  "tag_rows": 61725,
   "gen_min": 2007,
-  "gen_max": 2025,
+  "gen_max": 2026,
   "counts": {
-    "stats_universe": 241864,
-    "baseline_v0": 30832,
-    "admitted_v3": 18704,
+    "stats_universe": 249885,
+    "baseline_v0": 30294,
+    "admitted_v3": 18837,
     "licensed_added": 47,
-    "seed": 18751,
-    "deep_rank_rows": 14621,
-    "lqs_scored_universe": 11784,
+    "seed": 18884,
+    "deep_rank_rows": 15421,
+    "lqs_scored_universe": 12287,
     "award_rows": 911,
-    "cqs_scored": 5536,
-    "cqs_stable": 4152,
-    "cps_scored": 102459
+    "cqs_scored": 5682,
+    "cqs_stable": 4207,
+    "cps_scored": 105326
   },
   "admission_detail": {
     "top_favs": 20000,
-    "monthly": 1661,
+    "monthly": 1762,
     "featured": 620,
     "short": 2000,
-    "time_excluded": 9326,
-    "time_gated_diagnostic": 4159,
-    "time_cut_diagnostic": 4886,
-    "deep": 7835,
+    "time_excluded": 8679,
+    "time_gated_diagnostic": 3567,
+    "time_cut_diagnostic": 4826,
+    "deep": 8278,
     "contest_floor": {
-      "contests": 96,
-      "added": 11,
-      "shortfalls": {
-        "九征短篇": {
-          "total": 428,
-          "held": 2,
-          "added": 1,
-          "need": 1,
-          "eligible": 110
-        },
-        "十一征短篇": {
-          "total": 440,
-          "held": 2,
-          "added": 1,
-          "need": 1,
-          "eligible": 141
-        },
-        "失业魔王同人征文": {
-          "total": 11,
-          "held": 1,
-          "added": 2,
-          "need": 2,
-          "eligible": 2
-        },
-        "怪谈异闻主题征文短篇": {
-          "total": 39,
-          "held": 2,
-          "added": 1,
-          "need": 1,
-          "eligible": 7
-        },
-        "楚楚动仁同人征文": {
-          "total": 31,
-          "held": 2,
-          "added": 1,
-          "need": 1,
-          "eligible": 8
-        },
-        "英雄再临同人征文": {
-          "total": 14,
-          "held": 0,
-          "added": 3,
-          "need": 3,
-          "eligible": 6
-        },
-        "龙之谷征文": {
-          "total": 128,
-          "held": 1,
-          "added": 2,
-          "need": 2,
-          "eligible": 55
-        }
-      }
+      "manual_only": true,
+      "contests": 0,
+      "added": 0,
+      "shortfalls": {}
     },
     "abandoned": {
-      "total": 131452,
-      "in_seed": 1,
-      "exempt_pctl_098": 31
+      "total": 137105,
+      "in_seed": 0,
+      "manual_exempt": 0,
+      "manual_blacklist": 0
     },
     "invalid": {
-      "total": 21138,
+      "total": 21488,
       "in_seed": 0
     },
     "fake_complete_p10": {
-      "total": 21916,
+      "total": 24818,
       "in_seed": 0
     }
   },
-  "favs_coverage": 0.965277,
+  "favs_coverage": 0.964004,
   "postconditions": [
     {
       "name": "P1 合格深榜书全部在种子内",
       "pass": true,
-      "detail": "4,518 本合格深榜书，缺 0"
+      "detail": "4,777 本合格深榜书，缺 0"
     },
     {
       "name": "P2 favs<5 且字数<1万必须有外部锚",
@@ -115,32 +67,32 @@
     {
       "name": "P3 收藏覆盖回退 ≤ 时间渠道放弃量（合格书口径）",
       "pass": true,
-      "detail": "新 96.53% vs V0 96.54%，差 -0.02pp（容差 0.2pp）"
+      "detail": "新 96.40% vs V0 96.37%，差 +0.03pp（容差 0.2pp）"
     },
     {
-      "name": "P4 每个征文至少 3 本",
+      "name": "P4 人工保底清单内征文达到设定本数",
       "pass": true,
-      "detail": "96 个征文，缺口 0"
+      "detail": "清单内 0 个征文，缺口 0"
     },
     {
-      "name": "P5 弃书仅经征文保底豁免入种",
+      "name": "P5 连载 short/medium 零入种（仅人工豁免例外）",
       "pass": true,
-      "detail": "弃书 131,452 本（另有同代 pctl≥0.98 豁免 31 本经质量锚入种），种子内 1 本（均须来自征文保底），越界 0 本"
+      "detail": "全世代连载短/中篇 137,105 本（已剔除 0 本人工豁免），入种 0 本"
     },
     {
       "name": "P6 invalid（僵尸/假短篇）零入种",
       "pass": true,
-      "detail": "invalid 21,138 本，入种 0 本"
+      "detail": "invalid 21,488 本，入种 0 本"
     },
     {
       "name": "P7 short 层不越短篇三条天花板",
       "pass": true,
-      "detail": "short 556 本；越点击 0、越收藏 0、越点赞 0"
+      "detail": "short 544 本；越点击 0、越收藏 0、越点赞 0"
     },
     {
-      "name": "P8 连载中篇零入种（中篇必须已完结）",
+      "name": "P8 全世代 short/medium 必须已完结（仅人工豁免例外）",
       "pass": true,
-      "detail": "连载中篇 21,904 本，入种 0 本"
+      "detail": "全世代连载短/中篇 137,105 本，人工豁免 0 本，入种 0 本"
     },
     {
       "name": "P9 Web 死链零入种（详情页「小说不存在」）",
@@ -150,13 +102,18 @@
     {
       "name": "P10 征文含「长篇」的 short/medium 零入种（假完结）",
       "pass": true,
-      "detail": "命中 21,916 本，入种 0 本"
+      "detail": "命中 24,818 本，入种 0 本"
+    },
+    {
+      "name": "P11 人工黑名单零入种（优先于人工豁免）",
+      "pass": true,
+      "detail": "黑名单 0 本，入种 0 本"
     }
   ],
   "source": {
     "dataset": "local:dataset/out/books.jsonl",
-    "dataset_sha256": "8ea1c09b3c7e1eacc40a12c1aa45c40cb91fad6b0e8df48d93ad5b449c07d1c6",
-    "analysis_rows": 245887,
+    "dataset_sha256": "fe172dc7e49273424e680207d7258f6065f7e73aeef0baff53b9b7557e9a5504",
+    "analysis_rows": 249885,
     "dropped_rows": 2451,
     "upstream": "light-nook-labs/novel_hub",
     "upstream_asset": "dataset.7z"
@@ -164,13 +121,13 @@
   "files": {
     "db": {
       "name": "seed.db",
-      "bytes": 16654336,
-      "sha256": "5f3ca99777de4d3d9d2269f3f23df96d4cc7d8b55cf4da7c52db55aebca4c6db"
+      "bytes": 16912384,
+      "sha256": "7a11b8273c71d1fa949d11af9f16f8353adb26cef9e59cb12210c95a0b5000c1"
     },
     "gz": {
       "name": "seed.db.gz",
-      "bytes": 7373202,
-      "sha256": "6a5d9ed36232b7901f7e20281aa4a182b4f0b787137faf6d3deef747a4691d66"
+      "bytes": 7484932,
+      "sha256": "fc23620412c1513efed810d923b39e41f92f0ef81aa2e71f0e5d4743ccfa557f"
     }
   }
 }

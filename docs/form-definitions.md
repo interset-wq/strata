@@ -132,23 +132,25 @@ CREATE INDEX idx_books_form ON books(form, favs DESC);   -- schema v2→v3，24�
 `classify` 产出纯标签、不随 status 变；收录资格在种子层判定：
 
 ```python
-def seed_admit(row, form) -> bool:
+def seed_admit(row, form, manual_exempt: set[int], manual_blacklist: set[int]) -> bool:
+    if row.nid in manual_blacklist:
+        return False                                  # E.32 黑名单优先于一切豁免
+    if row.is_licensed:
+        return True                                   # 授权日轻展示例外（用户裁定）
     if form == "invalid":
         return False                                  # 僵尸，无豁免（P6）
-    if form == "medium" and row.status != "已完结":
-        return False                                  # 中篇必须已完结（E.20，无豁免）
-    if form == "short" and row.status != "已完结" and row.fav_pctl < 0.98:
-        return False                                  # 连载短篇 = 弃书（E.11）
+    if form in ("short", "medium") and row.status != "已完结":
+        return row.nid in manual_exempt               # E.31：仅人工清单可豁免
     return True
 ```
 
-- **弃书规则（E.11）**：短/中篇阅读本质是「一口气读完」，连载中视为作者弃书，丧失收录资格。
-- **中篇无豁免（E.20，用户定）**：`medium` 且连载中一律出局，不看 `fav_pctl`（开口子等于放大量太监长篇进种子）。
-- **质量豁免（E.13，仅 short）**：同代 `fav_pctl ≥ 0.98` 的连载短篇不算弃书（作者可能只是忘点完结，锚点 24132），但仍须经质量锚（Top20k/月榜/banner/短篇双分位/深榜）入种，实际豁免约 31 本（快照现算）。豁免不等于直接入库。
-- **征文保底豁免（E.9）**：每征文 ≥3 本保底从全池选书、不查 status（部分比赛完结率极低）；保底候选 `words ≥ 1万`，天然不碰 invalid。E.20 起保底也不得选连载中篇；种子内连载短篇只能来自保底路径（P5 守门）。
+- **弃书规则（E.11 → E.31）**：短/中篇阅读本质是「一口气读完」，连载中视为作者弃书，丧失收录资格。**所有年份同受此硬约束**；2026 起 sfacg 又把中篇并入短篇，更无年份例外。范围是非授权种子；授权日轻 47 本仅作展示、不进评分/收录池，按用户裁定保留（其中 2 本连载中篇）。
+- **自动豁免全部取消（E.31）**：原 E.13「同代 `fav_pctl ≥ 0.98` 质量豁免连载短篇」与原 E.9「征文保底不查 status」均已作废（旧文档中的 31 本、保底补入本数为历史值，不再适用）。自动豁免会放进大量杂质；`docs/fake-complete-short-medium.md` 的 24132「回到旧时光」等锚点如需放行，须逐本写入人工清单。
+- **人工通道（E.31，唯一例外）**：`analysis/anchors/seed_manual_exempt.jsonl`（`nid` / `waive: "complete"` / `reason` / `verified_on`）逐本批准；`analysis/anchors/seed_contest_floor.jsonl`（`contest` / `min` / `reason` / `verified_on`）逐赛事批准保底，未列名赛事没有保底 quota。两份清单初始为空；保底候选仍须 `favs ≥ 5`、`words ≥ 1万` 且过所有 ineligible 规则。
+- **人工黑名单（E.32）**：`analysis/anchors/seed_manual_blacklist.jsonl`（`nid` / `kind` ∈ `fake_short|fake_medium|fake_complete` / `reason` / `verified_on`）逐本永久剔除确定性规则抓不到的假短/假中篇（如断更后恶意标完结、内容裁剪、僵尸替换）；优先级高于人工豁免，征文保底也不得带入。黑名单只作用种子收录层，不改写作品级 `form`；P10 与 E.19 等确定性规则继续独立生效，不必重复登记。初始为空。
 - **短篇双分位渠道噪声底（E.15）**：Top-2000 候选须 `favs ≥ 5`（与征文保底同门槛），分位仍在全池上算（先过滤会缩小分母、扭曲排名）。翻年改组曾让 38821（favs=3 的 3–6k×2014 小组头部）无锚入种，违反 P2。
 
-**后置断言**（`seed_policy.postconditions()`，重建时强制）：P1 合格深榜书全入池；P2 favs<5 且 <1 万字须有外部锚；P3 收藏覆盖回退 ≤0.2pp（合格书口径，分母剔除弃书+invalid）；P4 每征文 ≥3 本；P5 弃书仅经保底入种；P6 invalid 零入种；P7 种子内 short 不越三条天花板（全时期）；P8 连载中篇零入种；P9 Web 死链零入种（E.25）。种子重建时 P1–P9 全 PASS（快照现算，随种子现算）。
+**后置断言**（`seed_policy.postconditions()`，重建时强制）：P1 合格深榜书全入池；P2 favs<5 且 <1 万字须有外部锚；P3 收藏覆盖回退 ≤0.2pp（合格书口径，分母剔除弃书+invalid）；P4 人工保底清单内征文达到设定本数；P5 全世代连载 short/medium 零入种（仅人工豁免例外）；P6 invalid 零入种；P7 种子内 short 不越三条天花板（全时期）；P8 全世代 short/medium 必须已完结（仅人工豁免例外）；P9 Web 死链零入种（E.25）；P10 征文含「长篇」假完结零入种；P11 人工黑名单零入种（优先于人工豁免）。种子重建时 P1–P11 全 PASS（快照现算，随种子现算）。
 
 > **P10（假完结剔除，已实施）**：裁定规则见 `fake-complete-short-medium.md`——short/medium 档「征文名含长篇」即假完结（命中 145 本）+ 第二类僵尸逐本裁定。入种剔除已在 `seed_policy.py` 落地，P10 断言守门，`.25` 种子验证清零；裁定规则本身仍以假完结文档为准。
 

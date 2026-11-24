@@ -4,8 +4,9 @@ The app seed is a curated 30,878-book pool. Its per-generation ranking endpoint
 can accept limit=200, but the pool itself only holds 6-97 books for the 2007-2014
 generations, so a "Top200" query silently returns a handful of rows. Deep ranks
 solve this without touching the seed book list: compute the ranking on the full
-statistical universe (is_licensed=0, est_year in 2007..2025) at build time and
-ship the result as an additive table in seed.db.
+statistical universe (is_licensed=0, est_year in 2007..2026) at build time and
+ship the result as an additive table in seed.db. 2026 joined as a normal
+generation in E.30 (filtered through the same admit channels as every year).
 
 Scope (pinned by app/docs/09-seed-refresh-proposal.md appendix A, decision D2):
   - grouping key: est_year, one independent board per generation
@@ -25,7 +26,7 @@ import pandas as pd
 
 METRICS = ("favs", "clicks", "praises", "pr")
 TOP_N = 200
-GEN_MIN, GEN_MAX = 2007, 2025
+GEN_MIN, GEN_MAX = 2007, 2026
 PR_MIN_FAVS = 10
 
 # Long-format columns, also the deep_ranks SQLite schema.

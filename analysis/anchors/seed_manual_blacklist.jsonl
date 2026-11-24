@@ -1,0 +1,4 @@
+// 人工黑名单（E.32）：确认为假短/假中篇（断更后恶意标完结、内容裁剪、僵尸替换等）的书，种子永久剔除。
+// 行格式：nid / kind / reason / verified_on。kind 取 fake_short / fake_medium / fake_complete。
+// 优先级高于 seed_manual_exempt.jsonl：同一 nid 同时出现在两表时以黑名单为准。
+// 空文件即当前无人工黑名单；确定性规则 P10（征文含「长篇」）与 E.19 天花板仍在，不必重复登记。

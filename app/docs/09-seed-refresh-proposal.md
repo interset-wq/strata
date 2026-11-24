@@ -785,3 +785,39 @@ E.1–E.8 的书数与版本由本节取代；时间渠道取消的决定不变�
   （115 万字/41,779 收藏 … 16 万字/15,943 收藏），**10/10 全部确认为对话**——头部无误判，
   种子不需改动。
 - **结论**：form 侧不再投入精度工程；后续再遇到错判，走裁定表一次解决。
+
+#### E.31 取消自动保底与自动豁免、短/中篇强制完结（2026-11-24，用户定）
+
+- **口径变化**：2026 起 sfacg 把中篇并入短篇（`docs/form-definitions.md` 附录 D 的观察）；
+  我们的内部 `form` 仍按字数保留六值，但**所有年份的非授权 `short`/`medium` 都必须
+  `status=已完结`，无年份例外**。E.11 的质量豁免（同代 `fav_pctl≥0.98`）
+  与 E.9 的全赛事征文保底（每征文 ≥3 本、不查 status）**同时取消**：自动豁免会
+  放进大量杂质，而真正需要放行的书只是少数。授权日轻 47 本仅作展示、不进评分/收录池，
+  按用户裁定保留例外（其中 201168/657292 为连载中篇）。
+- **唯一例外 = 人工清单**：`analysis/anchors/seed_manual_exempt.jsonl`
+  （`nid`/`waive: "complete"`/`reason`/`verified_on`，逐本批准完结豁免）与
+  `analysis/anchors/seed_contest_floor.jsonl`（`contest`/`min`/`reason`/`verified_on`，
+  逐赛事批准保底 quota）。两份清单初始为空；未列名赛事不再有保底，保底候选
+  仍须过 `favs≥5`/`words≥1万`/`ineligible`（含完结规则）。
+- **实现**：`seed_policy.py` 删掉 `ABANDON_PCTL_EXEMPT` 与 `exempt_from_abandon()`，
+  `abandoned_ids()` 只按人工清单放行；`contest_guarantee()` 只遍历人工赛事清单；
+  P4 改为「清单内征文达标」，P5 改为「连载短/中篇零入种（仅人工豁免例外）」，
+  P8 改为「全世代短/中篇必须已完结」。`validate.py` 增加入库后的完结复核（授权日轻例外）。
+- **结果**：`seed_version=20261124.31`，合格入种 18,880 → **18,837**（-43），种子
+  **18,884**（+47 授权）。P1–P10 全 PASS；P5/P8 显示全世代连载短/中篇 137,105 本
+  入种 0（人工豁免 0）；保底清单与豁免清单均为空，征文 quota 0；收藏覆盖 96.40%
+  不变。两份资产 `app/assets/` 与 `app/ui/assets/` 的 gz / manifest sha256 一致。
+
+#### E.32 人工黑名单排除假短/假中篇（2026-11-24，用户定）
+
+- **问题**：假中篇/假短篇很多没有确定性信号（作者断更后恶意标完结、正文裁剪、
+  内容替换为无意义文本），P10 只覆盖「征文名含长篇」，E.19 只覆盖 ≤5 万字越
+  点击天花板的一批，剩余靠逐本人工裁定最省事。
+- **落地**：`analysis/anchors/seed_manual_blacklist.jsonl`（`nid` / `kind` ∈
+  `fake_short|fake_medium|fake_complete` / `reason` / `verified_on`），并入
+  `seed_policy.ineligible`，征文保底候选池同样排除；**优先级高于人工豁免清单**
+  （同 nid 同时出现时黑名单胜出）。只作用种子收录层，不改写作品级 `form`；
+  确定性规则继续独立生效，不必重复登记。初始为空；新增 P11 断言与
+  `validate.py` 复核（含授权书）保证零入种。
+- **结果**：`seed_version=20261124.32`，种子仍 18,884（黑名单为空，无内容变化），
+  P1–P11 全 PASS，两份资产 sha256 一致。

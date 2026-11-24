@@ -42,7 +42,9 @@ def build(universe: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
     """Score the calibration universe and fit the runtime calibration tables.
 
     universe carries id/form/est_year/genre/words/favs/praises for
-    is_licensed=0, est_year 2007..2025 (form/est_year already assigned).
+    is_licensed=0, est_year 2007..2026 (E.30: 2026 is a normal generation;
+    cqs/cps cells are keyed by est_year so 2026 forms its own baseline, never
+    falling into older years).
     Returns (scores, summary): scores maps id -> cqs/cqs_state/cps/len_norm
     for the seed merge; summary holds the calib_* tables (engine phase 2) and
     coverage counts for the manifest.

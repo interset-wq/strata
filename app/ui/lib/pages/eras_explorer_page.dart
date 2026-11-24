@@ -12,7 +12,7 @@ final erasExplorerProvider =
   return handle.api.erasExplorer();
 });
 
-/// 世代对比探索器：选题材 → 2007–2025 每年的书数条 + 同代 P50 收藏。
+/// 世代对比探索器：选题材 → 2007–2026 每年的书数条 + 同代 P50 收藏。
 /// 帮助用户回答「这个题材哪几年繁荣、收藏水位如何变化」。
 class ErasExplorerPage extends ConsumerWidget {
   const ErasExplorerPage({super.key});

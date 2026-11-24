@@ -1,0 +1,4 @@
+// 人工保底清单（E.31）：只有列入的征文才享受保底；自动全赛事保底已取消。
+// 行格式：contest / min / reason / verified_on。contest 与 books.contest 精确匹配（去首尾空格）。
+// min 为该征文最少入种本数（正整数，建议 3）；理由须说明为何该赛事必须人工保底。
+// 保底候选仍须过 favs>=5 / words>=1万 / ineligible 过滤；空文件即无保底。

@@ -19,11 +19,14 @@ in the library. The velocity gate is still computed for diagnostics only;
 it never admits a book. Removing the channel drops 4,164 books worth 0.26% of
 all favourites and raises the seed's median favourites from 652 to 870.
 
-Since 2026-11-19 a separate **contest floor** (E.9) keeps every named contest
-— the six closed IP collabs and the other 90 competitions alike — represented
-by at least three books. It is a diversity constraint, not a quality exception:
-candidates must still clear `favs >= 5` and `words >= 10_000`, and are chosen by
-same-generation `fav_pctl`.
+Since 2026-11-24 (E.31) there is **no automatic contest floor and no automatic
+exemption**: `short`/`medium` must be `status=已完结` in every generation, and
+the only way back in is a human-curated line in `seed_manual_exempt.jsonl`.
+A human-curated `seed_contest_floor.jsonl` names the few contests that still
+get a quota; candidates must clear `favs >= 5`, `words >= 10_000` and every
+ineligibility rule (including the completion rule unless manually exempted).
+E.32 adds a human-curated `seed_manual_blacklist.jsonl` for fake short/medium
+books that deterministic rules miss; it outranks the exemption list.
 
 Run the audit (read-only, no writes, no network)::
 
@@ -61,13 +64,89 @@ SHORT_BINS = [-1, 3_000, 6_000, 10_000, 20_000, 50_001]
 SHORT_LABELS = ["<=3k", "3-6k", "6-10k", "10-20k", "20-50k"]
 NOISE_FAVS = 5          # post-condition: favs below this and short words must be anchored
 NOISE_WORDS = 10_000
-CONTEST_MIN_PER = 3     # E.9: every named contest keeps >= 3 books (incl. IP collabs)
-CONTEST_MIN_FAVS = 5    # floor for contest-floor candidates (no quality exception)
+CONTEST_MIN_FAVS = 5    # floor for manually listed contest-floor candidates
 CONTEST_MIN_WORDS = 10_000  # same: avoid padding the seed with <1万-word noise
-ABANDON_FORMS = ("short", "medium")  # E.11: 连载中的短/中篇 = 作者弃书，无收录资格
-ABANDON_PCTL_EXEMPT = 0.98  # E.13: 同代 fav_pctl ≥ 0.98 的连载短/中篇 豁免弃书规则
-GEN_MIN, GEN_MAX = 2007, 2025
+ABANDON_FORMS = ("short", "medium")  # E.31: 连载短/中篇无收录资格，人工清单除外
+GEN_MIN, GEN_MAX = 2007, 2026  # E.30: 2026 作为正常世代进 universe，与其他年份一样筛选
 LICENSED = 47           # appended by build_seed.py, outside the universe
+SEED_EXEMPT_ANCHOR = ANALYSIS / "anchors" / "seed_manual_exempt.jsonl"
+SEED_FLOOR_ANCHOR = ANALYSIS / "anchors" / "seed_contest_floor.jsonl"
+SEED_BLACKLIST_ANCHOR = ANALYSIS / "anchors" / "seed_manual_blacklist.jsonl"
+BLACKLIST_KINDS = ("fake_short", "fake_medium", "fake_complete")
+
+
+def _read_seed_anchor(path: Path) -> list[dict]:
+    """Read a human-curated JSONL anchor; blank/`//` lines are comments."""
+    rows: list[dict] = []
+    for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        text = line.strip()
+        if not text or text.startswith("//"):
+            continue
+        try:
+            obj = json.loads(text)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"{path.name}:{lineno}: invalid JSON: {exc}") from exc
+        if not isinstance(obj, dict):
+            raise ValueError(f"{path.name}:{lineno}: expected a JSON object")
+        rows.append(obj)
+    return rows
+
+
+def manual_exempt_ids(df: pd.DataFrame) -> set[int]:
+    """E.31: the only channel allowed to waive the `short/medium` completion rule.
+
+    Each row is ``{nid, waive: "complete", reason, verified_on}``. Unknown
+    ``waive`` values and nids outside the universe fail loudly: a stale manual
+    list must never silently turn into an automatic exemption rule.
+    """
+    present = set(df["id"])
+    out: set[int] = set()
+    for row in _read_seed_anchor(SEED_EXEMPT_ANCHOR):
+        if row.get("waive") != "complete":
+            raise ValueError(f"{SEED_EXEMPT_ANCHOR.name}: unsupported waive={row.get('waive')!r}")
+        if not all(row.get(k) for k in ("reason", "verified_on")):
+            raise ValueError(f"{SEED_EXEMPT_ANCHOR.name}: reason/verified_on required")
+        nid = int(row["nid"])
+        if nid not in present:
+            raise ValueError(f"{SEED_EXEMPT_ANCHOR.name}: nid {nid} outside the universe")
+        out.add(nid)
+    return out
+
+
+def manual_blacklist_ids(df: pd.DataFrame) -> set[int]:
+    """E.32: human-confirmed fake short/medium books, permanently excluded.
+
+    Rows are ``{nid, kind, reason, verified_on}``; ``kind`` must be one of
+    `BLACKLIST_KINDS`. This is a seed-admission blacklist — it does not rewrite
+    the work-level `form`. It outranks the manual exemption list: a nid on both
+    lists stays excluded. Deterministic rules (P10, E.19) still run as well.
+    """
+    present = set(df["id"])
+    out: set[int] = set()
+    for row in _read_seed_anchor(SEED_BLACKLIST_ANCHOR):
+        if row.get("kind") not in BLACKLIST_KINDS:
+            raise ValueError(f"{SEED_BLACKLIST_ANCHOR.name}: unsupported kind={row.get('kind')!r}")
+        if not all(row.get(k) for k in ("reason", "verified_on")):
+            raise ValueError(f"{SEED_BLACKLIST_ANCHOR.name}: reason/verified_on required")
+        nid = int(row["nid"])
+        if nid not in present:
+            raise ValueError(f"{SEED_BLACKLIST_ANCHOR.name}: nid {nid} outside the universe")
+        out.add(nid)
+    return out
+
+
+def contest_floor_specs() -> dict[str, int]:
+    """E.31: contests with a human-approved quota; empty file = no floor at all."""
+    specs: dict[str, int] = {}
+    for row in _read_seed_anchor(SEED_FLOOR_ANCHOR):
+        name = str(row.get("contest", "")).strip()
+        if not name or not all(row.get(k) for k in ("reason", "verified_on")):
+            raise ValueError(f"{SEED_FLOOR_ANCHOR.name}: contest/reason/verified_on required")
+        minimum = int(row.get("min", 3))
+        if minimum < 1 or name in specs:
+            raise ValueError(f"{SEED_FLOOR_ANCHOR.name}: invalid or duplicate contest {name!r}")
+        specs[name] = minimum
+    return specs
 
 
 def _form(df: pd.DataFrame) -> pd.Series:
@@ -78,43 +157,24 @@ def _form(df: pd.DataFrame) -> pd.Series:
     return FM.classify(df)
 
 
-def abandoned_ids(df: pd.DataFrame) -> set[int]:
-    """E.11+13 弃书规则：连载中的 short/medium 不具收录资格（质量豁免见下）。
+def abandoned_ids(df: pd.DataFrame, exempt: set[int] | None = None) -> set[int]:
+    """E.31 弃书规则：连载中的 short/medium 一律无收录资格。
 
-    理由是产品直觉——短/中篇是「一口气读完」的作品，连载中意味着作者
-    没写完（弃书），比已完结劣质书更没有资格进种子。`form` 仍是纯篇幅
-    标签、不随 status 变；本函数只在种子收录层生效。
+    短/中篇是「一口气读完」的作品，连载中意味着作者没写完，比已完结劣质书
+    更没有资格进种子。2026 起 sfacg 把中篇并入短篇（`app/docs/09` 附录 D），
+    两个形态都按同一条硬规则处理：`status=已完结` 才合格。
 
-    **E.13 质量豁免（2026-11-19，用户定，仅 short）**：同代 `fav_pctl ≥ 0.98`
-    的连载短篇不算弃书——status 字段不可靠（24132「回到旧时光」同代前 0.85%
-    的短篇，作者只是忘了点完结）。豁免不是直接入库：这些书仍须有质量锚
-    （Top20k/月榜/banner/短篇补/深榜）才能进种子。
-
-    **E.20（2026-11-19，用户定）：中篇无豁免**。`form=medium` 且连载中的书
-    一律弃书，不看 fav_pctl——5–15 万字仍在连载的中篇，绝大多数是作者弃掉的
-    长篇（字数还会涨、结构是长篇），给它们开口子等于让大量太监长篇进种子。
-    中篇必须 `status=已完结` 才有收录资格，征文保底也不例外（P8 守门）。
+    E.13 的 `fav_pctl≥0.98` 自动质量豁免与 E.9 的征文保底豁免均已取消；
+    唯一例外是人工逐本写入 `seed_manual_exempt.jsonl` 的书（P5/P8 守门）。
+    `form` 仍是作品级属性、不随 status 变，本函数只在种子收录层生效。
     """
+    if exempt is None:
+        exempt = manual_exempt_ids(df)
     form = _form(df)
     serial = df["status"].ne("已完结").to_numpy()
-    is_short = form.eq("short").to_numpy()
-    is_medium = form.eq("medium").to_numpy()
-    low = df["fav_pctl"].lt(ABANDON_PCTL_EXEMPT).to_numpy()
-    mask = (is_medium & serial) | (is_short & serial & low)
-    return set(df.loc[mask, "id"])
-
-
-def exempt_from_abandon(df: pd.DataFrame) -> set[int]:
-    """E.13 豁免集：连载中的 **short** 且同代 fav_pctl ≥ 0.98。
-
-    E.20 起中篇不再豁免——连载中篇一律弃书（见 `abandoned_ids`）。
-    这些书不进 ineligible；若原本有质量锚则照常经锚入种（P3/P1 的合格
-    分母包含它们）。
-    """
-    form = _form(df)
-    mask = (form.eq("short").to_numpy()
-            & df["status"].ne("已完结").to_numpy()
-            & df["fav_pctl"].ge(ABANDON_PCTL_EXEMPT).to_numpy())
+    long_form = form.isin(ABANDON_FORMS).to_numpy()
+    waived = df["id"].isin(exempt).to_numpy()
+    mask = long_form & serial & ~waived
     return set(df.loc[mask, "id"])
 
 
@@ -178,7 +238,7 @@ def dead_ids(df: pd.DataFrame) -> set[int]:
 
 
 def load_universe(csv: Path | None = None) -> pd.DataFrame:
-    """Analysis universe: licensed Japanese LN dropped, est_year 2007..2025."""
+    """Analysis universe: licensed Japanese LN dropped, est_year 2007..2026."""
     df = pd.read_csv(csv or paths.OUT_DIR / "novels.csv")
     df["upd"] = pd.to_datetime(df["updated_at"], errors="coerce")
     est = eras.estimate(df["id"]).rename(columns={"confidence": "est_conf"})
@@ -237,34 +297,40 @@ def short_supplement(df: pd.DataFrame) -> set[int]:
     return set(cand.sort_values("p_grp", ascending=False).head(SHORT_TOP_N)["id"])
 
 
-def contest_guarantee(df: pd.DataFrame, existing: set[int]) -> tuple[set[int], dict]:
-    """E.9: every named contest keeps at least three seed books.
+def contest_guarantee(df: pd.DataFrame, existing: set[int],
+                      ineligible: set[int] | None = None,
+                      floor: dict[str, int] | None = None) -> tuple[set[int], dict]:
+    """E.31: quota only for contests on the human-curated floor list.
 
-    Covers all contests (IP collabs included), not only the closed IP list.
-    Adds only from `favs >= 5` and `words >= 10_000`, ranked by same-generation
-    `fav_pctl` (ties: favs desc, id asc). Books already in the seed count even
-    if they entered through another channel. Contests with fewer than three
-    total books can only contribute however many exist.
+    The old E.9 rule auto-filled *every* named contest to three books; that
+    imported low-quality noise (especially serial short/medium books) and is
+    removed. Only rows in `seed_contest_floor.jsonl` get a quota, with each
+    row's own `min`. Candidates still clear `favs >= 5`, `words >= 10_000`
+    and `ineligible` up front — including the completion rule, unless that
+    specific nid is on the manual exemption list. Ranking uses same-generation
+    `fav_pctl` (ties: favs desc, id asc); books already in the seed count.
     """
+    if floor is None:
+        floor = contest_floor_specs()
     added: set[int] = set()
     detail: dict[str, dict] = {}
     contest = df["contest"].fillna("").astype(str).str.strip()
-    # E.20: a serialising medium book is never eligible, contest floor included.
-    serial_medium = _form(df).eq("medium") & df["status"].ne("已完结")
-    for name in sorted(contest[contest != ""].unique()):
+    blocked = ineligible or set()
+    for name, minimum in sorted(floor.items()):
         group = df[contest == name]
         held = set(group.loc[group["id"].isin(existing), "id"])
-        need = max(0, min(CONTEST_MIN_PER, len(group)) - len(held))
-        pool = group[(group["favs"] >= CONTEST_MIN_FAVS)
-                     & (group["words"] >= CONTEST_MIN_WORDS)
-                     & (~group["id"].isin(held))
-                     & (~serial_medium.loc[group.index])]
+        eligible = group[~group["id"].isin(blocked)]
+        need = max(0, min(minimum, len(eligible)) - len(held))
+        pool = eligible[(eligible["favs"] >= CONTEST_MIN_FAVS)
+                        & (eligible["words"] >= CONTEST_MIN_WORDS)
+                        & (~eligible["id"].isin(held))]
         picked = set(pool.sort_values(
             ["fav_pctl", "favs", "id"], ascending=[False, False, True]
         ).head(need)["id"])
         added |= picked
-        detail[name] = {"total": len(group), "held": len(held),
-                        "added": len(picked), "need": need,
+        detail[name] = {"total": len(group), "min": minimum,
+                        "eligible_total": int(len(eligible)),
+                        "held": len(held), "added": len(picked), "need": need,
                         "eligible": len(pool)}
     return added, detail
 
@@ -277,11 +343,10 @@ def admit(df: pd.DataFrame, content_end: pd.Timestamp,
     ``active`` / ``gated`` / ``cut`` are computed for diagnostics only and are
     never unioned into ``ids``. See the module docstring for the decision.
 
-    E.11+13: 连载中的 short/medium（弃书，short 同代 pctl≥0.98 豁免）从质量锚
-    剔除；E.20 起中篇无任何豁免（连载中篇一律出局，保底也不例外）。
-    征文保底（E.9）对 short 豁免该规则、仍从全池选书，以保住低完结率比赛的代表性。
-    E.12: `form=invalid`（words<2000 的僵尸书）无收录资格，从质量锚剔除；
-    征文保底候选 words>=1万、天然不碰 invalid，故保底也不带入。
+    E.31: 连载中的 short/medium 在所有世代均无收录资格（2026 中短合并后同样
+    如此），唯一例外是人工清单逐本批准；征文保底仅对人工列名赛事生效，
+    且不得绕过这条完结规则。`form=invalid`（words<2000 的僵尸书）同样无资格。
+    E.32: 人工黑名单逐本排除假短/假中篇，优先级高于人工豁免，保底同样不得带入。
     """
     base = set(df.nlargest(REC_N, "favs")["id"])
     monthly = monthly_ids(df)
@@ -292,19 +357,21 @@ def admit(df: pd.DataFrame, content_end: pd.Timestamp,
     if deep is None:
         deep = set(build_deep_ranks(df, 200)["nid"])
 
-    abandoned = abandoned_ids(df)
+    blacklist = manual_blacklist_ids(df)
+    exempt = manual_exempt_ids(df) - blacklist  # 黑名单优先于豁免
+    floor = contest_floor_specs()
+    abandoned = abandoned_ids(df, exempt=exempt)
     invalid = invalid_ids(df)
     fake_complete = fake_complete_ids(df)
     dead = dead_ids(df)
-    exempt = exempt_from_abandon(df)
-    ineligible = abandoned | invalid | fake_complete | dead
+    ineligible = abandoned | invalid | fake_complete | dead | blacklist
     anchors = (core | short | deep) - ineligible
 
     ids = set(anchors)
-    contest_added, contest_detail = contest_guarantee(df, ids)  # 豁免弃书：全池
-    # 但不豁免 invalid/P10 假完结/死链（这三类 145 本里有 124 本过保底门槛，
-    # 不二次过滤会被征文保底重新加回）。
-    contest_added -= invalid | fake_complete | dead
+    # ineligible 在保底候选池源头就排除；二次过滤保留作防御。
+    contest_added, contest_detail = contest_guarantee(
+        df, ids, ineligible=ineligible, floor=floor)
+    contest_added -= ineligible
     ids |= contest_added
 
     # Diagnostic only: what the retired V2 time gate would have admitted.
@@ -323,9 +390,11 @@ def admit(df: pd.DataFrame, content_end: pd.Timestamp,
         "short": short,
         "contest_added": contest_added,
         "contest_detail": contest_detail,
+        "contest_floor_specs": floor,
         "abandoned": abandoned,
         "abandoned_in_seed": abandoned & ids,
-        "abandon_exempt": exempt,
+        "manual_exempt": exempt,
+        "manual_blacklist": blacklist,
         "invalid": invalid,
         "fake_complete": fake_complete,
         "dead": dead,
@@ -340,7 +409,7 @@ def admit(df: pd.DataFrame, content_end: pd.Timestamp,
 
 
 def postconditions(df: pd.DataFrame, res: dict) -> list[tuple[str, bool, str]]:
-    """Checks the rebuild must assert before shipping (P1-P10).
+    """Checks the rebuild must assert before shipping (P1-P11).
 
     P1/P3 use the **eligible** denominator (连载 short/medium + invalid excluded):
     those books voluntarily lost coverage under E.11/E.12, so counting them as a
@@ -364,17 +433,28 @@ def postconditions(df: pd.DataFrame, res: dict) -> list[tuple[str, bool, str]]:
     # decision, not a regression, so P3 now bounds the *deliberate* loss.
     p3 = cov_new >= cov_old - COVERAGE_TOL
     contest = df["contest"].fillna("").astype(str).str.strip()
-    named = contest != ""
     shortfalls = {}
-    for name, group in df[named].groupby(contest[named]):
-        target = min(CONTEST_MIN_PER, len(group))
+    # E.31: 保底清单是唯一有 quota 的赛事集合；不在清单里的征文没有 P4 门槛。
+    # target 按合格候选数（非 ineligible + 过 favs/words 门槛 + held）封顶，
+    # 避免与 P6/P9/P10 的硬剔除直接冲突。
+    for name in sorted(res["contest_floor_specs"]):
+        group = df[contest == name]
+        detail = res["contest_detail"].get(name, {})
+        eligible_n = detail.get("eligible", 0) + detail.get("held", 0)
+        target = min(res["contest_floor_specs"][name], eligible_n)
         have = int(group["id"].isin(res["ids"]).sum())
         if have < target:
-            shortfalls[name] = {"have": have, "target": target}
+            shortfalls[name] = {"have": have, "target": target,
+                                "eligible": eligible_n}
     p4 = not shortfalls
-    # P5: 弃书只能通过征文保底豁免回到种子；其他渠道一律不得带入。
-    stray = abandoned - res["contest_added"]
-    p5 = not (stray & res["ids"])
+    # P5: 连载 short/medium 零入种；唯一的合法例外是人工豁免清单逐本放行。
+    form_all = _form(df)
+    serial = df["status"].ne("已完结").to_numpy()
+    exempt = res["manual_exempt"]
+    serial_short_medium = set(df.loc[
+        form_all.isin(ABANDON_FORMS).to_numpy() & serial, "id"]) - exempt
+    stray = serial_short_medium & res["ids"]
+    p5 = not stray
     # P6: invalid（<2000 字僵尸 / 越短篇点击天花板的假短篇）在任何渠道都不得入种。
     p6 = not (invalid & res["ids"])
     # P7: 短篇三条天花板（E.17/E.19，用户 App 目验）。回到旧时光 clicks 215,723
@@ -388,11 +468,9 @@ def postconditions(df: pd.DataFrame, res: dict) -> list[tuple[str, bool, str]]:
     over_f = df.loc[short_mask & (df["favs"] > DF.SHORT_MAX_FAVS)]
     over_p = df.loc[short_mask & (df["praises"] > DF.SHORT_MAX_PRAISES)]
     p7 = over_c.empty and over_f.empty and over_p.empty
-    # P8: E.20 中篇必须已完结——连载中篇零入种，征文保底也不例外。
-    form_all = FM.classify(df)
-    serial_medium = set(df.loc[(form_all == "medium").to_numpy()
-                               & df["status"].ne("已完结").to_numpy(), "id"])
-    p8 = not (serial_medium & res["ids"])
+    # P8: E.31 全世代 short/medium 必须已完结——连载书零入种，
+    # 唯一例外是人工豁免清单逐本批准者。与 P5 相互独立复核同一条硬规则。
+    p8 = not stray
     # P9: E.25 Web 死链（详情页「小说不存在」）在任何渠道都不得入种——快照
     #     里它们的收藏/字数都还正常，形态规则看不出异常，只有详情页判活能拦住。
     dead = res["dead"]
@@ -401,6 +479,9 @@ def postconditions(df: pd.DataFrame, res: dict) -> list[tuple[str, bool, str]]:
     #     包括征文保底（124/145 本过保底门槛，靠 contest_added 二次过滤拦住）。
     fake = res["fake_complete"]
     p10 = not (fake & res["ids"])
+    # P11: 人工黑名单（假短/假中篇）在任何渠道零入种，且压过人工豁免。
+    blacklist = res["manual_blacklist"]
+    p11 = not (blacklist & res["ids"])
     return [
         ("P1 合格深榜书全部在种子内", p1,
          f"{len(res['deep'] - ineligible):,} 本合格深榜书，"
@@ -411,14 +492,13 @@ def postconditions(df: pd.DataFrame, res: dict) -> list[tuple[str, bool, str]]:
         ("P3 收藏覆盖回退 ≤ 时间渠道放弃量（合格书口径）", p3,
          f"新 {cov_new:.2%} vs V0 {cov_old:.2%}，差 "
          f"{(cov_new - cov_old)*100:+.2f}pp（容差 {COVERAGE_TOL*100:.1f}pp）"),
-        ("P4 每个征文至少 3 本", p4,
-         f"{len(res['contest_detail'])} 个征文，缺口 "
+        ("P4 人工保底清单内征文达到设定本数", p4,
+         f"清单内 {len(res['contest_detail'])} 个征文，缺口 "
          f"{len(shortfalls)}" + (f"：{shortfalls}" if shortfalls else "")),
-        ("P5 弃书仅经征文保底豁免入种", p5,
-         f"弃书 {len(abandoned):,} 本（另有同代 pctl≥{ABANDON_PCTL_EXEMPT} 豁免 "
-         f"{len(res['abandon_exempt'])} 本经质量锚入种），种子内 "
-         f"{len(res['abandoned_in_seed'])} 本（均须来自征文保底），"
-         f"越界 {len(stray & res['ids'])} 本"),
+        ("P5 连载 short/medium 零入种（仅人工豁免例外）", p5,
+         f"全世代连载短/中篇 {len(serial_short_medium):,} 本（已剔除 "
+         f"{len(exempt)} 本人工豁免），入种 {len(stray)} 本"
+         + (f"：{sorted(stray)[:10]}" if stray else "")),
         ("P6 invalid（僵尸/假短篇）零入种", p6,
          f"invalid {len(invalid):,} 本，入种 {len(invalid & res['ids'])} 本"),
         ("P7 short 层不越短篇三条天花板", p7,
@@ -426,15 +506,18 @@ def postconditions(df: pd.DataFrame, res: dict) -> list[tuple[str, bool, str]]:
          f"{len(over_c)}、越收藏 {len(over_f)}、越点赞 {len(over_p)}"
          + (f"：{(over_c['id'].tolist() + over_f['id'].tolist() + over_p['id'].tolist())[:5]}"
             if not p7 else "")),
-        ("P8 连载中篇零入种（中篇必须已完结）", p8,
-         f"连载中篇 {len(serial_medium):,} 本，入种 "
-         f"{len(serial_medium & res['ids'])} 本"),
+        ("P8 全世代 short/medium 必须已完结（仅人工豁免例外）", p8,
+         f"全世代连载短/中篇 {len(serial_short_medium):,} 本，人工豁免 "
+         f"{len(exempt)} 本，入种 {len(stray)} 本"),
         ("P9 Web 死链零入种（详情页「小说不存在」）", p9,
          f"死链 {len(dead)} 本，入种 {len(dead & res['ids'])} 本"
          + (f"：{sorted(dead & res['ids'])}" if not p9 else "")),
         ("P10 征文含「长篇」的 short/medium 零入种（假完结）", p10,
          f"命中 {len(fake):,} 本，入种 {len(fake & res['ids'])} 本"
          + (f"：{sorted(fake & res['ids'])[:10]}" if not p10 else "")),
+        ("P11 人工黑名单零入种（优先于人工豁免）", p11,
+         f"黑名单 {len(blacklist)} 本，入种 {len(blacklist & res['ids'])} 本"
+         + (f"：{sorted(blacklist & res['ids'])[:10]}" if not p11 else "")),
     ]
 
 
@@ -485,9 +568,9 @@ def main() -> int:
           f"{len(res['deep'] - res['baseline']):,} | missing from V3 "
           f"{len(res['deep'] - res['ids']):,}")
 
-    print(f"\n== 征文保底（每个 >= {CONTEST_MIN_PER} 本）==")
+    print("\n== 征文保底（仅人工清单）==")
     gaps = {k: v for k, v in res["contest_detail"].items() if v["need"] > 0}
-    print(f"named contests {len(res['contest_detail'])} | below floor {len(gaps)} "
+    print(f"listed contests {len(res['contest_detail'])} | below floor {len(gaps)} "
           f"| added {len(res['contest_added'])}")
     for name, d in gaps.items():
         print(f"  {name:24} total {d['total']:4} | before {d['held']:3} "

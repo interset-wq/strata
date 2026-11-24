@@ -1,0 +1,4 @@
+// 人工豁免清单（E.31）：唯一可豁免「short/medium 必须已完结」的通道。
+// 行格式：nid / waive / reason / verified_on。waive 目前只接受 "complete"。
+// 每行一本书；reason 必须写清为什么连载中仍可进种子。空文件即零豁免。
+// 自动豁免（E.13 fav_pctl≥0.98、E.9 征文保底）已全部取消，禁止再引入。

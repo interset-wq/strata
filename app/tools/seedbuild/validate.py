@@ -83,7 +83,7 @@ def check_db(db_path: Path, seed: pd.DataFrame, meta: dict) -> None:
             _fail(errors, f"deep metrics {sorted(deep_metrics)} != expected four")
         bad_deep = conn.execute(
             "SELECT COUNT(*) FROM deep_ranks WHERE pctl IS NULL OR pctl <= 0 OR pctl > 1"
-            " OR rank_no < 1 OR est_year NOT BETWEEN 2007 AND 2025").fetchone()[0]
+            " OR rank_no < 1 OR est_year NOT BETWEEN 2007 AND 2026").fetchone()[0]
         if bad_deep:
             _fail(errors, f"{bad_deep} deep rows have invalid rank/pctl/year")
         pr_gate = conn.execute(
@@ -179,6 +179,25 @@ def check_db(db_path: Path, seed: pd.DataFrame, meta: dict) -> None:
             " ('invalid','short','medium','long','dialogue','ip_collab')").fetchone()[0]
         if bad_form:
             _fail(errors, f"{bad_form} rows have invalid form")
+        # E.31: every non-licensed short/medium book must be 已完结 (the two
+        # official categories merged in 2026); only the human-curated exemption
+        # list may waive. Licensed LNs are a display-only carve-out (user ruling).
+        exempt = set(meta.get("manual_exempt", ()))
+        serial_short = conn.execute(
+            "SELECT nid FROM books WHERE is_licensed=0"
+            " AND form IN ('short','medium')"
+            " AND (status IS NULL OR status <> '已完结')").fetchall()
+        serial_violations = [r["nid"] for r in serial_short
+                             if r["nid"] not in exempt]
+        if serial_violations:
+            _fail(errors, f"serial short/medium in seed: {serial_violations[:10]}")
+        # E.32: human blacklist is an unconditional seed veto (it outranks the
+        # manual exemption list); the DB check spans the whole seed, while the
+        # anchor loader validates nids against the non-licensed universe.
+        blacklist = set(meta.get("manual_blacklist", ()))
+        blacklist_hits = seed.loc[seed["nid"].isin(blacklist), "nid"].tolist()
+        if blacklist_hits:
+            _fail(errors, f"blacklisted nids in seed: {blacklist_hits[:10]}")
         bad_quality = conn.execute(
             "SELECT COUNT(*) FROM books WHERE"
             " (lqs IS NOT NULL AND (lqs <= 0 OR lqs > 1)) OR"
@@ -245,9 +264,9 @@ def check_db(db_path: Path, seed: pd.DataFrame, meta: dict) -> None:
 
         ln_range = conn.execute(
             "SELECT COUNT(*) FROM books WHERE is_licensed=0 AND"
-            " (est_year < 2007 OR est_year > 2025)").fetchone()[0]
+            " (est_year < 2007 OR est_year > 2026)").fetchone()[0]
         if ln_range:
-            _fail(errors, f"{ln_range} non-licensed rows outside 2007..2025")
+            _fail(errors, f"{ln_range} non-licensed rows outside 2007..2026")
 
         sample = conn.execute(
             "SELECT nid, is_licensed, fav_pctl FROM books WHERE nid=2242").fetchone()

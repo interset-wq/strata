@@ -206,14 +206,15 @@ def main() -> int:
         f"深榜锚（P1 强制全入池）与月榜锚；不是对话形态造成的。")
 
     add("")
-    add("## 5. 征文保底（E.9）")
+    add("## 5. 征文保底（E.31 人工清单）")
     add("")
     seed_ids = set(core["id"])
     gaps = {k: v for k, v in res["contest_detail"].items() if v["need"] > 0}
-    add(f"- 全部分母共 **{len(res['contest_detail'])} 个具名征文**"
-        f"（含 6 个封闭 IP 合作）；规则要求每个至少 {SP.CONTEST_MIN_PER} 本，"
+    floor = res["contest_floor_specs"]
+    add(f"- 自动全赛事保底已取消；**{len(floor)} 个征文**由人工写入保底清单"
+        f"（{'、'.join(f'{k}≥{v}' for k, v in sorted(floor.items())) or '当前为空'}）。"
         f"本次从 `favs≥{SP.CONTEST_MIN_FAVS}、字数≥{SP.CONTEST_MIN_WORDS:,}` 的"
-        f"候选中按同代收藏分位补入 **{len(res['contest_added'])} 本**，缺口已清零。")
+        f"合格候选中按同代收藏分位补入 **{len(res['contest_added'])} 本**，缺口已清零。")
     add("")
     add("| 征文 | 全量 | 保底前 | 补入 | 当前 | 合格候选 |")
     add("|---|---:|---:|---:|---:|---:|")
@@ -298,13 +299,14 @@ def main() -> int:
         "favs<5 且 <1 万字的无锚噪声 0；"
         f"收藏覆盖合格书口径 {cov_seed:.2%}（VS V0 {cov_v0:.2%}，"
         f"差 {(cov_seed-cov_v0)*100:+.2f}pp，容差 0.2pp）；"
-        f"{len(res['contest_detail'])} 个征文全部 ≥3 本（E.9）；"
-        f"弃书仅经征文保底豁免入种 {len(res['abandoned_in_seed'])} 本（E.11）；"
+        f"人工保底清单内 {len(res['contest_detail'])} 个征文达标（E.31）；"
+        f"连载短/中篇仅人工豁免可入种，现有 {len(res['abandoned_in_seed'])} 本（E.31）；"
         f"invalid 零入种（E.12）。")
-    add(f"- E.11+13 弃书规则：连载中的短/中篇（{len(res['abandoned']):,} 本）无收录资格，"
-        "读者直觉是「一口气读完」，连载中视为作者弃书；征文保底豁免该规则；"
-        f"E.13 同代 fav_pctl≥0.98 质量豁免 {len(res['abandon_exempt'])} 本"
-        "（status 字段不可靠——24132「回到旧时光」同代前 0.85% 的短篇，作者只是忘了点完结）。")
+    add(f"- E.31 弃书规则：连载中的短/中篇（{len(res['abandoned']):,} 本）无收录资格，"
+        "读者直觉是「一口气读完」，2026 中篇并入短篇后同一条硬规则适用全世代；"
+        "自动征文保底与 fav_pctl 质量豁免均已取消，"
+        f"仅人工清单 {len(res['manual_exempt'])} 本可逐本放行（P5/P8 守门）。"
+        f"E.32 人工黑名单 {len(res['manual_blacklist'])} 本永久剔除，优先于豁免（P11）。")
     add(f"- E.12 僵尸规则：`form=invalid`（words<2000，{len(res['invalid']):,} 本）"
         "无收录资格——app 正常章节最少 2000 字、正常书至少一章，<2000 多为目录"
         "抓取残缺的僵尸书（锚点 4166 辞别黄昏的小镇 words=775）。征文保底候选"
