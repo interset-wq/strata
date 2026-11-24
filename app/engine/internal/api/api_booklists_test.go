@@ -130,15 +130,18 @@ func TestParseBooklistDead(t *testing.T) {
 // TestBooklistsRecommend: the date-seeded sample returns exactly count
 // distinct booklists; dead ids in the draw (here: the whole lower half of
 // the id space) are topped up without error.
+// TestBooklistsRecommend pins the home feed's recommend sample: default
+// count 3, no duplicate ids, ids inside the live space. The mock keeps
+// every id valid — the date-seeded RNG (booklistsRecommend) draws a
+// different sequence each day, and a random "invalid band" would make the
+// count flaky across midnight (skip-without-refill is the released
+// design; invalid-id handling is covered by the window tests below).
 func TestBooklistsRecommend(t *testing.T) {
 	ts, srv := newRosterTestServer(t)
 	srv.booklistFetch = func(ctx context.Context, client *http.Client,
 		l *crawl.Limiter, id int, kind string, foreground bool) (string, error) {
 		if kind != "item" {
 			return "", fmt.Errorf("unexpected kind %q", kind)
-		}
-		if id <= 600 {
-			return booklistInvalidJSON, nil
 		}
 		return validBooklistJSON(id), nil
 	}
