@@ -307,7 +307,6 @@ class _HomePageState extends ConsumerState<HomePage> {
               subtitle: '月票 / 新书 / 热销 / 打赏 · 在线',
               route: '/official-ranks',
             ),
-            _booklistRecommendSection(context),
             _sectionTitle(
               context,
               '连载发现',
@@ -320,6 +319,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               onMore: () => context.push('/finished-random'),
             ),
             _ShowcaseSection(provider: finishedShowcaseProvider(_form)),
+            _booklistRecommendSection(context),
             _sectionTitle(
               context,
               '随便看看',
