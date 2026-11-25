@@ -218,23 +218,28 @@ func EnsureUserDB(path string) error {
 	if err := db.QueryRow("PRAGMA user_version").Scan(&version); err != nil {
 		return fmt.Errorf("read user_version: %w", err)
 	}
-	if version >= userSchemaVersion {
-		return nil
+	if version < userSchemaVersion {
+		if _, err := db.Exec(userSchemaV5); err != nil {
+			return fmt.Errorf("create user schema: %w", err)
+		}
+		if err := migrateV5toV6(db); err != nil {
+			return fmt.Errorf("migrate v5→v6: %w", err)
+		}
+		if err := migrateV7toV8(db); err != nil {
+			return fmt.Errorf("migrate v7→v8: %w", err)
+		}
+		if _, err := db.Exec(fmt.Sprintf("PRAGMA user_version=%d", userSchemaVersion)); err != nil {
+			return err
+		}
 	}
-	if _, err := db.Exec(userSchemaV5); err != nil {
-		return fmt.Errorf("create user schema: %w", err)
-	}
-	if err := migrateV5toV6(db); err != nil {
-		return fmt.Errorf("migrate v5→v6: %w", err)
-	}
-	if err := migrateV7toV8(db); err != nil {
-		return fmt.Errorf("migrate v7→v8: %w", err)
-	}
+	// 幂等加列迁移在基表就绪后无条件重放（列已存在即 no-op）。它们曾经
+	// 只在版本闸门后跑，版本已到位的旧库永远跳过——book_meta 指标列因此
+	// 写不进（2026-11-25 用户报告的"收录后没有计算值"根因）。
 	if err := migrateDiscoveredMetrics(db); err != nil {
 		return fmt.Errorf("migrate discovered metrics: %w", err)
 	}
-	if _, err := db.Exec(fmt.Sprintf("PRAGMA user_version=%d", userSchemaVersion)); err != nil {
-		return err
+	if err := migrateBookMetaMetrics(db); err != nil {
+		return fmt.Errorf("migrate book_meta metrics: %w", err)
 	}
 	return nil
 }
@@ -288,6 +293,26 @@ func migrateDiscoveredMetrics(db *sql.DB) error {
 	for _, c := range cols {
 		if !hasColumn(db, "discovered", c.name) {
 			if _, err := db.Exec("ALTER TABLE discovered ADD COLUMN " +
+				c.name + " " + c.typ); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// migrateBookMetaMetrics adds the same runtime-metric columns to book_meta
+// (app/docs/18-runtime-metrics.md P2): a detail refresh rescores the row in
+// place so collected books carry every derived column the seed books do.
+// Idempotent per-column check, mirroring migrateDiscoveredMetrics.
+func migrateBookMetaMetrics(db *sql.DB) error {
+	cols := []struct{ name, typ string }{
+		{"est_year", "INTEGER"}, {"form", "TEXT"}, {"cqs", "REAL"},
+		{"cqs_state", "TEXT"}, {"cps", "REAL"}, {"len_norm", "REAL"},
+	}
+	for _, c := range cols {
+		if !hasColumn(db, "book_meta", c.name) {
+			if _, err := db.Exec("ALTER TABLE book_meta ADD COLUMN " +
 				c.name + " " + c.typ); err != nil {
 				return err
 			}
