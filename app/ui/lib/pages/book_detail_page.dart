@@ -320,6 +320,11 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                               _badge(context,
                                   s(eff['status'] ?? b['status'])!,
                                   filled: true),
+                            // 价格类型与状态同款徽标，紧随其后（用户 2026-11-25）。
+                            if (s(eff['price_type'] ?? b['price_type']) != null)
+                              _badge(context,
+                                  s(eff['price_type'] ?? b['price_type'])!,
+                                  filled: true),
                             if (onSale)
                               _badge(context, '官方热销', filled: true),
                             if (s(eff['genre'] ?? b['genre']) != null)
@@ -679,7 +684,6 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
             row('形式', s(b['form'])),
             row('入库日期（估计）', s(b['est_date'])),
             row('收录置信度', s(b['est_conf'])),
-            row('价格类型', s(eff['price_type'] ?? b['price_type'])),
             row('比赛', s(b['contest'])),
             row('featured', b['featured'] == true ? '是（编辑精选）' : null),
             row('cqs（质量分）', s(b['cqs'])),
