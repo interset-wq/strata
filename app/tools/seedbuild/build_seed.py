@@ -56,13 +56,22 @@ from deep_ranks import DEEP_COLUMNS, METRICS as DEEP_METRICS  # noqa: E402
 from deep_ranks import TOP_N as DEEP_TOP_N  # noqa: E402
 from deep_ranks import build_deep_ranks, seed_coverage  # noqa: E402
 
+# v10: author boards (docs/author-rank.md). Loaded by file path — generators/
+# is not a package. The module must stay import-light (no out/ artifacts):
+# its CSS/JS preview shell loads lazily inside its own main().
+import importlib.util as _ilu  # noqa: E402
+_ar_spec = _ilu.spec_from_file_location(
+    "author_rank", ANALYSIS / "generators" / "author_rank.py")
+author_rank = _ilu.module_from_spec(_ar_spec)
+_ar_spec.loader.exec_module(author_rank)
+
 ASSETS = REPO / "app" / "assets"
 SCHEMA = Path(__file__).resolve().parent / "schema.sql"
 DATASET = REPO / "dataset" / "out" / "books.jsonl"
 AWARD_CSV = ANALYSIS / "out" / "contest_awards_normalized.csv"
 
-SCHEMA_VERSION = 9  # v9: dropped the four universe percentile columns — device-irrecomputable, no user.db mirror (see schema.sql)
-SEED_VERSION = "20261124.33"  # .33: E.33 补采 2026 春征（tag 789）369 本，按正常世代筛选
+SCHEMA_VERSION = 10  # v10: additive author_ranks table (docs/author-rank.md §9) — stable-output authors per form, top100
+SEED_VERSION = "20261124.34"  # .34: v10 additive author_ranks（无数据变化，仅新增展示表）
 CONTENT_END = pd.Timestamp("2026-11-24")  # 数据集从不全量刷新：标注最近一次部分更新时间，非快照上界
 GEN_MIN, GEN_MAX = 2007, 2026  # E.30: 2026 由"出界"改为正常世代，与其他年份一样走 admit 渠道筛选
 
@@ -478,7 +487,8 @@ def build_frames() -> tuple[pd.DataFrame, dict]:
 
 
 def write_db(seed: pd.DataFrame, meta: dict, db_path: Path,
-             awards: pd.DataFrame) -> dict:
+             awards: pd.DataFrame,
+             author_ranks: list[tuple]) -> dict:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     if db_path.exists():
         db_path.unlink()
@@ -527,6 +537,12 @@ def write_db(seed: pd.DataFrame, meta: dict, db_path: Path,
                 " source_nid) VALUES(?, ?, ?, ?, ?)",
                 [tuple(bind(v) for v in row)
                  for row in awards.itertuples(index=False, name=None)],
+            )
+            conn.executemany(
+                "INSERT INTO author_ranks(form, rank_no, author, rep_nid,"
+                " rep_title) VALUES(?, ?, ?, ?, ?)",
+                [(fm, int(rn), au, int(nid), tt)
+                 for fm, rn, au, nid, tt in author_ranks],
             )
             for table, cols in [
                 ("calib_fav_bounds", ("form", "est_year", "p50", "p75", "p90")),
@@ -579,6 +595,10 @@ def write_db(seed: pd.DataFrame, meta: dict, db_path: Path,
                     ("cps_scored", str(meta["runtime"]["cps_scored"])),
                     ("cqs_mu0", f"{meta['runtime']['mu0']:.6f}"),
                     ("eras_anchor_rows", str(len(meta["eras_anchors"]))),
+                    ("author_rank_rows", str(len(author_ranks))),
+                    ("author_rank_forms",
+                     ",".join(sorted({fm for fm, *_rest in author_ranks}))),
+                    ("author_rank_snapshot", "2026-05-03"),
                 ],
             )
         conn.execute("VACUUM")
@@ -616,12 +636,18 @@ def main() -> int:
     seed, meta = build_frames()
     awards = load_awards()
     meta["awards"] = awards
+    # v10: prebuilt author boards (docs/author-rank.md §9). Build-time only:
+    # the seed ships frozen (form, rank_no, author, rep_nid, rep_title) rows.
+    author_rows = author_rank.app_seed_rows()
+    meta["author_ranks"] = author_rows
     log(f"seed rows: {len(seed)} (quality-anchored admitted {meta['admitted']} + licensed "
         f"{meta['licensed_rows']}; V0 was {V0_SEED})")
     log(f"favs coverage: {meta['favs_coverage']:.2%}")
     log(f"runtime metrics: cqs scored {meta['runtime']['cqs_scored']:,} "
         f"(stable {meta['runtime']['cqs_stable']:,}) | cps scored "
         f"{meta['runtime']['cps_scored']:,} | mu0={meta['runtime']['mu0']:.3f}")
+    log(f"author ranks: {len(author_rows)} rows across "
+        f"{len({r[0] for r in author_rows})} forms (top100/form, docs/author-rank.md)")
     log(f"deep ranks: {len(meta['deep_ranks'])} rows "
         f"({len(DEEP_METRICS)} metrics x top {DEEP_TOP_N}, full universe)")
     log(f"contest awards: {len(awards)} rows "
@@ -630,7 +656,7 @@ def main() -> int:
     work = REPO / "temp" / "seedbuild"
     work.mkdir(parents=True, exist_ok=True)
     db_path = work / "seed.db"
-    info = write_db(seed, meta, db_path, awards)
+    info = write_db(seed, meta, db_path, awards, author_rows)
 
     V.check_db(db_path, seed, meta)
 
@@ -660,6 +686,7 @@ def main() -> int:
             "cqs_scored": meta["runtime"]["cqs_scored"],
             "cqs_stable": meta["runtime"]["cqs_stable"],
             "cps_scored": meta["runtime"]["cps_scored"],
+            "author_rank_rows": len(author_rows),
         },
         "admission_detail": meta["admission_detail"],
         "favs_coverage": round(meta["favs_coverage"], 6),

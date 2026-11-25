@@ -8,9 +8,9 @@ from pathlib import Path
 
 import pandas as pd
 
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 EXPECTED_TABLES = {"books", "book_tags", "seed_meta", "deep_ranks",
-                   "calendar_universe", "contest_awards",
+                   "calendar_universe", "contest_awards", "author_ranks",
                    "calib_fav_bounds", "calib_len_anchors",
                    "calib_cqs_median", "calib_cps_median", "eras_anchors"}
 EXPECTED_INDEXES = {
@@ -119,11 +119,38 @@ def check_db(db_path: Path, seed: pd.DataFrame, meta: dict) -> None:
         if award_meta_row is None or int(award_meta_row[0]) != award_rows:
             _fail(errors, "seed_meta award_rows mismatch")
 
+        # v10 author ranks (docs/author-rank.md §9): additive display table,
+        # zero runtime computation. Guards: expected row count, <= 500 total,
+        # clean fields, rank_no contiguous from 1 per form, meta cross-check.
+        ar_rows = conn.execute("SELECT COUNT(*) FROM author_ranks").fetchone()[0]
+        ar_expected = len(meta.get("author_ranks", []))
+        if ar_rows == 0 or (ar_expected and ar_rows != ar_expected):
+            _fail(errors, f"author_ranks {ar_rows} != expected {ar_expected}")
+        if ar_rows > 500:
+            _fail(errors, f"author_ranks {ar_rows} > 500 (5 forms x 100)")
+        bad_ar = conn.execute(
+            "SELECT COUNT(*) FROM author_ranks WHERE author IS NULL OR author=''"
+            " OR rep_title IS NULL OR rep_title='' OR rep_nid <= 0"
+            " OR form NOT IN ('long','dialogue','medium','short','ip_collab')"
+        ).fetchone()[0]
+        if bad_ar:
+            _fail(errors, f"{bad_ar} author_rank rows with invalid fields")
+        ar_gap = conn.execute(
+            "SELECT COUNT(*) FROM (SELECT form, MAX(rank_no) - MIN(rank_no) + 1"
+            " - COUNT(*) AS missing FROM author_ranks GROUP BY form)"
+            " WHERE missing > 0").fetchone()[0]
+        if ar_gap:
+            _fail(errors, f"{ar_gap} forms with non-contiguous author rank_no")
+        ar_meta_row = conn.execute(
+            "SELECT value FROM seed_meta WHERE key='author_rank_rows'").fetchone()
+        if ar_meta_row is None or int(ar_meta_row[0]) != ar_rows:
+            _fail(errors, "seed_meta author_rank_rows mismatch")
+
         required = {"schema_version", "seed_version", "content_end", "built_at",
                     "book_count", "tag_count", "gen_min", "gen_max", "licensed_count",
                     "deep_metrics", "deep_top_n", "deep_rank_rows", "deep_seed_hit",
                     "award_rows", "calibration_version", "cqs_scored",
-                    "cqs_stable", "cps_scored", "cqs_mu0"}
+                    "cqs_stable", "cps_scored", "cqs_mu0", "author_rank_rows"}
         meta_keys = {r["key"] for r in conn.execute("SELECT key FROM seed_meta")}
         if not required <= meta_keys:
             _fail(errors, f"seed_meta missing {sorted(required - meta_keys)}")
