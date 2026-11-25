@@ -313,6 +313,7 @@ type RankItem struct {
 	EstDate  *string  `json:"est_date,omitempty"`
 	Favs     *int64   `json:"favs"`
 	CQS      *float64 `json:"cqs,omitempty"`
+	CPS      *float64 `json:"cps,omitempty"`
 	CQSState string   `json:"cqs_state,omitempty"`
 	Contest  *string  `json:"contest"`
 	CoverURL *string  `json:"cover_url"`
@@ -982,6 +983,98 @@ func (s *Store) cpsMidBand(ctx context.Context, form string) (lo, hi float64, ok
 		return 0, 0, false
 	}
 	return lo, hi, true
+}
+
+// QuantBooks lists the quantitative boards (user 2026-11-25: custom metrics
+// publish their own boards; the classic list is off-limits for modification;
+// app/docs/18 red-line revision): board "cqs" = 口碑榜 (cqs DESC, NULLs out,
+// cqs_state evidence strength — red line 4: no exact ranks), board "cps" =
+// 位置榜 (cps DESC, NULLs out). form is a hard prerequisite (red line 1);
+// the page currently ships form=long only. Candidate pool is the three-source
+// union seed books (is_licensed=0) ∪ scored discovered ∪ collected book_meta
+// (nid-deduped, collected-books-equality); unlike the recommend stream there
+// is NO cps mid-band / cover filter — boards rank the full pool.
+func (s *Store) QuantBooks(ctx context.Context, form, board string,
+	limit, offset int) ([]RankItem, error) {
+	if board != "cqs" && board != "cps" {
+		return nil, fmt.Errorf("unsupported quant board %q", board)
+	}
+	score := "cqs"
+	if board == "cps" {
+		score = "cps"
+	}
+	// P2: score discovered rows first, then fold them in (same path as the
+	// recommend stream — collected/detail-fetched books must appear here).
+	if err := s.scorePendingDiscovered(ctx); err != nil {
+		return nil, err
+	}
+	q := `SELECT * FROM (
+  SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
+         seed.books.est_year, seed.books.status, seed.books.price_type,
+         seed.books.words, seed.books.clicks, seed.books.favs,
+         seed.books.cqs, seed.books.cps, seed.books.cqs_state,
+         COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url
+  FROM seed.books
+  LEFT JOIN covers c ON c.nid = seed.books.nid
+  WHERE seed.books.is_licensed = 0 AND seed.books.form = ?
+    AND seed.books.` + score + ` IS NOT NULL
+  UNION ALL
+  SELECT discovered.nid, discovered.title, discovered.author, discovered.genre,
+         discovered.est_year, NULL, NULL, discovered.words, NULL,
+         discovered.favs, discovered.cqs, discovered.cps,
+         discovered.cqs_state,
+         COALESCE(c.cover, NULLIF(discovered.cover_url, '')) AS cover_url
+  FROM discovered
+  LEFT JOIN covers c ON c.nid = discovered.nid
+  WHERE discovered.form = ? AND discovered.` + score + ` IS NOT NULL
+  UNION ALL
+  SELECT book_meta.nid, book_meta.title, book_meta.author, book_meta.genre,
+         book_meta.est_year, NULL, book_meta.price_type, book_meta.words,
+         NULL, book_meta.favs, book_meta.cqs, book_meta.cps,
+         book_meta.cqs_state,
+         COALESCE(c.cover, NULLIF(book_meta.cover_url, '')) AS cover_url
+  FROM book_meta
+  LEFT JOIN covers c ON c.nid = book_meta.nid
+  WHERE book_meta.form = ? AND book_meta.` + score + ` IS NOT NULL
+    AND book_meta.nid NOT IN (SELECT nid FROM discovered)
+) ORDER BY ` + score + ` DESC, nid ASC LIMIT ? OFFSET ?`
+	rows, err := s.DB.QueryContext(ctx, q, form, form, form, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := make([]RankItem, 0, limit)
+	for rows.Next() {
+		var (
+			item                     RankItem
+			gen, status, price, cover sql.NullString
+			words, clicks, favs       sql.NullInt64
+			cqs, cps                  sql.NullFloat64
+			state                     sql.NullString
+		)
+		if err := rows.Scan(&item.NID, &item.Title, &item.Author, &gen,
+			&item.EstYear, &status, &price, &words, &clicks, &favs,
+			&cqs, &cps, &state, &cover); err != nil {
+			return nil, err
+		}
+		item.Rank = len(items) + offset + 1
+		item.Genre = strPtr(gen)
+		item.Status = strPtr(status)
+		item.PriceType = strPtr(price)
+		item.Words = intPtr(words)
+		item.Clicks = intPtr(clicks)
+		item.Favs = intPtr(favs)
+		item.CQS = floatPtr(cqs)
+		item.CPS = floatPtr(cps)
+		item.CQSState = state.String
+		item.CoverURL = strPtr(cover)
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	s.attachTags(ctx, items)
+	return items, nil
 }
 
 // parseScoreCursor decodes the "score|nid" keyset cursor of the cqs/clx

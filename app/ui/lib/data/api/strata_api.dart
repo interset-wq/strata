@@ -254,6 +254,29 @@ class StrataApi {
         .toList();
   }
 
+  /// 量化榜单页（用户 2026-11-25）：board cqs=口碑榜 / cps=位置榜，form 硬
+  /// 前置（目前仅 long），offset 分页（同经典榜）。
+  Future<({List<RankItem> items, Map<String, dynamic> meta})> quantList({
+    String board = 'cqs',
+    String form = 'long',
+    int limit = 30,
+    int offset = 0,
+  }) async {
+    final body = await _get('/quant', {
+      'board': board,
+      'form': form,
+      'limit': '$limit',
+      'offset': '$offset',
+    }) as Map<String, dynamic>;
+    final items = ((body['items'] as List?) ?? const [])
+        .map((e) => RankItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+    return (
+      items: items,
+      meta: (body['meta'] as Map?)?.cast<String, dynamic>() ?? const {}
+    );
+  }
+
   Future<DiscoverPage> discover({
     String? cursor,
     String? form,
@@ -1285,6 +1308,10 @@ class RankItem {
   /// 定年日期（YYYY-MM-DD）：作者页时间轴用（est_date）；旧端点不返回此字段。
   final String? estDate;
 
+  /// 量化指标（量化榜单页，用户 2026-11-25）：cqs 口碑分 / cps 位置分。
+  final double? cqs;
+  final double? cps;
+
   /// 证据强度（app/docs/18-runtime-metrics.md）：'stable'/'low'，仅 cqs 流
   /// 返回；其余端点为空串。
   final String cqsState;
@@ -1305,6 +1332,8 @@ class RankItem {
       clicks = m['clicks'] as int?,
       praises = (m['praises'] as num?)?.toInt(),
       form = m['form'] as String? ?? '',
+      cqs = m['cqs'] as double?,
+      cps = m['cps'] as double?,
       estDate = m['est_date'] as String?,
       cqsState = m['cqs_state'] as String? ?? '',
       tags = ((m['tags'] as List?) ?? const [])

@@ -159,6 +159,7 @@ func NewServer(s *store.Store) *Server {
 	group.GET("/rankings/favs", srv.rankingFavs)
 	group.GET("/rankings/board", srv.rankingBoard)
 	group.GET("/rankings/classic", srv.rankingClassic)
+	group.GET("/quant", srv.quant)
 	group.GET("/discover", srv.discover)
 	group.GET("/recommend", srv.recommend)
 	group.GET("/rankings/deep", srv.rankingDeep)
@@ -931,6 +932,52 @@ func (s *Server) rankingClassic(c *gin.Context) {
 			"contest": contest, "form": form, "year": year,
 			"tag": c.Query("tag"), "ptype": ptype,
 			"order": order, "dir": dirEcho, "licensed_excluded": true,
+		},
+		"items": items,
+	})
+}
+
+// quant serves the quantitative boards page (user 2026-11-25: custom metrics
+// publish their own boards; the classic list is off-limits for modification).
+// board=cqs 口碑榜 (cqs DESC, evidence strength, no exact ranks), board=cps
+// 位置榜 (cps DESC); form defaults to long and is a hard prerequisite.
+func (s *Server) quant(c *gin.Context) {
+	limit, ok := parseLimit(c)
+	if !ok {
+		return
+	}
+	offset := 0
+	if raw := c.Query("offset"); raw != "" {
+		var err error
+		if offset, err = strconv.Atoi(raw); err != nil || offset < 0 {
+			fail(c, http.StatusBadRequest, "invalid_argument",
+				"offset must be a non-negative integer")
+			return
+		}
+	}
+	board := c.Query("board")
+	if board == "" {
+		board = "cqs"
+	}
+	if board != "cqs" && board != "cps" {
+		fail(c, http.StatusBadRequest, "invalid_argument",
+			"board must be \"cqs\" or \"cps\"")
+		return
+	}
+	form := c.Query("form")
+	if form == "" {
+		form = "long"
+	}
+	items, err := s.store.QuantBooks(c.Request.Context(), form, board,
+		limit, offset)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"meta": gin.H{
+			"kind": "quant", "board": board, "form": form,
+			"licensed_excluded": true,
 		},
 		"items": items,
 	})

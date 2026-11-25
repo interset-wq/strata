@@ -547,6 +547,29 @@ func TestClassicTagPtypeFilters(t *testing.T) {
 // TestRecommendCQS pins the cqs-scored quantitative stream (app/docs/
 // 18-runtime-metrics.md): form isolation, the cps mid-band screen, the clx
 // runtime re-rank by k, the evidence label, and the score|nid keyset cursor.
+func TestQuantBooks(t *testing.T) {
+	st := openTestStore(t)
+	ctx := context.Background()
+	if _, err := st.QuantBooks(ctx, "long", "praise", 10, 0); err == nil {
+		t.Fatal("unsupported quant board must error")
+	}
+	for _, board := range []string{"cqs", "cps"} {
+		items, err := st.QuantBooks(ctx, "long", board, 100, 0)
+		if err != nil {
+			t.Fatalf("board=%s: %v", board, err)
+		}
+		// NULL 不进榜：排序分必须非 nil（IS NOT NULL 门）。
+		for _, it := range items {
+			if board == "cqs" && it.CQS == nil {
+				t.Fatalf("board=cqs: NULL cqs leaked: nid=%d", it.NID)
+			}
+			if board == "cps" && it.CPS == nil {
+				t.Fatalf("board=cps: NULL cps leaked: nid=%d", it.NID)
+			}
+		}
+	}
+}
+
 func TestRecommendCQS(t *testing.T) {
 	st := openTestStore(t)
 	ctx := context.Background()

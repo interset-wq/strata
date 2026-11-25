@@ -18,6 +18,7 @@ import '../pages/history_page.dart';
 import '../pages/eras_explorer_page.dart';
 import '../pages/home_page.dart';
 import '../pages/ip_books_page.dart';
+import '../pages/quant_list_page.dart';
 import '../pages/calendar_page.dart';
 import '../pages/search_page.dart';
 import '../pages/image_viewer_page.dart';
@@ -223,6 +224,10 @@ final router = GoRouter(
         title: '随机对话 · 100 本',
         form: 'dialogue',
       ),
+    ),
+    GoRoute(
+      path: '/quant-list',
+      builder: (_, _) => const QuantListPage(),
     ),
     GoRoute(
       path: '/classic-list',

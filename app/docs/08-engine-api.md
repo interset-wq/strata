@@ -299,6 +299,20 @@ discovered 中已评分的库外书以同键并流——详情抓取写回后运
 已切换至本端点；`/discover` 保持 clicks 展示流口径不变
 （端点保真、展示层裁剪的同一政策）。
 
+### GET /strata/quant?form=&board=&limit=&offset=（**已实现**，2026-11-25）
+
+量化榜单页（用户 2026-11-25 裁定：自定义指标独立出榜，**经典榜单禁止修改**；
+app/docs/18 红线修订）：`board=cqs` 为**口碑榜**（form 内 `cqs DESC`，NULL 不进榜，
+items 带 `cqs_state`（stable/low）证据强度——18 §2 红线 4：不展示精确名次）；
+`board=cps` 为**位置榜**（form 内 `cps DESC`，NULL 不进榜；替代旧「不发榜」裁定）。
+**form 是硬前置**（18 §2 红线 1）：页面目前仅发布 form=long（缺省 long；
+short/medium/IP 无 cqs 证据）。候选池 = 三源并集（种子书 `is_licensed=0`
+∪ 已评分 discovered ∪ 收录 book_meta，按 nid 去重——收录均等原则）；
+**无** cps 中层带过滤、**无**封面硬门槛（榜单全量排序，非发现流，区别于
+`/recommend`）；平台累计值（clicks/favs/praises）不进 ORDER BY（docs/12 红线）。
+offset 分页（同 `/rankings/classic`）；`meta.kind="quant"`，回显 `board`/`form`，
+`licensed_excluded=true`。clx 篇幅偏好不属于榜单（18 §2 红线 5），本端点不接受 `k`。
+
 ### GET/POST/PUT/DELETE /strata/watchlist（**已实现**，v6 起统一书架）
 
 用户兴趣的唯一列表（docs/02 §v6：本 app 无阅读功能，书架并入 watchlist——

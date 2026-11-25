@@ -705,7 +705,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     final entries = [
       (Icons.bookmarks, '书单', '/booklists'),
       (Icons.update, '状态', '/browse?mode=status'),
-      (Icons.emoji_events, '比赛', '/contests'),
+      (Icons.insights, '量化榜单', '/quant-list'),
       (
         Icons.leaderboard,
         '经典榜单',
