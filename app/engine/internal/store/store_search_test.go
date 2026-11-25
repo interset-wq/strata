@@ -2,23 +2,30 @@ package store
 
 import "testing"
 
-// TestParseNIDQuery pins the nid-search boundary: 4+ all-digit queries are
-// exact id lookups; 1–3 digit strings, non-digit chars and int64 overflow
-// all stay on the keyword path (docs/08 §search).
+// TestParseNIDQuery pins the nid-search boundary: only a '#' prefix is an
+// exact id lookup; bare numbers, non-digit chars and int64 overflow all stay
+// on the keyword path (docs/08 §search).
 func TestParseNIDQuery(t *testing.T) {
 	cases := []struct {
-	q  string
-	n  int64
-	ok bool
+		q  string
+		n  int64
+		ok bool
 	}{
 		{"", 0, false},
+		{"#", 0, false},
+		{"#7", 7, true},
+		{"#999", 999, true},
+		{"#1000", 1000, true},
+		{"#705464", 705464, true},
+		{"#12a4", 0, false},
+		{"#10 1", 0, false},
+		{"#-5", 0, false},
+		{"#99999999999999999999", 0, false}, // int64 overflow
 		{"7", 0, false},
 		{"999", 0, false},
-		{"1000", 1000, true},
-		{"705464", 705464, true},
+		{"1000", 0, false},
+		{"705464", 0, false},
 		{"12a4", 0, false},
-		{"10 1", 0, false},
-		{"99999999999999999999", 0, false}, // int64 overflow
 	}
 	for _, c := range cases {
 		if n, ok := parseNIDQuery(c.q); n != c.n || ok != c.ok {

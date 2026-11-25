@@ -39,12 +39,13 @@ class _SearchPageState extends ConsumerState<SearchPage> {
   static final RegExp _nidLink =
       RegExp(r'sfacg\.com/(?:Novel|b)/(\d+)', caseSensitive: false);
 
-  /// 查询规范化：粘贴进来的 SFACG 书籍链接自动提取 nid，走 nid 精确找书；
-  /// 纯数字与其余输入原样。
+  /// 查询规范化：粘贴进来的 SFACG 书籍链接自动提取 nid 转成 #id；
+  /// #id 是唯一的 nid 精确搜索入口，其余输入（含纯数字）原样走关键词。
   String _normalizeQuery(String raw) {
-    if (RegExp(r'^\d+$').hasMatch(raw)) return raw;
+    if (raw.startsWith('#')) return raw;
     final m = _nidLink.firstMatch(raw);
-    return m?.group(1) ?? raw;
+    if (m != null) return '#${m.group(1)}';
+    return raw;
   }
 
   void _submit(String v) {
@@ -98,7 +99,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
         title: TextField(
           controller: _controller,
           decoration: InputDecoration(
-            hintText: '搜索书名 / 作者 / nid（内置库）',
+            hintText: '搜索书名、作者或 #id（内置库）',
             border: InputBorder.none,
             suffixIcon: _query == null
                 ? null
@@ -134,7 +135,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
           Icon(Icons.search,
               size: 56, color: scheme.onSurfaceVariant.withValues(alpha: .5)),
           const SizedBox(height: 12),
-          Text('搜索书名 / 作者 / nid（内置库）',
+          Text('搜索书名、作者或 #id（内置库）',
               style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
           const SizedBox(height: 20),
           history.when(
@@ -184,18 +185,20 @@ class _SearchPageState extends ConsumerState<SearchPage> {
       itemBuilder: (_, i) {
         if (i < list.length) return _localCard(context, scheme, list[i]);
         i -= list.length;
-        if (nidMiss && i == 0) return _nidMissCard(context, scheme, _query!);
+        if (nidMiss && i == 0) {
+          return _nidMissCard(context, scheme, _query!.substring(1));
+        }
         i -= 1;
         return _remoteRow(context, scheme, i, list.length);
       },
     );
   }
 
-  /// nid 查询判定（与引擎侧同规则：≥4 位纯数字 = 按 id 精确找书；
-  /// 1–3 位数字仍走关键词，避免把「7」当成 id）。
+  /// nid 查询判定（与引擎侧同规则：仅 # 前缀 = 按 id 精确找书；
+  /// 纯数字与其他输入一律走关键词）。
   bool _isNIDQuery(String? q) {
-    if (q == null || q.length < 4) return false;
-    for (final r in q.runes) {
+    if (q == null || !q.startsWith('#') || q.length < 2) return false;
+    for (final r in q.substring(1).runes) {
       if (r < 0x30 || r > 0x39) return false;
     }
     return true;

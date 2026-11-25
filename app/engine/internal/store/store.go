@@ -1912,19 +1912,20 @@ SELECT nid, tag FROM seed.book_tags WHERE nid IN (%s) ORDER BY tag`,
 // Search is the L1 local search over the bundled seed (title/author LIKE).
 // Licensed books are included: they are searchable and detail-visible by
 // design, just excluded from percentile rankings.
-// parseNIDQuery decodes an exact nid search: an all-digit query of 4+ chars
-// (SFACG nids are 4+ digits; 1–3 digit strings stay keyword search — a bare
-// "7" is far more likely a word than an id). 0,false = keyword path.
+// parseNIDQuery decodes an exact nid search: only a '#' prefix (e.g.
+// "#123") marks an id search (user 2026-11-25) — bare numbers and every
+// other query are keyword searches. 0,false = keyword path.
 func parseNIDQuery(q string) (int64, bool) {
-	if len(q) < 4 {
+	if len(q) < 2 || q[0] != '#' {
 		return 0, false
 	}
-	for i := 0; i < len(q); i++ {
-		if q[i] < '0' || q[i] > '9' {
+	digits := q[1:]
+	for i := 0; i < len(digits); i++ {
+		if digits[i] < '0' || digits[i] > '9' {
 			return 0, false
 		}
 	}
-	n, err := strconv.ParseInt(q, 10, 64)
+	n, err := strconv.ParseInt(digits, 10, 64)
 	if err != nil {
 		return 0, false
 	}
