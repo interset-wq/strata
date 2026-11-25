@@ -332,11 +332,6 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                                   s(eff['genre'] ?? b['genre'])!),
                             if (s(b['est_year']) != null)
                               _badge(context, '${s(b['est_year'])} 代'),
-                            // 获奖徽标（schema v5，docs §6）：{edition} · {award|征文获奖}，
-                            // edition 原样显示不走映射表，多届并列；永不参与排序/打分。
-                            for (final aw in d.awards)
-                              _badge(context,
-                                  '${aw.edition} · ${aw.displayAward}'),
                           ],
                         ),
                       ],
@@ -371,6 +366,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                 ),
               // 六指标格：点击/收藏/点赞/字数（短评/长评来自观测，种子无）
               _metricGrid(context, eff, b),
+              if (d.awards.isNotEmpty) _contestCards(context, d),
               _pctlCard(context, b),
               _metaCard(context, d, eff, b),
               const SizedBox(height: 12),
@@ -612,6 +608,40 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
           ),
       ],
     );
+  }
+
+  /// 比赛信息卡片（用户 2026-11-25）：每届获奖一张卡，点击跳转赛事档案
+  /// 并定位到对应分类 tab。edition → series 用最粗的字面判定即可。
+  Widget _contestCards(BuildContext context, BookDetail d) {
+    return Column(
+      children: [
+        for (final aw in d.awards)
+          Card(
+            margin: const EdgeInsets.only(top: 8),
+            child: ListTile(
+              dense: true,
+              leading: Icon(Icons.emoji_events,
+                  color: Colors.amber.shade700, size: 22),
+              title: Text('${aw.edition} ${aw.displayAward}',
+                  style: const TextStyle(fontSize: 13.5)),
+              trailing:
+                  const Icon(Icons.chevron_right, size: 18),
+              onTap: () => context
+                  .push('/contests?tab=${_contestTab(aw.edition)}'),
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// 届次字面 → 赛事档案 tab：春/秋/冬直接认字，其余含 x 归 x征，
+  /// 萌神/无法识别的归「其他」。
+  static String _contestTab(String edition) {
+    if (edition.contains('春')) return 'spring';
+    if (edition.contains('秋')) return 'autumn';
+    if (edition.contains('冬')) return 'winter';
+    if (edition.toLowerCase().contains('x')) return 'x';
+    return 'other';
   }
 
   /// PR 指标卡（E.30：同代分位列已退役；PR = 赞/藏，端上可重算的比值

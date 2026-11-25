@@ -17,7 +17,8 @@ import '../widgets/contest_row_card.dart';
 /// 数据源 = seed 内置库的 contest 字段标注（平台标注，非官方全量参赛
 /// 规模——库外规模见档案页「查看官方清单」）。
 class ContestListPage extends ConsumerStatefulWidget {
-  const ContestListPage({super.key});
+  const ContestListPage({super.key, this.initialTab});
+  final String? initialTab;
 
   @override
   ConsumerState<ContestListPage> createState() => _ContestListPageState();
@@ -43,6 +44,9 @@ class _ContestListPageState extends ConsumerState<ContestListPage>
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: _tabs.length, vsync: this);
+    // 详情页比赛卡片跳转：按 series 定位到对应分类 tab（用户 2026-11-25）。
+    final idx = _tabs.indexWhere((t) => t.$1 == widget.initialTab);
+    if (idx > 0) _tabCtrl.index = idx;
     _tabCtrl.addListener(() => setState(() {}));
     _scroll.addListener(() {
       final show = _scroll.hasClients && _scroll.offset > 500;

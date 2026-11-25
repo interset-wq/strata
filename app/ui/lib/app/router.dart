@@ -78,7 +78,8 @@ final router = GoRouter(
           routes: [
             GoRoute(
               path: '/contests',
-              builder: (_, _) => const ContestListPage(),
+              builder: (context, state) => ContestListPage(
+                  initialTab: state.uri.queryParameters['tab']),
             ),
           ],
         ),
@@ -145,7 +146,8 @@ final router = GoRouter(
     // 库外参赛规模/获奖属 P1 清单 API。
     GoRoute(
       path: '/contests',
-      builder: (_, _) => const ContestListPage(),
+      builder: (context, state) => ContestListPage(
+          initialTab: state.uri.queryParameters['tab']),
     ),
     // 官方清单（形态二，按需 + 引擎按页缓存）；静态段必须在
     // /contests/:name 之前注册，否则 'roster' 会被当赛事名吃掉。
