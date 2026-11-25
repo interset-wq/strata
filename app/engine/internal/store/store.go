@@ -499,7 +499,13 @@ WHERE seed.books.is_licensed = 0`
 		item.CoverURL = strPtr(cover)
 		items = append(items, item)
 	}
-	return items, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	// 与 scanRankItems 同口径：tags 批查附加（用户 2026-11-25：榜单行
+	// 要显示 book_tags，此前此处漏接导致 tags 恒空）。
+	s.attachTags(ctx, items)
+	return items, nil
 }
 
 type DeepRankItem struct {
