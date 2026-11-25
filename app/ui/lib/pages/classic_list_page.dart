@@ -745,7 +745,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
           child: Wrap(
             spacing: 8,
-            runSpacing: 8,
+            runSpacing: 4,
             children: [
               _tagChip('全部', _tags.isEmpty, null),
               for (final t in selectedTags) _tagChip(t.name, true, t.name),
@@ -773,24 +773,41 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
     );
   }
 
-  Widget _tagChip(String label, bool selected, String? name) {
-    return FilterChip(
-      showCheckmark: false,
-      label: Text(label, style: const TextStyle(fontSize: 12)),
-      selected: selected,
-      onSelected: (_) => name == null ? _pickTags(const []) : _toggleTag(name),
+  // 统一 chip 视觉（用户 2026-11-25）：选中实心填充白字、未选细描边灰字；
+  // 单选（状态/价格/题材）与多选（标签）共用同一套配色，不再混用
+  // ChoiceChip/FilterChip 的默认皮肤。
+  Widget _chipBase(String label, bool selected, VoidCallback onTap) {
+    final scheme = Theme.of(context).colorScheme;
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected ? scheme.primary : null,
+          border: selected
+              ? null
+              : Border.all(color: scheme.outline.withValues(alpha: .45)),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: selected ? Colors.white : scheme.onSurfaceVariant,
+          ),
+        ),
+      ),
     );
   }
 
+  Widget _tagChip(String label, bool selected, String? name) {
+    return _chipBase(label, selected,
+        () => name == null ? _pickTags(const []) : _toggleTag(name));
+  }
+
   Widget _chip(String label, bool selected, void Function() onTap) {
-    return ChoiceChip(
-      // 用户 2026-11-21：选中不显示 ✔（组件默认 showCheckmark:true），
-      // 选中态靠填充底色表达——与 SegmentedButton 口径一致。
-      showCheckmark: false,
-      label: Text(label, style: const TextStyle(fontSize: 12)),
-      selected: selected,
-      onSelected: (_) => onTap(),
-    );
+    return _chipBase(label, selected, onTap);
   }
 
   @override
@@ -861,7 +878,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                         '状态',
                         Wrap(
                           spacing: 8,
-                          runSpacing: 8,
+                          runSpacing: 4,
                           children: [
                             _chip(
                               '全部',
@@ -888,7 +905,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                         '价格',
                         Wrap(
                           spacing: 8,
-                          runSpacing: 8,
+                          runSpacing: 4,
                           children: [
                             _chip(
                               '全部',
@@ -915,10 +932,10 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                         '题材',
                         Wrap(
                           spacing: 8,
-                          runSpacing: 8,
+                          runSpacing: 4,
                           children: [
                             _chip(
-                              '全部题材',
+                              '全部',
                               _genre == null,
                               () => _pick(
                                 () => _genre = null,
