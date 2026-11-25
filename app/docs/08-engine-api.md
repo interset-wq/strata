@@ -191,9 +191,9 @@ form **且有封面**（covers 观测或 seed `cover_url` 非空）的书按
 
 短篇 tab 年份榜入口：`form` 必填（同 `/banner` 的枚举校验），池按
 `est_year` 聚合（`est_year DESC`）。返回 `total`（池总量）+
-`groups: [{year, count}]`。原用途 = `/classic-list` 年份榜页的**年份
-bottom sheet**（用户 2026-11-19 定）；2026-11-21 筛选面板化后经典页
-年份值改走 `/facets`，本端点保留。
+`groups: [{year, count}]`。用途 = `/classic-list` 顶部**年份轴横向条**
+（全部 + 各年，用户 2026-11-25 定；年份高频切换，不放进筛选面板）。
+2026-11-21–24 曾临时走 `/facets`，现恢复使用本端点。
 
 ### GET /strata/genre-groups?form=（**已实现**）
 
@@ -264,10 +264,10 @@ RankItem（含 `form`），`meta.ordering` 回显实际排序
 短篇 tab（docs/form-definitions §4 收录资格）的年份榜/比赛榜/题材榜/优质榜
 以 `form=short[&year=Y|&contest=X|&genre=G]` 调本端点（不带
 status——种子层已实施完结条款，池本身已干净）。入口**不做中间页**：
-直达 `/classic-list` 榜单页，页内两类控件——比赛赛道 = Drawer（侧滑
-面板，大池要搜索），五维筛选（状态/价格/年份/题材/标签）= 统一筛选
-BottomSheet（用户 2026-11-21：所有经典榜单页共用；旧年份 ModalBottomSheet
-/ 题材 FilterChip 行并入筛选面板）、
+直达 `/classic-list` 榜单页，页内控件——年份 = 顶部固定横向条
+（`/year-groups`，全部 + 各年，一键切换）、比赛赛道 = Drawer（侧滑
+面板，大池要搜索）、四维筛选（状态/价格/题材/标签）= 统一筛选
+BottomSheet（用户 2026-11-25：年份移出后所有经典榜单页共用）、
 指标 = SegmentedButton（用户 2026-11-21：短篇 tab「经典榜单」入口
 `metric-switchable=1`，点击/收藏/点赞/字数四榜页内切换，20 本/页上滑加载）。
 

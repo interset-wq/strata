@@ -25,27 +25,33 @@ final boardProvider = FutureProvider.autoDispose.family<List<RankItem>, String>(
 /// 三个 showcase 均不 autoDispose：ListView 懒构建下分区滚出视口缓存区
 /// 即卸载子树，autoDispose 会在滚回时重抽随机批（2026-11-24 用户报告
 /// 的滑动换批回归）；常驻后重掷只走下拉刷新的 invalidate。
-final serialShowcaseProvider = FutureProvider
-    .family<List<RankItem>, String>((ref, form) async {
-      final handle = await ref.watch(bootProvider.future);
-      return handle.api.randomBooks(limit: 8, status: 'serial', form: form);
-    });
+final serialShowcaseProvider = FutureProvider.family<List<RankItem>, String>((
+  ref,
+  form,
+) async {
+  final handle = await ref.watch(bootProvider.future);
+  return handle.api.randomBooks(limit: 8, status: 'serial', form: form);
+});
 
 /// 完结精选：形态照搬连载发现——从完结长篇中均匀抽样 8 本，
 /// 下拉刷新换一批，更多入口进 100 本二级页。
-final finishedShowcaseProvider = FutureProvider
-    .family<List<RankItem>, String>((ref, form) async {
-      final handle = await ref.watch(bootProvider.future);
-      return handle.api.randomBooks(limit: 8, status: 'finished', form: form);
-    });
+final finishedShowcaseProvider = FutureProvider.family<List<RankItem>, String>((
+  ref,
+  form,
+) async {
+  final handle = await ref.watch(bootProvider.future);
+  return handle.api.randomBooks(limit: 8, status: 'finished', form: form);
+});
 
 /// 随便看看：形态照搬连载发现——从 60 万字以上的大书中均匀抽样 8 本
 ///（不限连载/完结），下拉刷新换一批，更多入口进 100 本二级页。
-final browseShowcaseProvider = FutureProvider
-    .family<List<RankItem>, String>((ref, form) async {
-      final handle = await ref.watch(bootProvider.future);
-      return handle.api.randomBooks(limit: 8, status: 'browse', form: form);
-    });
+final browseShowcaseProvider = FutureProvider.family<List<RankItem>, String>((
+  ref,
+  form,
+) async {
+  final handle = await ref.watch(bootProvider.future);
+  return handle.api.randomBooks(limit: 8, status: 'browse', form: form);
+});
 
 /// 首页：编辑精选轮播 → 入口宫格 → 分类找书 → 继续浏览。
 /// 不暴露种子统计——定位是找书 App（用户反馈 2026-11-17）。
@@ -892,7 +898,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         '>15 万字',
         listPath('长对话', '&words-band=long'),
       ),
-      (Icons.calendar_month, '年份榜', '筛选面板里选年份', listPath('年份榜', '')),
+      (Icons.calendar_month, '年份榜', '顶部年份条切换', listPath('年份榜', '')),
       (
         Icons.emoji_events,
         '比赛榜',

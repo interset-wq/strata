@@ -9,10 +9,10 @@ import '../widgets/book_row_tile.dart';
 /// 通用榜单列表页（各 tab 入口的落点）：classic 端点 + 任意维度 +
 /// order（favs=收藏降序，pct=同代分位降序，docs/form-definitions §6
 /// 优质口径）。20 本/页上滑加载。
-/// 页内两类控件（用户 2026-11-21 定）：比赛赛道 = Drawer（侧滑面板，
-/// 大池要搜索）；五维筛选（状态/价格/年份/题材/标签）= 统一筛选
-/// BottomSheet（AppBar filter_list 按钮 + 激活计数角标）。旧的年份
-/// bottom sheet / 题材 chip 行并入筛选面板（docs/16）。
+/// 页内控件：年份 = 顶部固定横向 chip 条（高频榜单轴，常驻）；
+/// 比赛赛道 = Drawer（侧滑面板，大池要搜索）；四维筛选（状态/价格/
+/// 题材/标签）= 统一筛选 BottomSheet（AppBar filter_list 按钮 + 激活
+/// 计数角标）。年份不再进筛选面板（2026-11-25，docs/16）。
 class ClassicListPage extends ConsumerStatefulWidget {
   final String title;
   final String form;
@@ -41,7 +41,7 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
   final _scroll = ScrollController();
   final _drawerSearch = TextEditingController();
   bool _showTop = false;
-  int? _currentYear; // 筛选维度：年份（筛选面板切换）
+  int? _currentYear; // 年份轴（顶部年份条切换；null=全部年份）
   String? _currentContest; // 比赛轴（drawer 切换）
   String? _currentGenre; // 筛选维度：题材（筛选面板切换）
   String? _fStatus; // 筛选维度：状态（已完结/连载中）
@@ -123,12 +123,10 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
     return Scaffold(
       // 比赛轴启用时提供侧滑面板（AppBar 自动出现汉堡按钮作为入口）。
       drawer: widget.contestSwitchable ? _buildContestDrawer() : null,
-      appBar: AppBar(
-        title: Text(_appBarTitle()),
-        actions: [_filterButton()],
-      ),
+      appBar: AppBar(title: Text(_appBarTitle()), actions: [_filterButton()]),
       body: Column(
         children: [
+          _yearStrip(),
           if (widget.metricSwitchable) _metricSwitcher(),
           Expanded(
             child: RefreshIndicator(
@@ -171,9 +169,71 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
     );
   }
 
+  // 年份轴独立于筛选：常驻在列表上方，横向滚动；切换后保留其他筛选。
+  // 年份使用 /year-groups（form 池口径），不拉 /facets 全量值。
+  Widget _yearStrip() {
+    final scheme = Theme.of(context).colorScheme;
+    final res = ref.watch(yearGroupsProvider(widget.form));
+    return SizedBox(
+      height: 44,
+      child: res.when(
+        loading: () => const Center(
+          child: SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
+        error: (e, _) => Center(
+          child: TextButton(
+            onPressed: () => ref.invalidate(yearGroupsProvider(widget.form)),
+            child: Text(
+              '年份加载失败，点按重试',
+              style: TextStyle(fontSize: 12, color: scheme.error),
+            ),
+          ),
+        ),
+        data: (r) => ListView.separated(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          itemCount: r.groups.length + 1,
+          separatorBuilder: (context, index) => const SizedBox(width: 8),
+          itemBuilder: (context, i) {
+            if (i == 0) return _yearChip('全部', _currentYear == null, null);
+            final g = r.groups[i - 1];
+            return _yearChip('${g.year}', _currentYear == g.year, g);
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _yearChip(String label, bool selected, YearGroup? g) {
+    final chip = ChoiceChip(
+      showCheckmark: false,
+      visualDensity: VisualDensity.compact,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      label: Text(label, style: const TextStyle(fontSize: 12)),
+      selected: selected,
+      onSelected: (_) => _selectYear(g?.year),
+    );
+    if (g == null) return chip;
+    return Tooltip(message: '${g.year} 年 · ${g.count} 本', child: chip);
+  }
+
+  void _selectYear(int? year) {
+    if (year == _currentYear) return;
+    setState(() {
+      _currentYear = year;
+      _resetList();
+    });
+    _scroll.jumpTo(0);
+    _loadMore();
+  }
+
   // 筛选面板入口（AppBar 右侧，docs/15：Icons.filter_list = 筛选）：
-  // 状态/价格/年份/题材/标签五维 BottomSheet（用户 2026-11-21：所有
-  // 经典榜单页统一多维 filter）；有激活维度时图标带计数角标。
+  // 状态/价格/题材/标签四维 BottomSheet（用户 2026-11-25：年份移出）；
+  // 有激活维度时图标带计数角标。
   Widget _filterButton() {
     final n = _activeFilterCount;
     return IconButton(
@@ -191,7 +251,6 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
     var n = 0;
     if (_fStatus != null) n++;
     if (_fPtype != null) n++;
-    if (_currentYear != null) n++;
     if (_currentGenre != null) n++;
     n += _fTags.length;
     return n;
@@ -204,28 +263,30 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
       useSafeArea: true,
       builder: (ctx) => _FilterSheet(
         form: widget.form,
-        year: _currentYear,
         genre: _currentGenre,
         status: _fStatus,
         ptype: _fPtype,
         tags: List.of(_fTags),
-        onChanged: (year, genre, status, ptype, tags) =>
-            _onFilterChanged(year, genre, status, ptype, tags),
+        onChanged: (genre, status, ptype, tags) =>
+            _onFilterChanged(genre, status, ptype, tags),
       ),
     );
   }
 
   // 筛选面板 live-apply：值未变不重载；变化则重置列表、回顶、重载
   // （面板保持打开，可连续多选维度）。
-  void _onFilterChanged(int? year, String? genre, String? status,
-      String? ptype, List<String> tags) {
-    final changed = year != _currentYear ||
+  void _onFilterChanged(
+    String? genre,
+    String? status,
+    String? ptype,
+    List<String> tags,
+  ) {
+    final changed =
         genre != _currentGenre ||
         status != _fStatus ||
         ptype != _fPtype ||
         tags.join(',') != _fTags.join(',');
     setState(() {
-      _currentYear = year;
       _currentGenre = genre;
       _fStatus = status;
       _fPtype = ptype;
@@ -481,26 +542,29 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
   }
 }
 
-/// 筛选面板 BottomSheet（用户 2026-11-21：所有经典榜单页统一的多维
-/// filter）：状态/价格/年份/题材/标签五维，单选 + 「全部」复位；
-/// 标签维度多选 OR（用户 2026-11-21）。chip 不显示计数、选中不显示
-/// ✔（showCheckmark:false，组件默认是 true，与 SegmentedButton 口径
-/// 一致）；点选 live-apply（背后列表实时刷新），面板保持打开直到
-/// 「完成」。值列表 = /facets（form 池口径）；状态是固定枚举，
-/// 价格值数据驱动（免费/VIP/签约）。
+/// 筛选面板 BottomSheet（用户 2026-11-21 定，2026-11-25 年份移出）：
+/// 状态/价格/题材/标签四维，单选 + 「全部」复位；标签维度多选 OR。
+/// 年份是高频榜单轴，已改为列表顶部独立横向条（docs/16）。
+/// chip 不显示计数、选中不显示 ✔（showCheckmark:false，组件默认是 true，
+/// 与 SegmentedButton 口径一致）；点选 live-apply（背后列表实时刷新），
+/// 面板保持打开直到「完成」。值列表 = /facets（form 池口径）；状态是
+/// 固定枚举，价格值数据驱动（免费/VIP/签约）。
 class _FilterSheet extends ConsumerStatefulWidget {
   final String form;
-  final int? year;
   final String? genre;
   final String? status;
   final String? ptype;
   final List<String> tags;
-  final void Function(int? year, String? genre, String? status, String? ptype,
-      List<String> tags) onChanged;
+  final void Function(
+    String? genre,
+    String? status,
+    String? ptype,
+    List<String> tags,
+  )
+  onChanged;
 
   const _FilterSheet({
     required this.form,
-    required this.year,
     required this.genre,
     required this.status,
     required this.ptype,
@@ -513,20 +577,61 @@ class _FilterSheet extends ConsumerStatefulWidget {
 }
 
 class _FilterSheetState extends ConsumerState<_FilterSheet> {
-  int? _year;
+  static const _tagPreviewLimit = 12;
+
+  final _tagSearch = TextEditingController();
   String? _genre;
   String? _status;
   String? _ptype;
   List<String> _tags = const [];
+  bool _tagsExpanded = false;
 
   @override
   void initState() {
     super.initState();
-    _year = widget.year;
     _genre = widget.genre;
     _status = widget.status;
     _ptype = widget.ptype;
     _tags = List.of(widget.tags);
+  }
+
+  @override
+  void dispose() {
+    _tagSearch.dispose();
+    super.dispose();
+  }
+
+  bool get _hasActiveFilters =>
+      _genre != null || _status != null || _ptype != null || _tags.isNotEmpty;
+
+  int get _selectedCount {
+    var n = 0;
+    if (_status != null) n++;
+    if (_ptype != null) n++;
+    if (_genre != null) n++;
+    n += _tags.length;
+    return n;
+  }
+
+  void _resetAll() {
+    if (!_hasActiveFilters) return;
+    setState(() {
+      _genre = null;
+      _status = null;
+      _ptype = null;
+      _tags = const [];
+      _tagsExpanded = false;
+      _tagSearch.clear();
+    });
+    widget.onChanged(_genre, _status, _ptype, _tags);
+  }
+
+  void _toggleTag(String name) {
+    _pickTags(
+      _tags.contains(name)
+          ? _tags.where((x) => x != name).toList()
+          : [..._tags, name],
+    );
   }
 
   // live-apply：更新本地选中态并通知父页（父页对比后决定是否重载）。
@@ -534,7 +639,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
     if (!changed) return;
     apply();
     setState(() {});
-    widget.onChanged(_year, _genre, _status, _ptype, _tags);
+    widget.onChanged(_genre, _status, _ptype, _tags);
   }
 
   // 标签多选（OR，用户 2026-11-21）：toggle 单个标签；「全部」= 清空。
@@ -542,28 +647,138 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
     if (next.join(',') == _tags.join(',')) return;
     _tags = next;
     setState(() {});
-    widget.onChanged(_year, _genre, _status, _ptype, _tags);
+    widget.onChanged(_genre, _status, _ptype, _tags);
   }
 
   Widget _section(String title, Widget chips) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+          child: Text(
+            title,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+        ),
+        Padding(padding: const EdgeInsets.fromLTRB(16, 8, 16, 0), child: chips),
+      ],
+    );
+  }
+
+  Widget get _divider => const Divider(height: 20, indent: 16, endIndent: 16);
+
+  Widget _tagSection(FacetsResult f) {
+    final scheme = Theme.of(context).colorScheme;
+    final query = _tagSearch.text.trim().toLowerCase();
+    final selected = _tags.toSet();
+    final matched = query.isEmpty
+        ? f.tags
+        : f.tags.where((t) => t.name.toLowerCase().contains(query)).toList();
+    final selectedTags = f.tags
+        .where((t) => selected.contains(t.name))
+        .toList();
+    final unselected = matched
+        .where((t) => !selected.contains(t.name))
+        .toList();
+    final preview = query.isEmpty && !_tagsExpanded
+        ? unselected.take(_tagPreviewLimit).toList()
+        : unselected;
+    final canExpand = query.isEmpty && unselected.length > _tagPreviewLimit;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+          child: Row(
+            children: [
+              const Text(
+                '标签（多选，OR）',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              ),
+              if (_tags.isNotEmpty) ...[
+                const SizedBox(width: 8),
+                Text(
+                  '已选 ${_tags.length}',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        if (f.tags.length > _tagPreviewLimit)
           Padding(
-            padding: const EdgeInsets.only(bottom: 6),
-            child: Text(
-              title,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: TextField(
+              controller: _tagSearch,
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                hintText: '搜索标签',
+                prefixIcon: const Icon(Icons.search, size: 18),
+                suffixIcon: _tagSearch.text.isEmpty
+                    ? null
+                    : IconButton(
+                        tooltip: '清除标签搜索',
+                        icon: const Icon(Icons.close, size: 18),
+                        onPressed: () {
+                          _tagSearch.clear();
+                          setState(() {});
+                        },
+                      ),
+                isDense: true,
+                filled: true,
+                fillColor: scheme.surface,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(
+                    color: scheme.outline.withValues(alpha: .4),
+                  ),
+                ),
               ),
             ),
           ),
-          chips,
-        ],
-      ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _tagChip('全部', _tags.isEmpty, null),
+              for (final t in selectedTags) _tagChip(t.name, true, t.name),
+              for (final t in preview) _tagChip(t.name, false, t.name),
+            ],
+          ),
+        ),
+        if (canExpand)
+          Padding(
+            padding: const EdgeInsets.only(left: 8),
+            child: TextButton(
+              onPressed: () => setState(() => _tagsExpanded = !_tagsExpanded),
+              child: Text(_tagsExpanded ? '收起' : '展开全部（${unselected.length}）'),
+            ),
+          ),
+        if (query.isNotEmpty && matched.isEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+            child: Text(
+              '没有匹配的标签',
+              style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _tagChip(String label, bool selected, String? name) {
+    return FilterChip(
+      showCheckmark: false,
+      label: Text(label, style: const TextStyle(fontSize: 12)),
+      selected: selected,
+      onSelected: (_) => name == null ? _pickTags(const []) : _toggleTag(name),
     );
   }
 
@@ -595,11 +810,6 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
         ),
       ),
       data: (f) {
-        final active = _year != null ||
-            _genre != null ||
-            _status != null ||
-            _ptype != null ||
-            _tags.isNotEmpty;
         return ConstrainedBox(
           constraints: BoxConstraints(
             maxHeight: MediaQuery.of(context).size.height * 0.85,
@@ -627,24 +837,22 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    const Spacer(),
-                    if (active)
-                      TextButton(
-                        onPressed: () => _pick(() {
-                          _year = null;
-                          _genre = null;
-                          _status = null;
-                          _ptype = null;
-                          _tags = const [];
-                        }, changed: true),
-                        child: const Text('清除全部'),
+                    if (_selectedCount > 0) ...[
+                      const SizedBox(width: 8),
+                      Text(
+                        '已选 $_selectedCount 项',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: scheme.onSurfaceVariant,
+                        ),
                       ),
+                    ],
                   ],
                 ),
               ),
               Flexible(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.only(top: 2, bottom: 8),
                   child: Column(
                     children: [
                       _section(
@@ -653,101 +861,104 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                           spacing: 8,
                           runSpacing: 8,
                           children: [
-                            _chip('全部', _status == null,
-                                () => _pick(() => _status = null,
-                                    changed: _status != null)),
+                            _chip(
+                              '全部',
+                              _status == null,
+                              () => _pick(
+                                () => _status = null,
+                                changed: _status != null,
+                              ),
+                            ),
                             for (final s in ['已完结', '连载中'])
-                              _chip(s, _status == s,
-                                  () => _pick(() => _status = s,
-                                      changed: _status != s)),
+                              _chip(
+                                s,
+                                _status == s,
+                                () => _pick(
+                                  () => _status = s,
+                                  changed: _status != s,
+                                ),
+                              ),
                           ],
                         ),
                       ),
+                      _divider,
                       _section(
                         '价格',
                         Wrap(
                           spacing: 8,
                           runSpacing: 8,
                           children: [
-                            _chip('全部', _ptype == null,
-                                () => _pick(() => _ptype = null,
-                                    changed: _ptype != null)),
+                            _chip(
+                              '全部',
+                              _ptype == null,
+                              () => _pick(
+                                () => _ptype = null,
+                                changed: _ptype != null,
+                              ),
+                            ),
                             for (final p in f.ptypes)
-                              _chip(p.name, _ptype == p.name,
-                                  () => _pick(() => _ptype = p.name,
-                                      changed: _ptype != p.name)),
+                              _chip(
+                                p.name,
+                                _ptype == p.name,
+                                () => _pick(
+                                  () => _ptype = p.name,
+                                  changed: _ptype != p.name,
+                                ),
+                              ),
                           ],
                         ),
                       ),
-                      _section(
-                        '年份',
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            _chip('全部年份', _year == null,
-                                () => _pick(() => _year = null,
-                                    changed: _year != null)),
-                            for (final y in f.years)
-                              _chip('${y.year}', _year == y.year,
-                                  () => _pick(() => _year = y.year,
-                                      changed: _year != y.year)),
-                          ],
-                        ),
-                      ),
+                      _divider,
                       _section(
                         '题材',
                         Wrap(
                           spacing: 8,
                           runSpacing: 8,
                           children: [
-                            _chip('全部题材', _genre == null,
-                                () => _pick(() => _genre = null,
-                                    changed: _genre != null)),
-                            for (final g in f.genres)
-                              _chip(g.name, _genre == g.name,
-                                  () => _pick(() => _genre = g.name,
-                                      changed: _genre != g.name)),
-                          ],
-                        ),
-                      ),
-                      _section(
-                        '标签（多选，OR）',
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            FilterChip(
-                              showCheckmark: false, // 用户 2026-11-21
-                              label: const Text('全部',
-                                  style: TextStyle(fontSize: 12)),
-                              selected: _tags.isEmpty,
-                              onSelected: (_) => _pickTags(const []),
+                            _chip(
+                              '全部题材',
+                              _genre == null,
+                              () => _pick(
+                                () => _genre = null,
+                                changed: _genre != null,
+                              ),
                             ),
-                            for (final t in f.tags)
-                              FilterChip(
-                                showCheckmark: false,
-                                label: Text(t.name,
-                                    style: const TextStyle(fontSize: 12)),
-                                selected: _tags.contains(t.name),
-                                onSelected: (on) => _pickTags(
-                                    on
-                                        ? [..._tags, t.name]
-                                        : _tags
-                                              .where((x) => x != t.name)
-                                              .toList()),
+                            for (final g in f.genres)
+                              _chip(
+                                g.name,
+                                _genre == g.name,
+                                () => _pick(
+                                  () => _genre = g.name,
+                                  changed: _genre != g.name,
+                                ),
                               ),
                           ],
                         ),
                       ),
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                        child: SizedBox(
-                          width: double.infinity,
-                          child: FilledButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('完成'),
-                          ),
+                      _divider,
+                      _tagSection(f),
+                    ],
+                  ),
+                ),
+              ),
+              SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: _hasActiveFilters ? _resetAll : null,
+                          child: const Text('重置'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: FilledButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('完成'),
                         ),
                       ),
                     ],
