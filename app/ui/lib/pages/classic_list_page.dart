@@ -218,7 +218,7 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
       onSelected: (_) => _selectYear(g?.year),
     );
     if (g == null) return chip;
-    return Tooltip(message: '${g.year} 代 · ${g.count} 本', child: chip);
+    return Tooltip(message: '${g.year} · ${g.count} 本', child: chip);
   }
 
   void _selectYear(int? year) {

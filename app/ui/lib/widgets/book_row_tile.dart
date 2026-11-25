@@ -164,7 +164,7 @@ class BookRowTile extends StatelessWidget {
                               : scheme.outline.withValues(alpha: .15),
                         ),
                       if (item.estYear > 0)
-                        Text('${item.estYear} 代',
+                        Text('${item.estYear}',
                             style: TextStyle(
                                 fontSize: 10,
                                 color: scheme.onSurfaceVariant)),

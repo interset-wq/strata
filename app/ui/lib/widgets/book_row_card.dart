@@ -79,7 +79,7 @@ class BookRowCard extends StatelessWidget {
                             ?.copyWith(fontSize: 13.5)),
                     const SizedBox(height: 3),
                     Text(
-                      '${item.author} · ${item.genre ?? '未分类'} · ${item.estYear} 代',
+                      '${item.author} · ${item.genre ?? '未分类'} · ${item.estYear}',
                       style: TextStyle(
                           fontSize: 11, color: scheme.onSurfaceVariant),
                     ),

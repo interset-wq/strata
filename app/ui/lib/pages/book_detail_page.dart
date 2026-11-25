@@ -331,7 +331,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                               _badge(context,
                                   s(eff['genre'] ?? b['genre'])!),
                             if (s(b['est_year']) != null)
-                              _badge(context, '${s(b['est_year'])} 代'),
+                              _badge(context, '${s(b['est_year'])}'),
                           ],
                         ),
                       ],
