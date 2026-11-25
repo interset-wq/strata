@@ -1,7 +1,8 @@
 // Booklist endpoints (docs/booklist-in-app.md). The official booklist API
-// has no enumeration action, so the list endpoint probes a window of ten
+// has no enumeration action, so the list endpoint probes a window of five
 // sequential ids — one fetch at a time through the shared limiter
-// (queueCap 8: submitting a whole window at once would drop the tail).
+// (window 10→5, 2026-11-25 user ruling: under the global rate limiter a
+// large window loads far too slow; the UI pages manually via 加载更多).
 // Each id's raw body is cached 24h in the official-ranks cache (booklists
 // update — lastUpdateDateTime is the evidence) and parsed on every serve,
 // so the local join stays live. A short page = end (the temp/novly-proven
@@ -21,7 +22,10 @@ import (
 )
 
 const (
-	booklistPageSize = 10
+	// booklistPageSize: window 10→5 (2026-11-25 user ruling) — under the
+	// global rate limiter (~1s/fetch) a 10-id window means ≈10s per page,
+	// far too slow; 5 halves it and the UI loads pages manually.
+	booklistPageSize = 5
 	booklistTTL      = 24 * time.Hour
 
 	// booklistKnownTotal is the approximate size of the live booklist id
@@ -31,7 +35,7 @@ const (
 )
 
 // probe-loop deadlines (2026-11-23 device report: a black-holed mobile
-// request burns the full 30s client timeout, so a serial 10-id window
+// request burns the full 30s client timeout, so a serial 5-id window
 // spun for minutes with no error). They bound each endpoint; the per-id
 // cache makes the UI retry cheap — only the ids that failed re-fetch.
 var (

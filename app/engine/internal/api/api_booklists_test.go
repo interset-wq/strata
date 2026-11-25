@@ -26,9 +26,9 @@ func validBooklistJSON(id int) string {
 		`"bookListID":`+strconv.Itoa(id), 1)
 }
 
-// TestBooklistsWindow: a 10-id window, ids 1..8 valid / 9..10 invalid →
-// 8 items + done=true (short page = end); the second page is fully
-// invalid → empty items + done.
+// TestBooklistsWindow: a 5-id window (booklistPageSize), ids 1..8 valid /
+// 9+ invalid → page 1 full (ids 1..5, done=false), page 2 short (ids 6..10
+// → 3 items, done=true = end), page 3 empty (ids 11..15, done).
 func TestBooklistsWindow(t *testing.T) {
 	ts, srv := newRosterTestServer(t)
 	srv.booklistFetch = func(ctx context.Context, client *http.Client,
@@ -43,24 +43,30 @@ func TestBooklistsWindow(t *testing.T) {
 	}
 	body := getJSON(t, ts.URL+"/strata/booklists", http.StatusOK)
 	items := body["items"].([]any)
-	if len(items) != 8 {
-		t.Fatalf("items = %v, want 8 valid of 10", items)
+	if len(items) != 5 {
+		t.Fatalf("items = %v, want 5 valid on page 1", items)
 	}
-	if items[7].(map[string]any)["id"].(float64) != 8 {
-		t.Fatalf("last item = %v, want id 8", items[7])
+	if items[4].(map[string]any)["id"].(float64) != 5 {
+		t.Fatalf("last item = %v, want id 5", items[4])
 	}
-	if body["done"] != true {
-		t.Fatalf("done = %v, want true (short page)", body["done"])
+	if body["done"] != false {
+		t.Fatalf("done = %v, want false (full page)", body["done"])
 	}
 	it := items[0].(map[string]any)
 	if it["title"] != "测试书单" || it["vip"] != true ||
 		it["novel_num"].(float64) != 2 || it["updated"] != "2021-05-11" {
 		t.Fatalf("item 0 = %v", it)
 	}
-	// page 2: ids 11..20 all invalid → empty window, done.
+	// page 2: ids 6..10, 9..10 invalid → short page = end.
 	body2 := getJSON(t, ts.URL+"/strata/booklists?page=2", http.StatusOK)
-	if got := body2["items"].([]any); len(got) != 0 || body2["done"] != true {
-		t.Fatalf("page 2 = %v, want empty items + done", body2)
+	items2 := body2["items"].([]any)
+	if len(items2) != 3 || body2["done"] != true {
+		t.Fatalf("page 2 = %v, want 3 items + done (short page)", body2)
+	}
+	// page 3: ids 11..15 all invalid → empty window, done.
+	body3 := getJSON(t, ts.URL+"/strata/booklists?page=3", http.StatusOK)
+	if got := body3["items"].([]any); len(got) != 0 || body3["done"] != true {
+		t.Fatalf("page 3 = %v, want empty items + done", body3)
 	}
 }
 
@@ -164,7 +170,7 @@ func TestBooklistsRecommend(t *testing.T) {
 }
 
 // TestBooklistsWindowDeadline: a slow (not dead) upstream must not let the
-// serial 10-id window spin for minutes — the window deadline bounds it and
+// serial 5-id window spin for minutes — the window deadline bounds it and
 // surfaces as 502 (the UI retries; the per-id cache keeps the retry cheap).
 // The seam is ctx-aware, mirroring the production request abort.
 func TestBooklistsWindowDeadline(t *testing.T) {

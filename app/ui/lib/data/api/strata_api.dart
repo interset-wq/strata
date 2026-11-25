@@ -531,8 +531,8 @@ class StrataApi {
     return RosterPage.fromJson(body);
   }
 
-  /// 官方书单列表一窗（顺序 id 探测：引擎每窗 10 个、逐个走限速器——
-  /// 首窗 ≈10 秒，当日再访 24h 缓存秒回；docs/booklist-in-app.md）。
+  /// 官方书单列表一窗（顺序 id 探测：引擎每窗 5 个、逐个走限速器——
+  /// 首窗 ≈5 秒，当日再访 24h 缓存秒回；docs/booklist-in-app.md）。
   Future<BooklistPage> booklists({int page = 1}) async {
     final body = await _getOnline('/booklists', {'page': '$page'});
     return BooklistPage.fromJson(body);

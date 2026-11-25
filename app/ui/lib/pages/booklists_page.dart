@@ -7,9 +7,10 @@ import '../data/api/strata_api.dart';
 import '../widgets/back_to_top.dart';
 
 /// 官方书单浏览页（docs/booklist-in-app.md）：官方 API 无枚举动作，引擎
-/// 顺序 id 探测（每窗 10 个、逐个走限速器——首窗 ≈10 秒，当日再访 24h
+/// 顺序 id 探测（每窗 5 个、逐个走限速器——首窗 ≈5 秒，当日再访 24h
 /// 缓存秒回）。顶部 #id 跳转框直跳某号所在窗口；行卡：#id + 标题 +
-/// 简介 2 行 + 作者 + N 部作品 + 更新日期。
+/// 简介 2 行 + 作者 + N 部作品 + 更新日期。**手动分页**（底部「加载更多」
+/// 按钮；无自动上滑加载——限速器下自动续载越滚越慢，2026-11-25 用户裁定）。
 class BooklistsPage extends ConsumerStatefulWidget {
   const BooklistsPage({super.key});
 
@@ -48,14 +49,11 @@ class _BooklistsPageState extends ConsumerState<BooklistsPage> {
     super.dispose();
   }
 
+  // 仅回到顶部显隐——自动上滑加载已删（2026-11-25 用户裁定：限速器下
+  // 自动续载越滚越慢，只能点底部「加载更多」手动触发）。
   void _onScroll() {
     final show = _scroll.hasClients && _scroll.offset > 500;
     if (show != _showTop) setState(() => _showTop = show);
-    if (_loading || _loadingMore || _done || _moreFailed) return;
-    if (_scroll.position.pixels >=
-        _scroll.position.maxScrollExtent - 400) {
-      _loadPage(_page + 1, reset: false);
-    }
   }
 
   Future<void> _loadPage(int page, {required bool reset}) async {
@@ -108,10 +106,10 @@ class _BooklistsPageState extends ConsumerState<BooklistsPage> {
     }
   }
 
-  /// #id 跳转：直跳该号所在窗口（引擎页窗 = 10 个连续号）。
+  /// #id 跳转：直跳该号所在窗口（引擎页窗 = 5 个连续号，booklistPageSize）。
   void _jumpTo(int id) {
     _idCtrl.clear();
-    _loadPage((id - 1) ~/ 10 + 1, reset: true);
+    _loadPage((id - 1) ~/ 5 + 1, reset: true);
   }
 
   @override
@@ -135,7 +133,7 @@ class _BooklistsPageState extends ConsumerState<BooklistsPage> {
                         const CircularProgressIndicator(strokeWidth: 2),
                         const SizedBox(height: 12),
                         Text(
-                          '正在探测书单（首窗约 10 秒）…',
+                          '正在探测书单（首窗约 5 秒）…',
                           style:
                               TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
                         ),
@@ -191,6 +189,17 @@ class _BooklistsPageState extends ConsumerState<BooklistsPage> {
                         '— 已探到末尾 —',
                         style: TextStyle(
                             fontSize: 11, color: scheme.onSurfaceVariant),
+                      ),
+                    ),
+                  )
+                else if (_items.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Center(
+                      child: FilledButton(
+                        onPressed: () => _loadPage(_page + 1, reset: false),
+                        child: const Text(
+                            '加载更多', style: TextStyle(fontSize: 12.5)),
                       ),
                     ),
                   )
