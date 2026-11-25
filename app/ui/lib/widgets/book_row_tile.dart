@@ -23,10 +23,12 @@ class BookRowTile extends StatelessWidget {
     return '$n';
   }
 
-  /// 状态/付费小徽标：浅底 + 彩色字（用户 2026-11-25 榜单行版式）。
-  Widget _pill(BuildContext context, String text, Color fg, Color bg) {
+  /// 状态/付费小徽标：彩色底 + 彩色字（用户 2026-11-25 榜单行版式）。
+  /// gap = 与前邻元素的间距，默认 4px（与 tags 行一致）。
+  Widget _pill(BuildContext context, String text, Color fg, Color bg,
+      {double gap = 4}) {
     return Container(
-      margin: const EdgeInsets.only(left: 6),
+      margin: EdgeInsets.only(left: gap),
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
         color: bg,
@@ -152,6 +154,7 @@ class BookRowTile extends StatelessWidget {
                               TextStyle(fontSize: 11, color: scheme.secondary),
                         ),
                       ),
+                      // 状态徽标在前、年份在后，gap 与 tags 行一致（4px）。
                       if (status != null)
                         _pill(
                           context,
@@ -160,14 +163,18 @@ class BookRowTile extends StatelessWidget {
                               ? scheme.primary
                               : scheme.onSurfaceVariant,
                           status == '连载中'
-                              ? scheme.primary.withValues(alpha: .12)
-                              : scheme.outline.withValues(alpha: .15),
+                              ? scheme.primary.withValues(alpha: .24)
+                              : scheme.outline.withValues(alpha: .24),
+                          gap: 4,
                         ),
                       if (item.estYear > 0)
-                        Text('${item.estYear}',
-                            style: TextStyle(
-                                fontSize: 10,
-                                color: scheme.onSurfaceVariant)),
+                        Padding(
+                          padding: const EdgeInsets.only(left: 4),
+                          child: Text('${item.estYear}',
+                              style: TextStyle(
+                                  fontSize: 10,
+                                  color: scheme.onSurfaceVariant)),
+                        ),
                     ],
                   ),
                   if (genre != null || bookTags.isNotEmpty) ...[
