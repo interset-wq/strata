@@ -82,11 +82,18 @@ class _AuthorPageState extends ConsumerState<AuthorPage> {
     }
   }
 
+  /// 下拉刷新（用户 2026-11-25）：重新触发一次数据库查询。书单与库外
+  /// 差集都是引擎现查，收录状态即时更新；档案走 TTL 缓存不抓网。
+  Future<void> _refresh() async {
+    await Future.wait([_loadProfile(), _loadBooks(silent: true)]);
+  }
+
   /// 全量书目单次拉取（docs/17 §4.5：limit=200 = 统一契约上限；20260503.26
   /// 种子实测单作者最多 36 本，一页必够）。概览/代表作需全量，单次取回后
-  /// 即时计算，无「部分数据」中间态。
-  Future<void> _loadBooks() async {
-    setState(() => _booksLoading = true);
+  /// 即时计算，无「部分数据」中间态。silent=true 用于下拉刷新：不切全屏
+  /// loading，由刷新指示器表达进度。
+  Future<void> _loadBooks({bool silent = false}) async {
+    if (!silent) setState(() => _booksLoading = true);
     try {
       final h = await ref.read(bootProvider.future);
       final page = await h.api.authorBooks(
@@ -221,7 +228,9 @@ class _AuthorPageState extends ConsumerState<AuthorPage> {
         ),
       );
     }
-    return ListView.builder(
+    return RefreshIndicator(
+      onRefresh: _refresh,
+      child: ListView.builder(
       controller: _scroll,
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 96),
       itemCount: _itemCount,
@@ -264,6 +273,7 @@ class _AuthorPageState extends ConsumerState<AuthorPage> {
         }
         return const SizedBox.shrink();
       },
+      ),
     );
   }
 

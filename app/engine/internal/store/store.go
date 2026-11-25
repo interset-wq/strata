@@ -1347,7 +1347,7 @@ SELECT * FROM (
          book_meta.est_year, book_meta.status, book_meta.words, book_meta.clicks,
          book_meta.favs, book_meta.praises, book_meta.form,
          COALESCE(c2.cover, NULLIF(book_meta.cover_url, '')) AS cover_url,
-         NULL AS est_date
+         book_meta.est_date AS est_date
   FROM book_meta
   LEFT JOIN covers c2 ON c2.nid = book_meta.nid
   WHERE book_meta.author = ?1
