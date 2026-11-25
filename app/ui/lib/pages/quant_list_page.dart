@@ -22,6 +22,8 @@ class _QuantListPageState extends ConsumerState<QuantListPage> {
 
   String _board = 'cqs'; // 'cqs' 口碑榜 | 'cps' 位置榜
   int _session = 0; // 加载会话号：切榜/刷新自增，陈旧响应作废
+  int _baseOffset = 0; // 手动翻页锚点（用户 2026-11-25：便于手动传 offset）
+  final _offsetInput = TextEditingController();
   final _scroll = ScrollController();
   List<RankItem> _items = [];
   bool _loading = false;
@@ -47,6 +49,7 @@ class _QuantListPageState extends ConsumerState<QuantListPage> {
   @override
   void dispose() {
     _scroll.dispose();
+    _offsetInput.dispose();
     super.dispose();
   }
 
@@ -57,7 +60,7 @@ class _QuantListPageState extends ConsumerState<QuantListPage> {
     // 用户 2026-11-25 报告位置榜空列表）。
     final session = _session;
     final board = _board;
-    final offset = _items.length;
+    final offset = _baseOffset + _items.length;
     setState(() {
       _loading = true;
       _error = null;
@@ -90,8 +93,26 @@ class _QuantListPageState extends ConsumerState<QuantListPage> {
     // 会话号自增作废在途请求；强制释放 _loading 保证新榜首屏
     // 请求一定发出（否则在途口碑请求期间切榜，位置榜永远不加载）。
     _session++;
+    _offsetInput.clear();
     setState(() {
       _board = board;
+      _baseOffset = 0;
+      _items = [];
+      _done = false;
+      _loading = false;
+    });
+    _scroll.jumpTo(0);
+    await _loadMore();
+  }
+
+  /// 手动翻页：直接传 offset 跳到该页（用户 2026-11-25）；跳转后列表
+  /// 替换为该页数据，继续上滑从该锚点自然延续。
+  Future<void> _jumpToOffset() async {
+    final v = int.tryParse(_offsetInput.text.trim());
+    if (v == null || v < 0) return;
+    _session++;
+    setState(() {
+      _baseOffset = v;
       _items = [];
       _done = false;
       _loading = false;
@@ -130,17 +151,45 @@ class _QuantListPageState extends ConsumerState<QuantListPage> {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
             child: Text(
-              _board == 'cqs'
-                  ? '长篇 · 按同代口碑分排序（不显示精确名次）'
-                  : '长篇 · 按同格收藏位置排序',
+              (_board == 'cqs'
+                      ? '长篇 · 按同代口碑分排序（不显示精确名次）'
+                      : '长篇 · 按同格收藏位置排序') +
+                  (_baseOffset > 0 ? '  (offset $_baseOffset)' : ''),
               style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
+            ),
+          ),
+          // 手动翻页器：直接传 offset 跳转（用户 2026-11-25）
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _offsetInput,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      hintText: 'offset',
+                      isDense: true,
+                      border: OutlineInputBorder(),
+                    ),
+                    onSubmitted: (_) => _jumpToOffset(),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FilledButton.tonal(
+                  onPressed: _jumpToOffset,
+                  child: const Text('跳转'),
+                ),
+              ],
             ),
           ),
           Expanded(
             child: RefreshIndicator(
               onRefresh: () async {
                 _session++;
+                _offsetInput.clear();
                 setState(() {
+                  _baseOffset = 0;
                   _items = [];
                   _done = false;
                   _loading = false;
