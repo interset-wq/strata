@@ -830,12 +830,16 @@ func (s *Store) RecommendCQS(ctx context.Context, cursor, form string, k float64
 	}
 	seedScore := "seed.books.cqs"
 	discScore := "discovered.cqs"
+	bmScore := "book_meta.cqs"
 	if k > 0 {
 		seedScore = fmt.Sprintf(
 			"seed.books.cqs * (1 - %.17g + %.17g * COALESCE(seed.books.len_norm, 0))",
 			k, k)
 		discScore = fmt.Sprintf(
 			"discovered.cqs * (1 - %.17g + %.17g * COALESCE(discovered.len_norm, 0))",
+			k, k)
+		bmScore = fmt.Sprintf(
+			"book_meta.cqs * (1 - %.17g + %.17g * COALESCE(book_meta.len_norm, 0))",
 			k, k)
 	}
 	// Phase 2: score discovered rows that gained detail numbers, then fold
@@ -870,9 +874,23 @@ func (s *Store) RecommendCQS(ctx context.Context, cursor, form string, k float64
   WHERE COALESCE(c.cover, NULLIF(discovered.cover_url, '')) IS NOT NULL
     AND discovered.form = ?
     AND discovered.cqs IS NOT NULL
-    AND discovered.cps BETWEEN ? AND ?)
+    AND discovered.cps BETWEEN ? AND ?
+  UNION ALL
+  SELECT book_meta.nid, book_meta.title, book_meta.author, book_meta.genre,
+         book_meta.est_year, NULL, book_meta.words, NULL,
+         book_meta.favs, book_meta.form,
+         book_meta.cqs, book_meta.cqs_state,
+         (` + bmScore + `) AS stream_score,
+         COALESCE(c.cover, NULLIF(book_meta.cover_url, '')) AS cover_url
+  FROM book_meta
+  LEFT JOIN covers c ON c.nid = book_meta.nid
+  WHERE COALESCE(c.cover, NULLIF(book_meta.cover_url, '')) IS NOT NULL
+    AND book_meta.form = ?
+    AND book_meta.cqs IS NOT NULL
+    AND book_meta.cps BETWEEN ? AND ?
+    AND book_meta.nid NOT IN (SELECT nid FROM discovered))
 WHERE `
-	args := []any{form, lo, hi, form, lo, hi}
+	args := []any{form, lo, hi, form, lo, hi, form, lo, hi}
 	if cursor != "" {
 		score, nid, err := parseScoreCursor(cursor)
 		if err != nil {
@@ -1295,30 +1313,48 @@ func (s *Store) MoeGoddessBooks(ctx context.Context, limit int) ([]RankItem, err
 			AND bt.tag LIKE '____萌神') DESC, seed.books.favs DESC, seed.books.nid ASC LIMIT ?`)
 }
 
-// AuthorBooks lists one author's seed books in timeline order (est_date
+// AuthorBooks lists one author's books in timeline order (est_date
 // DESC; manual-early backfill rows with est_date '0001-01-01' sink to
-// the bottom) for the author page. Local seed data only — no network
+// the bottom) for the author page. Local data only — no network
 // (docs/author-profile-on-demand §1: the works list is read from the
 // local db). Seed author display names are canonical strings, so an
-// exact match is the identity check.
+// exact match is the identity check. Collected books (book_meta rows
+// written by rank-seed + refresh, user 2026-11-25: equal standing with
+// seed books) join the same timeline with no est_date — they sink to
+// the bottom of it instead of faking a dating they don't have.
 func (s *Store) AuthorBooks(ctx context.Context, author string, limit, offset int, newestFirst bool) ([]RankItem, error) {
 	// Backfilled books (est_date NULL/'' — the 0001 sentinel) stay at the
 	// bottom in either direction.
-	order := "ORDER BY CASE WHEN seed.books.est_date IS NULL OR seed.books.est_date = '' THEN 1 ELSE 0 END, seed.books.est_date DESC, seed.books.nid ASC"
+	order := "ORDER BY CASE WHEN est_date IS NULL OR est_date = '' THEN 1 ELSE 0 END, est_date DESC, nid ASC"
 	if !newestFirst {
-		order = "ORDER BY CASE WHEN seed.books.est_date IS NULL OR seed.books.est_date = '' THEN 1 ELSE 0 END, seed.books.est_date ASC, seed.books.nid DESC"
+		order = "ORDER BY CASE WHEN est_date IS NULL OR est_date = '' THEN 1 ELSE 0 END, est_date ASC, nid DESC"
 	}
 	query := `
-SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
-       seed.books.est_year, seed.books.status, seed.books.words, seed.books.clicks,
-       seed.books.favs, seed.books.praises, seed.books.form,
-       COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url,
-       seed.books.est_date
-FROM seed.books
-LEFT JOIN covers c ON c.nid = seed.books.nid
-WHERE seed.books.author = ?
+SELECT * FROM (
+  SELECT seed.books.nid AS nid, seed.books.title AS title,
+         seed.books.author AS author, seed.books.genre AS genre,
+         seed.books.est_year AS est_year, seed.books.status AS status,
+         seed.books.words AS words, seed.books.clicks AS clicks,
+         seed.books.favs AS favs, seed.books.praises AS praises,
+         seed.books.form AS form,
+         COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url,
+         seed.books.est_date AS est_date
+  FROM seed.books
+  LEFT JOIN covers c ON c.nid = seed.books.nid
+  WHERE seed.books.author = ?1
+  UNION ALL
+  SELECT book_meta.nid, book_meta.title, book_meta.author, book_meta.genre,
+         book_meta.est_year, book_meta.status, book_meta.words, book_meta.clicks,
+         book_meta.favs, book_meta.praises, book_meta.form,
+         COALESCE(c2.cover, NULLIF(book_meta.cover_url, '')) AS cover_url,
+         NULL AS est_date
+  FROM book_meta
+  LEFT JOIN covers c2 ON c2.nid = book_meta.nid
+  WHERE book_meta.author = ?1
+    AND book_meta.nid NOT IN (SELECT nid FROM seed.books)
+)
 ` + order + `
-LIMIT ? OFFSET ?`
+LIMIT ?2 OFFSET ?3`
 	rows, err := s.DB.QueryContext(ctx, query, author, limit, offset)
 	if err != nil {
 		return nil, err
@@ -1979,9 +2015,14 @@ SELECT nid, title, author, genre, est_year, favs, cover_url, in_seed FROM (
   SELECT d.nid, d.title, d.author, d.genre, NULL, d.favs, d.cover_url, 0
   FROM discovered d
   WHERE (d.title LIKE ? ESCAPE '\' OR d.author LIKE ? ESCAPE '\')
+  UNION ALL
+  SELECT m.nid, m.title, m.author, m.genre, m.est_year, m.favs, m.cover_url, 0
+  FROM book_meta m
+  WHERE (m.title LIKE ? ESCAPE '\' OR m.author LIKE ? ESCAPE '\')
+    AND m.nid NOT IN (SELECT nid FROM discovered)
 )
 ORDER BY favs DESC, nid ASC
-LIMIT ?`, pattern, pattern, pattern, pattern, limit)
+LIMIT ?`, pattern, pattern, pattern, pattern, pattern, pattern, limit)
 	}
 	if err != nil {
 		return nil, err

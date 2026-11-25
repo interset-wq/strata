@@ -46,7 +46,9 @@ func getJSON(t *testing.T, url string, status int) map[string]any {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != status {
-		t.Fatalf("%s status = %d, want %d", url, resp.StatusCode, status)
+		var errBody map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&errBody)
+		t.Fatalf("%s status = %d, want %d, body=%v", url, resp.StatusCode, status, errBody)
 	}
 	var body map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
