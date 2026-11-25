@@ -155,25 +155,32 @@ class BookRowTile extends StatelessWidget {
                         ),
                       ),
                       // 状态徽标在前、年份在后，gap 与 tags 行一致（4px）。
+                      // 完结与年份用明确灰底（用户 2026-11-25：不要白/近白底）
                       if (status != null)
                         _pill(
                           context,
                           status,
                           status == '连载中'
                               ? scheme.primary
-                              : scheme.onSurfaceVariant,
+                              : Colors.grey.shade800,
                           status == '连载中'
                               ? scheme.primary.withValues(alpha: .24)
-                              : scheme.outline.withValues(alpha: .24),
+                              : Colors.grey.shade300,
                           gap: 4,
                         ),
                       if (item.estYear > 0)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 4),
+                        Container(
+                          margin: const EdgeInsets.only(left: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade300,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
                           child: Text('${item.estYear}',
                               style: TextStyle(
                                   fontSize: 10,
-                                  color: scheme.onSurfaceVariant)),
+                                  color: Colors.grey.shade700)),
                         ),
                     ],
                   ),
