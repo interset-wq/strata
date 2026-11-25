@@ -227,7 +227,11 @@ final router = GoRouter(
     ),
     GoRoute(
       path: '/quant-list',
-      builder: (_, _) => const QuantListPage(),
+      builder: (_, loc) => QuantListPage(
+        // 按 form 隔离出页（用户 2026-11-25：app 一切按 form 隔离，
+        // 无页内切换）：长篇 tab 默认 / 对话 tab 传 form=dialogue。
+        form: loc.uri.queryParameters['form'] ?? 'long',
+      ),
     ),
     GoRoute(
       path: '/classic-list',

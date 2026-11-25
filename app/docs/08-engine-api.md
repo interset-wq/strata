@@ -305,7 +305,8 @@ discovered 中已评分的库外书以同键并流——详情抓取写回后运
 app/docs/18 红线修订）：`board=cqs` 为**口碑榜**（form 内 `cqs DESC`，NULL 不进榜，
 items 带 `cqs_state`（stable/low）证据强度——18 §2 红线 4：不展示精确名次）；
 `board=cps` 为**位置榜**（form 内 `cps DESC`，NULL 不进榜；替代旧「不发榜」裁定）。
-**form 是硬前置**（18 §2 红线 1）：页面目前仅发布 form=long（缺省 long；
+**form 是硬前置**（18 §2 红线 1）：发布 form=long（缺省）| form=dialogue
+（2026-11-25 起对话 tab 独立出页：app 按 form 隔离、无页内切换；
 short/medium/IP 无 cqs 证据）。候选池 = 三源并集（种子书 `is_licensed=0`
 ∪ 已评分 discovered ∪ 收录 book_meta，按 nid 去重——收录均等原则）；
 **无** cps 中层带过滤、**无**封面硬门槛（榜单全量排序，非发现流，区别于

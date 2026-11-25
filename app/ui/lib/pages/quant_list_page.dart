@@ -11,7 +11,11 @@ import '../widgets/book_row_tile.dart';
 /// DESC，替代旧「不发榜」裁定）。form 硬前置（红线 1）：目前仅长篇。
 /// 无 clx 发现（篇幅偏好不属于榜单，红线 5）。
 class QuantListPage extends ConsumerStatefulWidget {
-  const QuantListPage({super.key});
+  /// 形式（用户 2026-11-25：app 一切按 form 隔离，无页内切换）：
+  /// 长篇 tab 入口默认 'long'；对话 tab 入口传 'dialogue'。
+  final String form;
+
+  const QuantListPage({super.key, this.form = 'long'});
 
   @override
   ConsumerState<QuantListPage> createState() => _QuantListPageState();
@@ -67,7 +71,7 @@ class _QuantListPageState extends ConsumerState<QuantListPage> {
       final handle = await ref.read(bootProvider.future);
       final r = await handle.api.quantList(
         board: board,
-        form: 'long',
+        form: widget.form,
         limit: _batch,
         offset: offset,
       );
@@ -175,6 +179,7 @@ class _QuantListPageState extends ConsumerState<QuantListPage> {
 
   /// 榜单依据 modal（2026-11-25：替代页面说明行，内容随当前榜切换）。
   void _showAboutDialog() {
+    final scope = widget.form == 'dialogue' ? '对话' : '长篇';
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -183,8 +188,8 @@ class _QuantListPageState extends ConsumerState<QuantListPage> {
           width: 320,
           child: Text(
             _board == 'cqs'
-                ? '当前榜：口碑（cqs）\n\n按「同代口碑分」降序：\n· 同代 = 同形式 × 同年 × 同题材 × 同收藏档\n· 分数越高 = 口碑在同代同类中越好\n· 不显示精确名次\n\n「位置」榜按「同格收藏位置」（cps）：\n同形式 × 年 × 篇幅档 × 题材里的收藏位置\n\n目前范围：仅长篇；种子快照 + 库外书现算'
-                : '当前榜：位置（cps）\n\n按「同格收藏位置」降序：\n同形式 × 年 × 篇幅档 × 题材里的收藏位置\n\n「口碑」榜按「同代口碑分」（cqs）：\n· 同代 = 同形式 × 同年 × 同题材 × 同收藏档\n· 不显示精确名次\n\n目前范围：仅长篇；种子快照 + 库外书现算',
+                ? '当前榜：口碑（cqs）\n\n按「同代口碑分」降序：\n· 同代 = 同形式 × 同年 × 同题材 × 同收藏档\n· 分数越高 = 口碑在同代同类中越好\n· 不显示精确名次\n\n「位置」榜按「同格收藏位置」（cps）：\n同形式 × 年 × 篇幅档 × 题材里的收藏位置\n\n当前形式：$scope；种子快照 + 库外书现算'
+                : '当前榜：位置（cps）\n\n按「同格收藏位置」降序：\n同形式 × 年 × 篇幅档 × 题材里的收藏位置\n\n「口碑」榜按「同代口碑分」（cqs）：\n· 同代 = 同形式 × 同年 × 同题材 × 同收藏档\n· 不显示精确名次\n\n当前形式：$scope；种子快照 + 库外书现算',
             style: const TextStyle(fontSize: 12, height: 1.6),
           ),
         ),
@@ -203,7 +208,7 @@ class _QuantListPageState extends ConsumerState<QuantListPage> {
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('量化榜单'),
+        title: Text(widget.form == 'dialogue' ? '对话量化榜单' : '量化榜单'),
         actions: [
           IconButton(
             tooltip: '手动翻页',

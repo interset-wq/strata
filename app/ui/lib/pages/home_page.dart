@@ -885,6 +885,12 @@ class _HomePageState extends ConsumerState<HomePage> {
         '点击/收藏/点赞/字数',
         listPath('经典榜单', '&metric-switchable=1'),
       ),
+      (
+        Icons.insights,
+        '量化榜单',
+        '口碑/位置两榜',
+        '/quant-list?form=dialogue',
+      ),
       (Icons.short_text, '短对话', '≤5 万字', listPath('短对话', '&words-band=short')),
       (
         Icons.menu_book,
