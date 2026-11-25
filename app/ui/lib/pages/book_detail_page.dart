@@ -257,7 +257,9 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                               _copied('标题');
                             },
                             child: Text(
-                                s(eff['title'] ?? b['title']) ?? '',
+                                '${s(eff['title'] ?? b['title']) ?? ''} #${widget.nid}',
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
                                 style:
                                     Theme.of(context).textTheme.headlineSmall),
                           ),
@@ -644,40 +646,6 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                     fontSize: 12,
                     color: Theme.of(context).colorScheme.onSurfaceVariant)),
             const SizedBox(height: 6),
-            InkWell(
-              // 书籍 ID（可复制，用户 2026-11-21 要求）：复制 nid 便于跨端检索。
-              onTap: () {
-                Clipboard.setData(ClipboardData(text: '${widget.nid}'));
-                _copied('书籍 ID');
-              },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 3),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('书籍 ID',
-                        style: TextStyle(
-                            fontSize: 12,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurfaceVariant)),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text('${widget.nid}',
-                            style: const TextStyle(fontSize: 12)),
-                        const SizedBox(width: 4),
-                        Icon(Icons.copy_rounded,
-                            size: 12,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurfaceVariant),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
             row('状态', eff['status']?.toString() ?? s(b['status'])),
             row('形式', s(b['form'])),
             row('入库日期（估计）', s(b['est_date'])),
