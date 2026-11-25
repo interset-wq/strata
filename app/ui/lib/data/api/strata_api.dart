@@ -1275,6 +1275,7 @@ class RankItem {
   final String? contest;
   final String? coverUrl;
   final String? status;
+  final String? priceType;
   final int? words;
   final int? clicks;
   final int? praises;
@@ -1299,6 +1300,7 @@ class RankItem {
       contest = m['contest'] as String?,
       coverUrl = m['cover_url'] as String?,
       status = m['status'] as String?,
+      priceType = m['price_type'] as String?,
       words = m['words'] as int?,
       clicks = m['clicks'] as int?,
       praises = (m['praises'] as num?)?.toInt(),

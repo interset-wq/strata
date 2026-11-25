@@ -317,6 +317,7 @@ type RankItem struct {
 	Contest  *string  `json:"contest"`
 	CoverURL *string  `json:"cover_url"`
 	Status   *string  `json:"status"`
+	PriceType *string `json:"price_type"`
 	Words    *int64   `json:"words"`
 	Clicks   *int64   `json:"clicks"`
 	Praises  *int64   `json:"praises"`
@@ -390,7 +391,8 @@ func (s *Store) ClassicBooks(ctx context.Context, genre, status, contest, form, 
 	tags []string, year, limit, offset int, order, dir string) ([]RankItem, error) {
 	query := `
 SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
-       seed.books.est_year, seed.books.status, seed.books.words, seed.books.clicks,
+       seed.books.est_year, seed.books.status, seed.books.price_type,
+       seed.books.words, seed.books.clicks,
        seed.books.favs, seed.books.praises, seed.books.contest, seed.books.form,
        COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url
 FROM seed.books
@@ -476,18 +478,19 @@ WHERE seed.books.is_licensed = 0`
 	items := make([]RankItem, 0, limit)
 	for rows.Next() {
 		var (
-			item                         RankItem
-			gen, status, contest, cover  sql.NullString
-			words, clicks, favs, praises sql.NullInt64
+			item                                RankItem
+			gen, status, price, contest, cover  sql.NullString
+			words, clicks, favs, praises        sql.NullInt64
 		)
 		if err := rows.Scan(&item.NID, &item.Title, &item.Author, &gen,
-			&item.EstYear, &status, &words, &clicks, &favs, &praises,
+			&item.EstYear, &status, &price, &words, &clicks, &favs, &praises,
 			&contest, &item.Form, &cover); err != nil {
 			return nil, err
 		}
 		item.Rank = len(items) + offset + 1
 		item.Genre = strPtr(gen)
 		item.Status = strPtr(status)
+		item.PriceType = strPtr(price)
 		item.Words = intPtr(words)
 		item.Clicks = intPtr(clicks)
 		item.Favs = intPtr(favs)
@@ -1217,7 +1220,8 @@ func (s *Store) RandomBooks(ctx context.Context, limit int, status, form string)
 	}
 	query := `
 SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
-       seed.books.est_year, seed.books.status, seed.books.words, seed.books.clicks,
+       seed.books.est_year, seed.books.status, seed.books.price_type,
+       seed.books.words, seed.books.clicks,
        seed.books.favs, seed.books.praises, seed.books.form,
        COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url
 FROM seed.books
@@ -1245,17 +1249,18 @@ func (s *Store) scanRankItems(ctx context.Context, rows *sql.Rows,
 	items := []RankItem{}
 	for rows.Next() {
 		var (
-			item               RankItem
-			gen, status, cover sql.NullString
+			item                 RankItem
+			gen, status, price, cover sql.NullString
 			words, clicks, favs,
 			praises sql.NullInt64
 		)
 		if err := rows.Scan(&item.NID, &item.Title, &item.Author, &gen,
-			&item.EstYear, &status, &words, &clicks, &favs, &praises, &item.Form, &cover); err != nil {
+			&item.EstYear, &status, &price, &words, &clicks, &favs, &praises, &item.Form, &cover); err != nil {
 			return nil, err
 		}
 		item.Genre = strPtr(gen)
 		item.Status = strPtr(status)
+		item.PriceType = strPtr(price)
 		item.Words = intPtr(words)
 		item.Clicks = intPtr(clicks)
 		item.Favs = intPtr(favs)
@@ -1283,7 +1288,8 @@ func (s *Store) curated(ctx context.Context, limit int, extra string) ([]RankIte
 func (s *Store) curatedOrder(ctx context.Context, limit int, extra, order string) ([]RankItem, error) {
 	query := `
 SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
-       seed.books.est_year, seed.books.status, seed.books.words, seed.books.clicks,
+       seed.books.est_year, seed.books.status, seed.books.price_type,
+       seed.books.words, seed.books.clicks,
        seed.books.favs, seed.books.praises, seed.books.form,
        COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url
 FROM seed.books
@@ -1508,7 +1514,8 @@ func (s *Store) CoverCarousel(ctx context.Context, form string,
 	limit int, seed int64) ([]RankItem, error) {
 	query := `
 SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
-       seed.books.est_year, seed.books.status, seed.books.words, seed.books.clicks,
+       seed.books.est_year, seed.books.status, seed.books.price_type,
+       seed.books.words, seed.books.clicks,
        seed.books.favs, seed.books.praises, seed.books.form,
        COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url
 FROM seed.books

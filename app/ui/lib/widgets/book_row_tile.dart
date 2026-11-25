@@ -23,22 +23,53 @@ class BookRowTile extends StatelessWidget {
     return '$n';
   }
 
+  /// 状态/付费小徽标：浅底 + 彩色字（用户 2026-11-25 榜单行版式）。
+  Widget _pill(BuildContext context, String text, Color fg, Color bg) {
+    return Container(
+      margin: const EdgeInsets.only(left: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(text, style: TextStyle(fontSize: 10, color: fg)),
+    );
+  }
+
+  /// 标签 pill：题材与 book_tags 同款（主色浅底）。
+  Widget _tagPill(BuildContext context, String t) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: scheme.primary.withValues(alpha: .08),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(t, style: TextStyle(fontSize: 10, color: scheme.primary)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final coverUrl = item.coverUrl;
     final hasCover = coverUrl != null && coverUrl.isNotEmpty;
 
-    // 标签：题材 + book_tags（最多 3 个）
-    final tags = <String>[
-      if (item.genre != null && item.genre!.isNotEmpty) item.genre!,
-      ...item.tags,
-    ];
-    if (tags.toSet().length != tags.length) {
-      // 去重且保持顺序
-      final seen = <String>{};
-      tags.removeWhere((t) => !seen.add(t));
+    // 标签行：题材 + book_tags（去重；题材与 book_tags 之间竖线分隔，
+    // 用户 2026-11-25 最终版排版）。
+    final genre = (item.genre != null && item.genre!.isNotEmpty)
+        ? item.genre!
+        : null;
+    final bookTags = <String>[];
+    for (final t in item.tags) {
+      if (t != genre && !bookTags.contains(t)) bookTags.add(t);
     }
+
+    // 状态徽标（标题行右侧；未判定不显示）
+    final status =
+        (item.status != null && item.status!.isNotEmpty) ? item.status! : null;
+    // 付费徽标（作者行右侧；免费不显示——用户 2026-11-25）
+    final price = item.priceType;
 
     // 指标行：字数 · 点击 · 收藏 · 赞（非空才显示；顺序对齐官方 app 排版）
     final metrics = <(IconData, String)>[
@@ -79,23 +110,52 @@ class BookRowTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    item.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  // 标题行：单行标题 + 状态徽标（用户 2026-11-25）
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      if (status != null)
+                        _pill(
+                          context,
+                          status,
+                          status == '连载中'
+                              ? scheme.primary
+                              : scheme.onSurfaceVariant,
+                          status == '连载中'
+                              ? scheme.primary.withValues(alpha: .12)
+                              : scheme.outline.withValues(alpha: .15),
+                        ),
+                    ],
                   ),
                   const SizedBox(height: 3),
-                  Text(
-                    item.author,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 11, color: scheme.secondary),
+                  // 作者行：作者（左）…… 付费徽标（右对齐；免费不显示）
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item.author,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              TextStyle(fontSize: 11, color: scheme.secondary),
+                        ),
+                      ),
+                      if (price != null && price.isNotEmpty && price != '免费')
+                        _pill(context, price, Colors.amber.shade900,
+                            Colors.amber.withValues(alpha: .15)),
+                    ],
                   ),
-                  if (tags.isNotEmpty) ...[
+                  if (genre != null || bookTags.isNotEmpty) ...[
                     const SizedBox(height: 6),
                     Wrap(
                       spacing: 4,
@@ -124,24 +184,18 @@ class BookRowTile extends StatelessWidget {
                               ),
                             ),
                           ),
-                        for (final t in tags.take(3))
+                        if (genre != null) _tagPill(context, genre),
+                        // 题材与 book_tags 之间竖线分隔（用户 2026-11-25）
+                        if (genre != null && bookTags.isNotEmpty)
                           Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: scheme.primary.withValues(alpha: .08),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              t,
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: scheme.primary,
-                              ),
-                            ),
+                            width: 1,
+                            height: 10,
+                            margin:
+                                const EdgeInsets.symmetric(horizontal: 2),
+                            color: scheme.outline.withValues(alpha: .5),
                           ),
+                        for (final t in bookTags.take(genre == null ? 3 : 2))
+                          _tagPill(context, t),
                       ],
                     ),
                   ],
