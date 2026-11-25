@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -46,6 +47,17 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
   bool onWatch = false;
   bool tracking = false;
   Future<List<ObservationRow>>? observations;
+
+  // 标题区点击复制：title 与 #id 各自可点（用户 2026-11-25）。
+  final TapGestureRecognizer _titleTap = TapGestureRecognizer();
+  final TapGestureRecognizer _idTap = TapGestureRecognizer();
+
+  @override
+  void dispose() {
+    _titleTap.dispose();
+    _idTap.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -247,22 +259,39 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // 标题快速复制：长按（用户 2026-11-21 要求）。
-                        Tooltip(
-                          message: '长按复制标题',
-                          child: GestureDetector(
-                            onLongPress: () {
-                              final t = s(eff['title'] ?? b['title']) ?? '';
-                              Clipboard.setData(ClipboardData(text: t));
-                              _copied('标题');
-                            },
-                            child: Text(
-                                '${s(eff['title'] ?? b['title']) ?? ''} #${widget.nid}',
-                                maxLines: 3,
-                                overflow: TextOverflow.ellipsis,
-                                style:
-                                    Theme.of(context).textTheme.headlineSmall),
+                        // 标题区点击复制（用户 2026-11-25）：点 title 复制
+                        // 标题，点 #id 复制 id；#id 小号浅色作次级信息。
+                        Text.rich(
+                          TextSpan(
+                            style: Theme.of(context).textTheme.headlineSmall,
+                            children: [
+                              TextSpan(
+                                text: s(eff['title'] ?? b['title']) ?? '',
+                                recognizer: _titleTap..onTap = () {
+                                  final t =
+                                      s(eff['title'] ?? b['title']) ?? '';
+                                  Clipboard.setData(ClipboardData(text: t));
+                                  _copied('标题');
+                                },
+                              ),
+                              TextSpan(
+                                text: ' #${widget.nid}',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
+                                ),
+                                recognizer: _idTap..onTap = () {
+                                  Clipboard.setData(
+                                      ClipboardData(text: '${widget.nid}'));
+                                  _copied('书籍 ID');
+                                },
+                              ),
+                            ],
                           ),
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 6),
                         InkWell(
