@@ -755,7 +755,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
         ),
         if (canExpand)
           Padding(
-            padding: const EdgeInsets.only(left: 8),
+            padding: const EdgeInsets.only(left: 16, top: 4),
             child: TextButton(
               onPressed: () => setState(() => _tagsExpanded = !_tagsExpanded),
               child: Text(_tagsExpanded ? '收起' : '展开全部（${unselected.length}）'),
@@ -816,6 +816,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 12),
               Container(
@@ -854,6 +855,7 @@ class _FilterSheetState extends ConsumerState<_FilterSheet> {
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.only(top: 2, bottom: 8),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _section(
                         '状态',
