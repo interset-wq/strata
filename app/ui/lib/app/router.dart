@@ -18,7 +18,6 @@ import '../pages/history_page.dart';
 import '../pages/eras_explorer_page.dart';
 import '../pages/home_page.dart';
 import '../pages/ip_books_page.dart';
-import '../pages/rankings_page.dart';
 import '../pages/calendar_page.dart';
 import '../pages/search_page.dart';
 import '../pages/image_viewer_page.dart';
@@ -77,7 +76,10 @@ final router = GoRouter(
         ),
         StatefulShellBranch(
           routes: [
-            GoRoute(path: '/rankings', builder: (_, _) => const RankingsPage()),
+            GoRoute(
+              path: '/contests',
+              builder: (_, _) => const ContestListPage(),
+            ),
           ],
         ),
         StatefulShellBranch(

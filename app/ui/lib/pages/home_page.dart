@@ -567,14 +567,6 @@ class _HomePageState extends ConsumerState<HomePage> {
           subtitle: '官方授权日本轻小说',
           route: '/licensed',
         ),
-        const SizedBox(height: 10),
-        _wideEntryCard(
-          context,
-          icon: Icons.emoji_events,
-          title: '萌神获奖',
-          subtitle: '官方萌神奖 2018–2024',
-          route: '/moe-goddess',
-        ),
       ],
     );
   }

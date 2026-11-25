@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../core/providers.dart';
 import '../widgets/back_to_top.dart';
@@ -63,6 +64,14 @@ class _ContestListPageState extends ConsumerState<ContestListPage>
     return Scaffold(
       appBar: AppBar(
         title: const Text('赛事档案'),
+        actions: [
+          // 萌神大赛纳入比赛归档（用户 2026-11-25）：入口常驻归档页头部。
+          IconButton(
+            icon: const Icon(Icons.emoji_events),
+            tooltip: '萌神获奖',
+            onPressed: () => context.push('/moe-goddess'),
+          ),
+        ],
         bottom: TabBar(
           controller: _tabCtrl,
           labelColor: scheme.primary,
