@@ -174,17 +174,19 @@ class _AuthorRankPageState extends ConsumerState<AuthorRankPage> {
                                   children: [
                                     CircleAvatar(
                                       radius: 20,
-                                      backgroundColor:
-                                          scheme.surfaceContainerHighest,
+                                      // 首字符兜底底/字用 primaryContainer
+                                      // 语义色对（对比度有保证；surfaceContainer
+                                      // 太浅，首字符会糊成一片白）。
+                                      backgroundColor: scheme.primaryContainer,
                                       backgroundImage: (a.avatar != null)
                                           ? NetworkImage(a.avatar!)
                                           : null,
                                       child: Text(
                                         _firstChar(a.author),
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                             fontSize: 15,
-                                            fontWeight:
-                                                FontWeight.w600),
+                                            fontWeight: FontWeight.w600,
+                                            color: scheme.onPrimaryContainer),
                                       ),
                                     ),
                                     Positioned(
