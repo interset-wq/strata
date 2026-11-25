@@ -45,6 +45,10 @@ type Book struct {
 	Tags       *string  `json:"tags"`
 	PR         *float64 `json:"pr"`
 	Form       string   `json:"form"`
+	Cqs        *float64 `json:"cqs"`
+	CqsState   *string  `json:"cqs_state"`
+	Cps        *float64 `json:"cps"`
+	LenNorm    *float64 `json:"len_norm"`
 	IsLicensed bool     `json:"is_licensed"`
 }
 
@@ -174,7 +178,7 @@ func (s *Store) Book(ctx context.Context, nid int64) (*BookDetail, error) {
 	const q = `
 SELECT nid, title, author, genre, price_type, status, contest, words, clicks,
        favs, praises, featured, cover_url, updated_at, est_year, est_date,
-       est_conf, tags, pr, form,
+       est_conf, tags, pr, form, cqs, cqs_state, cps, len_norm,
        is_licensed
 FROM seed.books WHERE nid = ?`
 
@@ -186,12 +190,14 @@ FROM seed.books WHERE nid = ?`
 		pr                                       sql.NullFloat64
 		form                                     string
 		isLicensed                               sql.NullInt64
+		cqs, cps, lenNorm                        sql.NullFloat64
+		cqsState                                 sql.NullString
 	)
 	err := s.DB.QueryRowContext(ctx, q, nid).Scan(
 		&b.NID, &b.Title, &b.Author, &genre, &priceType, &status, &contest,
 		&words, &clicks, &favs, &praises, &featured, &cover, &updatedAt,
 		&b.EstYear, &b.EstDate, &b.EstConf, &tags,
-		&pr, &form, &isLicensed,
+		&pr, &form, &cqs, &cqsState, &cps, &lenNorm, &isLicensed,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
@@ -212,6 +218,10 @@ FROM seed.books WHERE nid = ?`
 	b.UpdatedAt = strPtr(updatedAt)
 	b.Tags = strPtr(tags)
 	b.PR = floatPtr(pr)
+	b.Cqs = floatPtr(cqs)
+	b.CqsState = strPtr(cqsState)
+	b.Cps = floatPtr(cps)
+	b.LenNorm = floatPtr(lenNorm)
 	b.Form = form
 	b.IsLicensed = isLicensed.Valid && isLicensed.Int64 != 0
 
