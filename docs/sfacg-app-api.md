@@ -127,7 +127,7 @@ resp = requests.get("https://api.sfacg.com/novels/730611",
 | `novelName` | str | `title` | 标题 |
 | `authorId` | int | — | **账号唯一身份**（改名/大小写不变，可做作者生态） |
 | `authorName` | str | `author` | 作者**显示名**（可改，不能当身份） |
-| `addTime` | str | — | **上架时间，精确到秒**（`2024-12-27T19:03:11`） |
+| `addTime` | str | — | **建档时间，精确到秒**（`2024-12-27T19:03:11`） |
 | `lastUpdateTime` | str | `updated_at` | 最后更新时间，精确到秒 |
 | `markCount` | int | `favs` | 收藏数（精确整数） |
 | `viewTimes` | int | `clicks` | 浏览/点击数（**精确整数**，非「万」量化） |
@@ -272,7 +272,7 @@ PC 版人气显示到 `0.1 万`（步长 1,000、±500），本项目据此取�
 | 维度 | PC HTML（`m.sfacg.com`） | App API（`api.sfacg.com`） |
 | --- | --- | --- |
 | 单本体积 | 15 KB（移动版）/ 73 KB（PC 版） | **0.7 KB** |
-| 上架时间 | 无 | **有（精确到秒）** |
+| 建档时间 | 无 | **有（精确到秒）** |
 | 点击数 | `11899.5万` 量化（±500） | **精确整数** |
 | 章节清单 | 需解析目录 HTML | **结构化 JSON** |
 | 榜单 | `MonthlyBoy.ashx`（可回溯任意月） | `/specialpush` 位表 + `ticket/rank`（当期） |
