@@ -92,7 +92,7 @@ type BookMeta struct {
 	CategoryID  *int64   `json:"category_id"`
 	IsSensitive *bool    `json:"is_sensitive"`
 	AllowDown   *bool    `json:"allow_down"`
-	EstYear     *int     `json:"est_year"`
+	EstYear     *int64   `json:"est_year"`
 	Form        *string  `json:"form"`
 	Cqs         *float64 `json:"cqs"`
 	CqsState    *string  `json:"cqs_state"`
@@ -1393,7 +1393,9 @@ func (s *Store) SeedNIDSet(ctx context.Context, nids []int64) (map[int64]bool, e
 		}
 		rows, err := s.DB.QueryContext(ctx,
 			"SELECT nid FROM seed.books WHERE nid IN ("+
-				strings.Join(ph, ",")+")", args...)
+				strings.Join(ph, ",")+") UNION SELECT nid FROM book_meta"+
+				" WHERE nid IN ("+strings.Join(ph, ",")+")",
+			append(append([]any{}, args...), args...)...)
 		if err != nil {
 			return nil, err
 		}
@@ -2483,7 +2485,8 @@ func (s *Store) BookMeta(ctx context.Context, nid int64) (*BookMeta, error) {
 	const q = `
 SELECT nid, source, fetched_at, title, author, author_id, genre, type_id,
  price_type, status, cover_url, summary, words, favs, praises, clicks,
- updated_at, add_time, point, bg_banner, category_id, is_sensitive, allow_down
+ updated_at, add_time, point, bg_banner, category_id, is_sensitive, allow_down,
+ est_year, form, cqs, cqs_state, cps, len_norm
 FROM book_meta WHERE nid = ?`
 	var (
 		m                                              BookMeta
@@ -2492,12 +2495,16 @@ FROM book_meta WHERE nid = ?`
 		authorID, typeID, words, favs, praises, clicks sql.NullInt64
 		categoryID, isSensitive, allowDown             sql.NullInt64
 		point                                          sql.NullFloat64
+		estYear                                        sql.NullInt64
+		form, cqsState                                 sql.NullString
+		cqs, cps, lenNorm                              sql.NullFloat64
 	)
 	err := s.DB.QueryRowContext(ctx, q, nid).Scan(
 		&m.NID, &m.Source, &m.FetchedAt, &title, &author, &authorID, &genre,
 		&typeID, &priceType, &status, &cover, &summary, &words, &favs,
 		&praises, &clicks, &updatedAt, &addTime, &point, &bgBanner,
 		&categoryID, &isSensitive, &allowDown,
+		&estYear, &form, &cqs, &cqsState, &cps, &lenNorm,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
@@ -2525,6 +2532,12 @@ FROM book_meta WHERE nid = ?`
 	m.CategoryID = intPtr(categoryID)
 	m.IsSensitive = boolPtr(isSensitive)
 	m.AllowDown = boolPtr(allowDown)
+	m.EstYear = intPtr(estYear)
+	m.Form = strPtr(form)
+	m.Cqs = floatPtr(cqs)
+	m.CqsState = strPtr(cqsState)
+	m.Cps = floatPtr(cps)
+	m.LenNorm = floatPtr(lenNorm)
 	return &m, nil
 }
 
