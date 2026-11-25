@@ -51,7 +51,7 @@ final router = GoRouter(
             NavigationDestination(
               icon: Icon(Icons.leaderboard_outlined),
               selectedIcon: Icon(Icons.leaderboard),
-              label: '榜单',
+              label: '比赛',
             ),
             NavigationDestination(
               icon: Icon(Icons.event_available_outlined),
