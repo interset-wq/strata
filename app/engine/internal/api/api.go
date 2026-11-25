@@ -197,6 +197,9 @@ func NewServer(s *store.Store) *Server {
 	group.GET("/dev/test-book", srv.devTestBook)
 	group.POST("/dev/test-book", srv.devTestBookInject)
 	group.DELETE("/dev/test-book", srv.devTestBookRemove)
+	// 升级前收录的 book_meta 行追溯补算运行时指标（幂等；一次性批量，
+	// 失败 best-effort——下次启动或收录时再补）。
+	_ = srv.store.ScorePendingBookMeta(context.Background())
 	srv.startWatcher(context.Background())
 	return srv
 }
@@ -383,6 +386,14 @@ func (s *Server) book(c *gin.Context) {
 			fail(c, http.StatusInternalServerError, "internal", rerr.Error())
 			return
 		}
+		// 升级前收录的行没有计算列：幂等补算（纯本地计算，无网络）
+		// 后带值返回（用户 2026-11-25：收录书与内置书地位均等）。
+		if meta.Cqs == nil {
+			_ = s.store.RescoreBookMeta(c.Request.Context(), nid)
+			if rm, rerr := s.store.BookMeta(c.Request.Context(), nid); rerr == nil {
+				meta = rm
+			}
+		}
 		book := gin.H{
 			"nid":        nid,
 			"title":      meta.Title,
@@ -397,6 +408,12 @@ func (s *Server) book(c *gin.Context) {
 			"cover_url":  meta.CoverURL,
 			"updated_at": meta.UpdatedAt,
 			"summary":    meta.Summary,
+			"form":       meta.Form,
+			"est_year":   meta.EstYear,
+			"cqs":        meta.Cqs,
+			"cqs_state":  meta.CqsState,
+			"cps":        meta.Cps,
+			"len_norm":   meta.LenNorm,
 		}
 		eff := gin.H{
 			"title":      meta.Title,

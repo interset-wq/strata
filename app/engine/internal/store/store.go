@@ -92,6 +92,12 @@ type BookMeta struct {
 	CategoryID  *int64   `json:"category_id"`
 	IsSensitive *bool    `json:"is_sensitive"`
 	AllowDown   *bool    `json:"allow_down"`
+	EstYear     *int     `json:"est_year"`
+	Form        *string  `json:"form"`
+	Cqs         *float64 `json:"cqs"`
+	CqsState    *string  `json:"cqs_state"`
+	Cps         *float64 `json:"cps"`
+	LenNorm     *float64 `json:"len_norm"`
 }
 
 type BookDetail struct {

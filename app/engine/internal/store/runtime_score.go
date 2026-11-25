@@ -119,6 +119,35 @@ UPDATE book_meta SET est_year = ?, form = ?, cqs = ?, cqs_state = ?,
 	return err
 }
 
+// ScorePendingBookMeta backfills every book_meta row admitted before the
+// metric columns existed (cqs IS NULL). Idempotent — rows whose numbers the
+// calib tables cannot support stay NULL and are retried on next start.
+func (s *Store) ScorePendingBookMeta(ctx context.Context) error {
+	rows, err := s.DB.QueryContext(ctx, `
+SELECT nid FROM book_meta
+WHERE cqs IS NULL AND words IS NOT NULL AND words >= 2000
+  AND favs IS NOT NULL`)
+	if err != nil {
+		return err
+	}
+	var nids []int64
+	for rows.Next() {
+		var n int64
+		if err := rows.Scan(&n); err != nil {
+			rows.Close()
+			return err
+		}
+		nids = append(nids, n)
+	}
+	rows.Close()
+	for _, n := range nids {
+		if err := s.RescoreBookMeta(ctx, n); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // score carries the runtime-metric outputs for one row. A zero year means
 // "nothing to store" — the anchors could not date the row.
 type score struct {
