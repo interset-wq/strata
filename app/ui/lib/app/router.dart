@@ -18,6 +18,7 @@ import '../pages/history_page.dart';
 import '../pages/eras_explorer_page.dart';
 import '../pages/home_page.dart';
 import '../pages/ip_books_page.dart';
+import '../pages/author_rank_page.dart';
 import '../pages/quant_list_page.dart';
 import '../pages/calendar_page.dart';
 import '../pages/search_page.dart';
@@ -230,6 +231,13 @@ final router = GoRouter(
       builder: (_, loc) => QuantListPage(
         // 按 form 隔离出页（用户 2026-11-25：app 一切按 form 隔离，
         // 无页内切换）：长篇 tab 默认 / 对话 tab 传 form=dialogue。
+        form: loc.uri.queryParameters['form'] ?? 'long',
+      ),
+    ),
+    GoRoute(
+      path: '/author-ranks',
+      builder: (_, loc) => AuthorRankPage(
+        // 同隔离原则（docs/author-rank.md §9）：form 缺省 long。
         form: loc.uri.queryParameters['form'] ?? 'long',
       ),
     ),

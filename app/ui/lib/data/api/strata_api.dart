@@ -6,6 +6,28 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 
 /// HTTP client for the embedded Go engine.
 /// Contract: app/docs/08-engine-api.md.
+/// 作者榜行（docs/author-rank.md §9 最小字段）：作者名 + 一本代表作。
+class AuthorRankItem {
+  final int rankNo;
+  final String author;
+  final int repNid;
+  final String repTitle;
+
+  const AuthorRankItem({
+    required this.rankNo,
+    required this.author,
+    required this.repNid,
+    required this.repTitle,
+  });
+
+  factory AuthorRankItem.fromJson(Map<String, dynamic> m) => AuthorRankItem(
+    rankNo: (m['rank_no'] as num).toInt(),
+    author: m['author'] as String,
+    repNid: (m['rep_nid'] as num).toInt(),
+    repTitle: m['rep_title'] as String,
+  );
+}
+
 class StrataApi {
   final HttpClient _client = HttpClient();
   final String base; // e.g. http://127.0.0.1:45851
@@ -275,6 +297,16 @@ class StrataApi {
       items: items,
       meta: (body['meta'] as Map?)?.cast<String, dynamic>() ?? const {}
     );
+  }
+
+  /// 作者榜（docs/author-rank.md §9；用户 2026-11-25 home 状态入口换作者榜）：
+  /// seed v10 预构建表，按 form 隔离，运行时零计算。
+  Future<List<AuthorRankItem>> authorRanks({String form = 'long'}) async {
+    final body = await _get('/author-ranks', {'form': form})
+        as Map<String, dynamic>;
+    return ((body['items'] as List?) ?? const [])
+        .map((e) => AuthorRankItem.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   Future<DiscoverPage> discover({

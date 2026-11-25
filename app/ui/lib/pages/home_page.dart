@@ -704,7 +704,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     final scheme = Theme.of(context).colorScheme;
     final entries = [
       (Icons.bookmarks, '书单', '/booklists'),
-      (Icons.update, '状态', '/browse?mode=status'),
+      (Icons.person_search, '作者榜', '/author-ranks?form=long'),
       (Icons.insights, '量化榜单', '/quant-list'),
       (
         Icons.leaderboard,
