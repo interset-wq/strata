@@ -627,7 +627,8 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                   color: Colors.amber.shade700, size: 22),
               title: Text(contest, style: const TextStyle(fontSize: 13.5)),
               trailing: const Icon(Icons.chevron_right, size: 18),
-              onTap: () => context.push('/contests?tab=${_contestTab(contest)}'),
+              onTap: () => context
+                  .push('/contest-archive?tab=${_contestTab(contest)}'),
             ),
           ),
         for (final aw in d.awards)
@@ -641,7 +642,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                   style: const TextStyle(fontSize: 13.5)),
               trailing: const Icon(Icons.chevron_right, size: 18),
               onTap: () => context
-                  .push('/contests?tab=${_contestTab(aw.edition)}'),
+                  .push('/contest-archive?tab=${_contestTab(aw.edition)}'),
             ),
           ),
       ],

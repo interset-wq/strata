@@ -144,8 +144,10 @@ final router = GoRouter(
     ),
     // 赛事档案（docs/contest-display-in-app.md 形态一）：本地零请求视图，
     // 库外参赛规模/获奖属 P1 清单 API。
+    // 赛事档案全屏页（从详情页等根级页面进入）。不能复用 /contests——
+    // 那是底部导航 shell 分支内的路径，从 shell 外 push 会报错。
     GoRoute(
-      path: '/contests',
+      path: '/contest-archive',
       builder: (context, state) => ContestListPage(
           initialTab: state.uri.queryParameters['tab']),
     ),
