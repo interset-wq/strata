@@ -366,7 +366,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                 ),
               // 六指标格：点击/收藏/点赞/字数（短评/长评来自观测，种子无）
               _metricGrid(context, eff, b),
-              if (d.awards.isNotEmpty) _contestCards(context, d),
+              _contestCards(context, d, s(b['contest'])),
               _pctlCard(context, b),
               _metaCard(context, d, eff, b),
               const SizedBox(height: 12),
@@ -610,11 +610,26 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
     );
   }
 
-  /// 比赛信息卡片（用户 2026-11-25）：每届获奖一张卡，点击跳转赛事档案
-  /// 并定位到对应分类 tab。edition → series 用最粗的字面判定即可。
-  Widget _contestCards(BuildContext context, BookDetail d) {
+  /// 比赛信息卡片（用户 2026-11-25）：只要参加了比赛（books.contest 有
+  /// 届次文本）就出参赛卡；获奖标定（contest_awards）作为附加行。点击
+  /// 跳转赛事档案并定位到对应分类 tab。
+  Widget _contestCards(BuildContext context, BookDetail d, String? contest) {
+    final hasContest = contest != null && contest.isNotEmpty;
+    if (!hasContest && d.awards.isEmpty) return const SizedBox.shrink();
     return Column(
       children: [
+        if (hasContest)
+          Card(
+            margin: const EdgeInsets.only(top: 8),
+            child: ListTile(
+              dense: true,
+              leading: Icon(Icons.emoji_events,
+                  color: Colors.amber.shade700, size: 22),
+              title: Text(contest, style: const TextStyle(fontSize: 13.5)),
+              trailing: const Icon(Icons.chevron_right, size: 18),
+              onTap: () => context.push('/contests?tab=${_contestTab(contest)}'),
+            ),
+          ),
         for (final aw in d.awards)
           Card(
             margin: const EdgeInsets.only(top: 8),
@@ -624,8 +639,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                   color: Colors.amber.shade700, size: 22),
               title: Text('${aw.edition} ${aw.displayAward}',
                   style: const TextStyle(fontSize: 13.5)),
-              trailing:
-                  const Icon(Icons.chevron_right, size: 18),
+              trailing: const Icon(Icons.chevron_right, size: 18),
               onTap: () => context
                   .push('/contests?tab=${_contestTab(aw.edition)}'),
             ),
