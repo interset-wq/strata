@@ -132,22 +132,15 @@ class BookRowTile extends StatelessWidget {
                           ),
                         ),
                       ),
-                      if (status != null)
-                        _pill(
-                          context,
-                          status,
-                          status == '连载中'
-                              ? scheme.primary
-                              : scheme.onSurfaceVariant,
-                          status == '连载中'
-                              ? scheme.primary.withValues(alpha: .12)
-                              : scheme.outline.withValues(alpha: .15),
-                        ),
+                      // 付费徽标占标题行（免费不显示）；状态徽标在作者行
+                      if (price != null && price.isNotEmpty && price != '免费')
+                        _pill(context, price, Colors.amber.shade900,
+                            Colors.amber.withValues(alpha: .15)),
                     ],
                   ),
                   const SizedBox(height: 3),
-                  // 作者行：作者（左）…… 代系 · 付费徽标（右对齐；
-                  // 免费不显示；代系缺失不显示）
+                  // 作者行：作者（左）…… 状态徽标 · 代系（右对齐；
+                  // 缺失不显示）
                   Row(
                     children: [
                       Expanded(
@@ -159,14 +152,22 @@ class BookRowTile extends StatelessWidget {
                               TextStyle(fontSize: 11, color: scheme.secondary),
                         ),
                       ),
+                      if (status != null)
+                        _pill(
+                          context,
+                          status,
+                          status == '连载中'
+                              ? scheme.primary
+                              : scheme.onSurfaceVariant,
+                          status == '连载中'
+                              ? scheme.primary.withValues(alpha: .12)
+                              : scheme.outline.withValues(alpha: .15),
+                        ),
                       if (item.estYear > 0)
                         Text('${item.estYear} 代',
                             style: TextStyle(
                                 fontSize: 10,
                                 color: scheme.onSurfaceVariant)),
-                      if (price != null && price.isNotEmpty && price != '免费')
-                        _pill(context, price, Colors.amber.shade900,
-                            Colors.amber.withValues(alpha: .15)),
                     ],
                   ),
                   if (genre != null || bookTags.isNotEmpty) ...[
