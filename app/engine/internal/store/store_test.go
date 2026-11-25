@@ -603,6 +603,29 @@ func TestAuthorRanks(t *testing.T) {
 	if err != nil || len(short) != 0 {
 		t.Fatalf("short board (no rows) = %+v, %v", short, err)
 	}
+	// Avatar: the cached author image (user.db author_profiles, keyed by
+	// lower display name) is attached for cached authors only — never
+	// fetched, never from the seed.
+	if _, err := st.DB.ExecContext(ctx,
+		`INSERT INTO author_profiles(author_key, author_name, author_intro,
+		 author_avatar, verdict, source_nid, observed_at, works)
+		 VALUES('author a', 'Author A', NULL, 'https://rss.sfacg.com/a.jpg',
+		 'ok', 1001, 1, '[]')`); err != nil {
+		t.Fatal(err)
+	}
+	long2, err := st.AuthorRanks(ctx, "long")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(long2) != 2 {
+		t.Fatalf("long board with cache: got %d rows", len(long2))
+	}
+	if long2[0].Avatar == nil || *long2[0].Avatar != "https://rss.sfacg.com/a.jpg" {
+		t.Fatalf("rank1 avatar = %+v, want the cached image", long2[0].Avatar)
+	}
+	if long2[1].Avatar != nil {
+		t.Fatalf("rank2 avatar = %+v, want nil (no cached profile)", long2[1].Avatar)
+	}
 }
 
 func TestRecommendCQS(t *testing.T) {

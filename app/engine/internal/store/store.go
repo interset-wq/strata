@@ -1087,6 +1087,10 @@ type AuthorRank struct {
 	Author   string `json:"author"`
 	RepNID   int64  `json:"rep_nid"`
 	RepTitle string `json:"rep_title"`
+	// Avatar is the cached author image from user.db author_profiles (set
+	// when the author page was opened); never fetched here. NULL when the
+	// author has no cached profile — the UI renders the first character.
+	Avatar *string `json:"avatar,omitempty"`
 }
 
 // AuthorRanks lists the prebuilt author board for one form, ordered by
@@ -1099,18 +1103,25 @@ func (s *Store) AuthorRanks(ctx context.Context, form string) ([]AuthorRank, err
 		return nil, fmt.Errorf("unsupported author-rank form %q", form)
 	}
 	rows, err := s.DB.QueryContext(ctx,
-		`SELECT rank_no, author, rep_nid, rep_title
-		   FROM seed.author_ranks WHERE form = ? ORDER BY rank_no`, form)
+		`SELECT ar.rank_no, ar.author, ar.rep_nid, ar.rep_title, ap.author_avatar
+		   FROM seed.author_ranks ar
+		   LEFT JOIN author_profiles ap ON ap.author_key = lower(ar.author)
+		  WHERE ar.form = ? ORDER BY ar.rank_no`, form)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	out := make([]AuthorRank, 0, 100)
 	for rows.Next() {
-		var a AuthorRank
-		if err := rows.Scan(&a.RankNo, &a.Author, &a.RepNID, &a.RepTitle); err != nil {
+		var (
+			a  AuthorRank
+			av sql.NullString
+		)
+		if err := rows.Scan(&a.RankNo, &a.Author, &a.RepNID, &a.RepTitle,
+			&av); err != nil {
 			return nil, err
 		}
+		a.Avatar = strPtr(av)
 		out = append(out, a)
 	}
 	if err := rows.Err(); err != nil {
