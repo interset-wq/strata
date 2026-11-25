@@ -43,6 +43,7 @@
 | 官方书单 | `Icons.bookmarks` | 「书单推荐」区块更多按钮（2026-11-25 原长篇宫格入口被「日轻」取代）：官方书单浏览入口（顺序 id 探测，docs/booklist-in-app.md） |
 | 日轻 | `Icons.local_library` | 首页长篇宫格（2026-11-25 用户裁定取代「官方书单」入口）：官方授权日本轻小说全量列表（/licensed，PoolListPage）；原「授权作品」宽卡入口退役；不用 `Icons.menu_book`（已被「中对话」占用） |
 | 官方榜单 | `Icons.leaderboard_outlined` | 首页长篇宫格第 5 格（2026-11-25 用户裁定：宽卡降级为宫格单元、与作者榜同一行）：页内 Tab 切换月票/新书/热销/打赏；outlined 与「经典榜单」实心 `Icons.leaderboard` 同排区分（在线口径 vs 本地口径） |
+| 作者榜 | `Icons.person_search` | 首页长篇宫格第 2 格 / 中篇·短篇·对话 tab 入口（2026-11-25 用户裁定：全 form 覆盖）：构建期预构建 top100 作者（/author-ranks?form=，引擎零运行时计算；docs/author-rank.md） |
 
 ## 分类入口（首页 curated 宽卡）
 

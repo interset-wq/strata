@@ -153,7 +153,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               _formTabs(context, onSelect: selectForm),
               _searchRow(context),
               // 纸墨合成轮播（无 featured 定制图，封面合成）+
-              // 短篇专属五格入口。
+              // 短篇专属入口列表。
               _coverBannerCarousel('short'),
               const SizedBox(height: 8),
               _shortEntryGrid(context),
@@ -809,7 +809,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  // 中篇 tab 入口网格（2×3）：经典榜单/年份/比赛/题材/优质/随机。
+  // 中篇 tab 入口网格（2 列）：经典榜单/作者榜/年份/比赛/题材/优质/随机。
   // 首位经典榜单与短篇 tab 同构（点击/收藏/点赞/字数四段切换 + 逆序，
   // 总榜=其中收藏段，故不再单列总榜入口）；入口只做导航，轴切换留在
   // ClassicListPage 页内（docs/16）。
@@ -820,6 +820,12 @@ class _HomePageState extends ConsumerState<HomePage> {
         '经典榜单',
         '点击/收藏/点赞/字数',
         '/classic-list?title=经典榜单&form=medium&metric-switchable=1',
+      ),
+      (
+        Icons.person_search,
+        '作者榜',
+        'top 100 作者',
+        '/author-ranks?form=medium',
       ),
       (
         Icons.calendar_month,
@@ -854,7 +860,7 @@ class _HomePageState extends ConsumerState<HomePage> {
     return _portalGrid(context, entries, crossAxisCount: 2);
   }
 
-  // 对话 tab 入口网格（3×3）：篇幅优先，再是榜单轴。首位经典榜单与
+  // 对话 tab 入口网格（3 列）：篇幅优先，再是榜单轴。首位经典榜单与
   // 短篇/中篇同构（四段切换 + 逆序，总榜=其中收藏段）。
   List<(IconData, String, String, String)> _dialogueEntryGridEntries() {
     String listPath(String title, String extra) =>
@@ -871,6 +877,12 @@ class _HomePageState extends ConsumerState<HomePage> {
         '量化榜单',
         '口碑/位置两榜',
         '/quant-list?form=dialogue',
+      ),
+      (
+        Icons.person_search,
+        '作者榜',
+        'top 100 作者',
+        '/author-ranks?form=dialogue',
       ),
       (Icons.short_text, '短对话', '≤5 万字', listPath('短对话', '&words-band=short')),
       (
@@ -977,6 +989,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         '点击/收藏/点赞/字数',
         '/classic-list?title=经典榜单&form=short&metric-switchable=1',
       ),
+      (Icons.person_search, '作者榜', 'top 100 作者', '/author-ranks?form=short'),
       (
         Icons.calendar_month,
         '年份榜',
