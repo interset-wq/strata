@@ -205,12 +205,23 @@ class _SearchPageState extends ConsumerState<SearchPage> {
   }
 
   /// 「未收录」行（nid 精确查找未命中）：内置库与已收录库都没有此书——
-  /// 点开走详情页收录链路（与榜单/清单页库外书同路径）。
+  /// 点开先 rank-seed 预写（纯本地写，毫秒级），详情页首帧即渲染、后台
+  /// refresh 补全（与榜单/清单页库外书同路径；不预写会整页 404 等待
+  /// 同步抓取，体感极慢）。
   Widget _nidMissCard(BuildContext context, ColorScheme scheme, String nid) {
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: InkWell(
-        onTap: () => context.push('/book/$nid'),
+        onTap: () async {
+          final n = int.tryParse(nid) ?? 0;
+          try {
+            final h = await ref.read(bootProvider.future);
+            await h.api.rankSeed(nid: n, title: 'nid $nid', coverUrl: '');
+          } catch (_) {
+            // 预写失败也进详情：详情页会自行报错可重试。
+          }
+          if (context.mounted) context.push('/book/$nid');
+        },
         borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.all(12),
