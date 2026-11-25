@@ -113,9 +113,9 @@ func (s *Store) RescoreBookMeta(ctx context.Context, nid int64) error {
 		return nil
 	}
 	_, err = s.DB.ExecContext(ctx, `
-UPDATE book_meta SET est_year = ?, form = ?, cqs = ?, cqs_state = ?,
-  cps = ?, len_norm = ? WHERE nid = ?`,
-		sc.year, sc.form, sc.cqs, sc.state, sc.cps, sc.lenN, nid)
+UPDATE book_meta SET est_year = ?, est_date = ?, est_conf = ?, form = ?,
+  cqs = ?, cqs_state = ?, cps = ?, len_norm = ? WHERE nid = ?`,
+		sc.year, sc.date, sc.conf, sc.form, sc.cqs, sc.state, sc.cps, sc.lenN, nid)
 	return err
 }
 
@@ -152,6 +152,8 @@ WHERE cqs IS NULL AND words IS NOT NULL AND words >= 2000
 // "nothing to store" — the anchors could not date the row.
 type score struct {
 	year  int
+	date  string
+	conf  string
 	form  string
 	cqs   any
 	state any
@@ -165,10 +167,12 @@ type score struct {
 // recomputes it).
 func (s *Store) compute(ctx context.Context, nid int64, genre sql.NullString, words, favs, praises sql.NullInt64) (score, error) {
 	var sc score
-	year, _, ok, err := s.EstimateYear(ctx, nid)
+	year, date, conf, ok, err := s.EstimateFull(ctx, nid)
 	if err != nil || !ok {
 		return sc, err
 	}
+	sc.date = date
+	sc.conf = conf
 	if !words.Valid || words.Int64 < 2000 {
 		// Nothing scoreable: keep the dated year but no metrics.
 		sc.year = year

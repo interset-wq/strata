@@ -39,15 +39,16 @@ func (s *Store) loadErasAnchors(ctx context.Context) ([]eraAnchor, error) {
 	return out, rows.Err()
 }
 
-// EstimateYear dates one nid; ok=false when no anchors shipped. conf is
-// exact/high/mid/low — the same tiers as the analysis calibre.
-func (s *Store) EstimateYear(ctx context.Context, nid int64) (year int, conf string, ok bool, err error) {
+// EstimateFull dates one nid to both year and the interpolated exact date;
+// ok=false when no anchors shipped. conf is exact/high/mid/low — the same
+// tiers as the analysis calibre.
+func (s *Store) EstimateFull(ctx context.Context, nid int64) (year int, date string, conf string, ok bool, err error) {
 	anchors, err := s.loadErasAnchors(ctx)
 	if err != nil {
-		return 0, "", false, err
+		return 0, "", "", false, err
 	}
 	if len(anchors) == 0 {
-		return 0, "", false, nil
+		return 0, "", "", false, nil
 	}
 	x := math.Log(math.Max(float64(nid), 1))
 	i := sort.Search(len(anchors), func(i int) bool { return anchors[i].lnid >= x })
@@ -63,7 +64,7 @@ func (s *Store) EstimateYear(ctx context.Context, nid int64) (year int, conf str
 		a, b := anchors[i-1], anchors[i]
 		day = a.day + (x-a.lnid)*(b.day-a.day)/(b.lnid-a.lnid)
 	}
-	year = time.Unix(0, 0).UTC().AddDate(0, 0, int(math.Round(day))).Year()
+	est := time.Unix(0, 0).UTC().AddDate(0, 0, int(math.Round(day)))
 
 	conf = "low"
 	if i > 0 && i < len(anchors) {
@@ -77,7 +78,14 @@ func (s *Store) EstimateYear(ctx context.Context, nid int64) (year int, conf str
 	if j := sort.Search(len(anchors), func(j int) bool { return anchors[j].nid >= nid }); j < len(anchors) && anchors[j].nid == nid {
 		conf = "exact"
 	}
-	return year, conf, true, nil
+	return est.Year(), est.Format("2006-01-02"), conf, true, nil
+}
+
+// EstimateYear dates one nid; ok=false when no anchors shipped. conf is
+// exact/high/mid/low — the same tiers as the analysis calibre.
+func (s *Store) EstimateYear(ctx context.Context, nid int64) (year int, conf string, ok bool, err error) {
+	y, _, conf, ok, err := s.EstimateFull(ctx, nid)
+	return y, conf, ok, err
 }
 
 // loSlope/hiSlope port eras._Model._edge_slopes: the first non-degenerate

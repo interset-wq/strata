@@ -307,8 +307,9 @@ func migrateDiscoveredMetrics(db *sql.DB) error {
 // Idempotent per-column check, mirroring migrateDiscoveredMetrics.
 func migrateBookMetaMetrics(db *sql.DB) error {
 	cols := []struct{ name, typ string }{
-		{"est_year", "INTEGER"}, {"form", "TEXT"}, {"cqs", "REAL"},
-		{"cqs_state", "TEXT"}, {"cps", "REAL"}, {"len_norm", "REAL"},
+		{"est_year", "INTEGER"}, {"est_date", "TEXT"}, {"est_conf", "TEXT"},
+		{"form", "TEXT"}, {"cqs", "REAL"}, {"cqs_state", "TEXT"},
+		{"cps", "REAL"}, {"len_norm", "REAL"},
 	}
 	for _, c := range cols {
 		if !hasColumn(db, "book_meta", c.name) {
