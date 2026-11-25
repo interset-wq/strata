@@ -36,16 +36,24 @@ class BookRowTile extends StatelessWidget {
     );
   }
 
-  /// 标签 pill：题材与 book_tags 同款（主色浅底）。
-  Widget _tagPill(BuildContext context, String t) {
+  /// 标签 pill：题材深底（deep: true）、book_tags 浅底——竖线分隔看不清，
+  /// 改背景深浅区分（用户 2026-11-25）。
+  Widget _tagPill(BuildContext context, String t, {bool deep = false}) {
     final scheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: scheme.primary.withValues(alpha: .08),
+        color: scheme.primary.withValues(alpha: deep ? .18 : .08),
         borderRadius: BorderRadius.circular(4),
       ),
-      child: Text(t, style: TextStyle(fontSize: 10, color: scheme.primary)),
+      child: Text(
+        t,
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: deep ? FontWeight.w600 : FontWeight.w400,
+          color: scheme.primary,
+        ),
+      ),
     );
   }
 
@@ -138,7 +146,8 @@ class BookRowTile extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 3),
-                  // 作者行：作者（左）…… 付费徽标（右对齐；免费不显示）
+                  // 作者行：作者（左）…… 代系 · 付费徽标（右对齐；
+                  // 免费不显示；代系缺失不显示）
                   Row(
                     children: [
                       Expanded(
@@ -150,6 +159,11 @@ class BookRowTile extends StatelessWidget {
                               TextStyle(fontSize: 11, color: scheme.secondary),
                         ),
                       ),
+                      if (item.estYear > 0)
+                        Text('${item.estYear} 代',
+                            style: TextStyle(
+                                fontSize: 10,
+                                color: scheme.onSurfaceVariant)),
                       if (price != null && price.isNotEmpty && price != '免费')
                         _pill(context, price, Colors.amber.shade900,
                             Colors.amber.withValues(alpha: .15)),
@@ -184,16 +198,8 @@ class BookRowTile extends StatelessWidget {
                               ),
                             ),
                           ),
-                        if (genre != null) _tagPill(context, genre),
-                        // 题材与 book_tags 之间竖线分隔（用户 2026-11-25）
-                        if (genre != null && bookTags.isNotEmpty)
-                          Container(
-                            width: 1,
-                            height: 10,
-                            margin:
-                                const EdgeInsets.symmetric(horizontal: 2),
-                            color: scheme.outline.withValues(alpha: .5),
-                          ),
+                        if (genre != null)
+                          _tagPill(context, genre, deep: true),
                         for (final t in bookTags.take(genre == null ? 3 : 2))
                           _tagPill(context, t),
                       ],
