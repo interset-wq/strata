@@ -720,7 +720,7 @@ func (s *Server) licensed(c *gin.Context) {
 }
 
 // moeGoddess lists books carrying a yearly 萌神 award tag (2018–2024),
-// favs order. Home entry card 萌神获奖.
+// newest award year first (2026-11-25 user call: tag-year desc, not favs).
 func (s *Server) moeGoddess(c *gin.Context) {
 	limit, ok := parseLimit(c)
 	if !ok {
@@ -732,7 +732,7 @@ func (s *Server) moeGoddess(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{
-		"meta":  gin.H{"pool": "moe-goddess", "ordering": "favs"},
+		"meta":  gin.H{"pool": "moe-goddess", "ordering": "award-year-desc"},
 		"items": items,
 	})
 }

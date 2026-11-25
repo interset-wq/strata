@@ -1240,6 +1240,13 @@ func (s *Store) scanRankItems(ctx context.Context, rows *sql.Rows,
 // seed-book SELECT as RandomBooks, with a pool-specific WHERE clause and
 // favs ordering (no randomness — these are small fixed lists).
 func (s *Store) curated(ctx context.Context, limit int, extra string) ([]RankItem, error) {
+	return s.curatedOrder(ctx, limit, extra,
+		" ORDER BY seed.books.favs DESC, seed.books.nid ASC LIMIT ?")
+}
+
+// curatedOrder is curated with an explicit ORDER BY/LIMIT tail for pools
+// that rank by something other than favs.
+func (s *Store) curatedOrder(ctx context.Context, limit int, extra, order string) ([]RankItem, error) {
 	query := `
 SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
        seed.books.est_year, seed.books.status, seed.books.words, seed.books.clicks,
@@ -1247,8 +1254,7 @@ SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
        COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url
 FROM seed.books
 LEFT JOIN covers c ON c.nid = seed.books.nid
-WHERE 1=1` + extra +
-		` ORDER BY seed.books.favs DESC, seed.books.nid ASC LIMIT ?`
+WHERE 1=1` + extra + order
 	rows, err := s.DB.QueryContext(ctx, query, limit)
 	return s.scanRankItems(ctx, rows, err)
 }
@@ -1261,11 +1267,16 @@ func (s *Store) LicensedBooks(ctx context.Context, limit int) ([]RankItem, error
 }
 
 // MoeGoddessBooks lists books carrying a yearly 萌神 award tag
-// (2018萌神 … 2024萌神, 2 per year in the canonical seed).
+// (2018萌神 … 2024萌神, 2 per year in the canonical seed), newest award
+// year first (user 2026-11-25: rank by the 20xx萌神 tag, not favs);
+// same-year ties and non-tagged rows fall back to favs DESC.
 func (s *Store) MoeGoddessBooks(ctx context.Context, limit int) ([]RankItem, error) {
-	return s.curated(ctx, limit,
+	return s.curatedOrder(ctx, limit,
 		" AND seed.books.nid IN (SELECT nid FROM seed.book_tags "+
-			"WHERE tag LIKE '____萌神')")
+			"WHERE tag LIKE '____萌神')",
+		` ORDER BY (SELECT MAX(CAST(SUBSTR(bt.tag, 1, 4) AS INTEGER))
+			FROM seed.book_tags bt WHERE bt.nid = seed.books.nid
+			AND bt.tag LIKE '____萌神') DESC, seed.books.favs DESC, seed.books.nid ASC LIMIT ?`)
 }
 
 // AuthorBooks lists one author's seed books in timeline order (est_date
