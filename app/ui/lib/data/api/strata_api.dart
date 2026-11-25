@@ -13,11 +13,16 @@ class AuthorRankItem {
   final int repNid;
   final String repTitle;
 
+  /// 缓存头像（user.db author_profiles，作者页打开过才有）；无缓存为 null，
+  /// 端上渲染首字符头像。引擎只读本地缓存，不为榜单抓网。
+  final String? avatar;
+
   const AuthorRankItem({
     required this.rankNo,
     required this.author,
     required this.repNid,
     required this.repTitle,
+    this.avatar,
   });
 
   factory AuthorRankItem.fromJson(Map<String, dynamic> m) => AuthorRankItem(
@@ -25,6 +30,7 @@ class AuthorRankItem {
     author: m['author'] as String,
     repNid: (m['rep_nid'] as num).toInt(),
     repTitle: m['rep_title'] as String,
+    avatar: (m['avatar'] as String?)?.isEmpty == true ? null : m['avatar'] as String?,
   );
 }
 

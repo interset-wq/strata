@@ -84,6 +84,12 @@ class _AuthorRankPageState extends ConsumerState<AuthorRankPage> {
     }
   }
 
+  /// 头像首字符：取第一个 Unicode code point（中文/emoji 均正确）。
+  String _firstChar(String s) {
+    if (s.isEmpty) return '?';
+    return String.fromCharCodes(s.runes.take(1));
+  }
+
   void _showAbout() {
     showDialog<void>(
       context: context,
@@ -158,25 +164,60 @@ class _AuthorRankPageState extends ConsumerState<AuthorRankPage> {
                           color: scheme.surface,
                           child: Row(
                             children: [
-                              Container(
-                                width: 28,
-                                height: 28,
-                                alignment: Alignment.center,
-                                decoration: BoxDecoration(
-                                  color: hot
-                                      ? scheme.primary
-                                      : scheme.surfaceContainerHighest,
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  '${a.rankNo}',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: hot
-                                        ? scheme.onPrimary
-                                        : scheme.onSurfaceVariant,
-                                  ),
+                              // 头像（用户 2026-11-25）：有缓存头像（user.db
+                              // author_profiles，作者页打开过才有）直接用图，
+                              // 否则首字符兜底；名次收进右下角小角标（前 3 主色）。
+                              SizedBox(
+                                width: 40,
+                                height: 40,
+                                child: Stack(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 20,
+                                      backgroundColor:
+                                          scheme.surfaceContainerHighest,
+                                      backgroundImage: (a.avatar != null)
+                                          ? NetworkImage(a.avatar!)
+                                          : null,
+                                      child: Text(
+                                        _firstChar(a.author),
+                                        style: const TextStyle(
+                                            fontSize: 15,
+                                            fontWeight:
+                                                FontWeight.w600),
+                                      ),
+                                    ),
+                                    Positioned(
+                                      right: -2,
+                                      bottom: -2,
+                                      child: Container(
+                                        padding:
+                                            const EdgeInsets.symmetric(
+                                                horizontal: 5, vertical: 1),
+                                        decoration: BoxDecoration(
+                                          color: hot
+                                              ? scheme.primary
+                                              : scheme
+                                                  .surfaceContainerHighest,
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                          border: Border.all(
+                                              color: scheme.surface,
+                                              width: 1),
+                                        ),
+                                        child: Text(
+                                          '${a.rankNo}',
+                                          style: TextStyle(
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w700,
+                                            color: hot
+                                                ? scheme.onPrimary
+                                                : scheme.onSurfaceVariant,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                               const SizedBox(width: 12),
