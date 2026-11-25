@@ -43,6 +43,11 @@ CREATE TABLE contest_awards(
   category TEXT, source_nid TEXT NOT NULL,
   PRIMARY KEY(nid, edition)
 );
+CREATE TABLE author_ranks(
+  form TEXT NOT NULL, rank_no INTEGER NOT NULL, author TEXT NOT NULL,
+  rep_nid INTEGER NOT NULL, rep_title TEXT NOT NULL,
+  PRIMARY KEY(form, rank_no)
+);
 CREATE TABLE eras_anchors(nid INTEGER PRIMARY KEY, day INTEGER NOT NULL);
 CREATE TABLE calib_fav_bounds(
   form TEXT, est_year INTEGER, p50 REAL, p75 REAL, p90 REAL,
@@ -241,6 +246,15 @@ VALUES(3003,'2025春征','金奖','短篇','zw20250301'),
 	 (2010,'favs',2,7777,'Deep Only','Author Z','都市',250,0.5,NULL),
 	 (2010,'pr',1,1001,'Long A','Author A','魔幻',0.02,0.8,NULL),
 	 (2025,'favs',1,1005,'New E','Author E','都市',300,0.95,NULL)`); err != nil {
+		db.Close()
+		return nil, err
+	}
+	// v10 author boards: two long rows + one dialogue row (form isolation).
+	if _, err := db.Exec(`INSERT INTO author_ranks
+	 (form,rank_no,author,rep_nid,rep_title) VALUES
+	 ('long',1,'Author A',1001,'Long A'),
+	 ('long',2,'Author C',1003,'Long C'),
+	 ('dialogue',1,'Author H',1008,'Dialogue H')`); err != nil {
 		db.Close()
 		return nil, err
 	}

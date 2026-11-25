@@ -1077,6 +1077,48 @@ func (s *Store) QuantBooks(ctx context.Context, form, board string,
 	return items, nil
 }
 
+// AuthorRank is one row of the v10 prebuilt author_ranks table
+// (docs/author-rank.md §9): stable-output authors per form, top 100.
+// Frozen display facts: the engine never recomputes, joins, or scores from
+// this table — the ranking is decided at seed build time and must never
+// feed book ranking (禁回流书榜打分).
+type AuthorRank struct {
+	RankNo   int    `json:"rank_no"`
+	Author   string `json:"author"`
+	RepNID   int64  `json:"rep_nid"`
+	RepTitle string `json:"rep_title"`
+}
+
+// AuthorRanks lists the prebuilt author board for one form, ordered by
+// rank_no. Form is a hard prerequisite (18 §2 红线 1): one board per form,
+// never merged across forms (app 按 form 隔离，无页内切换).
+func (s *Store) AuthorRanks(ctx context.Context, form string) ([]AuthorRank, error) {
+	switch form {
+	case "long", "dialogue", "medium", "short", "ip_collab":
+	default:
+		return nil, fmt.Errorf("unsupported author-rank form %q", form)
+	}
+	rows, err := s.DB.QueryContext(ctx,
+		`SELECT rank_no, author, rep_nid, rep_title
+		   FROM seed.author_ranks WHERE form = ? ORDER BY rank_no`, form)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]AuthorRank, 0, 100)
+	for rows.Next() {
+		var a AuthorRank
+		if err := rows.Scan(&a.RankNo, &a.Author, &a.RepNID, &a.RepTitle); err != nil {
+			return nil, err
+		}
+		out = append(out, a)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // parseScoreCursor decodes the "score|nid" keyset cursor of the cqs/clx
 // stream. cqs is a signed log-scale score, not a percentile — NaN is
 // rejected by self-comparison (NaN != NaN).

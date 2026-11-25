@@ -160,6 +160,7 @@ func NewServer(s *store.Store) *Server {
 	group.GET("/rankings/board", srv.rankingBoard)
 	group.GET("/rankings/classic", srv.rankingClassic)
 	group.GET("/quant", srv.quant)
+	group.GET("/author-ranks", srv.authorRanks)
 	group.GET("/discover", srv.discover)
 	group.GET("/recommend", srv.recommend)
 	group.GET("/rankings/deep", srv.rankingDeep)
@@ -978,6 +979,25 @@ func (s *Server) quant(c *gin.Context) {
 		"meta": gin.H{
 			"kind": "quant", "board": board, "form": form,
 			"licensed_excluded": true,
+		},
+		"items": items,
+	})
+}
+
+// authorRanks serves the prebuilt stable-output author board for one form
+// (docs/author-rank.md §9; v10 seed table, zero runtime computation). Form
+// is isolated per board (app 按 form 隔离): no cross-form merge, no in-page
+// switching — each form entry links its own board.
+func (s *Server) authorRanks(c *gin.Context) {
+	form := c.DefaultQuery("form", "long")
+	items, err := s.store.AuthorRanks(c.Request.Context(), form)
+	if err != nil {
+		fail(c, http.StatusBadRequest, "invalid_argument", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"meta": gin.H{
+			"kind": "author_ranks", "form": form, "count": len(items),
 		},
 		"items": items,
 	})

@@ -570,6 +570,41 @@ func TestQuantBooks(t *testing.T) {
 	}
 }
 
+// TestAuthorRanks pins the v10 prebuilt author board (docs/author-rank.md
+// §9): form isolation, rank_no order, and unsupported-form rejection.
+func TestAuthorRanks(t *testing.T) {
+	st := openTestStore(t)
+	ctx := context.Background()
+	if _, err := st.AuthorRanks(ctx, "novel"); err == nil {
+		t.Fatal("unsupported author-rank form must error")
+	}
+	long, err := st.AuthorRanks(ctx, "long")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(long) != 2 {
+		t.Fatalf("long board: got %d rows, want 2", len(long))
+	}
+	if long[0].RankNo != 1 || long[0].Author != "Author A" ||
+		long[0].RepNID != 1001 || long[0].RepTitle != "Long A" {
+		t.Fatalf("long rank1 = %+v", long[0])
+	}
+	if long[1].RankNo != 2 || long[1].Author != "Author C" {
+		t.Fatalf("long rank2 = %+v", long[1])
+	}
+	dial, err := st.AuthorRanks(ctx, "dialogue")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(dial) != 1 || dial[0].Author != "Author H" || dial[0].RepNID != 1008 {
+		t.Fatalf("dialogue board = %+v", dial)
+	}
+	short, err := st.AuthorRanks(ctx, "short")
+	if err != nil || len(short) != 0 {
+		t.Fatalf("short board (no rows) = %+v, %v", short, err)
+	}
+}
+
 func TestRecommendCQS(t *testing.T) {
 	st := openTestStore(t)
 	ctx := context.Background()
