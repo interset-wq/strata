@@ -75,7 +75,7 @@
 | 语义 | icon | 使用处 |
 | --- | --- | --- |
 | 图片不可用 | `Icons.image_not_supported_outlined` | 大图精选卡片 / 全屏查看器：banner cut 图 404 时的占位容器（不做封面兜底——3:4 封面塞 16:9 容器会被裁成一条） |
-| 头像不可用 | `Icons.person` | 作者页头部 CircleAvatar：无网络头像或加载失败时的占位（outlined，onSurfaceVariant；展示层 outlined 规范 4） |
+| 头像不可用 | （无 icon） | 作者页头部 / 作者榜行：无网络头像时占位为**作者名首字符**（用户 2026-11-25 裁定；原 `Icons.person` 占位退役——纯图标占位无辨识信息，首字符至少能对上名字） |
 
 ## 动作
 

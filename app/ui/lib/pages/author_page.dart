@@ -381,6 +381,13 @@ class _AuthorPageState extends ConsumerState<AuthorPage> {
     final name = (p != null && p.authorName.isNotEmpty)
         ? p.authorName
         : widget.author;
+
+    /// 头像首字符（取第一个 Unicode code point，中文/emoji 安全）。
+    String firstChar() {
+      if (name.isEmpty) return '?';
+      return String.fromCharCodes(name.runes.take(1));
+    }
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       child: Row(
@@ -397,9 +404,17 @@ class _AuthorPageState extends ConsumerState<AuthorPage> {
                               p.authorAvatar!.isNotEmpty)
                           ? NetworkImage(p.authorAvatar!)
                           : null,
+                  // 占位 = 作者名首字符（用户 2026-11-25，与作者榜行同款；
+                  // 原 Icons.person 占位退役，docs/15 同步）。
                   child: (p == null || p.authorAvatar == null ||
                           p.authorAvatar!.isEmpty)
-                      ? Icon(Icons.person, size: 28, color: scheme.onSurfaceVariant)
+                      ? Text(
+                          firstChar(),
+                          style: TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.w600,
+                              color: scheme.onPrimary),
+                        )
                       : null,
                 ),
           const SizedBox(width: 12),

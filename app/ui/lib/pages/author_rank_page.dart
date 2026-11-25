@@ -155,7 +155,8 @@ class _AuthorRankPageState extends ConsumerState<AuthorRankPage> {
                       final hot = a.rankNo <= 3;
                       return InkWell(
                         onTap: () => context.push(
-                            '/author?author=${Uri.encodeComponent(a.author)}'),
+                            '/author?author=${Uri.encodeComponent(a.author)}'
+                            '&nid=${a.repNid}'),
                         borderRadius: BorderRadius.circular(12),
                         child: Container(
                           margin: const EdgeInsets.symmetric(vertical: 3),
