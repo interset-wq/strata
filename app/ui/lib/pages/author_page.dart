@@ -295,7 +295,7 @@ class _AuthorPageState extends ConsumerState<AuthorPage> {
     if (_books.isNotEmpty && i == n) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(4, 10, 4, 0),
-        child: Text('年份为估算（锚点插值）；未知年份置末',
+        child: Text('代系为估算（锚点插值）；未知代系置末',
             style: TextStyle(
                 fontSize: 10.5, color: scheme.onSurfaceVariant)),
       );
@@ -306,7 +306,7 @@ class _AuthorPageState extends ConsumerState<AuthorPage> {
   /// 年份分组头（点 + 标题 + 分隔线，与库外区块头同款样式，docs/16 不新造
   /// 控件）；未知年份组显示「年份未知」（docs/17 §4.4）。
   Widget _yearHeader(BuildContext context, ColorScheme scheme, RankItem b) {
-    final label = _unknownYear(b) ? '年份未知' : '${b.estYear}';
+    final label = _unknownYear(b) ? '代系未知' : '${b.estYear}';
     return Padding(
       padding: const EdgeInsets.fromLTRB(4, 12, 4, 6),
       child: Row(

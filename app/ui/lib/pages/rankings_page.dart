@@ -186,7 +186,7 @@ class _BoardList extends ConsumerWidget {
       error: (e, _) =>
           Padding(padding: const EdgeInsets.all(16), child: Text('加载失败：$e')),
       data: (list) => list.isEmpty
-          ? const Center(child: Text('该年份下无种子书目'))
+          ? const Center(child: Text('该代系下无种子书目'))
           : ListView.builder(
               controller: scroll,
               padding: const EdgeInsets.fromLTRB(14, 14, 14, 60),
