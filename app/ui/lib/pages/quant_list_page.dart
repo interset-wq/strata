@@ -21,6 +21,7 @@ class _QuantListPageState extends ConsumerState<QuantListPage> {
   static const int _batch = 20;
 
   String _board = 'cqs'; // 'cqs' 口碑榜 | 'cps' 位置榜
+  int _session = 0; // 加载会话号：切榜/刷新自增，陈旧响应作废
   final _scroll = ScrollController();
   List<RankItem> _items = [];
   bool _loading = false;
@@ -51,6 +52,12 @@ class _QuantListPageState extends ConsumerState<QuantListPage> {
 
   Future<void> _loadMore() async {
     if (_loading || _done) return;
+    // 快照：board/offset 在调用时钉死，在途期间切榜不改请求参数；
+    // 响应回来时 session 对不上即作废（修复位置榜空白/串榜竞态，
+    // 用户 2026-11-25 报告位置榜空列表）。
+    final session = _session;
+    final board = _board;
+    final offset = _items.length;
     setState(() {
       _loading = true;
       _error = null;
@@ -58,19 +65,19 @@ class _QuantListPageState extends ConsumerState<QuantListPage> {
     try {
       final handle = await ref.read(bootProvider.future);
       final r = await handle.api.quantList(
-        board: _board,
+        board: board,
         form: 'long',
         limit: _batch,
-        offset: _items.length,
+        offset: offset,
       );
-      if (!mounted) return;
+      if (!mounted || session != _session) return;
       setState(() {
         _items = [..._items, ...r.items];
         _done = r.items.length < _batch;
         _loading = false;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || session != _session) return;
       setState(() {
         _error = '$e';
         _loading = false;
@@ -80,10 +87,14 @@ class _QuantListPageState extends ConsumerState<QuantListPage> {
 
   Future<void> _switchBoard(String board) async {
     if (board == _board) return;
+    // 会话号自增作废在途请求；强制释放 _loading 保证新榜首屏
+    // 请求一定发出（否则在途口碑请求期间切榜，位置榜永远不加载）。
+    _session++;
     setState(() {
       _board = board;
       _items = [];
       _done = false;
+      _loading = false;
     });
     _scroll.jumpTo(0);
     await _loadMore();
@@ -128,9 +139,11 @@ class _QuantListPageState extends ConsumerState<QuantListPage> {
           Expanded(
             child: RefreshIndicator(
               onRefresh: () async {
+                _session++;
                 setState(() {
                   _items = [];
                   _done = false;
+                  _loading = false;
                 });
                 await _loadMore();
               },
@@ -139,7 +152,10 @@ class _QuantListPageState extends ConsumerState<QuantListPage> {
                   ListView.builder(
                     controller: _scroll,
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 80),
-                    itemCount: _items.length + (_loading ? 1 : 0),
+                    itemCount: _items.length +
+                        (_loading || (_error != null && _items.isEmpty)
+                            ? 1
+                            : 0),
                     itemBuilder: (context, i) {
                       if (_error != null && _items.isEmpty && i == 0) {
                         return Padding(

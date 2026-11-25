@@ -1332,8 +1332,10 @@ class RankItem {
       clicks = m['clicks'] as int?,
       praises = (m['praises'] as num?)?.toInt(),
       form = m['form'] as String? ?? '',
-      cqs = m['cqs'] as double?,
-      cps = m['cps'] as double?,
+      // Go 把整数值 float64（如 2.0）序列化为 JSON int——必须经 num 转
+      // toDouble，直接 `as double?` 会炸（位置榜空列表根因，2026-11-25）。
+      cqs = (m['cqs'] as num?)?.toDouble(),
+      cps = (m['cps'] as num?)?.toDouble(),
       estDate = m['est_date'] as String?,
       cqsState = m['cqs_state'] as String? ?? '',
       tags = ((m['tags'] as List?) ?? const [])
