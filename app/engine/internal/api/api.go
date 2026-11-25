@@ -1737,6 +1737,10 @@ func (s *Server) writeHTML(ctx context.Context, nid int64, d *crawl.Detail, obse
 	if d.CoverURL != "" {
 		_ = s.store.UpsertCover(ctx, nid, d.CoverURL, observedAt)
 	}
+	// 详情抓取落库后立即补算运行时指标（docs/18 P2，用户 2026-11-25：
+	// 自动收录时所有计算列一次算完）；best-effort，失败不阻塞刷新。
+	_ = s.store.RescoreBookMeta(ctx, nid)
+	_ = s.store.RescoreDiscovered(ctx, nid)
 	return nil
 }
 
@@ -1782,6 +1786,9 @@ func (s *Server) writeApp(ctx context.Context, nid int64, app *crawl.AppNovel, o
 	if app.NovelCover != "" {
 		_ = s.store.UpsertCover(ctx, nid, app.NovelCover, observedAt)
 	}
+	// App 路径同样补算（用户 2026-11-25：自动收录时所有计算列一次算完）。
+	_ = s.store.RescoreBookMeta(ctx, nid)
+	_ = s.store.RescoreDiscovered(ctx, nid)
 	return nil
 }
 

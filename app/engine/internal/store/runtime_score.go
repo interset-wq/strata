@@ -64,9 +64,87 @@ WHERE est_year IS NULL AND words IS NOT NULL AND words >= 2000
 // (the calib tables only carry cells the analysis universe could support,
 // and μ0 comes from seed_meta so the runtime never recomputes it).
 func (s *Store) scoreDiscovered(ctx context.Context, nid int64, genre sql.NullString, words, favs, praises sql.NullInt64) error {
+	sc, err := s.compute(ctx, nid, genre, words, favs, praises)
+	if err != nil {
+		return err
+	}
+	if sc.year == 0 {
+		return nil
+	}
+	_, err = s.DB.ExecContext(ctx, `
+UPDATE discovered SET est_year = ?, form = ?, cqs = ?, cqs_state = ?,
+  cps = ?, len_norm = ? WHERE nid = ?`,
+		sc.year, sc.form, sc.cqs, sc.state, sc.cps, sc.lenN, nid)
+	return err
+}
+
+// RescoreDiscovered re-scores one discovered row after its numbers change.
+// A missing row (ErrNoRows) is a no-op.
+func (s *Store) RescoreDiscovered(ctx context.Context, nid int64) error {
+	var genre sql.NullString
+	var words, favs, praises sql.NullInt64
+	err := s.DB.QueryRowContext(ctx,
+		"SELECT genre, words, favs, praises FROM discovered WHERE nid = ?", nid).
+		Scan(&genre, &words, &favs, &praises)
+	if err != nil {
+		return err
+	}
+	return s.scoreDiscovered(ctx, nid, genre, words, favs, praises)
+}
+
+// RescoreBookMeta recomputes the runtime metrics for one book_meta row (the
+// record a detail refresh just wrote) and stores them on the row — this is
+// what makes 自动收录 compute every derived column (user 2026-11-25). No-op
+// when the row lacks scoreable numbers or the anchors cannot date the book.
+func (s *Store) RescoreBookMeta(ctx context.Context, nid int64) error {
+	var genre sql.NullString
+	var words, favs, praises sql.NullInt64
+	err := s.DB.QueryRowContext(ctx,
+		"SELECT genre, words, favs, praises FROM book_meta WHERE nid = ?", nid).
+		Scan(&genre, &words, &favs, &praises)
+	if err != nil {
+		return err
+	}
+	sc, err := s.compute(ctx, nid, genre, words, favs, praises)
+	if err != nil {
+		return err
+	}
+	if sc.year == 0 {
+		return nil
+	}
+	_, err = s.DB.ExecContext(ctx, `
+UPDATE book_meta SET est_year = ?, form = ?, cqs = ?, cqs_state = ?,
+  cps = ?, len_norm = ? WHERE nid = ?`,
+		sc.year, sc.form, sc.cqs, sc.state, sc.cps, sc.lenN, nid)
+	return err
+}
+
+// score carries the runtime-metric outputs for one row. A zero year means
+// "nothing to store" — the anchors could not date the row.
+type score struct {
+	year  int
+	form  string
+	cqs   any
+	state any
+	cps   any
+	lenN  any
+}
+
+// compute runs the metric formulas over one row's inputs. Every table
+// lookup misses gracefully (the calib tables only carry cells the analysis
+// universe could support, and μ0 comes from seed_meta so the runtime never
+// recomputes it).
+func (s *Store) compute(ctx context.Context, nid int64, genre sql.NullString, words, favs, praises sql.NullInt64) (score, error) {
+	var sc score
 	year, _, ok, err := s.EstimateYear(ctx, nid)
 	if err != nil || !ok {
-		return err
+		return sc, err
+	}
+	if !words.Valid || words.Int64 < 2000 {
+		// Nothing scoreable: keep the dated year but no metrics.
+		sc.year = year
+		sc.form = "long"
+		return sc, nil
 	}
 	w := words.Int64
 	band := "long"
@@ -75,25 +153,24 @@ func (s *Store) scoreDiscovered(ctx context.Context, nid int64, genre sql.NullSt
 	} else if w <= 150_000 {
 		band = "medium"
 	}
-	form := band
+	sc.year = year
+	sc.form = band
 	tongRen := genre.Valid && strings.Contains(genre.String, "同人")
 
-	var cqs, cps, ln any
-	var cqsState any
 	if !tongRen && genre.Valid && favs.Int64 >= 10 {
 		var med sql.NullFloat64
 		if err := s.DB.QueryRowContext(ctx, `
 SELECT med FROM seed.calib_cps_median
 WHERE form = ? AND est_year = ? AND band = ? AND genre = ?`,
-			form, year, band, genre.String).Scan(&med); err == nil && med.Valid {
-			cps = math.Log1p(float64(favs.Int64)) - med.Float64
+			band, year, band, genre.String).Scan(&med); err == nil && med.Valid {
+			sc.cps = math.Log1p(float64(favs.Int64)) - med.Float64
 		}
 	}
 	if !tongRen && genre.Valid && favs.Int64 >= 1000 && praises.Valid {
 		var p50, p75, p90 sql.NullFloat64
 		if err := s.DB.QueryRowContext(ctx, `
 SELECT p50, p75, p90 FROM seed.calib_fav_bounds
-WHERE form = ? AND est_year = ?`, form, year).
+WHERE form = ? AND est_year = ?`, band, year).
 			Scan(&p50, &p75, &p90); err == nil && p50.Valid {
 			f := float64(favs.Int64)
 			fband := "P50-"
@@ -110,7 +187,7 @@ WHERE form = ? AND est_year = ?`, form, year).
 				if err := s.DB.QueryRowContext(ctx, `
 SELECT med, cell_n FROM seed.calib_cqs_median
 WHERE form = ? AND est_year = ? AND genre = ? AND fband = ?`,
-					form, year, genre.String, fband).Scan(&med, &cellN); err == nil && med.Valid {
+					band, year, genre.String, fband).Scan(&med, &cellN); err == nil && med.Valid {
 					mu0 := 0.232
 					var m string
 					if err := s.DB.QueryRowContext(ctx,
@@ -122,26 +199,22 @@ WHERE form = ? AND est_year = ? AND genre = ? AND fband = ?`,
 					}
 					logPrS := math.Log((float64(praises.Int64) + 500*mu0) /
 						(float64(favs.Int64) + 500))
-					cqs = logPrS - med.Float64
+					sc.cqs = logPrS - med.Float64
 					if cellN >= 20 {
-						cqsState = "stable"
+						sc.state = "stable"
 					} else {
-						cqsState = "low"
+						sc.state = "low"
 					}
 					var lo, hi sql.NullFloat64
 					if err := s.DB.QueryRowContext(ctx, `
-SELECT lo, hi FROM seed.calib_len_anchors WHERE form = ?`, form).
+SELECT lo, hi FROM seed.calib_len_anchors WHERE form = ?`, band).
 						Scan(&lo, &hi); err == nil && lo.Valid && hi.Valid && lo.Float64 > 0 {
 						clipped := math.Min(math.Max(float64(w), lo.Float64), hi.Float64)
-						ln = math.Log(clipped/lo.Float64) / math.Log(hi.Float64/lo.Float64)
+						sc.lenN = math.Log(clipped/lo.Float64) / math.Log(hi.Float64/lo.Float64)
 					}
 				}
 			}
 		}
 	}
-	_, err = s.DB.ExecContext(ctx, `
-UPDATE discovered SET est_year = ?, form = ?, cqs = ?, cqs_state = ?,
-  cps = ?, len_norm = ? WHERE nid = ?`,
-		year, form, cqs, cqsState, cps, ln, nid)
-	return err
+	return sc, nil
 }
