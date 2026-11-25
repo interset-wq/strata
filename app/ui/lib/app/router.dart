@@ -258,7 +258,7 @@ final router = GoRouter(
     ),
     GoRoute(
       path: '/licensed',
-      builder: (_, _) => const PoolListPage(kind: 'licensed', title: '授权作品'),
+      builder: (_, _) => const PoolListPage(kind: 'licensed', title: '日轻'),
     ),
     GoRoute(
       path: '/moe-goddess',

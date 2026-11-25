@@ -320,7 +320,6 @@ class _HomePageState extends ConsumerState<HomePage> {
               onMore: () => context.push('/finished-random'),
             ),
             _ShowcaseSection(provider: finishedShowcaseProvider(_form)),
-            _entryCards(context),
             _sectionTitle(
               context,
               '随便看看',
@@ -561,22 +560,6 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  // 宽卡入口：授权作品 / 萌神获奖——打断连续 4×2 网格的节奏，
-  // 同时给两个 curated 池补上首页入口（icon 语义见 app/docs/15）。
-  Widget _entryCards(BuildContext context) {
-    return Column(
-      children: [
-        _wideEntryCard(
-          context,
-          icon: Icons.lock,
-          title: '授权作品',
-          subtitle: '官方授权日本轻小说',
-          route: '/licensed',
-        ),
-      ],
-    );
-  }
-
   Widget _wideEntryCard(
     BuildContext context, {
     required IconData icon,
@@ -703,7 +686,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   Widget _entryGrid(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final entries = [
-      (Icons.bookmarks, '书单', '/booklists'),
+      (Icons.local_library, '日轻', '/licensed'),
       (Icons.person_search, '作者榜', '/author-ranks?form=long'),
       (Icons.insights, '量化榜单', '/quant-list'),
       (

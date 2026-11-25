@@ -6,7 +6,7 @@ import '../data/api/strata_api.dart';
 import '../widgets/back_to_top.dart';
 import '../widgets/book_row_tile.dart';
 
-/// curated 全量池：授权作品（licensed）/ 萌神获奖（moe-goddess）。
+/// curated 全量池：日轻（licensed，官方授权日本轻小说）/ 萌神获奖（moe-goddess）。
 /// 与随机池不同：收藏排序的确定性列表，不换批、不重掷。
 final poolListProvider =
     FutureProvider.autoDispose.family<List<RankItem>, String>((ref, kind)

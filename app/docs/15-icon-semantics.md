@@ -40,14 +40,14 @@
 | 征文比赛 | `Icons.emoji_events` | 首页宫格 |
 | 短篇榜 | `Icons.article` | 首页宫格 |
 | 经典榜单入口 | `Icons.leaderboard` | 短篇入口列表 / 中篇/对话入口网格：点击/收藏/点赞/字数四榜（页内 SegmentedButton 切换；总榜=其中收藏段，故各 tab 不再单列总榜入口） |
-| 官方书单 | `Icons.bookmarks` | 首页长篇宫格（2026-11-23 取代「分类找书」）：官方书单浏览入口（顺序 id 探测，docs/booklist-in-app.md）；不占用「中对话」的 `Icons.menu_book`（语义不同） |
+| 官方书单 | `Icons.bookmarks` | 「书单推荐」区块更多按钮（2026-11-25 原长篇宫格入口被「日轻」取代）：官方书单浏览入口（顺序 id 探测，docs/booklist-in-app.md） |
+| 日轻 | `Icons.local_library` | 首页长篇宫格（2026-11-25 用户裁定取代「官方书单」入口）：官方授权日本轻小说全量列表（/licensed，PoolListPage）；原「授权作品」宽卡入口退役；不用 `Icons.menu_book`（已被「中对话」占用） |
 
 ## 分类入口（首页 curated 宽卡）
 
 | 语义 | icon | 使用处 |
 | --- | --- | --- |
-| 授权作品（licensed） | `Icons.lock` | 首页宽卡入口（可点击用实心，与规则 4 一致） |
-| 萌神获奖 | `Icons.emoji_events` | 首页宽卡入口（与宫格"征文比赛"同"获奖"语义，复用） |
+| 萌神获奖 | `Icons.emoji_events` | 赛事归档页 AppBar 入口（2026-11-25 首页宽卡已删，随比赛 tab 归档改造）；与宫格"征文比赛"同"获奖"语义，复用 |
 | 官方榜单 | `Icons.leaderboard_outlined` | 首页长篇宽卡（页内 Tab 切换月票/新书/热销/打赏）/ 对话 tab 宽卡（直达对话月票榜 m4）；文档不登记本数 |
 
 ## 分类入口（短篇 tab 入口列表 / 中篇/对话 tab 入口网格）
