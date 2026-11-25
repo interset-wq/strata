@@ -1,4 +1,6 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -16,7 +18,7 @@ import '../widgets/metric_badge.dart';
 ///  - 周视图：7 行（每日一行）+ 前三本迷你卡，点行进日视图
 ///  - 日视图：全量列表（收藏降序，带 est_conf 精度徽标）
 /// 口径（docs/14 §1.3）：日期是「作品创建时间估计」，非首章发布日期，
-/// UI 标「上架日期（估计）」；low 档只入月视图（引擎侧过滤）；
+/// UI 标「入库日期（估计）」；low 档只入月视图（引擎侧过滤）；
 /// 右删失边界 = manifest genMin..genMax（日历不显示界外年份）。
 /// 推荐层不消费日历——只改变浏览路径，不改打分（12 §信号白名单）。
 class CalendarPage extends ConsumerStatefulWidget {
@@ -42,6 +44,9 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
   DateTime _mondayOf(DateTime d) =>
       d.subtract(Duration(days: (d.weekday - DateTime.monday)));
 
+  // 周一开头周的周六 = VIP 期数键（§7.5：只有周六有数据）。
+  DateTime _saturdayOf(DateTime d) => _mondayOf(d).add(const Duration(days: 5));
+
   String _pad(int n) => n.toString().padLeft(2, '0');
 
   String _anchor() {
@@ -49,6 +54,9 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
     switch (_granularity) {
       case 'month':
         return '${f.year}-${_pad(f.month)}-01';
+      case 'vip':
+        final s = _saturdayOf(f);
+        return '${s.year}${_pad(s.month)}${_pad(s.day)}';
       case 'week':
         final m = _mondayOf(f);
         return '${m.year}-${_pad(m.month)}-${_pad(m.day)}';
@@ -63,6 +71,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
       case 'month':
         return DateTime(f.year, f.month, 1);
       case 'week':
+      case 'vip':
         return _mondayOf(f);
       default:
         return DateTime(f.year, f.month, f.day);
@@ -75,6 +84,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
       case 'month':
         return DateTime(f.year, f.month + 1, 0);
       case 'week':
+      case 'vip':
         return _mondayOf(f).add(const Duration(days: 6));
       default:
         return DateTime(f.year, f.month, f.day);
@@ -94,6 +104,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
         case 'month':
           _focus = DateTime(f.year, f.month + dir, 1);
         case 'week':
+        case 'vip':
           _focus = f.add(Duration(days: 7 * dir));
         default:
           _focus = f.add(Duration(days: dir));
@@ -114,11 +125,9 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
   // 点年即时切换（保留月，sheet 不关，可继续点月）；点月跳转并关闭。
   // 右删失边界直接由年范围表达（genMin..genMax），无需禁用态。
 
-  void _jumpTo(int y, int m) {
-    setState(() => _focus = DateTime(y, m, 1));
-  }
-
-  Future<void> _showYearMonthPicker() async {
+  // 双列滚轮选年月（用户 2026-11-25 定）：CupertinoPicker 拖动即时生效
+  //（年列与月列联动，sheet 不关）；日历只需年月精度，不用完整日历选择器。
+  Future<void> _pickDate() async {
     final scheme = Theme.of(context).colorScheme;
     await showModalBottomSheet<void>(
       context: context,
@@ -126,13 +135,16 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => _YearMonthSheet(
+      builder: (_) => _YearMonthWheel(
         minYear: _genMin,
         maxYear: _genMax,
         initialYear: _focus.year,
         initialMonth: _focus.month,
-        onYear: (y) => _jumpTo(y, _focus.month),
-        onMonth: (m) => _jumpTo(_focus.year, m),
+        onChanged: (y, m) {
+          if (mounted) {
+            setState(() => _focus = DateTime(y, m, 1));
+          }
+        },
       ),
     );
   }
@@ -177,6 +189,9 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
         final m = _mondayOf(f);
         final s = m.add(const Duration(days: 6));
         return '${m.month}月${m.day}日 – ${s.month}月${s.day}日';
+      case 'vip':
+        final s = _saturdayOf(f);
+        return '${s.month}月${s.day}日 期（周六）';
       default:
         return '${f.month}月${f.day}日（周${_weekdays[f.weekday - 1]}）';
     }
@@ -185,11 +200,18 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final data = ref.watch(calendarProvider(CalendarQuery(
-      granularity: _granularity,
-      anchor: _anchor(),
-      perCell: _granularity == 'day' ? 50 : 3,
-    )));
+    final isVip = _granularity == 'vip';
+    final data = isVip
+        ? null
+        : ref.watch(
+            calendarProvider(
+              CalendarQuery(
+                granularity: _granularity,
+                anchor: _anchor(),
+                perCell: _granularity == 'day' ? 50 : 3,
+              ),
+            ),
+          );
 
     return Scaffold(
       appBar: AppBar(
@@ -216,13 +238,17 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                   Text(
                     '双层计数：~N = 全平台估计新书  N 内置 = 可点击内置库子集',
                     style: TextStyle(
-                        fontSize: 11, color: scheme.onSurfaceVariant),
+                      fontSize: 11,
+                      color: scheme.onSurfaceVariant,
+                    ),
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '定年 = nid 锚点内插（中位误差 2 天）；上架日期为估计值，非首章发布日期',
+                    '定年 = nid 锚点内插（中位误差 2 天）；入库日期为估计值，非首章发布日期',
                     style: TextStyle(
-                        fontSize: 11, color: scheme.onSurfaceVariant),
+                      fontSize: 11,
+                      color: scheme.onSurfaceVariant,
+                    ),
                   ),
                 ],
               ),
@@ -235,6 +261,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                   ButtonSegment(value: 'month', label: Text('月')),
                   ButtonSegment(value: 'week', label: Text('周')),
                   ButtonSegment(value: 'day', label: Text('日')),
+                  ButtonSegment(value: 'vip', label: Text('VIP')),
                 ],
                 selected: {_granularity},
                 onSelectionChanged: (s) =>
@@ -252,7 +279,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                   ),
                   Expanded(
                     child: InkWell(
-                      onTap: _showYearMonthPicker,
+                      onTap: _pickDate,
                       child: Padding(
                         padding: const EdgeInsets.symmetric(vertical: 8),
                         child: Row(
@@ -262,9 +289,10 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                             Text(
                               _title(),
                               style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  fontFamily: StrataTokens.serif),
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: StrataTokens.serif,
+                              ),
                             ),
                             const SizedBox(width: 4),
                             Icon(
@@ -286,17 +314,18 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
             ),
             // 内容区
             Expanded(
-              child: data.when(
-                loading: () =>
-                    const Center(child: CircularProgressIndicator()),
-                error: (e, _) =>
-                    Center(child: Text('日历加载失败：$e')),
-                data: (resp) => switch (_granularity) {
-                  'month' => _buildMonth(resp, scheme),
-                  'week' => _buildWeek(resp, scheme),
-                  _ => _buildDay(resp, scheme),
-                },
-              ),
+              child: isVip
+                  ? _buildVip(scheme)
+                  : data!.when(
+                      loading: () =>
+                          const Center(child: CircularProgressIndicator()),
+                      error: (e, _) => Center(child: Text('日历加载失败：$e')),
+                      data: (resp) => switch (_granularity) {
+                        'month' => _buildMonth(resp, scheme),
+                        'week' => _buildWeek(resp, scheme),
+                        _ => _buildDay(resp, scheme),
+                      },
+                    ),
             ),
           ],
         ),
@@ -329,7 +358,9 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                     '周$w',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                        fontSize: 11, color: scheme.onSurfaceVariant),
+                      fontSize: 11,
+                      color: scheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
             ],
@@ -337,8 +368,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
           const SizedBox(height: 6),
           Expanded(
             child: GridView.builder(
-              gridDelegate:
-                  const SliverGridDelegateWithFixedCrossAxisCount(
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 7,
                 mainAxisSpacing: 6,
                 crossAxisSpacing: 6,
@@ -358,7 +388,8 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                       borderRadius: BorderRadius.circular(8),
                       border: has
                           ? Border.all(
-                              color: scheme.outline.withValues(alpha: .35))
+                              color: scheme.outline.withValues(alpha: .35),
+                            )
                           : null,
                     ),
                     child: Column(
@@ -368,27 +399,28 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                           '$dayNum',
                           style: TextStyle(
                             fontSize: 13,
-                            fontWeight:
-                                has ? FontWeight.w700 : FontWeight.w400,
+                            fontWeight: has ? FontWeight.w700 : FontWeight.w400,
                             color: has
                                 ? scheme.onSurface
-                                : scheme.onSurfaceVariant
-                                    .withValues(alpha: .7),
+                                : scheme.onSurfaceVariant.withValues(alpha: .7),
                           ),
                         ),
                         if (has)
                           Text(
                             '~${c.universe}',
                             style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: scheme.primary),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: scheme.primary,
+                            ),
                           ),
                         if (has)
                           Text(
                             '${c.total}内置',
                             style: TextStyle(
-                                fontSize: 9, color: scheme.onSurfaceVariant),
+                              fontSize: 9,
+                              color: scheme.onSurfaceVariant,
+                            ),
                           ),
                       ],
                     ),
@@ -401,8 +433,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
           Center(
             child: Text(
               '本月：全平台估计 ~$uni 本 · 内置库 $total 本（可点击）',
-              style:
-                  TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
+              style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
             ),
           ),
         ],
@@ -432,8 +463,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
             decoration: BoxDecoration(
               color: scheme.surface,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                  color: scheme.outline.withValues(alpha: .25)),
+              border: Border.all(color: scheme.outline.withValues(alpha: .25)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -443,13 +473,17 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                     Text(
                       '${d.month}月${d.day}日',
                       style: const TextStyle(
-                          fontSize: 14, fontWeight: FontWeight.w600),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     const SizedBox(width: 6),
                     Text(
                       '（周${_weekdays[d.weekday - 1]}）',
                       style: TextStyle(
-                          fontSize: 12, color: scheme.onSurfaceVariant),
+                        fontSize: 12,
+                        color: scheme.onSurfaceVariant,
+                      ),
                     ),
                     const Spacer(),
                     if (c.total > 0 || c.universe > 0)
@@ -458,9 +492,10 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                             ? '~${c.universe}本 · ${c.total}内置'
                             : '${c.total}本',
                         style: TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            color: scheme.primary),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: scheme.primary,
+                        ),
                       ),
                   ],
                 ),
@@ -486,8 +521,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                                 it.title,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style:
-                                    const TextStyle(fontSize: 12),
+                                style: const TextStyle(fontSize: 12),
                               ),
                               const SizedBox(height: 2),
                               Text(
@@ -495,8 +529,9 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                    fontSize: 10,
-                                    color: scheme.onSurfaceVariant),
+                                  fontSize: 10,
+                                  color: scheme.onSurfaceVariant,
+                                ),
                               ),
                             ],
                           ),
@@ -521,8 +556,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
       return _empty('当日没有估计发书作品');
     }
     if (day.total == 0) {
-      return _empty(
-          '内置库当日无可点击作品（全平台估计 ~${day.universe} 本）');
+      return _empty('内置库当日无可点击作品（全平台估计 ~${day.universe} 本）');
     }
     return Stack(
       children: [
@@ -541,14 +575,18 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                         ? '— 全平台估计当日发书 ~${day.universe} 本 · 内置库 ${day.total} 本，按收藏排序 —'
                         : '— 内置库 ${day.total} 本，按收藏排序 —',
                     style: TextStyle(
-                        fontSize: 11, color: scheme.onSurfaceVariant),
+                      fontSize: 11,
+                      color: scheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
               );
             }
             final it = day.items[i];
             return _CalendarBookRow(
-                item: it, onOpen: () => context.push('/book/${it.nid}'));
+              item: it,
+              onOpen: () => context.push('/book/${it.nid}'),
+            );
           },
         ),
         if (_showTop)
@@ -567,12 +605,108 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
     );
   }
 
+  // ── VIP 视图（docs/14 §1.5）：官方每周签约升 VIP 推荐期次（在线层）。
+  // 口径红线（sfacg-endpoints §7.5）：date 是预定签约升 VIP 周，不是首发日，
+  // 与 est_date「入库日期（估计）」分列展示、不得互推。─────────────────
+
+  Widget _buildVip(ColorScheme scheme) {
+    final sat = _saturdayOf(_focus);
+    final key = '${sat.year}${_pad(sat.month)}${_pad(sat.day)}';
+    final data = ref.watch(preorderProvider(key));
+    return data.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'VIP 期次加载失败：$e',
+              style: TextStyle(fontSize: 12, color: scheme.error),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () => ref.invalidate(preorderProvider(key)),
+              child: const Text('重试'),
+            ),
+          ],
+        ),
+      ),
+      data: (resp) {
+        if (resp.items.isEmpty) {
+          return _empty('该周没有签约升 VIP 预告（官方编辑精选期次）');
+        }
+        return ListView.separated(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+          itemCount: resp.items.length + 1,
+          separatorBuilder: (_, _) => const SizedBox(height: 4),
+          itemBuilder: (context, i) {
+            if (i == resp.items.length) {
+              // 官方签约升 VIP 预告 H5（§7.5）：给出来源页防"数据是编的"。
+              final url =
+                  'https://pages.sfacg.com/h5/general/preorder-${resp.date}.html?type=android';
+              return Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  children: [
+                    Text(
+                      '— ${resp.date} 期 · 官方编辑精选 · 预定签约升 VIP 周（在线数据，非首发/入库日）—',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: () => launchUrl(
+                        Uri.parse(url),
+                        mode: LaunchMode.externalApplication,
+                      ),
+                      icon: const Icon(Icons.open_in_new, size: 14),
+                      label: const Text(
+                        '打开官方签约升 VIP 预告页',
+                        style: TextStyle(fontSize: 11),
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+            final it = resp.items[i];
+            return _PreorderRow(
+              item: it,
+              onOpen: () async {
+                if (!it.inSeed) {
+                  // 库外书自动收录：rank-seed 预写标题/封面（纯本地写），
+                  // 进详情页后 words==null 自动后台 refresh 补全（docs/08）。
+                  try {
+                    final handle = await ref.read(bootProvider.future);
+                    await handle.api.rankSeed(
+                      nid: it.nid,
+                      title: it.title,
+                      coverUrl: it.cover ?? '',
+                    );
+                  } catch (_) {
+                    // 预写失败也进详情：详情页会自行报错可重试。
+                  }
+                }
+                if (context.mounted) context.push('/book/${it.nid}');
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
   Widget _miniCover(CalendarItem it) {
     final coverUrl = it.coverUrl;
     if (coverUrl == null || coverUrl.isEmpty) {
       return defaultCover(it.nid);
     }
-    return coverImage(coverImageUrl(coverUrl) == null ? null : coverUrl, it.nid);
+    return coverImage(
+      coverImageUrl(coverUrl) == null ? null : coverUrl,
+      it.nid,
+    );
   }
 
   Widget _empty(String msg) {
@@ -647,7 +781,9 @@ class _CalendarBookRow extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                        fontSize: 13, fontWeight: FontWeight.w600),
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   const SizedBox(height: 3),
                   Text(
@@ -659,14 +795,18 @@ class _CalendarBookRow extends StatelessWidget {
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      Icon(MetricIcons.favs,
-                          size: 13, color: scheme.onSurfaceVariant),
+                      Icon(
+                        MetricIcons.favs,
+                        size: 13,
+                        color: scheme.onSurfaceVariant,
+                      ),
                       const SizedBox(width: 3),
                       Text(
                         BookRowTile.wan(item.favs),
                         style: TextStyle(
-                            fontSize: 11,
-                            color: scheme.onSurfaceVariant),
+                          fontSize: 11,
+                          color: scheme.onSurfaceVariant,
+                        ),
                       ),
                       const SizedBox(width: 10),
                       _ConfBadge(conf: item.estConf),
@@ -677,6 +817,182 @@ class _CalendarBookRow extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// VIP 签约升卡（docs/14 §1.5）：第一行通用卡（封面+标题+徽标+tags），
+/// 第二行完整 intro 容器（官方 <br> 转换行，不截断）；库外书点击先
+/// rank-seed 预写收录再进详情页（详情页 words==null 自动 refresh 补全）。
+class _PreorderRow extends StatelessWidget {
+  final PreorderItem item;
+  final VoidCallback onOpen;
+
+  const _PreorderRow({required this.item, required this.onOpen});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final author = item.inSeed && (item.inLibAuthor?.isNotEmpty ?? false)
+        ? item.inLibAuthor!
+        : null;
+    // 官方 intro 是内嵌 <br> 的 HTML 片段，转真实换行后全文展示。
+    final intro = item.intro.replaceAll(RegExp(r'<br\s*/?>'), '\n').trim();
+    return InkWell(
+      onTap: onOpen,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 3),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: scheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: scheme.outline.withValues(alpha: .25)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 48,
+                  height: 64,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(6),
+                    child: coverImage(item.cover, item.nid),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              item.title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          if (item.isMainPush) ...[
+                            const SizedBox(width: 6),
+                            const _VipBadge(),
+                          ],
+                        ],
+                      ),
+                      if (author != null) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          author,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: scheme.secondary,
+                          ),
+                        ),
+                      ],
+                      if (item.tags.isNotEmpty) ...[
+                        const SizedBox(height: 3),
+                        Text(
+                          item.tags.join('  '),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: scheme.primary,
+                          ),
+                        ),
+                      ],
+                      if (item.inSeed && (item.inLibFavs ?? 0) > 0) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(
+                              MetricIcons.favs,
+                              size: 13,
+                              color: scheme.onSurfaceVariant,
+                            ),
+                            const SizedBox(width: 3),
+                            Text(
+                              BookRowTile.wan(item.inLibFavs),
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                      if (!item.inSeed) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          '库外作品 · 点击自动收录进详情',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: scheme.onSurfaceVariant.withValues(
+                              alpha: .7,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            if (intro.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: scheme.onSurface.withValues(alpha: .04),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  intro,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    height: 1.5,
+                    color: scheme.onSurface.withValues(alpha: .85),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 主编推荐徽标（isMainPush=true 才显示；无对应 else 形态）。
+class _VipBadge extends StatelessWidget {
+  const _VipBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+      decoration: BoxDecoration(
+        color: scheme.primary.withValues(alpha: .12),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: scheme.primary.withValues(alpha: .5)),
+      ),
+      child: Text(
+        '主编推荐',
+        style: TextStyle(fontSize: 10, color: scheme.primary),
       ),
     );
   }
@@ -701,117 +1017,112 @@ class _ConfBadge extends StatelessWidget {
             : scheme.onSurface.withValues(alpha: .05),
         borderRadius: BorderRadius.circular(4),
         border: Border.all(
-            color: exact
-                ? scheme.primary.withValues(alpha: .5)
-                : scheme.outline.withValues(alpha: .3)),
+          color: exact
+              ? scheme.primary.withValues(alpha: .5)
+              : scheme.outline.withValues(alpha: .3),
+        ),
       ),
       child: Text(
         exact ? '精确' : '估计',
         style: TextStyle(
-            fontSize: 10,
-            color: exact ? scheme.primary : scheme.onSurfaceVariant),
+          fontSize: 10,
+          color: exact ? scheme.primary : scheme.onSurfaceVariant,
+        ),
       ),
     );
   }
 }
 
-/// 二维年月选择器（BottomSheet）：点年即时切换（保留月，sheet 不关，可继续
-/// 点月）；点月跳转并关闭。年范围 = 右删失边界（genMin..genMax），无需禁用态。
-class _YearMonthSheet extends StatefulWidget {
+/// 双列滚轮选年月（CupertinoPicker）：拖动即时切换（年月联动，sheet 不
+/// 关）；年范围 = 右删失边界（genMin..genMax），无需禁用态。
+class _YearMonthWheel extends StatefulWidget {
   final int minYear;
   final int maxYear;
   final int initialYear;
   final int initialMonth;
-  final ValueChanged<int> onYear;
-  final ValueChanged<int> onMonth;
+  final void Function(int year, int month) onChanged;
 
-  const _YearMonthSheet({
+  const _YearMonthWheel({
     required this.minYear,
     required this.maxYear,
     required this.initialYear,
     required this.initialMonth,
-    required this.onYear,
-    required this.onMonth,
+    required this.onChanged,
   });
 
   @override
-  State<_YearMonthSheet> createState() => _YearMonthSheetState();
+  State<_YearMonthWheel> createState() => _YearMonthWheelState();
 }
 
-class _YearMonthSheetState extends State<_YearMonthSheet> {
-  late int _year = widget.initialYear;
+class _YearMonthWheelState extends State<_YearMonthWheel> {
+  late final FixedExtentScrollController _year = FixedExtentScrollController(
+    initialItem: widget.initialYear - minYear,
+  );
+  late final FixedExtentScrollController _month = FixedExtentScrollController(
+    initialItem: widget.initialMonth - 1,
+  );
+  late int _yearItem = _year.selectedItem;
+  late int _monthItem = _month.selectedItem;
+
+  int get minYear => widget.minYear;
+
+  @override
+  void dispose() {
+    _year.dispose();
+    _month.dispose();
+    super.dispose();
+  }
+
+  void _emit() => widget.onChanged(minYear + _yearItem, _monthItem + 1);
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final itemStyle = TextStyle(fontSize: 17, color: scheme.onSurface);
     return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
+      child: SizedBox(
+        height: 210,
+        child: Row(
           children: [
-            Row(
-              children: [
-                const Text(
-                  '选择年月',
-                  style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      fontFamily: StrataTokens.serif),
-                ),
-                const Spacer(),
-                Text(
-                  '点年即时切换 · 点月跳转',
-                  style: TextStyle(
-                      fontSize: 11, color: scheme.onSurfaceVariant),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              height: 40,
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    for (int y = widget.minYear; y <= widget.maxYear; y++)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: FilterChip(
-                          label: Text('$y'),
-                          selected: _year == y,
-                          showCheckmark: false,
-                          onSelected: (_) {
-                            setState(() => _year = y);
-                            widget.onYear(y);
-                          },
-                        ),
-                      ),
-                  ],
-                ),
+            Expanded(
+              child: CupertinoPicker(
+                scrollController: _year,
+                itemExtent: 42,
+                useMagnifier: true,
+                magnification: 1.08,
+                onSelectedItemChanged: (i) {
+                  _yearItem = i;
+                  _emit();
+                },
+                children: [
+                  for (int y = widget.minYear; y <= widget.maxYear; y++)
+                    // 子项高度必须等于 itemExtent，否则选中项相对高亮中央
+                    // 逐项累积偏移（真机复现的错位根因）。
+                    SizedBox(
+                      height: 42,
+                      child: Center(child: Text('$y', style: itemStyle)),
+                    ),
+                ],
               ),
             ),
-            const SizedBox(height: 12),
-            GridView.count(
-              crossAxisCount: 4,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              mainAxisSpacing: 8,
-              crossAxisSpacing: 8,
-              childAspectRatio: 2.6,
-              children: [
-                for (int m = 1; m <= 12; m++)
-                  FilterChip(
-                    label: Text('$m月'),
-                    selected: widget.initialMonth == m,
-                    showCheckmark: false,
-                    onSelected: (_) {
-                      widget.onMonth(m);
-                      Navigator.of(context).pop();
-                    },
-                  ),
-              ],
+            Expanded(
+              child: CupertinoPicker(
+                scrollController: _month,
+                itemExtent: 42,
+                useMagnifier: true,
+                magnification: 1.08,
+                onSelectedItemChanged: (i) {
+                  _monthItem = i;
+                  _emit();
+                },
+                children: [
+                  for (int m = 1; m <= 12; m++)
+                    SizedBox(
+                      height: 42,
+                      child: Center(child: Text('$m 月', style: itemStyle)),
+                    ),
+                ],
+              ),
             ),
           ],
         ),

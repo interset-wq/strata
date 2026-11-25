@@ -176,6 +176,15 @@ final calendarProvider = FutureProvider.family<CalendarResponse, CalendarQuery>(
   },
 );
 
+/// 每周签约升 VIP 推荐（官方活动名"每周上架推荐"）：key = 周六期数 YYYYMMDD。在线层，
+/// 引擎侧 24h 期次缓存；失败可重试，不影响月/周/日的种子视图。
+final preorderProvider = FutureProvider.family<PreorderResponse, String>(
+  (ref, date) async {
+    final handle = await ref.watch(bootProvider.future);
+    return handle.api.preorder(date: date);
+  },
+);
+
 /// IP tab 分组网格：ip_collab 池按征文（contest）聚合（count DESC），
 /// 端上展示全部组，每组带收藏最高一本的 top_* 做封面卡片。
 final ipGroupsProvider = FutureProvider<IpGroupsResult>((ref) async {

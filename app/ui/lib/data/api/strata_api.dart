@@ -637,6 +637,14 @@ class StrataApi {
     return CalendarResponse.fromJson(body as Map<String, dynamic>);
   }
 
+  /// 每周签约升 VIP 推荐（官方活动名"每周上架推荐"）：引擎代理官方 PreOrder.ashx
+  /// （docs/sfacg-endpoints.md §7.5），date = 周六期数 YYYYMMDD。
+  /// in_seed 项可进详情页；库外项仅 intro 内联（上游无作者/字数）。
+  Future<PreorderResponse> preorder({required String date}) async {
+    final body = await _get('/preorder', {'date': date});
+    return PreorderResponse.fromJson(body as Map<String, dynamic>);
+  }
+
   /// IP tab 分组网格：一个 form 的书按征文（contest）聚合，
   /// count DESC（引擎侧稳定排序）；每组 top_* 是收藏最高的一本。
   Future<IpGroupsResult> ipGroups({
@@ -952,6 +960,45 @@ class Manifest {
       tagRows = m['tag_rows'] as int,
       genMin = m['gen_min'] as int,
       genMax = m['gen_max'] as int;
+}
+
+/// 每周签约升 VIP 推荐条目（官方 8 字段去 hasOrder——那是登录用户预约态）。
+/// 口径红线（§7.5）：date 是预定签约升 VIP 周，不是首发日，与 est_date
+/// 分列展示、不得互推。
+class PreorderItem {
+  final int nid;
+  final String title;
+  final String intro;
+  final String? cover;
+  final bool isMainPush;
+  final List<String> tags;
+  final bool inSeed;
+  final String? inLibAuthor;
+  final int? inLibFavs;
+
+  PreorderItem.fromJson(Map<String, dynamic> m)
+    : nid = (m['nid'] as num).toInt(),
+      title = m['title'] as String? ?? '',
+      intro = m['intro'] as String? ?? '',
+      cover = m['cover'] as String?,
+      isMainPush = m['is_main_push'] as bool? ?? false,
+      tags = [for (final t in ((m['tags'] as List?) ?? const [])) '$t'],
+      inSeed = m['in_seed'] as bool? ?? false,
+      inLibAuthor =
+          ((m['in_lib'] as Map<String, dynamic>?)?['author']) as String?,
+      inLibFavs =
+          ((m['in_lib'] as Map<String, dynamic>?)?['favs'] as num?)?.toInt();
+}
+
+class PreorderResponse {
+  final String date; // 归一后的周六期数 YYYYMMDD
+  final List<PreorderItem> items;
+
+  PreorderResponse.fromJson(Map<String, dynamic> m)
+    : date = m['date'] as String? ?? '',
+      items = ((m['items'] as List?) ?? const [])
+          .map((e) => PreorderItem.fromJson(e as Map<String, dynamic>))
+          .toList();
 }
 
 class CalendarItem {

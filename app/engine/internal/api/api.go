@@ -66,6 +66,15 @@ type Server struct {
 	// shared limiter (foreground lane) via crawl.FetchBooklist.
 	booklistFetch func(ctx context.Context, client *http.Client, l *crawl.Limiter,
 		id int, kind string, foreground bool) (string, error)
+
+	// 24h per-issue cache for the preorder proxy (payload is tiny; one
+	// upstream hit per issue serves repeated taps).
+	preorderCache *preorderState
+
+	// Seam for the preorder endpoint tests: the default goes through the
+	// shared limiter (foreground lane) via crawl.FetchPreOrder.
+	preorderFetch func(ctx context.Context, client *http.Client, l *crawl.Limiter,
+		date string, foreground bool) ([]crawl.PreOrderItem, error)
 }
 
 const (
@@ -120,6 +129,11 @@ func NewServer(s *store.Store) *Server {
 			l *crawl.Limiter, id int, kind string, foreground bool) (string, error) {
 			return crawl.FetchBooklist(ctx, client, l, id, kind, foreground)
 		},
+		preorderCache: &preorderState{entries: map[string]preorderEntry{}},
+		preorderFetch: func(ctx context.Context, client *http.Client,
+			l *crawl.Limiter, date string, foreground bool) ([]crawl.PreOrderItem, error) {
+			return crawl.FetchPreOrder(ctx, client, l, date, foreground)
+		},
 	}
 	group := r.Group("/strata")
 	group.GET("/healthz", srv.healthz)
@@ -169,6 +183,7 @@ func NewServer(s *store.Store) *Server {
 	group.GET("/featured-all", srv.featuredAll)
 	group.GET("/cover-carousel", srv.coverCarousel)
 	group.GET("/calendar", srv.calendar)
+	group.GET("/preorder", srv.preorder)
 	group.GET("/ip-groups", srv.ipGroups)
 	group.GET("/facets", srv.facets)
 	group.GET("/year-groups", srv.yearGroups)

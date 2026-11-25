@@ -156,6 +156,27 @@ nid ASC`，分页同 `/rankings/classic`。未知征文名返回空列表不报�
 `'other'` 仍保留为兼容旧深链（归一化后收藏数前 2 名征文之外的长尾，
 引擎内部算 top-2），但 IP tab 分组网格已不再生成该入口。
 
+### GET /strata/preorder?date=YYYYMMDD（**已实现**，2026-11-24）
+
+每周签约升 VIP 推荐（官方活动名"每周上架推荐"）：代理官方
+`pages.sfacg.com/ajax/act/PreOrder.ashx?op=getPreOrderNovels&date=&cid=0`
+（端点事实与语义实证 → docs/sfacg-endpoints.md §7.5）。要点：
+
+- `date` 必须是**周六**（期数键）；非周六由引擎归一到所在周的周六。
+  2020-08 中旬前基本全空（2018-12 起零星有），空期返回 `items: []`。
+- `cid` 固定 0（轻小说）——实测各期 cid=1 对话小说全空，暂不暴露参数。
+- 只读、无认证、无分页；走全局限速器前台车道（用户触发），结果按期缓存
+  24h（空期缓存负结果），重复打开不再打上游。
+- 响应：`{date: "YYYY-MM-DD", items: [{nid, title, intro, cover,
+  is_main_push, tags: [], in_seed, in_lib}]}`。`is_main_push=true` 官方渲染
+  「主编推荐」。`in_seed` = 该 nid 在内置库；是则 `in_lib` 带库内
+  author/favs/cover，端上直接进详情页；否则详情不可用（上游无作者/字数，
+  intro 内联展示）。
+- 口径红线（§7.5 实证）：`date` 是**预定签约升 VIP 周**（官方语义 =
+  签约升级为 VIP），不是首发日——我们此前的「上架」语义实为入库/创建，
+  与官方不符已弃用；与日历 est_date（nid 内插）口径不同，UI 严禁混列/互推。
+- `hasOrder` 是用户预约态（未登录恒 false），不透传。
+
 ### GET /strata/cover-carousel?form=&limit=&seed=（**已实现**）
 
 对话/短篇 tab 合成轮播源：`form` 必填（同 `/banner` 的枚举校验），`seed` 同
