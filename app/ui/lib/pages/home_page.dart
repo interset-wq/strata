@@ -300,13 +300,6 @@ class _HomePageState extends ConsumerState<HomePage> {
             _featuredCarousel(context, banners),
             const SizedBox(height: 8),
             _entryGrid(context),
-            _wideEntryCard(
-              context,
-              icon: Icons.leaderboard_outlined,
-              title: '官方榜单',
-              subtitle: '月票 / 新书 / 热销 / 打赏 · 在线',
-              route: '/official-ranks',
-            ),
             _sectionTitle(
               context,
               '连载发现',
@@ -683,6 +676,8 @@ class _HomePageState extends ConsumerState<HomePage> {
   // 二级页面分流宫格：底部 Tab 之外的目的地都从这里进。
   // 第四格是经典榜单（与短篇/中篇/对话 tab 首位同构：四段切换 +
   // 逆序，总榜=其中收藏段；用户 2026-11-21：原短篇入口让位）。
+  // 第五格是官方榜单（用户 2026-11-25：宽卡降级为宫格单元、放作者榜
+  // 同一行；outlined 图标与经典榜单的实心区分）。
   Widget _entryGrid(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final entries = [
@@ -694,6 +689,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         '经典榜单',
         '/classic-list?title=经典榜单&form=long&metric-switchable=1',
       ),
+      (Icons.leaderboard_outlined, '官方榜单', '/official-ranks'),
     ];
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
