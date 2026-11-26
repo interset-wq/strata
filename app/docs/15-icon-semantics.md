@@ -39,7 +39,7 @@
 | 按状态浏览 | `Icons.update` | 首页宫格 |
 | 征文比赛 | `Icons.emoji_events` | 首页宫格 |
 | 短篇榜 | `Icons.article` | 首页宫格 |
-| 经典榜单入口 | `Icons.leaderboard` | 短篇入口列表 / 中篇/对话入口网格：点击/收藏/点赞/字数四榜（页内 SegmentedButton 切换；总榜=其中收藏段，故各 tab 不再单列总榜入口） |
+| 经典榜单入口 | `Icons.leaderboard` | 短篇/中篇/对话 tab 入口行：点击/收藏/点赞/字数四榜（页内 SegmentedButton 切换；总榜=其中收藏段，故各 tab 不再单列总榜入口） |
 | 官方书单 | `Icons.bookmarks` | 「书单推荐」区块更多按钮（2026-11-25 原长篇宫格入口被「日轻」取代）：官方书单浏览入口（顺序 id 探测，docs/booklist-in-app.md） |
 | 日轻 | `Icons.local_library` | 首页长篇宫格（2026-11-25 用户裁定取代「官方书单」入口）：官方授权日本轻小说全量列表（/licensed，PoolListPage）；原「授权作品」宽卡入口退役；不用 `Icons.menu_book`（已被「中对话」占用） |
 | 官方榜单 | `Icons.leaderboard_outlined` | 首页长篇宫格第 5 格（2026-11-25 用户裁定：宽卡降级为宫格单元、与作者榜同一行）：页内 Tab 切换月票/新书/热销/打赏；outlined 与「经典榜单」实心 `Icons.leaderboard` 同排区分（在线口径 vs 本地口径） |
@@ -50,20 +50,19 @@
 | 语义 | icon | 使用处 |
 | --- | --- | --- |
 | 萌神获奖 | `Icons.emoji_events` | 赛事归档页 AppBar 入口（2026-11-25 首页宽卡已删，随比赛 tab 归档改造）；与宫格"征文比赛"同"获奖"语义，复用 |
-| 官方榜单 | `Icons.leaderboard_outlined` | 对话 tab 宽卡（直达对话月票榜 m4）；首页长篇原宽卡 2026-11-25 降级为宫格单元（见「首页宫格」分节）；文档不登记本数 |
+| 官方榜单 | `Icons.leaderboard_outlined` | 对话 tab 入口行第 4 格「月票榜」（直达对话月票榜 m4）；首页长篇原宽卡 2026-11-25 降级为宫格单元（见「首页宫格」分节）；文档不登记本数 |
+| 赛事归档 | `Icons.event_note` | 对话 tab 入口行第 5 格（/contest-archive 全屏归档页；2026-11-26 用户裁定：原对话区内联归档列表退役，入口收进导航行） |
 
-## 分类入口（短篇 tab 入口列表 / 中篇/对话 tab 入口网格）
+## 分类入口（原中篇/对话 tab 入口网格，2026-11-26 精简退役）
 
 | 语义 | icon | 使用处 |
 | --- | --- | --- |
-| 短对话 | `Icons.short_text` | 对话 tab 入口网格（≤5 万字） |
-| 中对话 | `Icons.menu_book` | 对话 tab 入口网格（5–15 万字） |
-| 长对话 | `Icons.auto_stories` | 对话 tab 入口网格（>15 万字） |
-| 年份榜 | `Icons.calendar_month` | 短篇 tab 入口列表 / 中篇/对话 tab 入口网格 |
-| 比赛榜 | `Icons.emoji_events` | 短篇 tab 入口列表 / 中篇/对话 tab 入口网格（复用"征文比赛"语义） |
-| 题材浏览 | `Icons.category` | 短篇 tab 入口列表 / 中篇/对话 tab 入口网格（复用"分类找书"语义） |
-| 优质短篇/中篇/对话 | `Icons.star` | 短篇入口列表 / 中篇/对话入口网格（同代分位榜，docs/form-definitions §6） |
-| 随机短篇/中篇/对话 | `Icons.shuffle` | 短篇入口列表 / 中篇/对话入口网格（/strata/random?status=short，form 区分） |
+| 短/中/长对话篇幅轴 | （无 icon） | 经典榜单页（对话 form）顶部篇幅 chip 行：全部/短 ≤5万/中 5–15万/长 >15万（2026-11-26 用户裁定：篇幅是筛选轴不是三个独立页面，首页短/中/长入口退役；`Icons.short_text`/`Icons.menu_book`/`Icons.auto_stories` 随入口退役） |
+| 年份榜 | `Icons.calendar_month` | 官方榜单页月份按钮（原首页年份榜入口退役：年份在经典榜单页顶部年份条切换） |
+| 比赛榜 | （无 icon） | 经典榜单页侧滑赛道面板（原首页比赛榜入口退役；`Icons.emoji_events` 保留给赛事归档页萌神 AppBar 入口） |
+| 题材浏览 | （无 icon） | 经典榜单页筛选面板（原首页题材榜入口退役；`Icons.category` 随入口退役） |
+| 优质中篇/对话 | （无 icon） | 经典榜单页 order=pct 排序（原首页优质入口退役；`Icons.star` 随入口退役） |
+| 随机短篇/中篇/对话 | （无 icon） | 各 tab 随机预览列表「更多」进随机池页（`Icons.shuffle` 随首页入口退役） |
 
 ## 主导航（底部 Tab Bar）
 
@@ -106,3 +105,4 @@
 - 榜单字数榜（字数 badge）
 - 作者页（头像占位 `Icons.person`；书目行为简单文本行，暂无 MetricBadge 语义）
 - 搜索页（收藏 badge、`Icons.travel_explore` 全搜按钮、历史 chips 无 icon）
+

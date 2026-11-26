@@ -8,9 +8,9 @@ import '../data/api/strata_api.dart';
 import '../widgets/banner_carousel.dart';
 import '../widgets/banner_large_card.dart';
 import '../widgets/back_to_top.dart';
+import '../widgets/book_row_tile.dart';
 import '../widgets/cover_banner.dart';
 import '../widgets/default_cover.dart';
-import '../widgets/contest_row_card.dart';
 
 /// Classic 排行行卡数据（board 端点），kind: finish / popular。
 final boardProvider = FutureProvider.autoDispose.family<List<RankItem>, String>(
@@ -55,6 +55,14 @@ final browseShowcaseProvider = FutureProvider.family<List<RankItem>, String>((
   return handle.api.randomBooks(limit: 8, status: 'browse', form: form);
 });
 
+/// 短篇/中篇 tab 的随机预览：只取 10 条，更多走各自随机池页。
+/// autoDispose：离开 tab 再回来会换一批；页面内滚动/重建保持稳定。
+final formRandomPreviewProvider = FutureProvider.autoDispose
+    .family<List<RankItem>, String>((ref, form) async {
+      final handle = await ref.watch(bootProvider.future);
+      return handle.api.randomBooks(limit: 10, status: 'short', form: form);
+    });
+
 /// 首页：编辑精选轮播 → 入口宫格 → 分类找书 → 继续浏览。
 /// 不暴露种子统计——定位是找书 App（用户反馈 2026-11-17）。
 class HomePage extends ConsumerStatefulWidget {
@@ -79,15 +87,16 @@ class _HomePageState extends ConsumerState<HomePage> {
   // IP tab：小池（seed 只有 62 本/6 个征文），首页只做分组卡片，
   // 不再把全池 62 行倒进“随便看看”；二级页看单 IP 全部作品。
 
-  // 中篇 tab（小池，words 5万–15万，池规模随种子版本变化）：入口网格
-  // 门户（总榜/年份/比赛/题材/优质/随机）。原页内单列表信息量低
-  // （用户 2026-11-19 反馈），榜单落点复用 ClassicListPage，随机走
-  // /medium-random。与长篇=分区首页、短篇=入口列表、对话=篇幅+榜单
-  // 3×3、IP=分组封面卡片刻意区分（docs/16）。
+  // 中篇 tab（小池，words 5万–15万，池规模随种子版本变化）：与短篇
+  // 同构的两入口图标行（经典榜单/作者榜）+ 随机中篇 10 条预览。
+  // 年份/比赛/题材/优质在经典榜单页内筛选，首页不再重复；与长篇=
+  // 分区首页、短篇/中篇=入口图标行、对话=篇幅+榜单 3×3、IP=分组
+  // 封面卡片刻意区分（docs/16）。
 
-  // 对话 tab（大类，无完结条款，E.22 口径）：字数从 3 万到上百万，
-  // 单一收藏榜会被长篇占满。入口网格按短/中/长篇幅 + 榜单分流；
-  // 轮播用封面合成纸墨 banner（无 featured 定制图池）。
+  // 对话 tab（大类，无完结条款，E.22 口径）：字数从 3 万到上百万。
+  // 五入口图标行分流（经典/量化/作者/月票/归档），篇幅/年份/比赛/
+  // 题材/优质在经典榜单页内切；轮播用封面合成纸墨 banner（无 featured
+  // 定制图池）。
 
   @override
   void initState() {
@@ -119,6 +128,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           ref.invalidate(contestGroupsProvider);
           ref.invalidate(yearGroupsProvider);
           ref.invalidate(genreGroupsProvider);
+          ref.invalidate(formRandomPreviewProvider);
           await ref.read(bannerProvider(carouselProviderKey(_form)).future);
         },
         child: SafeArea(bottom: false, child: _buildBody(context, banners)),
@@ -140,9 +150,10 @@ class _HomePageState extends ConsumerState<HomePage> {
 
     // 短篇 tab（docs/form-definitions §4）：收录资格（完结条款 +
     // 质量豁免 + 征文保底）由种子层实施，池本身已干净。布局对齐
-    // 其他页面：纸墨合成轮播（无 featured）+ 短篇专属五格入口
-    // （年份/比赛/题材/优质/随机——长篇的 showcase 与随机池对
-    // ≤5万字池无数据）。单列表已取消（用户 2026-11-19 定）。
+    // 长篇：纸墨合成轮播（无 featured）+ 两入口图标行
+    // （经典榜单/作者榜）+ 随机短篇 10 条预览（更多进 /short-random）。
+    // 2026-11-26 用户裁定删除年份/比赛/题材/优质四个重复入口，
+    // 并把随机从导航移入内容区。
     if (_form == 'short') {
       return Stack(
         children: [
@@ -153,10 +164,16 @@ class _HomePageState extends ConsumerState<HomePage> {
               _formTabs(context, onSelect: selectForm),
               _searchRow(context),
               // 纸墨合成轮播（无 featured 定制图，封面合成）+
-              // 短篇专属入口列表。
+              // 两入口图标行 + 随机短篇预览列表。
               _coverBannerCarousel('short'),
               const SizedBox(height: 8),
               _shortEntryGrid(context),
+              _randomPreviewSection(
+                context,
+                form: 'short',
+                title: '随机短篇',
+                route: '/short-random',
+              ),
             ],
           ),
           if (_showTop)
@@ -205,8 +222,9 @@ class _HomePageState extends ConsumerState<HomePage> {
         ],
       );
     }
-    // 对话 tab（大类）：纸墨轮播 + 3×3 入口网格。篇幅轴放在
-    // 网格首位，避免单一收藏榜被长篇占满（用户 2026-11-20）。
+    // 对话 tab（大类）：纸墨轮播 + 五入口图标行（经典/量化/作者/
+    // 月票/归档）+ 随机对话 10 条预览。短/中/长篇幅轴收进经典榜单
+    // 页内篇幅切换（用户 2026-11-26，docs/16）。
     if (_form == 'dialogue') {
       return Stack(
         children: [
@@ -218,19 +236,13 @@ class _HomePageState extends ConsumerState<HomePage> {
               _searchRow(context),
               _coverBannerCarousel('dialogue'),
               const SizedBox(height: 8),
-              _portalGrid(
+              _dialogueEntryGrid(context),
+              _randomPreviewSection(
                 context,
-                _dialogueEntryGridEntries(),
-                crossAxisCount: 3,
+                form: 'dialogue',
+                title: '随机对话',
+                route: '/dialogue-random',
               ),
-              _wideEntryCard(
-                context,
-                icon: Icons.leaderboard_outlined,
-                title: '官方对话月票榜',
-                subtitle: '2017-07 起 · 按月可查',
-                route: '/official-ranks/m4',
-              ),
-              _contestArchiveSection(context, 'dialogue'),
             ],
           ),
           if (_showTop)
@@ -248,10 +260,10 @@ class _HomePageState extends ConsumerState<HomePage> {
         ],
       );
     }
-    // 中篇 tab（小池）：固定轮播 + 2×3 入口网格（总榜/年份/
-    // 比赛/题材/优质/随机）。原页内单列表信息量低（用户
-    // 2026-11-19 反馈）；与长篇=分区首页、短篇=入口列表、
-    // IP=分组封面卡片刻意区分（docs/16）。
+    // 中篇 tab（小池）：固定轮播 + 与短篇同构的两入口图标行
+    // （经典榜单/作者榜）+ 随机中篇 10 条预览（更多进 /medium-random）。
+    // 2026-11-26 用户要求按短篇同款优化：年份/比赛/题材/优质入口
+    // 已在经典榜单页内可切，不再重复占首页；随机移入内容区。
     if (_form == 'medium') {
       return Stack(
         children: [
@@ -265,6 +277,12 @@ class _HomePageState extends ConsumerState<HomePage> {
               _featuredCarousel(context, banners),
               const SizedBox(height: 8),
               _mediumEntryGrid(context),
+              _randomPreviewSection(
+                context,
+                form: 'medium',
+                title: '随机中篇',
+                route: '/medium-random',
+              ),
             ],
           ),
           if (_showTop)
@@ -555,82 +573,6 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  Widget _wideEntryCard(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required String route,
-  }) {
-    final scheme = Theme.of(context).colorScheme;
-    return InkWell(
-      onTap: () => context.push(route),
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        decoration: BoxDecoration(
-          color: scheme.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: scheme.outline.withValues(alpha: .25)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: scheme.primary.withValues(alpha: .08),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, size: 20, color: scheme.primary),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: scheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(Icons.chevron_right, size: 20, color: scheme.outline),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // 对话区 / IP 区赛事归档（用户裁定 2026-11-22：对话的归档放对话区、
-  // IP 的归档放 IP 区；列表页「其他」tab 只留主题类）：按引擎侧 lane
-  // 分类过滤，零请求，空则整区隐藏。
-  Widget _contestArchiveSection(BuildContext context, String lane) {
-    final groups = ref.watch(contestArchiveProvider);
-    final items = groups.value?.where((g) => g.lane == lane).toList() ?? [];
-    if (items.isEmpty) return const SizedBox.shrink();
-    return Column(
-      children: [
-        _sectionTitle(context, '赛事归档'),
-        for (final g in items) ContestRowCard(group: g),
-      ],
-    );
-  }
-
   Widget _sectionTitle(
     BuildContext context,
     String text, {
@@ -681,7 +623,6 @@ class _HomePageState extends ConsumerState<HomePage> {
   // 第五格是官方榜单（用户 2026-11-25：宽卡降级为宫格单元、放作者榜
   // 同一行；outlined 图标与经典榜单的实心区分）。
   Widget _entryGrid(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final entries = [
       (Icons.local_library, '日轻', '/licensed'),
       (Icons.person_search, '作者榜', '/author-ranks?form=long'),
@@ -693,6 +634,14 @@ class _HomePageState extends ConsumerState<HomePage> {
       ),
       (Icons.leaderboard_outlined, '官方榜单', '/official-ranks'),
     ];
+    return _iconNavRow(context, entries);
+  }
+
+  Widget _iconNavRow(
+    BuildContext context,
+    List<(IconData, String, String)> entries,
+  ) {
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
@@ -809,277 +758,120 @@ class _HomePageState extends ConsumerState<HomePage> {
     );
   }
 
-  // 中篇 tab 入口网格（2 列）：经典榜单/作者榜/年份/比赛/题材/优质/随机。
-  // 首位经典榜单与短篇 tab 同构（点击/收藏/点赞/字数四段切换 + 逆序，
-  // 总榜=其中收藏段，故不再单列总榜入口）；入口只做导航，轴切换留在
-  // ClassicListPage 页内（docs/16）。
+  // 中篇 tab 入口行：经典榜单/作者榜，与短篇同构。经典榜单页内已有
+  // 点击/收藏/点赞/字数四段切换、年份/比赛/题材/优质筛选，首页不再
+  // 重复列出；随机中篇放到下方 10 条预览（docs/16）。
   Widget _mediumEntryGrid(BuildContext context) {
-    final entries = <(IconData, String, String, String)>[
-      (
-        Icons.leaderboard,
-        '经典榜单',
-        '点击/收藏/点赞/字数',
-        '/classic-list?title=经典榜单&form=medium&metric-switchable=1',
-      ),
-      (
-        Icons.person_search,
-        '作者榜',
-        'top 100 作者',
-        '/author-ranks?form=medium',
-      ),
-      (
-        Icons.calendar_month,
-        '年份榜',
-        '筛选面板里选年份',
-        '/classic-list?title=${Uri.encodeComponent('年份榜')}'
-            '&form=medium',
-      ),
-      (
-        Icons.emoji_events,
-        '比赛榜',
-        '按征文赛道筛选',
-        '/classic-list?title=${Uri.encodeComponent('比赛榜')}'
-            '&form=medium&contest-switchable=1',
-      ),
-      (
-        Icons.category,
-        '题材榜',
-        '筛选面板里选题材',
-        '/classic-list?title=${Uri.encodeComponent('题材榜')}'
-            '&form=medium',
-      ),
-      (
-        Icons.star,
-        '优质中篇',
-        '同代分位头部',
-        '/classic-list?title=${Uri.encodeComponent('优质中篇')}'
-            '&form=medium&order=pct',
-      ),
-      (Icons.shuffle, '随机中篇', '随机 100 本', '/medium-random'),
-    ];
-    return _portalGrid(context, entries, crossAxisCount: 2);
-  }
-
-  // 对话 tab 入口网格（3 列）：篇幅优先，再是榜单轴。首位经典榜单与
-  // 短篇/中篇同构（四段切换 + 逆序，总榜=其中收藏段）。
-  List<(IconData, String, String, String)> _dialogueEntryGridEntries() {
-    String listPath(String title, String extra) =>
-        '/classic-list?title=${Uri.encodeComponent(title)}&form=dialogue$extra';
-    return [
-      (
-        Icons.leaderboard,
-        '经典榜单',
-        '点击/收藏/点赞/字数',
-        listPath('经典榜单', '&metric-switchable=1'),
-      ),
-      (
-        Icons.insights,
-        '量化榜单',
-        '口碑/位置两榜',
-        '/quant-list?form=dialogue',
-      ),
-      (
-        Icons.person_search,
-        '作者榜',
-        'top 100 作者',
-        '/author-ranks?form=dialogue',
-      ),
-      (Icons.short_text, '短对话', '≤5 万字', listPath('短对话', '&words-band=short')),
-      (
-        Icons.menu_book,
-        '中对话',
-        '5–15 万字',
-        listPath('中对话', '&words-band=medium'),
-      ),
-      (
-        Icons.auto_stories,
-        '长对话',
-        '>15 万字',
-        listPath('长对话', '&words-band=long'),
-      ),
-      (Icons.calendar_month, '年份榜', '顶部年份条切换', listPath('年份榜', '')),
-      (
-        Icons.emoji_events,
-        '比赛榜',
-        '按征文赛道筛选',
-        listPath('比赛榜', '&contest-switchable=1'),
-      ),
-      (Icons.category, '题材榜', '筛选面板里选题材', listPath('题材榜', '')),
-      (Icons.star, '优质对话', '同代分位头部', listPath('优质对话', '&order=pct')),
-      (Icons.shuffle, '随机对话', '随机 100 本', '/dialogue-random'),
-    ];
-  }
-
-  Widget _portalGrid(
-    BuildContext context,
-    List<(IconData, String, String, String)> entries, {
-    required int crossAxisCount,
-  }) {
-    final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-      child: GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        itemCount: entries.length,
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: crossAxisCount,
-          mainAxisSpacing: 10,
-          crossAxisSpacing: 10,
-          childAspectRatio: crossAxisCount >= 3 ? 0.82 : 1.2,
-        ),
-        itemBuilder: (context, i) {
-          final (icon, title, desc, path) = entries[i];
-          return InkWell(
-            borderRadius: BorderRadius.circular(14),
-            onTap: () => context.push(path),
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: scheme.surface,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: scheme.outline.withValues(alpha: .3)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: scheme.primary.withValues(alpha: .12),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    alignment: Alignment.center,
-                    child: Icon(icon, size: 19, color: scheme.primary),
-                  ),
-                  const Spacer(),
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    desc,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _shortEntryGrid(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final entries = [
       (
         Icons.leaderboard,
         '经典榜单',
-        '点击/收藏/点赞/字数',
+        '/classic-list?title=经典榜单&form=medium&metric-switchable=1',
+      ),
+      (Icons.person_search, '作者榜', '/author-ranks?form=medium'),
+    ];
+    return _iconNavRow(context, entries);
+  }
+
+  // 对话 tab 入口网格（3 列）：篇幅优先，再是榜单轴。首位经典榜单与
+  // 短篇/中篇同构（四段切换 + 逆序，总榜=其中收藏段）。
+  // 对话 tab 入口行（用户 2026-11-26 裁定）：五大目的地一行排开——
+  // 经典榜单（篇幅/年份/比赛/题材在页内切）/ 量化榜单 / 作者榜 /
+  // 官方月票榜（直达 m4，独立在线数据）/ 赛事归档（全屏归档页）。
+  // 篇幅是筛选轴不是独立页面：短/中/长入口退役，并入经典榜单页
+  // 篇幅切换（docs/16）；随机对话移入下方 10 条预览内容区。
+  Widget _dialogueEntryGrid(BuildContext context) {
+    final entries = [
+      (
+        Icons.leaderboard,
+        '经典榜单',
+        '/classic-list?title=经典榜单&form=dialogue&metric-switchable=1',
+      ),
+      (Icons.insights, '量化榜单', '/quant-list?form=dialogue'),
+      (Icons.person_search, '作者榜', '/author-ranks?form=dialogue'),
+      (Icons.leaderboard_outlined, '月票榜', '/official-ranks/m4'),
+      (Icons.event_note, '赛事归档', '/contest-archive'),
+    ];
+    return _iconNavRow(context, entries);
+  }
+
+  Widget _shortEntryGrid(BuildContext context) {
+    final entries = [
+      (
+        Icons.leaderboard,
+        '经典榜单',
         '/classic-list?title=经典榜单&form=short&metric-switchable=1',
       ),
-      (Icons.person_search, '作者榜', 'top 100 作者', '/author-ranks?form=short'),
-      (
-        Icons.calendar_month,
-        '年份榜',
-        '筛选面板里选年份',
-        '/classic-list?title=年份榜&form=short',
-      ),
-      (
-        Icons.emoji_events,
-        '比赛榜',
-        '侧滑面板切换赛道',
-        '/classic-list?title=比赛榜&form=short&contest-switchable=1',
-      ),
-      (Icons.category, '题材榜', '筛选面板里选题材', '/classic-list?title=题材榜&form=short'),
-      (
-        Icons.star,
-        '优质短篇',
-        '同代分位头部',
-        '/classic-list?title=${Uri.encodeComponent('优质短篇')}&form=short&order=pct',
-      ),
-      (Icons.shuffle, '随机短篇', '随机 100 本', '/short-random'),
+      (Icons.person_search, '作者榜', '/author-ranks?form=short'),
     ];
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-      child: Column(
-        children: [
-          for (final (icon, title, desc, path) in entries)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(12),
-                onTap: () => context.push(path),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: scheme.surface,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: scheme.outline.withValues(alpha: .3),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 38,
-                        height: 38,
-                        decoration: BoxDecoration(
-                          color: scheme.primary.withValues(alpha: .12),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        alignment: Alignment.center,
-                        child: Icon(icon, size: 20, color: scheme.primary),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              title,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              desc,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: scheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Icon(
-                        Icons.chevron_right,
-                        size: 18,
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ],
-                  ),
-                ),
+    return _iconNavRow(context, entries);
+  }
+
+  Widget _randomPreviewSection(
+    BuildContext context, {
+    required String form,
+    required String title,
+    required String route,
+  }) {
+    final items = ref.watch(formRandomPreviewProvider(form));
+    final scheme = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _sectionTitle(context, title, onMore: () => context.push(route)),
+        items.when(
+          loading: () => const SizedBox(
+            height: 64,
+            child: Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
               ),
             ),
-        ],
-      ),
+          ),
+          error: (e, _) => Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '$title加载失败',
+                    style: TextStyle(fontSize: 12, color: scheme.error),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () =>
+                      ref.invalidate(formRandomPreviewProvider(form)),
+                  child: const Text('重试'),
+                ),
+              ],
+            ),
+          ),
+          data: (list) {
+            if (list.isEmpty) {
+              return Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Text(
+                  '暂无$title',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              );
+            }
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+              child: Column(
+                children: [
+                  for (final item in list.take(10)) BookRowTile(item: item),
+                ],
+              ),
+            );
+          },
+        ),
+      ],
     );
   }
 

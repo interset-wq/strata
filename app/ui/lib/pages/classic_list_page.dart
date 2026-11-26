@@ -42,6 +42,7 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
   final _drawerSearch = TextEditingController();
   bool _showTop = false;
   int? _currentYear; // 年份轴（顶部年份条切换；null=全部年份）
+  String? _wordsBand; // 篇幅轴（对话专属 chip 行；'short'|'medium'|'long'，null=全部）
   String? _currentContest; // 比赛轴（drawer 切换）
   String? _currentGenre; // 筛选维度：题材（筛选面板切换）
   String? _fStatus; // 筛选维度：状态（已完结/连载中）
@@ -59,6 +60,7 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
   void initState() {
     super.initState();
     _currentContest = widget.contest;
+    _wordsBand = widget.wordsBand;
     const metrics = ['clicks', 'favs', 'praises', 'words'];
     _currentOrder = widget.metricSwitchable
         ? (metrics.contains(widget.order) ? widget.order : 'clicks')
@@ -97,7 +99,7 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
         status: _fStatus,
         ptype: _fPtype,
         tag: _fTags.isEmpty ? null : _fTags.join(','),
-        wordsBand: widget.wordsBand,
+        wordsBand: _wordsBand,
         order: _currentOrder == 'favs' ? null : _currentOrder,
         dir: _ascending ? 'asc' : null,
         limit: 20,
@@ -127,6 +129,7 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
       body: Column(
         children: [
           _yearStrip(),
+          if (widget.form == 'dialogue') _wordsBandStrip(),
           if (widget.metricSwitchable) _metricSwitcher(),
           Expanded(
             child: RefreshIndicator(
@@ -225,6 +228,48 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
     if (year == _currentYear) return;
     setState(() {
       _currentYear = year;
+      _resetList();
+    });
+    _scroll.jumpTo(0);
+    _loadMore();
+  }
+
+  // 篇幅轴（对话 tab 专属，2026-11-26 用户裁定）：短/中/长入口从首页
+  // 收进页内——篇幅是筛选轴不是独立页面。与年份条同款 chip 风格；
+  // 切换保留其他筛选，回顶重载。
+  Widget _wordsBandStrip() {
+    const bands = [
+      ('全部', null),
+      ('短 ≤5万', 'short'),
+      ('中 5–15万', 'medium'),
+      ('长 >15万', 'long'),
+    ];
+    return SizedBox(
+      height: 44,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        itemCount: bands.length,
+        separatorBuilder: (context, index) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          final (label, band) = bands[i];
+          return ChoiceChip(
+            showCheckmark: false,
+            visualDensity: VisualDensity.compact,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            label: Text(label, style: const TextStyle(fontSize: 12)),
+            selected: _wordsBand == band,
+            onSelected: (_) => _selectWordsBand(band),
+          );
+        },
+      ),
+    );
+  }
+
+  void _selectWordsBand(String? band) {
+    if (band == _wordsBand) return;
+    setState(() {
+      _wordsBand = band;
       _resetList();
     });
     _scroll.jumpTo(0);
