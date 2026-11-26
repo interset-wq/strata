@@ -364,11 +364,10 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                     style: TextStyle(color: Colors.deepOrange),
                   ),
                 ),
-              // 六指标格：点击/收藏/点赞/字数（短评/长评来自观测，种子无）
-              _metricGrid(context, eff, b),
+              // 核心数据卡（2026-11-26 重设计：六指标格+PR卡+元数据卡合一）
+              _coreDataCard(context, eff, b),
               _contestCards(context, d, s(b['contest'])),
-              _pctlCard(context, b),
-              _metaCard(context, d, eff, b),
+              _officialCard(context, d, eff, b),
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -515,9 +514,10 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
           return const Text('暂无本地观测，点上方「刷新观测」开始累积',
               style: TextStyle(color: Colors.grey));
         }
+        // 2026-11-26 重设计：只常驻最近 3 条，全部进图表页。
         return Column(
           children: [
-            for (final o in items)
+            for (final o in items.take(3))
               ListTile(
                 dense: true,
                 title: Text(
@@ -531,6 +531,15 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                     const SizedBox(width: 10),
                     MetricBadge(icon: MetricIcons.words, text: '字数 ${o.words ?? '-'}'),
                   ],
+                ),
+              ),
+            if (items.length > 3)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: () => context.push('/book/${widget.nid}/data'),
+                  icon: const Icon(Icons.timeline, size: 18),
+                  label: Text('查看全部 ${items.length} 条'),
                 ),
               ),
           ],
@@ -576,37 +585,81 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
     );
   }
 
-  /// 六指标格（设计稿：尽可能多展示数据；短评/长评由观测通路提供，待接入）。
-  Widget _metricGrid(BuildContext context, Map<String, dynamic> eff,
+  /// 核心数据卡（2026-11-26 重设计：六指标格 + PR 卡 + 元数据卡的数字
+  /// 部分三卡合一）：主行 = 平台累计指标（点击/收藏/点赞/字数）；
+  /// 次级行 = 端上可算的派生指标（PR/CQS/CPS/长度归一），null 自动隐藏。
+  Widget _coreDataCard(BuildContext context, Map<String, dynamic> eff,
       Map<String, dynamic> b) {
     String v(String key) => _num(eff[key] ?? b[key]) ?? '—';
     final scheme = Theme.of(context).colorScheme;
-    final labels = [('点击', 'clicks'), ('收藏', 'favs'), ('点赞', 'praises'), ('字数', 'words')];
-    return Row(
-      children: [
-        for (final (label, key) in labels)
-          Expanded(
-            child: Card(
-              margin: const EdgeInsets.symmetric(horizontal: 4),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 10),
-                child: Column(
+    String? opt(String key) {
+      final raw = b[key]?.toString();
+      if (raw == null || raw.isEmpty || raw == 'null') return null;
+      return raw;
+    }
+
+    final secondary = [
+      if (opt('pr') != null) ('PR 赞/藏', opt('pr')!),
+      if (opt('cqs') != null) ('CQS', opt('cqs')!),
+      if (opt('cps') != null) ('CPS', opt('cps')!),
+      if (opt('len_norm') != null) ('长度归一', opt('len_norm')!),
+    ];
+    return Card(
+      margin: const EdgeInsets.only(top: 12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                for (final (label, key) in const [
+                  ('点击', 'clicks'),
+                  ('收藏', 'favs'),
+                  ('点赞', 'praises'),
+                  ('字数', 'words'),
+                ])
+                  Expanded(
+                    child: Column(
+                      children: [
+                        Text(label,
+                            style: TextStyle(
+                                fontSize: 10,
+                                color: scheme.onSurfaceVariant)),
+                        const SizedBox(height: 3),
+                        Text(v(key),
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleLarge
+                                ?.copyWith(fontSize: 15)),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+            if (secondary.isNotEmpty) ...[
+              const Divider(height: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: Row(
                   children: [
-                    Text(label,
-                        style: TextStyle(
-                            fontSize: 10, color: scheme.onSurfaceVariant)),
-                    const SizedBox(height: 3),
-                    Text(v(key),
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge
-                            ?.copyWith(fontSize: 15)),
+                    for (final (label, value) in secondary) ...[
+                      Text('$label ',
+                          style: TextStyle(
+                              fontSize: 10, color: scheme.onSurfaceVariant)),
+                      Text(value,
+                          style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: scheme.secondary)),
+                      const SizedBox(width: 12),
+                    ],
                   ],
                 ),
               ),
-            ),
-          ),
-      ],
+            ],
+          ],
+        ),
+      ),
     );
   }
 
@@ -659,36 +712,12 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
     return 'other';
   }
 
-  /// PR 指标卡（E.30：同代分位列已退役；PR = 赞/藏，端上可重算的比值
-  /// 信号）。favs < 10 时 PR 为 NULL，整卡隐藏。
-  Widget _pctlCard(BuildContext context, Map<String, dynamic> b) {
-    final scheme = Theme.of(context).colorScheme;
-    final pr = double.tryParse(b['pr']?.toString() ?? '');
-    if (pr == null) return const SizedBox.shrink();
-    return Card(
-      margin: const EdgeInsets.only(top: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('PR（赞/藏）',
-                style:
-                    TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
-            Text(pr.toStringAsFixed(3),
-                style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: scheme.secondary)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// 完整元数据卡（数据全展示原则）。
-  Widget _metaCard(BuildContext context, BookDetail d, Map<String, dynamic> eff,
-      Map<String, dynamic> b) {
+  /// 官方信息卡（2026-11-26 重设计：元数据卡 17 行 + PR 卡瘦身）——
+  /// 读者向字段常驻（评分/更新/建档/形式/入库估/同人/敏感）；工程口径
+  /// 字段（置信度/分类ID/允许下载/数据来源/数据截止/cqs 状态/featured）
+  /// 收进默认折叠的「详细信息」。PR 移入核心数据卡次级行。
+  Widget _officialCard(BuildContext context, BookDetail d,
+      Map<String, dynamic> eff, Map<String, dynamic> b) {
     String? s(Object? v) => v?.toString();
     Widget row(String label, String? value) {
       if (value == null || value.isEmpty || value == 'null') {
@@ -715,33 +744,29 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
 
     return Card(
       margin: const EdgeInsets.only(top: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+      child: Theme(
+        data: Theme.of(context)
+            .copyWith(dividerColor: Colors.transparent),
+        child: ExpansionTile(
+          tilePadding: const EdgeInsets.symmetric(horizontal: 14),
+          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+          initiallyExpanded: false,
+          title: Text('官方信息',
+              style: Theme.of(context).textTheme.titleSmall),
           children: [
-            Text('元数据',
-                style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant)),
-            const SizedBox(height: 6),
-            // 状态与赞率不在此重复：状态在头部徽标、pr 在上方 PR 卡。
-            row('形式', s(b['form'])),
-            row('入库日期（估计）', s(b['est_date'])),
-            row('收录置信度', s(b['est_conf'])),
-            row('比赛', s(b['contest'])),
-            row('featured', b['featured'] == true ? '是（编辑精选）' : null),
-            row('cqs（质量分）', s(b['cqs'])),
-            row('cqs 状态', s(b['cqs_state'])),
-            row('cps（签约潜力）', s(b['cps'])),
-            row('长度归一 len_norm', s(b['len_norm'])),
-            row('官方分类 ID', s(d.meta?['type_id'] ?? eff['type_id'])),
-            row('允许下载', eff['allow_down'] == true ? '是' : null),
+            row('官方评分', s(eff['point'])),
             row('官方更新时间', s(eff['updated_at'] ?? b['updated_at'])),
             row('官方建档时间', s(eff['add_time'])),
-            row('官方评分', s(eff['point'])),
-            row('同人', eff['category_id'] == 1 ? '是' : null),
-            row('敏感标记', eff['is_sensitive'] == true ? '是' : null),
+            row('形式', s(b['form'])),
+            row('入库日期（估计）', s(b['est_date'])),
+            if (eff['category_id'] == 1) row('同人', '是'),
+            if (eff['is_sensitive'] == true) row('敏感标记', '是'),
+            // 工程口径：默认折叠，供核对口径用。
+            row('收录置信度', s(b['est_conf'])),
+            row('cqs 状态', s(b['cqs_state'])),
+            row('featured', b['featured'] == true ? '是（编辑精选）' : null),
+            row('官方分类 ID', s(d.meta?['type_id'] ?? eff['type_id'])),
+            row('允许下载', eff['allow_down'] == true ? '是' : null),
             row('数据来源', d.source == 'local' ? '本地观测' : '种子'),
             row('数据截止', d.dataEnd),
           ],
