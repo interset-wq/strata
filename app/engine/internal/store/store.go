@@ -1658,8 +1658,8 @@ ON CONFLICT(author_key) DO UPDATE SET
 // the daily date hash: the pool is the top 100 by favs among cover-
 // bearing books of the form (quality floor — the dialogue long tail is
 // mostly mediocre, user-confirmed 2026-11-19), and the displayed slice
-// rotates daily with the same hash as BannerPick (B=500001 ≈ half the
-// 1,000,003-bucket key space), so consecutive days show different books
+// rotates daily with the same multiplicative hash as BannerPick
+// (2026-11-26 第三版), so consecutive days show different books
 // while staying within the head. Cover-less books are excluded up front,
 // so the client always gets a drawable result.
 func (s *Store) CoverCarousel(ctx context.Context, form string,
@@ -1680,7 +1680,7 @@ WHERE seed.books.nid IN (
     AND COALESCE(c2.cover, b.cover_url) != ''
   ORDER BY b.favs DESC, b.nid ASC
   LIMIT 100)
-ORDER BY (seed.books.nid*2654435761 + ?*500001) % 1000003, seed.books.nid
+ORDER BY ((seed.books.nid*2654435761) % 1000003) * ((? % 1000002) + 1) % 1000003, seed.books.nid
 LIMIT ?`
 	rows, err := s.DB.QueryContext(ctx, query, form, seed, limit)
 	return s.scanRankItems(ctx, rows, err)
@@ -2887,16 +2887,14 @@ ORDER BY h.viewed_at DESC LIMIT ?`, limit)
 }
 
 // BannerPick deterministically shuffles the banner pool (seed featured=1,
-// licensed works included — banners are display-layer) with the date as the
+// licensed works included — banners are display layers) with the date as the
 // random seed. Same seed → same set, every day a different draw, and every
 // banner stays reachable because the shuffle is a uniform reorder.
-// The seed must enter the hash with a coefficient whose residue mod M
-// is a large fraction of the 1,000,003-bucket key space: the cut point
-// then moves ~half the circle per day, so consecutive days draw the
-// opposite arc — genuinely different top-k. The old additive seed
-// (nid*a + day, B=1) advanced one bucket per day, so top-k never
-// changed (user-reported 2026-11-20: today == yesterday); B=996940
-// (≡ -3063) was no better for small pools. B = 500001 (half circle).
+// 洗牌公式（2026-11-26 第三版，用户报告：加法版只有 2 种结果）：加法 seed
+// （nid*a + day*B）只是给整圈哈希加常数——加常数不改变循环序，只旋转起点；
+// B=500001 每天推进半圈，于是 top-k 永远在「半圈 A / 半圈 B」之间二选一。
+// 改为乘法置换：排序键 = (Knuth(nid) % M) * m(seed) % M，M=1000003 质数、
+// m(seed) ∈ [1, M-1]——每个 seed 是真正不同的排列（不是旋转）。
 // Pure arithmetic: this SQLite build predates the ^ operator.
 // BannerPick returns a seeded deterministic segment of the featured=1
 // pool: the whole pool is shuffled by (nid, seed), then rows [offset,
@@ -2918,7 +2916,7 @@ WHERE featured = 1`
 		args = append(args, form)
 	}
 	query += `
-ORDER BY (seed.books.nid*2654435761 + ?*500001) % 1000003, seed.books.nid
+ORDER BY ((seed.books.nid*2654435761) % 1000003) * ((? % 1000002) + 1) % 1000003, seed.books.nid
 LIMIT ? OFFSET ?`
 	args = append(args, seed, limit, offset)
 	rows, err := s.DB.QueryContext(ctx, query, args...)

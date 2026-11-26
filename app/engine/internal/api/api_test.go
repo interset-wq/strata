@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -272,6 +273,28 @@ func TestBannerSegmented(t *testing.T) {
 	// Negative offset rejected.
 	getJSON(t, srv.URL+"/strata/banner?seed=20261118&limit=1&offset=-1",
 		http.StatusBadRequest)
+}
+
+// TestBannerSeedVariety (2026-11-26): the old additive day-seed rotated the
+// same fixed circle, so every day only had 2 distinct draws (user report).
+// The multiplicative permutation must yield more variety across a week of
+// consecutive seeds.
+func TestBannerSeedVariety(t *testing.T) {
+	srv, _ := newTestServer(t)
+	seen := map[int64]bool{}
+	for i := 0; i < 8; i++ {
+		body := getJSON(t, fmt.Sprintf(
+			srv.URL+"/strata/banner?seed=%d&limit=1", 20261120+i), http.StatusOK)
+		items := body["items"].([]any)
+		if len(items) != 1 {
+			t.Fatalf("seed +%d: items = %v", i, items)
+		}
+		seen[int64(items[0].(map[string]any)["nid"].(float64))] = true
+	}
+	if len(seen) < 3 {
+		t.Fatalf("8 consecutive seeds drew only %d distinct heads, want ≥3: %v",
+			len(seen), seen)
+	}
 }
 
 func TestFeaturedAll(t *testing.T) {
