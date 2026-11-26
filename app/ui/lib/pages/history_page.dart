@@ -116,7 +116,7 @@ class _HistoryTile extends StatelessWidget {
             SizedBox(
               width: 40,
               height: 56,
-              child: defaultCover(entry.nid, radius: 6),
+              child: defaultCover(entry.nid, title: entry.title, radius: 6),
             ),
             const SizedBox(width: 12),
             Expanded(

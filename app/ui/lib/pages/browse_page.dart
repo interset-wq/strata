@@ -309,11 +309,8 @@ class _ShortCard extends StatelessWidget {
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(6),
-                  child: cachedImage(
-                    coverImageUrl(item.coverUrl) ??
-                        defaultCoverUrl(item.nid),
-                    fit: BoxFit.cover,
-                  ),
+                  child: coverImage(item.coverUrl, item.nid,
+                      title: item.title),
                 ),
               ),
               const SizedBox(width: 12),

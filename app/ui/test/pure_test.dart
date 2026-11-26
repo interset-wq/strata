@@ -32,16 +32,12 @@ void main() {
     });
   });
 
-  group('defaultCoverUrl（官方默认封面兜底）', () {
-    test('按 nid 奇偶绑定两张官方图', () {
-      expect(defaultCoverUrl(0), endsWith('default.jpg'));
-      expect(defaultCoverUrl(2), endsWith('default.jpg'));
-      expect(defaultCoverUrl(1), endsWith('defaultNew.jpg'));
-      expect(defaultCoverUrl(3), endsWith('defaultNew.jpg'));
-    });
-
-    test('负 nid 取绝对值', () {
-      expect(defaultCoverUrl(-1), defaultCoverUrl(1));
+  group('coverImageUrl（封面 URL 归一化）', () {
+    // 默认封面兜底 2026-11-26 改为纯本地占位（logo 水印 + 首字符），
+    // 远程 default/defaultNew 兜底图退役；URL 归一化口径不变。
+    test('空值归一化为 null（调用方回退本地占位）', () {
+      expect(coverImageUrl(null), isNull);
+      expect(coverImageUrl(''), isNull);
     });
   });
 

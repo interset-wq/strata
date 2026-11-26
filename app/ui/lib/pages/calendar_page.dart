@@ -701,7 +701,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
   Widget _miniCover(CalendarItem it) {
     final coverUrl = it.coverUrl;
     if (coverUrl == null || coverUrl.isEmpty) {
-      return defaultCover(it.nid);
+      return defaultCover(it.nid, title: it.title);
     }
     return coverImage(
       coverImageUrl(coverUrl) == null ? null : coverUrl,
@@ -767,8 +767,8 @@ class _CalendarBookRow extends StatelessWidget {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(6),
                 child: hasCover
-                    ? coverImage(coverUrl, item.nid)
-                    : defaultCover(item.nid),
+                    ? coverImage(coverUrl, item.nid, title: item.title)
+                    : defaultCover(item.nid, title: item.title),
               ),
             ),
             const SizedBox(width: 12),

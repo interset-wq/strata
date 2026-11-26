@@ -1191,7 +1191,7 @@ class _CoverCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(10),
                           child: coverImage(coverUrl, item.nid),
                         )
-                      : _spine(context, item.nid),
+                      : _spine(context, item.nid, item.title),
                 ),
                 if (rank != null)
                   Positioned(
@@ -1234,6 +1234,6 @@ class _CoverCard extends StatelessWidget {
 
 /// 默认封面兜底（用户拍板）：cover_url 为空用官方 default/defaultNew
 /// 两张图按 nid 取余绑定，不用书脊占位。
-Widget _spine(BuildContext context, int nid) {
-  return defaultCover(nid, radius: 10);
+Widget _spine(BuildContext context, int nid, String title) {
+  return defaultCover(nid, title: title, radius: 10);
 }

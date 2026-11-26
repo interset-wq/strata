@@ -5,9 +5,6 @@ import '../data/api/strata_api.dart';
 import 'default_cover.dart';
 import 'metric_badge.dart';
 
-const kDefaultCover =
-    'https://rs.sfacg.com/web/novel/images/NovelCover/Big/default.jpg';
-
 /// 统一列表行卡（榜单页与二级浏览页共用）：衬线排名序号 + 小封面
 ///（朱砂偏移阴影）+ 单行标题 + 「作者 · 题材 · N 代」+ 指标徽标。
 class BookRowCard extends StatelessWidget {
@@ -18,9 +15,7 @@ class BookRowCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final cover = (item.coverUrl == null || item.coverUrl!.isEmpty)
-        ? kDefaultCover
-        : coverImageUrl(item.coverUrl)!;
+    final cover = coverImage(item.coverUrl, item.nid, title: item.title);
     final top = item.rank <= 3;
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
@@ -59,10 +54,7 @@ class BookRowCard extends StatelessWidget {
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(6),
-                  child: cachedImage(
-                    cover,
-                    fit: BoxFit.cover,
-                  ),
+                  child: cover,
                 ),
               ),
               const SizedBox(width: 12),

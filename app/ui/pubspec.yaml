@@ -69,6 +69,7 @@ flutter:
   assets:
     - assets/manifest.json
     - assets/seed.db.gz
+    - assets/icon/app-icon-foreground.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:
