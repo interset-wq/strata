@@ -715,7 +715,6 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
       'ip_collab': 'IP 联动',
     };
     final formRaw = s(b['form']);
-    final point = double.tryParse(s(eff['point']) ?? '');
     return Card(
       margin: const EdgeInsets.only(top: 12),
       child: Theme(
@@ -728,9 +727,8 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
           title: Text('官方信息',
               style: Theme.of(context).textTheme.titleSmall),
           children: [
-            // 评分美观显示：保留 2 位小数。
-            if (point != null)
-              row('官方评分', point.toStringAsFixed(2)),
+            // 官方评分（point）不显示：官方已废弃该字段（sfacg-app-api.md），
+            // seed.books 也无此列——废弃数据对用户没有参考价值。
             row('最后更新', s(eff['updated_at'] ?? b['updated_at'])),
             row('官方建档时间', s(eff['add_time'])),
             row('形式', formRaw == null
