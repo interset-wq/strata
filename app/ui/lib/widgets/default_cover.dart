@@ -25,16 +25,12 @@ const _palette = [
   Color(0xFF5F7D8C), // 青灰
 ];
 
-String _firstChar(String s) =>
-    s.isEmpty ? '' : String.fromCharCodes(s.runes.take(1));
-
 /// 本地占位封面（用户裁定 2026-11-26）：原「官方 default 图远程兜底」
 /// 退役——兜底图自己也是网络图，失败/加载中仍然白屏。现占位零网络
 /// 依赖、任何时刻可渲染：nid 绑定的低饱和底色 + 半透明 app logo 水印
-/// 铺底 + 中央书名首字符。
+/// 铺底（用户裁定：不放文字）。
 Widget placeholderCover(
-  int nid,
-  String? title, {
+  int nid, {
   double? width,
   double? height,
   BoxFit fit = BoxFit.cover,
@@ -54,17 +50,6 @@ Widget placeholderCover(
             fit: fit,
           ),
         ),
-        if (title != null && title.isNotEmpty)
-          Center(
-            child: Text(
-              _firstChar(title),
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w700,
-                color: Colors.white,
-              ),
-            ),
-          ),
       ],
     ),
   );
@@ -73,14 +58,13 @@ Widget placeholderCover(
       : base;
 }
 
-/// 默认封面兜底（签名保留，title 传入时渲染首字符）。
+/// 默认封面兜底。
 Widget defaultCover(
   int nid, {
-  String? title,
   BoxFit fit = BoxFit.cover,
   double radius = 0,
 }) =>
-    placeholderCover(nid, title, fit: fit, radius: radius);
+    placeholderCover(nid, fit: fit, radius: radius);
 
 /// 统一封面（磁盘 + 内存缓存，cached_network_image）：
 /// - URL 走 coverImageUrl 归一化；空值直接本地占位；
@@ -88,7 +72,6 @@ Widget defaultCover(
 Widget coverImage(
   String? raw,
   int nid, {
-  String? title,
   double? width,
   double? height,
   BoxFit fit = BoxFit.cover,
@@ -96,7 +79,7 @@ Widget coverImage(
 }) {
   final url = coverImageUrl(raw);
   if (url == null) {
-    return placeholderCover(nid, title,
+    return placeholderCover(nid,
         width: width, height: height, fit: fit, radius: radius);
   }
   return CachedNetworkImage(
@@ -104,10 +87,8 @@ Widget coverImage(
     width: width,
     height: height,
     fit: fit,
-    placeholder: (_, _) =>
-        placeholderCover(nid, title, fit: fit, radius: radius),
-    errorWidget: (_, _, _) =>
-        placeholderCover(nid, title, fit: fit, radius: radius),
+    placeholder: (_, _) => placeholderCover(nid, fit: fit, radius: radius),
+    errorWidget: (_, _, _) => placeholderCover(nid, fit: fit, radius: radius),
   );
 }
 

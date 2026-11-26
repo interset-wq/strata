@@ -192,7 +192,7 @@ class _WatchCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 alignment: Alignment.center,
-                child: defaultCover(item.nid, title: item.title, radius: 6),
+                child: defaultCover(item.nid, radius: 6),
               ),
               const SizedBox(width: 12),
               Expanded(

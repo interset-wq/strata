@@ -15,7 +15,7 @@ class BookRowCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final cover = coverImage(item.coverUrl, item.nid, title: item.title);
+    final cover = coverImage(item.coverUrl, item.nid);
     final top = item.rank <= 3;
     return Card(
       margin: const EdgeInsets.only(bottom: 10),

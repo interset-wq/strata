@@ -219,10 +219,10 @@ class _DiscoverCard extends StatelessWidget {
                           placeholder: (_, _) =>
                               const ColoredBox(color: Color(0x59B8AE9E)),
                           errorWidget: (_, _, _) =>
-                              defaultCover(item.nid, title: item.title, radius: 10),
+                              defaultCover(item.nid, radius: 10),
                         ),
                       )
-                    : defaultCover(item.nid, title: item.title, radius: 10),
+                    : defaultCover(item.nid, radius: 10),
               ),
               const SizedBox(width: 12),
               Expanded(
