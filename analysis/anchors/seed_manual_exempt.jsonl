@@ -1,4 +1,6 @@
-// 人工豁免清单（E.31）：唯一可豁免「short/medium 必须已完结」的通道。
-// 行格式：nid / waive / reason / verified_on。waive 目前只接受 "complete"。
-// 每行一本书；reason 必须写清为什么连载中仍可进种子。空文件即零豁免。
-// 自动豁免（E.13 fav_pctl≥0.98、E.9 征文保底）已全部取消，禁止再引入。
+// 人工豁免清单（E.31 / E.34）：唯一可豁免两条 short/medium 硬规则的通道。
+// 行格式：nid / waive / reason / verified_on。
+//   waive="complete"：E.31，连载中仍可进种子（reason 写清理由）。
+//   waive="contest" ：E.34，不在中短篇赛事 union 内仍可进池（reason 写清理由）。
+// 同一本同时需要两种豁免时写两行；黑名单（E.32）优先于本表。空文件即零豁免。
+// 自动豁免（E.13 fav_pctl≥0.98、E.9 征文保底、E.34 自动放行）已全部取消，禁止再引入。

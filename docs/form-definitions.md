@@ -1,8 +1,8 @@
 # `form` 形式字段与种子收录资格——权威口径
 
 > **定位**：本文是 `books.form` 六值判定与种子收录资格的**唯一权威口径**。
-> **状态**：已实施，`seed_version=20260503.25` 落地（含 E.9–E.24 全部条款、E.28 App `categoryId` 正向判据、P10 假完结剔除）；本文不改代码、不改定年、不硬编码分布数字。
-> **权威范围**：本文唯一维护——六值定义与优先级、用户裁定通道、种子收录资格与后置断言 P1–P10；实现真源为 `analysis/lib/forms.py::classify`（对话判据 `dialogue_form.py`、详情页真值 `web_dialogue.py`）与 `app/tools/seedbuild/seed_policy.py`。
+> **状态**：已实施，当前 `seed_version=20261126.38`（含 E.9–E.35 全部条款、E.28 App `categoryId` 正向判据、P10 假完结剔除、E.34 中短篇赛事 union 正向准入、E.35 form 配额同代分位准入、E.37 对话占比 ≤40% 硬上限；E.38 只补采数据、不改规则）；本文不改代码、不改定年、不硬编码分布数字。
+> **权威范围**：本文唯一维护——六值定义与优先级、用户裁定通道、种子收录资格与后置断言 P1–P14；实现真源为 `analysis/lib/forms.py::classify`（对话判据 `dialogue_form.py`、详情页真值 `web_dialogue.py`）与 `app/tools/seedbuild/seed_policy.py`。
 > **口径**：所有 form 分布、覆盖率、误差率均为快照现算值（内容上界 2026-05-03），随数据版本变化，仅供参考，禁止硬编码进代码。
 > **更新日期**：2026-11-21。
 
@@ -132,25 +132,30 @@ CREATE INDEX idx_books_form ON books(form, favs DESC);   -- schema v2→v3，24�
 `classify` 产出纯标签、不随 status 变；收录资格在种子层判定：
 
 ```python
-def seed_admit(row, form, manual_exempt: set[int], manual_blacklist: set[int]) -> bool:
-    if row.nid in manual_blacklist:
+def seed_admit(row, form, exempt_complete, exempt_contest, blacklist, pool) -> bool:
+    if row.nid in blacklist:
         return False                                  # E.32 黑名单优先于一切豁免
     if row.is_licensed:
         return True                                   # 授权日轻展示例外（用户裁定）
     if form == "invalid":
         return False                                  # 僵尸，无豁免（P6）
-    if form in ("short", "medium") and row.status != "已完结":
-        return row.nid in manual_exempt               # E.31：仅人工清单可豁免
+    if form in ("short", "medium"):
+        if row.status != "已完结" and row.nid not in exempt_complete:
+            return False                              # E.31：仅人工清单可豁免
+        if row.nid not in pool and row.nid not in exempt_contest:
+            return False                              # E.34：赛事 union 正向准入
     return True
 ```
 
 - **弃书规则（E.11 → E.31）**：短/中篇阅读本质是「一口气读完」，连载中视为作者弃书，丧失收录资格。**所有年份同受此硬约束**；2026 起 sfacg 又把中篇并入短篇，更无年份例外。范围是非授权种子；授权日轻 47 本仅作展示、不进评分/收录池，按用户裁定保留（其中 2 本连载中篇）。
 - **自动豁免全部取消（E.31）**：原 E.13「同代 `fav_pctl ≥ 0.98` 质量豁免连载短篇」与原 E.9「征文保底不查 status」均已作废（旧文档中的 31 本、保底补入本数为历史值，不再适用）。自动豁免会放进大量杂质；`docs/fake-complete-short-medium.md` 的 24132「回到旧时光」等锚点如需放行，须逐本写入人工清单。
-- **人工通道（E.31，唯一例外）**：`analysis/anchors/seed_manual_exempt.jsonl`（`nid` / `waive: "complete"` / `reason` / `verified_on`）逐本批准；`analysis/anchors/seed_contest_floor.jsonl`（`contest` / `min` / `reason` / `verified_on`）逐赛事批准保底，未列名赛事没有保底 quota。两份清单初始为空；保底候选仍须 `favs ≥ 5`、`words ≥ 1万` 且过所有 ineligible 规则。
-- **人工黑名单（E.32）**：`analysis/anchors/seed_manual_blacklist.jsonl`（`nid` / `kind` ∈ `fake_short|fake_medium|fake_complete` / `reason` / `verified_on`）逐本永久剔除确定性规则抓不到的假短/假中篇（如断更后恶意标完结、内容裁剪、僵尸替换）；优先级高于人工豁免，征文保底也不得带入。黑名单只作用种子收录层，不改写作品级 `form`；P10 与 E.19 等确定性规则继续独立生效，不必重复登记。初始为空。
+- **人工通道（E.31 / E.34，唯一例外）**：`analysis/anchors/seed_manual_exempt.jsonl`（`nid` / `waive` / `reason` / `verified_on`）逐本批准，`waive="complete"` 豁免 E.31 完结规则、`waive="contest"` 豁免 E.34 赛事池门槛，同一本需要两种豁免就写两行；`analysis/anchors/seed_contest_floor.jsonl`（`contest` / `min` / `reason` / `verified_on`）逐赛事批准保底，未列名赛事没有保底 quota。三份清单初始为空；保底候选仍须 `favs ≥ 5`、`words ≥ 1万` 且过所有 ineligible 规则。
+- **人工黑名单（E.32）**：`analysis/anchors/seed_manual_blacklist.jsonl`（`nid` / `kind` ∈ `fake_short|fake_medium|fake_complete` / `reason` / `verified_on`）逐本永久剔除确定性规则抓不到的假短/假中篇（如断更后恶意标完结、内容裁剪、僵尸替换）；优先级高于人工豁免，征文保底也不得带入。黑名单只作用种子收录层，不改写作品级 `form`；P10、E.19、E.34 等确定性规则继续独立生效，不必重复登记。初始为空。
+- **赛事池正向准入（E.34）**：short/medium 的 nid 必须落在 `contest-achieve` 归档的 26 个中短篇赛项 roster 并集（`analysis/anchors/contest_short_medium.json`，由 `analysis/fetchers/sync_contest_scope.py` 离线同步）里；无征文或挂非中短篇征文、按字数被判成 short/medium 的书，用户裁定为**假中/假短**，高收藏也不放行。union 只决定入池资格，**不决定 short 还是 medium**（《少女与龙》挂五征短篇、实为 13.9 万字 medium）。唯一豁免是人工 `waive="contest"`。详见 `fake-complete-short-medium.md` §6。
 - **短篇双分位渠道噪声底（E.15）**：Top-2000 候选须 `favs ≥ 5`（与征文保底同门槛），分位仍在全池上算（先过滤会缩小分母、扭曲排名）。翻年改组曾让 38821（favs=3 的 3–6k×2014 小组头部）无锚入种，违反 P2。
+- **form 配额准入（E.35，2026-11-26；E.37 调整对话上限）**：种子入种从「质量锚点驱动」改为**按 form 固定名额 + 同代分位取前 N**，总量 16,000：long 8,350（52.2%）/ dialogue 6,400（40.0%）/ short 1,100（6.9%）/ medium 100（0.6%）/ ip_collab 50（固定）。**E.37 硬约束：对话占比不得超过 40%**（用户裁定；原 `.36` 版为 8,000/6,750=42.2%，释放的 350 名额补给长篇）。同代分位 = 每本在自身 `est_year` 组内的 `favs` 排名百分位，解决绝对 favs 跨年不可比（很多年份对话/中篇头部到不了固定 favs 阈值）；名额从多到少由用户裁定（长篇 ≥50%、中篇地位尴尬继续压低、IP 固定 50）。eligible 池已扣 E.31/E.32/E.34/P10/E.19/E.25 后按 form 独立取前 N。旧锚点（favs Top-20k / 月榜 / featured / deep / 短篇双分位）和征文保底降级为诊断字段，**不再决定入种、不 override 配额**；其同代分位底随数据版本现算（旧版快照值 long 0.536 / dialogue 0.867 / short 0.610 / medium 0.789 / ip 0.950 只作历史参考，不再逐版抄录）。授权日轻 47 本仍在配额之外按展示例外并入，最终 seed 16,047。
 
-**后置断言**（`seed_policy.postconditions()`，重建时强制）：P1 合格深榜书全入池；P2 favs<5 且 <1 万字须有外部锚；P3 收藏覆盖回退 ≤0.2pp（合格书口径，分母剔除弃书+invalid）；P4 人工保底清单内征文达到设定本数；P5 全世代连载 short/medium 零入种（仅人工豁免例外）；P6 invalid 零入种；P7 种子内 short 不越三条天花板（全时期）；P8 全世代 short/medium 必须已完结（仅人工豁免例外）；P9 Web 死链零入种（E.25）；P10 征文含「长篇」假完结零入种；P11 人工黑名单零入种（优先于人工豁免）。种子重建时 P1–P11 全 PASS（快照现算，随种子现算）。
+**后置断言**（`seed_policy.postconditions()`，重建时强制）：P1 各 form 配额全部填满（E.35，取代旧「深榜书全入池」）；P2 favs<5 且 <1 万字须有外部锚；P3 收藏覆盖 ≥ 绝对下限 0.93（合格书口径，E.35 取代旧回退 ≤0.2pp，因总量从锚点时代主动压缩）；P4 人工保底清单内征文达到设定本数（清单空时自动通过）；P5 全世代连载 short/medium 零入种（仅人工豁免例外）；P6 invalid 零入种；P7 种子内 short 不越三条天花板（全时期）；P8 全世代 short/medium 必须已完结（仅人工豁免例外）；P9 Web 死链零入种（E.25）；P10 征文含「长篇」假完结零入种；P11 人工黑名单零入种（优先于人工豁免）；P13 非中短篇赛事 union 的 short/medium 零入种（仅人工 `waive="contest"` 例外）；P14 各 form 配额、总量 16,000 与对话占比 ≤40%（E.35/E.37，占比上限由 `DIALOGUE_MAX_SHARE` 守门）。种子重建时 P1–P14 全 PASS（快照现算，随种子现算）。
 
 > **P10（假完结剔除，已实施）**：裁定规则见 `fake-complete-short-medium.md`——short/medium 档「征文名含长篇」即假完结（命中 145 本）+ 第二类僵尸逐本裁定。入种剔除已在 `seed_policy.py` 落地，P10 断言守门，`.25` 种子验证清零；裁定规则本身仍以假完结文档为准。
 
@@ -209,11 +214,12 @@ def seed_admit(row, form, manual_exempt: set[int], manual_blacklist: set[int]) -
 | 六值分类单一真源 | `analysis/lib/forms.py::classify`（判据常量在此） |
 | 用户裁定（级 -1） | `analysis/anchors/form_user_verified.jsonl` → `forms.user_forms()` |
 | 对话形态判据 v2 | `analysis/lib/dialogue_form.py::mark` |
-| 收录资格 / 弃书 / 豁免 / P10 | `app/tools/seedbuild/seed_policy.py` |
-| 后置断言 P1–P10 | `seed_policy.postconditions()` |
+| 收录资格 / 弃书 / 豁免 / P10 / E.34 赛事池 / E.35 form 配额 | `app/tools/seedbuild/seed_policy.py` |
+| 赛事 roster union 锚点与同步 | `analysis/lib/contest_scope.py`、`analysis/fetchers/sync_contest_scope.py` |
+| 后置断言 P1–P14 | `seed_policy.postconditions()` |
 | 取值域断言 + 分布 | `app/tools/seedbuild/validate.py` → `manifest.json` |
 | 引擎 form 过滤 | `app/engine/internal/api`（`validForms` 含 invalid） |
-| 假完结剔除裁定与实施结果 | `fake-complete-short-medium.md`（P10 已落地，`.25` 种子清零） |
+| 假完结剔除裁定与实施结果 | `fake-complete-short-medium.md`（P10 已落地；E.34 正向准入见其 §6） |
 | 长篇排序分 `lqs` | `length-weighted-quality.md` |
 
 回归：`go test ./...` 全过；审计报告 `analysis/out/seed_v3_quality.md`；改判据只改真源文件，禁止在调用方复制逻辑。

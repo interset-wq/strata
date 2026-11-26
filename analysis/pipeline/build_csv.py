@@ -32,6 +32,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from lib import config as C
+from lib import contest_scope
 from pipeline import validate
 
 MULTISPACE = re.compile(r" {2,}")
@@ -369,6 +370,60 @@ def write_vocabulary(df: pd.DataFrame, path: Path) -> None:
 
 
 # ---------------------------------------------------------------- 主流程
+def merge_contest_sm(records: dict[int, dict]) -> dict | None:
+    """中短篇赛事补采接入分析口径（E.34 union 的 26 个 tag）。
+
+    `dataset/contest_new.jsonl` 含多种 tag：E.34 union 的中短篇赛事 roster
+    补采（本函数放行）、14 征长篇赛道 793、2026 春征 789 等。后两者只是
+    运行时发现池、留档在 dataset，不进分析口径（口径由用户裁定：补采只
+    为补齐 novel_hub 单向游标遗漏的中短篇，长篇/春征不参与形态分析）。
+    tag 集合真源为 `contest_scope.short_medium_tags()`，与 roster union 同锚点；
+    与主源 / 月榜补充 nid 必须互斥，15 源字段必须齐全。manifest 记 sha256
+    + 放行 tag + observed_at 供复核。计数为 2026-11 当期值，晚于
+    2026-05-03 快照上界（与 rank_missing 同类时点差异）。
+    """
+    if not C.CONTEST_NEW.exists():
+        return None
+    digest = sha256(C.CONTEST_NEW)
+    allowed = contest_scope.short_medium_tags()
+    n = 0
+    observed: set[str] = set()
+    from collections import Counter
+    by_tag: Counter[int] = Counter()
+    for line in C.CONTEST_NEW.open(encoding="utf-8"):
+        if not line.strip():
+            continue
+        row = json.loads(line)
+        tag = int(row.get("tag") or 0)
+        if tag not in allowed:
+            continue
+        nid = int(row["nid"])
+        if nid in records:
+            raise SystemExit(f"contest_new sm-tag nid {nid} 与主源/月榜补充冲突")
+        missing = [f for f in C.SOURCE_FIELDS if f not in row]
+        if missing:
+            raise SystemExit(f"contest_new sm-tag nid {nid} 缺少字段 {missing}")
+        # 分析库封面省略公共前缀（rs/rss 同图床别名），与主源口径一致
+        cover = row.get("cover") or ""
+        if "/NovelCover/Big/" in cover:
+            row = dict(row)
+            row["cover"] = cover.split("/NovelCover/Big/", 1)[1].split("?", 1)[0]
+        records[nid] = row
+        n += 1
+        by_tag[tag] += 1
+        if row.get("observed_at"):
+            observed.add(str(row["observed_at"]))
+    if n == 0:
+        raise SystemExit(f"{C.CONTEST_NEW} 中未找到中短篇赛事 tag 的记录")
+    return {"path": "dataset/contest_new.jsonl", "tags": sorted(allowed),
+            "lines": n, "by_tag": {str(k): v for k, v in sorted(by_tag.items())},
+            "sha256": digest,
+            "observed_at": sorted(observed)[-1] if observed else None,
+            "note": "中短篇赛事 roster 补采（E.34 union 26 tag）；App API + mobile web，"
+                    "计数为 2026-11 当期值，晚于 2026-05-03 快照上界；"
+                    "只并入中短篇赛事 tag，长篇赛道 793/春征 789 留档不进分析口径"}
+
+
 def main() -> int:
     if not C.JSONL_DIR.exists():
         raise SystemExit(
@@ -407,6 +462,12 @@ def main() -> int:
         load_stats["lines"] += n
         load_stats["duplicate_rows"] = load_stats["lines"] - len(records)
         print(f"补充月榜遗漏书 {n} 本（{supplement_stats['note']}）")
+    contest_stats = merge_contest_sm(records)
+    load_stats["lines"] += contest_stats["lines"] if contest_stats else 0
+    load_stats["duplicate_rows"] = load_stats["lines"] - len(records)
+    if contest_stats:
+        print(f"补充中短篇赛事补采 {contest_stats['lines']} 本 / "
+              f"{len(contest_stats['by_tag'])} 个 tag（{contest_stats['note']}）")
     df, tally, genre_fixes, dropped = build(records)
 
     C.OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -430,6 +491,7 @@ def main() -> int:
         "dataset": "novel_hub",
         "source": C.SOURCE,
         "supplement": supplement_stats,
+        "contest_supplement": contest_stats,
         "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "table": "novels",
         "rows": int(len(df)),

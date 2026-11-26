@@ -1,7 +1,7 @@
 # 作者榜口径（稳定产出的优质作者）
 
 > **定位**：作者榜的唯一权威口径。生成器、App 入口、预览页以本文为准。
-> **状态**：2026-11-25 定案（预览实现见 `analysis/out/gen_author_rank_preview.py`）。
+> **状态**：2026-11-25 定案，2026-11-26 同步 E.34 赛事池正向准入与 E.32 黑名单（口径见 `analysis/generators/author_rank.py`，预览为 `analysis/out/author_rank_preview.html`）。
 > **口径**：所有计数、收藏和、排名均为快照现算值，随数据版本变化，仅供参考；禁止硬编码进代码。
 > **目标**：选出**稳定产出的优质作者**，作为「同一作者的其他作品」次级入口，不取代书榜主排序。
 
@@ -19,10 +19,11 @@
 
 `lib/forms.py::classify` 只回答**作品形态**（纯字数/征文/DOM/API 证据），不随 `status` 变。作者榜**必须另套种子层的收录资格规则**，否则连载中的短/中篇会混进榜。以下规则只作用 `short`/`medium`，其他形态不受影响：
 
-- **E.31 弃书**：`status != 已完结` 的 short/medium 不构成有效中短篇（连载中意味着没写完）。等价于 `seed_policy.abandoned_ids`，无人工豁免（作者榜不读 `seed_manual_exempt`）。
+- **E.31 弃书**：`status != 已完结` 的 short/medium 不构成有效中短篇（连载中意味着没写完）。等价于 `seed_policy.abandoned_ids`；作者榜不读 `waive="complete"` 白名单。
 - **P10 假完结**：short/medium 且 `contest` 含「长篇」视为假完结，剔除。等价于 `seed_policy.fake_complete_ids`，确定性裁定、无豁免，见 `docs/fake-complete-short-medium.md`。
-- 因此在 short/medium 榜内，作品必然全部已完结，**完结率恒 100%**，完结率折扣对这两个形态无区分度。
-- E.32 人工黑名单（`seed_manual_blacklist.jsonl`）当前为空；作者榜不读它，若将来登记假短/假中篇，应同步到本口径。
+- **E.34 赛事池正向准入**：short/medium 的 nid 必须在 26 个中短篇赛事 roster union 内（`analysis/anchors/contest_short_medium.json`），等价于 `seed_policy.short_medium_outside_contest_ids`；唯一豁免是人工 `waive="contest"`（作者榜读该白名单，但不读 `waive="complete"`）。union 只决定入池资格、不决定形态（见 §2 末《少女与龙》例）。
+- **E.32 人工黑名单**：`seed_manual_blacklist.jsonl` 逐本剔除，当前为空；作者榜与种子共用同一锚点。
+- 因此在 short/medium 榜内，作品必然全部已完结且在赛事池内，**完结率恒 100%**，完结率折扣对这两个形态无区分度。
 - E.25 Web 死链（7 本）只在种子层；作者榜未接入，属已知边界。
 
 `invalid`（words<2000 / 点击天花板越线）由 `r24.load()` 在 form 层已剔除。
@@ -89,6 +90,7 @@ uv run --project analysis python analysis/generators/author_rank.py
 正式生成器必须保证：
 
 - short/medium 榜内每本书 `status == 已完结` 且 `contest` 不含「长篇」（零连载、零假完结）；
+- short/medium 榜内每本书 nid 在赛事 union 或人工 `waive="contest"` 白名单内，且零人工黑名单书；
 - 每榜每位作者的有效作品数 ≥ 3；
 - 每榜按信赖加权分降序、top100；
 - 若上述任一断言失败，生成中止并报错，不产出 HTML。
@@ -112,6 +114,6 @@ CREATE TABLE author_ranks(
 
 - **不存**：`author_key`、`n_books`、`fav_sum`、`fav_top`、`finished`、`finish_rate`、`score`、`year`、三本 `reps` JSON。它们是构建期字段，不是展示字段。
 - `rep_nid` / `rep_title` 取该 form 代表作的第 1 本（favs 最高）；排名仍按 top3 收藏和 + 完结率折扣计算，展示只露一本。
-- 若该 nid 不在 seed 的 18,881 本里，列表仍可显示标题，但点详情可能无本地数据；若要求点击必达，需在构建期把代表作限定在 seed 内，或另加封面/在线兜底（本轮不加，保持最小字段）。
+- 若该 nid 不在 seed 的 16,047 本里（E.35 form 配额准入后），列表仍可显示标题，但点详情可能无本地数据；若要求点击必达，需在构建期把代表作限定在 seed 内，或另加封面/在线兜底（本轮不加，保持最小字段）。
 - `seed_meta` 只追加 `author_rank_rows` / `author_rank_forms` / `author_rank_snapshot`，不记录构建期权重明细。
 - 守门：每张榜 `rank_no` 从 1 连续、`author` 与 `rep_title` 非空、`rep_nid > 0`、总行数 ≤ 500；两份 asset（`app/assets/`、`app/ui/assets/`）字节一致，`schema_version` 升为 10。

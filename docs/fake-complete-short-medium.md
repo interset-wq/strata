@@ -140,7 +140,19 @@
 
 ---
 
-## 6. 交叉引用
+## 6. E.34 中短篇赛事 union 正向准入（2026-11-26 用户裁定）
+
+P10 只挡住「征文名含长篇」这一类假完结；用户复核后确认中短篇池里仍有大量假中/假短——**无征文或挂非中短篇征文、却按字数被判成 short/medium 的高收藏书也是假的**，高收藏不构成放行理由。故把准入从「负面拦截」改为「正向门票 + 人工白名单」：
+
+1. **正向门票**：独立归档仓 `light-nook-labs/contest-achieve` 的 26 个中短篇赛项 roster 并集（`analysis/anchors/contest_short_medium.json`，19,706 nid 快照现算）。其中三征 644–649 是获奖分类、无参赛清单，剔除；七征 409/410 归档名只写「赛道2/赛道3」，经本地 `contest` 标注反查确认 409=七征中篇（804/805 命中）、410=七征短篇（376/376 命中）后纳入；七征 408=长篇、411/412=对话长/短，不纳入。
+2. **union 只决定能否进池，不决定 short 还是 medium**。《少女与龙》(86279) 挂「五征短篇」、却是 13.9 万字 `medium`，是用户认证的中篇天花板；按 tag 分形态会误伤。具体形态仍由 `forms.classify` 按字数/证据判。
+3. **唯一豁免 = 人工白名单**：`analysis/anchors/seed_manual_exempt.jsonl` 中 `waive="contest"` 逐本放行（`waive="complete"` 仍是 E.31 的完结豁免，两者互不替代）。禁止自动豁免、禁止按收藏/字数批量放行；E.32 人工黑名单优先于它。
+4. **实现**：`seed_policy.short_medium_outside_contest_ids()` 并入 `ineligible`（征文保底候选池源头同样排除），P13 守门「union 外 short/medium 零入种」；作者榜 `_effective_mask` 同步该规则，避免两边口径分叉。锚点由 `analysis/fetchers/sync_contest_scope.py` 从归档仓离线同步，构建时不读外部路径。
+5. **边界**：清单只覆盖参赛作品，一次性完本、从未参赛的真短篇会被这一门槛挡住——这是用户裁定的代价，不是采集遗漏；如确需保留，只能逐本写白名单。roster 是快照，新赛事/新页需重新同步锚点并重建种子。
+
+> 重建数字以当次 `manifest.json` 为准（种子版本 `.35`）；本节不硬编码计数。
+
+## 7. 交叉引用
 
 - `form-definitions.md`：form 六值判定、E.25 Web 死链、种子收录资格与 P1–P9 断言
 - `app/docs/12-dual-mode.md`：展示/推荐解耦、信号白名单

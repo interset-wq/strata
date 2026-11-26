@@ -31,6 +31,7 @@ ANCHORS_DIR = ROOT / "anchors"
 NID_ANCHORS = ANCHORS_DIR / "nid_anchors.jsonl"
 VERIFIED_DATES = ANCHORS_DIR / "verified_dates.jsonl"
 APPROXIMATE_DATES = ANCHORS_DIR / "approximate_dates.jsonl"
+CONTEST_SHORT_MEDIUM = ANCHORS_DIR / "contest_short_medium.json"  # E.34: 中短篇赛事 roster union
 REFERENCES_DIR = ROOT / "references"
 
 # ---- 产物（不入库，由管线重建）----
@@ -50,6 +51,7 @@ FIGURES_DIR = REPORTS_DIR / "figures"
 __all__ = [
     "ROOT", "DATA_DIR", "ARCHIVE", "EXTRACT_DIR", "JSONL_DIR",
     "ANCHORS_DIR", "NID_ANCHORS", "VERIFIED_DATES", "APPROXIMATE_DATES",
+    "CONTEST_SHORT_MEDIUM",
     "REFERENCES_DIR", "OUT_DIR", "CSV_FILE", "SQL_FILE", "MANIFEST",
     "MONTHLY_RANKS", "SURVIVAL_PROBE", "REPORTS_DIR", "FIGURES_DIR",
     "APP_API_NOVELS", "EXTERNAL_DATES",

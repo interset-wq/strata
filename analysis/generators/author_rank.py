@@ -5,11 +5,12 @@
 口径（用户定）：
 - 作者榜用于选「稳定产出的优质作者」；某 form 作品 <3 本视为不能稳定
   产出，不进该 form 榜。只有稳定产出的作者，其粉丝群体才有意义。
-- **有效中短篇（E.31 + P10）**：short/medium 必须 status=已完结；连载中
-  或征文含「长篇」（假完结）的短/中篇不构成有效中短篇，从所有形态榜剔除。
-  `lib/forms.py` 的 form 是纯作品属性、不随 status 变，作者榜必须另套这条
-  收录资格规则，否则连载中的短/中篇会混进榜（如林夕尘《苍的世界》）。
-  因此 short/medium 榜里的作品必然全完结，完结率恒 100%。
+- **有效中短篇（E.31 + P10 + E.32 + E.34）**：short/medium 必须 status=已完结、
+  征文不含「长篇」，且 nid 落在中短篇赛事 roster union 内（唯一豁免 =
+  `seed_manual_exempt.jsonl` 中 `waive="contest"`）；人工黑名单逐本剔除。
+  任一不满足即从所有形态榜剔除。`lib/forms.py` 的 form 是纯作品属性、不随
+  status/赛事变，作者榜必须另套这套收录资格规则，否则连载中或假中短篇会
+  混进榜。因此 short/medium 榜里的作品必然全完结且在赛事池内，完结率恒 100%。
 - 只看绝对数值判断受欢迎程度：用该 form 收藏最高的 3 本的收藏和。
 - 完结率判断「值得信赖」：代表作（这 3 本）中已完结的比例作为折扣。
   信赖加权分 = top3 收藏和 × (BASE_KEEP + (1-BASE_KEEP) × 完结率)；
@@ -37,6 +38,8 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "out"))
+
+from lib import contest_scope as CS  # noqa: E402
 
 spec = importlib.util.spec_from_file_location(
     "r24", ROOT / "generators" / "report_24_runtime_metrics.py")
@@ -67,15 +70,22 @@ def _reps(x) -> str:
 
 
 def _effective_mask(d: pd.DataFrame) -> pd.Series:
-    """E.31 + P10：连载中 or 假完结的 short/medium 不构成有效中短篇。
+    """E.31 + P10 + E.32 + E.34：有效中短篇的四条硬门槛。
 
-    与 `app/tools/seedbuild/seed_policy.py::abandoned_ids` / `fake_complete_ids`
-    同一条确定性规则，只作用 short/medium；long/dialogue/ip_collab 不剔除。
+    与 `app/tools/seedbuild/seed_policy.py` 的 `abandoned_ids` /
+    `fake_complete_ids` / `manual_blacklist_ids` /
+    `short_medium_outside_contest_ids` 同一套确定性规则，
+    只作用 short/medium；long/dialogue/ip_collab 不剔除。赛事 union 只决定
+    能否进池，不决定 short 还是 medium（《少女与龙》挂短篇赛道却是 medium）。
     """
     length = d["form"].isin(("short", "medium")).to_numpy()
     serial = d["status"].ne("已完结").to_numpy()
     fake = d["contest"].fillna("").astype(str).str.contains("长篇", regex=False).to_numpy()
-    return ~(length & (serial | fake))
+    in_pool = d["id"].isin(CS.short_medium_nids()).to_numpy()
+    waived = d["id"].isin(CS.contest_waived_nids()).to_numpy()
+    outside = length & ~in_pool & ~waived
+    blacklisted = d["id"].isin(CS.manual_blacklist_nids()).to_numpy()
+    return ~((length & (serial | fake)) | outside | blacklisted)
 
 
 def build_author_frame():
@@ -128,6 +138,10 @@ def _assert_guards(d: pd.DataFrame, pv: pd.DataFrame) -> None:
         f"有效中短篇混入连载书 {int((short_medium['status'] != '已完结').sum())} 本")
     assert not short_medium["contest"].fillna("").astype(str).str.contains(
         "长篇", regex=False).any(), "有效中短篇混入征文含「长篇」的假完结书"
+    allowed = CS.short_medium_nids() | CS.contest_waived_nids()
+    outside = short_medium[~short_medium["id"].isin(allowed)]
+    assert outside.empty, f"有效中短篇不在赛事 union: {len(outside)} 本"
+    assert d["id"].isin(CS.manual_blacklist_nids()).sum() == 0, "人工黑名单书混入作者榜"
     # 2. 每榜每位作者有效作品数 >= MIN_BOOKS
     assert (pv["n_books"] >= MIN_BOOKS).all(), (
         f"入榜作者作品数 < {MIN_BOOKS}: {int((pv['n_books'] < MIN_BOOKS).sum())} 行")

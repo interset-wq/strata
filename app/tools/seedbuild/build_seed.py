@@ -71,18 +71,18 @@ DATASET = REPO / "dataset" / "out" / "books.jsonl"
 AWARD_CSV = ANALYSIS / "out" / "contest_awards_normalized.csv"
 
 SCHEMA_VERSION = 10  # v10: additive author_ranks table (docs/author-rank.md §9) — stable-output authors per form, top100
-SEED_VERSION = "20261124.34"  # .34: v10 additive author_ranks（无数据变化，仅新增展示表）
+SEED_VERSION = "20261126.38"  # .38: E.38 中短篇赛事补采入池（dataset 252,705→260,627）
 CONTENT_END = pd.Timestamp("2026-11-24")  # 数据集从不全量刷新：标注最近一次部分更新时间，非快照上界
 GEN_MIN, GEN_MAX = 2007, 2026  # E.30: 2026 由"出界"改为正常世代，与其他年份一样走 admit 渠道筛选
 
 # Pinned calibre (see AGENTS.md and app/docs/02-data-model.md).
-EXPECT_UNIVERSE = 250_254       # 249,885 + 369 本 2026 春征新书（E.33）
-EXPECT_ANALYSIS_ROWS = 250_254  # 245,887 + 4,367 征文新书（14 征 3,998 + 2026 春征 369）
-EXPECT_DATASET_ROWS = 252_705   # v20261124.9: 248,338 + 4,367 征文新书
+EXPECT_UNIVERSE = 258_161       # 250,254 + 7,907 中短篇赛事补采（E.38，dataset 派生口径）
+EXPECT_ANALYSIS_ROWS = 258_161  # 同上；与 analysis/out/novels.csv 254,271 是双链差异（站外剔除口径不同）
+EXPECT_DATASET_ROWS = 260_627   # v20261126.10: 252,705 + 7,922 中短篇赛事补采
 EXPECT_LICENSED = 47
-EXPECT_ADMITTED = 18_834       # 2026 春征 369 本按正常世代筛选后净增 -3（短/中篇完结规则等）
-EXPECT_SEED = 18_881           # 18,834 + 47 licensed
-EXPECT_COVERAGE_MIN = 0.9639   # E.33: 分母纳入 369 本春征文（多数未入种），覆盖率 96.3937%
+EXPECT_ADMITTED = 16_000       # E.35/E.37: form 配额同代分位准入（8350/6400/1100/100/50）
+EXPECT_SEED = 16_047           # 16,000 + 47 licensed
+EXPECT_COVERAGE_MIN = 0.9300   # E.35: 配额制绝对下限（dataset 口径含 licensed 现算见构建日志）
 # v5 contest awards (docs/award-winners-as-seed-source.md): net 911 rows over
 # 11 editions; the 602 shortlist rows are excluded upstream of this CSV.
 # Display-only facts: award never feeds admission or ordering

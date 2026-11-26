@@ -1,36 +1,36 @@
 {
   "schema_version": 10,
-  "seed_version": "20261124.34",
+  "seed_version": "20261126.38",
   "content_end": "2026-11-24",
-  "built_at": "2026-11-25T12:56:50+00:00",
-  "book_count": 18881,
+  "built_at": "2026-11-26T04:53:01+00:00",
+  "book_count": 16047,
   "licensed_count": 47,
   "tag_count": 102,
-  "tag_rows": 61678,
+  "tag_rows": 51147,
   "gen_min": 2007,
   "gen_max": 2026,
   "counts": {
-    "stats_universe": 250254,
-    "baseline_v0": 30648,
-    "admitted_v3": 18834,
+    "stats_universe": 258161,
+    "baseline_v0": 30656,
+    "admitted_v3": 16000,
     "licensed_added": 47,
-    "seed": 18881,
+    "seed": 16047,
     "deep_rank_rows": 15421,
     "award_rows": 911,
-    "cqs_scored": 5684,
-    "cqs_stable": 4208,
-    "cps_scored": 105427,
-    "author_rank_rows": 356
+    "cqs_scored": 5710,
+    "cqs_stable": 4219,
+    "cps_scored": 107949,
+    "author_rank_rows": 319
   },
   "admission_detail": {
     "top_favs": 20000,
     "monthly": 1762,
-    "featured": 620,
+    "featured": 621,
     "short": 2000,
-    "time_excluded": 9038,
-    "time_gated_diagnostic": 3695,
+    "time_excluded": 9042,
+    "time_gated_diagnostic": 3712,
     "time_cut_diagnostic": 5051,
-    "deep": 8278,
+    "deep": 8281,
     "contest_floor": {
       "manual_only": true,
       "contests": 0,
@@ -38,13 +38,13 @@
       "shortfalls": {}
     },
     "abandoned": {
-      "total": 137318,
+      "total": 141528,
       "in_seed": 0,
       "manual_exempt": 0,
       "manual_blacklist": 0
     },
     "invalid": {
-      "total": 21580,
+      "total": 22633,
       "in_seed": 0
     },
     "fake_complete_p10": {
@@ -52,12 +52,12 @@
       "in_seed": 0
     }
   },
-  "favs_coverage": 0.963937,
+  "favs_coverage": 0.943031,
   "postconditions": [
     {
-      "name": "P1 合格深榜书全部在种子内",
+      "name": "P1 各 form 配额全部填满（E.35）",
       "pass": true,
-      "detail": "4,778 本合格深榜书，缺 0"
+      "detail": "long 8350/8350 · dialogue 6400/6400 · short 1100/1100 · medium 100/100 · ip_collab 50/50"
     },
     {
       "name": "P2 favs<5 且字数<1万必须有外部锚",
@@ -65,9 +65,9 @@
       "detail": "无锚噪声 0 本"
     },
     {
-      "name": "P3 收藏覆盖回退 ≤ 时间渠道放弃量（合格书口径）",
+      "name": "P3 收藏覆盖 ≥ 绝对下限（E.35 配额制）",
       "pass": true,
-      "detail": "新 96.39% vs V0 96.37%，差 +0.03pp（容差 0.2pp）"
+      "detail": "新 94.30% vs 下限 93.00% （旧基线 96.60%，配额制主动压缩不再用回退口径）"
     },
     {
       "name": "P4 人工保底清单内征文达到设定本数",
@@ -77,22 +77,22 @@
     {
       "name": "P5 连载 short/medium 零入种（仅人工豁免例外）",
       "pass": true,
-      "detail": "全世代连载短/中篇 137,318 本（已剔除 0 本人工豁免），入种 0 本"
+      "detail": "全世代连载短/中篇 141,528 本（已剔除 0 本人工豁免），入种 0 本"
     },
     {
       "name": "P6 invalid（僵尸/假短篇）零入种",
       "pass": true,
-      "detail": "invalid 21,580 本，入种 0 本"
+      "detail": "invalid 22,633 本，入种 0 本"
     },
     {
       "name": "P7 short 层不越短篇三条天花板",
       "pass": true,
-      "detail": "short 546 本；越点击 0、越收藏 0、越点赞 0"
+      "detail": "short 1,100 本；越点击 0、越收藏 0、越点赞 0"
     },
     {
       "name": "P8 全世代 short/medium 必须已完结（仅人工豁免例外）",
       "pass": true,
-      "detail": "全世代连载短/中篇 137,318 本，人工豁免 0 本，入种 0 本"
+      "detail": "全世代连载短/中篇 141,528 本，人工豁免 0 本，入种 0 本"
     },
     {
       "name": "P9 Web 死链零入种（详情页「小说不存在」）",
@@ -108,26 +108,36 @@
       "name": "P11 人工黑名单零入种（优先于人工豁免）",
       "pass": true,
       "detail": "黑名单 0 本，入种 0 本"
+    },
+    {
+      "name": "P13 非中短篇赛事的 short/medium 零入种（仅人工 waive=contest 例外）",
+      "pass": true,
+      "detail": "union 外 149,388 本，人工豁免 0 本，入种 0 本"
+    },
+    {
+      "name": "P14 各 form 配额、总量 16,000 与对话占比 ≤40%（E.35/E.37）",
+      "pass": true,
+      "detail": "总量 16,000/16,000 · long 8350/8350 · dialogue 6400/6400 · short 1100/1100 · medium 100/100 · ip_collab 50/50 · dialogue 40.00% ≤ 40%"
     }
   ],
   "source": {
     "dataset": "local:dataset/out/books.jsonl",
-    "dataset_sha256": "f3e4e0af222fd52b6d3dfd9f4093d1729721129395f61f96b562770eeb7cbee7",
-    "analysis_rows": 250254,
-    "dropped_rows": 2451,
+    "dataset_sha256": "a3742aedc1cfde1a391b97b3ff6a89f92807247a2c736043ebc0812512c15fad",
+    "analysis_rows": 258161,
+    "dropped_rows": 2466,
     "upstream": "light-nook-labs/novel_hub",
     "upstream_asset": "dataset.7z"
   },
   "files": {
     "db": {
       "name": "seed.db",
-      "bytes": 15310848,
-      "sha256": "cc28a69f22a268fc47b066ad29bb8c8286653076bbc1ca31385fd3bd79272ff4"
+      "bytes": 13434880,
+      "sha256": "e058b2e18176600c70b3a6c5de825834caa140bf9afceaad6b95aa6609a63450"
     },
     "gz": {
       "name": "seed.db.gz",
-      "bytes": 6402785,
-      "sha256": "a10de5df546c07c1a696403e694c1449b8990dff9311c2c43d7af4b819f0bd03"
+      "bytes": 5596945,
+      "sha256": "716a6ef20e8fffaa33910e131607fe128ca50eaf1b6a0c6b995052c3bb343f18"
     }
   }
 }

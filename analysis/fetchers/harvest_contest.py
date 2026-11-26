@@ -259,6 +259,17 @@ def fetch_mobile(nid: int) -> dict:
         return {}
 
 
+def _safe_count(value) -> int:
+    """App API 偶发返回负数计数（站点下溢，如 nid 54113 charCount=-56）。
+    负数不可信且无法修正出真值，置 0 留档（与 praise_num 的 zero_fallback
+    同类），避免污染 dataset 15 字段与下游 CSV 的非负校验。"""
+    try:
+        n = int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+    return n if n >= 0 else 0
+
+
 def build_detail(d: dict, roster_rec: dict, mobile: dict) -> dict:
     price = SIGN_MAP.get(d.get("signStatus") or "", "免费")
     return {
@@ -268,12 +279,12 @@ def build_detail(d: dict, roster_rec: dict, mobile: dict) -> dict:
         "price_type": price,
         "contest": roster_rec.get("tag_name", ""),
         "genre": TIDS.get(d.get("typeId"), ""),
-        "click_num": int(d.get("viewTimes") or 0),
-        "word_num": int(d.get("charCount") or 0),
+        "click_num": _safe_count(d.get("viewTimes")),
+        "word_num": _safe_count(d.get("charCount")),
         "status": "已完结" if d.get("isFinish") else "连载中",
         "last_update": (d.get("lastUpdateTime") or "").replace("T", " "),
         "praise_num": mobile.get("praises") if mobile.get("praises") is not None else 0,
-        "like_num": int(d.get("markCount") or 0),
+        "like_num": _safe_count(d.get("markCount")),
         "cover": d.get("novelCover") or "",
         "banner": bool(d.get("bgBanner")),
         "tags": [],

@@ -306,6 +306,34 @@ uv run --project analysis python analysis/fetchers/probe_contest_roster.py \
 
 探针固化时默认 tag 表 = 当时的 14 个主线赛项；串行 0.25s、失败即跳过。完整清单存 `analysis/out/contest_roster.csv`（不入库），含 nid/title/author/categoryID/tag。**注**：台账现已扩展至四季主线（含四/五/六征内嵌 JS tag）+ §2.8 的 34 个独立赛事，补采时需显式传入新增 tag；结论 4 的补采数字仍是原 14-tag 口径、未重算（数字过期只标注）。
 
+## 补采数据接入分析口径（试点：X 征短篇）
+
+`harvest_contest.py` 的详情补采落 `dataset/contest_new.jsonl`，默认只服务 app 全量目录；
+**分析口径此前不读它**（`build_csv.py` 只读 jsonl + `rank_missing.jsonl`），
+种子则从 `dataset/out/books.jsonl` 构建——两条数据链独立，改一边不自动影响另一边。
+
+2026-11-26 两步接入 `analysis/out/novels.csv`（供报告 24 / 作者榜使用）：
+
+1. **试点 tag 794**（十四征-短篇，477 本，roster 481 中 4 本本就在库）：验证通路。
+2. **续补 E.34 union 的 26 个中短篇 tag**：novel_hub 单向游标（约 3 周）漏采的四征–
+   十三征中短篇，按 union roster 逐本补详情（25 个 tag 有缺口，794 已全补）。
+   放行集合真源为 `contest_scope.short_medium_tags()`（读 `contest_short_medium.json`
+   同一锚点）；长篇赛道 793、春征 789 仍留档 dataset、不进分析口径。
+   发现通道（union 内已完结是否直接入种）仍挂起，补采只恢复遗漏书、不改准入规则。
+
+- 实现：`config.CONTEST_NEW`；`build_csv.merge_contest_sm()`。
+  断言 nid 与主源 / 月榜补充互斥、15 源字段齐全、封面前缀归一与主源一致；
+  `manifest.json.contest_supplement` 记 path / tags / lines / by_tag / sha256 / observed_at。
+- **时点差异**：补采计数是 2026-11 当期值，晚于主源 2026-05-03 快照上界。
+  tag 794 那 477 本 99% 不在主源是十四征开征晚于快照截点；中短篇续补那批是
+  游标遗漏（四征–十三征缺失率 30–60%），两者都与 `rank_missing` 同类时点差异。
+- **负计数兜底**：App API 偶发返回负 `charCount`（如 nid 54113 = −56，站点下溢），
+  `harvest_contest._safe_count()` 对 count 字段负值置 0 并留档，防污染 CSV 非负校验。
+- **结果（2026-11-26 完成）**：7,922 本全部补齐（7,915 本赞数来自 mobile web，7 本零兜底）。
+  dataset 252,705 → 260,627；分析 CSV 246,364 → 254,271（+7,907）；
+  `seed_version=20261126.38`（配额不变，P1–P14 全过）。作者榜 273 → 319 行：
+  medium 合格作者 5 → 14、short 65 → 165。
+
 ## 边界与降级
 
 - 清单只覆盖**参加征文**的书；未参赛的一次性完本短篇仍会漏，这条路不是全集。

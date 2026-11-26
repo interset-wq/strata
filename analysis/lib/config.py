@@ -18,6 +18,12 @@ JSONL_DIR = paths.JSONL_DIR
 # 由 analysis/fetchers/build_rank_missing_supplement.py 产出；字段与 meta jsonl
 # 同构（15 字段 + 溯源键）。计数为 2026-11 App API 当期值，晚于快照上界。
 RANK_MISSING = paths.ROOT.parent / "dataset" / "rank_missing.jsonl"
+# 征文清单补采（harvest_contest.py，App API + mobile web）：库外新书按 tag
+# 并入。分析口径只放行 E.34 中短篇 union 的 26 个赛事 tag（tag 集合真源为
+# `analysis/lib/contest_scope.py::short_medium_tags()`，读 anchors/contest_short_medium.json），
+# 长篇赛道（793 等）与春征（789）留档在 dataset 但不进分析口径。
+# 字段 15 项同构 + 溯源键；计数为 2026-11 当期值，晚于 2026-05-03 快照上界。
+CONTEST_NEW = paths.ROOT.parent / "dataset" / "contest_new.jsonl"
 OUT_DIR = paths.OUT_DIR
 CSV_FILE = paths.CSV_FILE
 SQL_FILE = paths.SQL_FILE

@@ -30,12 +30,14 @@
   当期值**（快照里没有这批书、无 5 月值），`observed_at` 逐本记录，manifest 记
   `rank_missing_observed`。这批书天然带月榜质量锚（`seed_policy.monthly_ids`）。
 
-- **征文新书并入**（2026-11-24，用户定）：征文清单 API 发现、详情补采的库外新书，
+- **征文新书并入**（2026-11-24 起，用户定）：征文清单 API 发现、详情补采的库外新书，
   由 `analysis/fetchers/harvest_contest.py` 产出 `dataset/contest_new.jsonl`
   （15 字段同构 + addTime/authorId/tag/tag_name/series/observed_at/praises_source 溯源）。
   14 征（tag 793/794）3,998 本于 11-23 采集，2026 春征（tag 789）369 本于 11-24
-  补采，合计 4,367 本。这批书建档在 2026-05 上界之后、est_year=2026，属**新增数据/
-  运行时发现池**，并入只为让目录全量、app 可搜索/看详情；计数为 2026-11 当期值，
+  补采；2026-11-26 续补 E.34 union 中短篇赛事 roster 的 novel_hub 遗漏书
+  （25 个 tag，建档 2016–2023，游标单向扫描漏采），计数同样为 2026-11 当期值。
+  14 征/春征那批建档在 2026-05 上界之后、est_year=2026，属新增数据/运行时发现池；
+  中短篇补采那批是**历史遗漏补齐**，会进入种子 eligible 池（形态仍由字数判）。
   `observed_at` 逐本记录，manifest 记 `contest_new_observed`。
 
 用法：
