@@ -193,6 +193,7 @@ func NewServer(s *store.Store) *Server {
 	group.GET("/ip-books", srv.ipBooks)
 	group.GET("/banner", srv.banner)
 	group.GET("/author-books", srv.authorBooks)
+	group.GET("/related", srv.related)
 	group.GET("/author-profile", srv.authorProfile)
 	group.POST("/dev/simulate", srv.devSimulate)
 	group.DELETE("/dev/simulate", srv.devSimulateDelete)
@@ -1036,9 +1037,10 @@ func (s *Server) contestArchiveBooks(c *gin.Context) {
 		fail(c, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
-	// v5 award block (docs/contest-display-in-app.md §6): the event's
-	// in-library award books, favs-ordered (the award field itself never
-	// orders). Always present — an empty list means "no award block".
+	// Verified award block (docs/contest-display-in-app.md §6): the event's
+	// contest-achieve winners in award-tier order, joined to seed when the
+	// book is in-library. Always present — empty means "no verified winners".
+	// Display-only: awards never feed admission, ordering or scoring.
 	awards, err := s.store.EditionAwards(c.Request.Context(), name)
 	if err != nil {
 		fail(c, http.StatusInternalServerError, "internal", err.Error())
@@ -1102,6 +1104,13 @@ func (s *Server) roster(c *gin.Context) {
 		s.rosterDegrade(c, event, division, "无官方清单，仅显示库内作品")
 		return
 	}
+	// Award-only events (一/二/三征, winner tags 635-649) serve 获奖名单:
+	// same fetch path, never labelled as a participation roster.
+	listKind := store.LedgerListKind(event)
+	listWord := "官方清单"
+	if listKind == store.LedgerKindAward {
+		listWord = "获奖名单"
+	}
 	t, ok := store.RosterTagFor(event, division)
 	if !ok {
 		fail(c, http.StatusBadRequest, "invalid_argument",
@@ -1119,7 +1128,9 @@ func (s *Server) roster(c *gin.Context) {
 		}
 		for i, sz := range sizes {
 			rp, ferr := s.rosterFetch(ctx, s.client, s.limiter, t.Gen, t.Tag,
-				page+t.PageStart-1, sz)
+				// App-facing pages are 1-based; both upstream generations
+				// page from 0 (2026-11-26 probe, see store.RosterTag).
+				page-1, sz)
 			if ferr != nil {
 				return nil, ferr
 			}
@@ -1133,21 +1144,22 @@ func (s *Server) roster(c *gin.Context) {
 		return nil, errRosterDead
 	})
 	if err != nil {
-		s.rosterDegrade(c, event, division, "官方清单暂不可用，仅显示库内作品")
+		s.rosterDegrade(c, event, division, listWord+"暂不可用，仅显示库内作品")
 		return
 	}
 	var rp crawl.RosterPage
 	if err := json.Unmarshal(body, &rp); err != nil {
-		s.rosterDegrade(c, event, division, "官方清单暂不可用，仅显示库内作品")
+		s.rosterDegrade(c, event, division, listWord+"暂不可用，仅显示库内作品")
 		return
 	}
 	resp := gin.H{
-		"contest":  event,
-		"division": division,
-		"page":     page,
-		"pages":    rp.TotalPage,
-		"source":   "official",
-		"items":    s.rosterJoin(ctx, &rp),
+		"contest":   event,
+		"division":  division,
+		"page":      page,
+		"pages":     rp.TotalPage,
+		"source":    "official",
+		"list_kind": listKind,
+		"items":     s.rosterJoin(ctx, &rp),
 	}
 	if est := rp.TotalPage * rp.Size; est > 0 {
 		// total_estimate = pages × served page length: an upper bound that
@@ -2048,10 +2060,18 @@ func (s *Server) calendar(c *gin.Context) {
 			cells = append(cells, store.CalendarDay{Date: key, Universe: universe[key]})
 		}
 	}
+	firstBound, lastBound, err := s.store.CalendarBounds(c.Request.Context())
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"granularity": gran,
 		"anchor":      anchorLabel,
 		"cells":       cells,
+		// bounds = 日历真正有数据的日子区间（两层并集）。UI 用它而不是
+		// manifest gen_max 推出来的 12-31，否则能翻进空月。
+		"bounds": gin.H{"first": firstBound, "last": lastBound},
 	})
 }
 
@@ -2231,6 +2251,41 @@ func (s *Server) authorBooks(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"meta":  gin.H{"pool": "seed", "ordering": ordering, "author": author},
 		"items": items,
+	})
+}
+
+// related is the detail page's 相关推荐 rail (docs/related-books.md §4):
+// tiered strong-tag recall around the anchor nid, pure local seed — no
+// network, no cumulative-value ordering. limit defaults to 8 and is capped
+// at 20 (the rail shows 8; the headroom exists for probes). meta.tier and
+// meta.ordering are diagnostics for the console, never user-facing metric
+// names.
+func (s *Server) related(c *gin.Context) {
+	nid, err := strconv.ParseInt(c.Query("nid"), 10, 64)
+	if err != nil || nid <= 0 {
+		fail(c, http.StatusBadRequest, "invalid_argument",
+			"nid must be a positive integer")
+		return
+	}
+	limit := 8
+	if raw := c.Query("limit"); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 1 || n > 20 {
+			fail(c, http.StatusBadRequest, "invalid_argument",
+				"limit must be 1..20")
+			return
+		}
+		limit = n
+	}
+	res, err := s.store.RelatedBooks(c.Request.Context(), nid, limit)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"meta": gin.H{"pool": "seed", "form": res.Form, "genre": res.Genre,
+			"tier": res.Tier, "ordering": res.Ordering},
+		"items": res.Items,
 	})
 }
 

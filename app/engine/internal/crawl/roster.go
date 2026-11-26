@@ -147,9 +147,9 @@ func ParseRosterOld(body string) *RosterPage {
 // FetchRoster fetches one page of one tag's roster through the shared
 // limiter (user-triggered = foreground lane). gen selects the endpoint
 // generation — the values mirror store.RosterGenNew ("new") /
-// store.RosterGenOld ("old") from the static tag table; an unknown value is
-// an error, not a guess. page is relative to the generation's start (new
-// 1-based, old 0-based pi); size is the per-generation page length
+// store.RosterGenOld ("old") from the contest ledger; an unknown value is an
+// error, not a guess. page is the upstream page index (0-based for both
+// generations, 2026-11-26 probe), size is the per-generation page length
 // (new <= 500, old ps <= 200).
 //
 // Result contract: err != nil = transport/queue problem; err == nil and

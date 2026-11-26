@@ -130,7 +130,9 @@ class _HomePageState extends ConsumerState<HomePage> {
           ref.invalidate(genreGroupsProvider);
           ref.invalidate(formRandomPreviewProvider);
           ref.invalidate(largeImageProvider(carouselDayKey(ref)));
-          await ref.read(bannerProvider(carouselProviderKey(ref, _form)).future);
+          await ref.read(
+            bannerProvider(carouselProviderKey(ref, _form)).future,
+          );
         },
         child: SafeArea(bottom: false, child: _buildBody(context, banners)),
       ),
@@ -395,8 +397,9 @@ class _HomePageState extends ConsumerState<HomePage> {
           height: 150,
           child: Center(
             child: TextButton(
-              onPressed: () =>
-                  ref.invalidate(bannerProvider(carouselProviderKey(ref, _form))),
+              onPressed: () => ref.invalidate(
+                bannerProvider(carouselProviderKey(ref, _form)),
+              ),
               child: const Text('轮播加载失败，点按重试'),
             ),
           ),
@@ -791,7 +794,7 @@ class _HomePageState extends ConsumerState<HomePage> {
       (Icons.insights, '量化榜单', '/quant-list?form=dialogue'),
       (Icons.person_search, '作者榜', '/author-ranks?form=dialogue'),
       (Icons.leaderboard_outlined, '月票榜', '/official-ranks/m4'),
-      (Icons.event_note, '赛事归档', '/contest-archive'),
+      (Icons.event_note, '对话线赛事', '/contest-archive?lane=dialogue'),
     ];
     return _iconNavRow(context, entries);
   }
@@ -879,7 +882,9 @@ class _HomePageState extends ConsumerState<HomePage> {
   // 对话/短篇 tab 轮播：无 featured 定制图，封面实时合成纸墨 banner
   // （见 widgets/cover_banner.dart）。静态收藏序（不随日期变），按 form 分池。
   Widget _coverBannerCarousel(String form) {
-    final list = ref.watch(coverCarouselProvider(carouselProviderKey(ref, form)));
+    final list = ref.watch(
+      coverCarouselProvider(carouselProviderKey(ref, form)),
+    );
     return list.when(
       loading: () => const Padding(
         padding: EdgeInsets.symmetric(horizontal: 16),
@@ -953,6 +958,42 @@ class IpGroupGrid extends ConsumerWidget {
                         style: TextStyle(
                           fontSize: 11,
                           color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                      // IP 线赛事归档挂本区（2026-11-22 用户裁定：对话的
+                      // 归档放对话区、IP 的放 IP 区）；「其他」tab 不含
+                      // lane 赛事，没有这一行就没有任何入口。
+                      InkWell(
+                        borderRadius: BorderRadius.circular(6),
+                        onTap: () => context.push('/contest-archive?lane=ip'),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.event_note,
+                                size: 15,
+                                color: scheme.onSurfaceVariant,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'IP 线赛事',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: scheme.onSurfaceVariant,
+                                ),
+                              ),
+                              Icon(
+                                Icons.chevron_right,
+                                size: 15,
+                                color: scheme.onSurfaceVariant,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ],
@@ -1131,13 +1172,18 @@ class _ShowcaseSection extends ConsumerWidget {
         padding: EdgeInsets.all(16),
         child: Center(child: CircularProgressIndicator()),
       ),
-      error: (e, _) => Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Text(
-          '加载失败：$e',
-          style: TextStyle(fontSize: 12, color: Colors.grey),
-        ),
-      ),
+      error: (e, _) {
+        // 对比度修正（2026-11-26）：原 Colors.grey #9E9E9E 在纸面仅
+        // 2.40:1 → 用 scheme.error（朱砂），浅色 5.35:1 / 深色 5.51:1。
+        final scheme = Theme.of(context).colorScheme;
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Text(
+            '加载失败：$e',
+            style: TextStyle(fontSize: 12, color: scheme.error),
+          ),
+        );
+      },
       data: (list) => Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Column(

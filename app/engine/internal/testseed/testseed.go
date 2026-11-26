@@ -88,6 +88,11 @@ type book struct {
 }
 
 var books = []book{
+	// 738162 matches the 2025春征 金奖 nid in the embedded award ledger —
+	// exercises the EditionAwards in-seed join (est_year/form backfill,
+	// 2026-11-26 bug fix).
+	{nid: 738162, title: "希瓦计划", author: "Author S", genre: "科幻", status: "连载中", words: 100000, favs: 800, pctl: 0.9, year: 2019,
+		cqs: 1.0, cps: 0.8, ln: 0.5, cqsState: "stable"},
 	{nid: 1001, title: "Long A", author: "Author A", genre: "魔幻", status: "连载中", words: 120000, favs: 500, pctl: 0.9, featured: 1, year: 2010,
 		cqs: 1.5, cps: 1.0, ln: 0.1, cqsState: "stable"},
 	{nid: 1002, title: "Short B", author: "Author B", genre: "都市", status: "已完结", words: 30000, favs: 100, pctl: 0.5, year: 2010},

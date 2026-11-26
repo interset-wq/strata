@@ -136,7 +136,9 @@ class BookRowTile extends StatelessWidget {
                       ),
                       // 付费徽标占标题行（免费不显示）；状态徽标在作者行
                       if (price != null && price.isNotEmpty && price != '免费')
-                        _pill(context, price, Colors.amber.shade900,
+                        // 对比度修正（2026-11-26）：原 Colors.amber.shade900
+                        // #FF6F00 在白底上仅 2.74:1 → #9A5700 5.53:1 过 AA。
+                        _pill(context, price, const Color(0xFF9A5700),
                             Colors.amber.withValues(alpha: .15)),
                     ],
                   ),

@@ -13,13 +13,17 @@ import '../widgets/default_cover.dart';
 import '../widgets/metric_badge.dart';
 
 /// 发书日历（docs/14 P1，底部导航替换搜索 tab）：
-/// 「同期出发的作品」——按 est_date 聚合 seed 书浏览。三个粒度：
+/// 「同期出发的作品」——按 est_date 聚合 seed 书浏览。粒度段为月/周/VIP，
+/// 日视图只经点格子下钻进入：
 ///  - 月视图（默认）：7 列日期格（每格作品数），点有书格子进日视图
 ///  - 周视图：7 行（每日一行）+ 前三本迷你卡，点行进日视图
-///  - 日视图：全量列表（收藏降序，带 est_conf 精度徽标）
+///  - 日视图：全量列表（收藏降序，带 est_conf 精度徽标），点「月」回网格
 /// 口径（docs/14 §1.3）：日期是「作品创建时间估计」，非首章发布日期，
 /// UI 标「入库日期（估计）」；low 档只入月视图（引擎侧过滤）；
-/// 右删失边界 = manifest genMin..genMax（日历不显示界外年份）。
+/// 导航边界/首次落点 = /calendar 的 bounds（两层并集），回退 manifest
+/// genMin..genMax（日历不显示界外年份）。所有全平台数字必须带「估计/~」标注；
+/// 估计只覆盖完整数据月——App 层由 bounds 末日是否在月末判定，不完整月
+/// （当前 2026-10）整月不展示全平台数字，种子与引擎不改。
 /// 推荐层不消费日历——只改变浏览路径，不改打分（12 §信号白名单）。
 class CalendarPage extends ConsumerStatefulWidget {
   const CalendarPage({super.key});
@@ -35,11 +39,42 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
   late DateTime _focus = DateTime(2025, 1, 1); // 用户当前聚焦日（统一锚点）
   int _genMin = 2007, _genMax = 2026; // manifest 右删失边界（initState 加载）
 
+  // 引擎 bounds（两层并集的有数据日期区间）：导航边界与首次落点用它，
+  // genMax 推出的 12-31 会让用户翻进空月。
+  DateTime? _boundFirst, _boundLast;
+  bool _userMoved = false; // 手动翻过页后不再自动落点
+
   final _dayScroll = ScrollController();
   bool _showTop = false;
 
-  DateTime get _minDate => DateTime(_genMin, 1, 1);
-  DateTime get _maxDate => DateTime(_genMax, 12, 31);
+  DateTime get _minDate => _boundFirst ?? DateTime(_genMin, 1, 1);
+  DateTime get _maxDate => _boundLast ?? DateTime(_genMax, 12, 31);
+
+  // 高误差尾部不估算（2026-11-26 用户裁定「高误差区直接不估算总数」）：
+  // bounds 末日停在月中的月份数据不完整（当前 2026-10 只到 07 日，月总量与
+  // 实际可差一个数量级），该月及之后不显示任何全平台数字。估计上界 = 上一个
+  // 完整月的月末；末日恰在月末则该月完整、照常估计。判定只用 /calendar 的
+  // bounds，不改种子（docs/14 §1.3）。
+  DateTime? get _estimateThrough {
+    final last = _boundLast;
+    if (last == null) return null;
+    final monthEnd = DateTime(last.year, last.month + 1, 0);
+    return last.isBefore(monthEnd)
+        ? DateTime(last.year, last.month, 0)
+        : monthEnd;
+  }
+
+  // 当前视图完全落在估计覆盖之后 → 不展示任何全平台数字。
+  bool get _noEstimate =>
+      _estimateThrough != null && _viewStart().isAfter(_estimateThrough!);
+
+  bool _suppressUniverse(String date) {
+    final cut = _estimateThrough;
+    return cut != null && DateTime.parse(date).isAfter(cut);
+  }
+
+  String get _estimateEnd =>
+      '${_estimateThrough!.year}年${_estimateThrough!.month}月';
 
   DateTime _mondayOf(DateTime d) =>
       d.subtract(Duration(days: (d.weekday - DateTime.monday)));
@@ -98,6 +133,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
       !_viewEnd().add(const Duration(days: 1)).isAfter(_maxDate);
 
   void _shift(int dir) {
+    _userMoved = true;
     setState(() {
       final f = _focus;
       switch (_granularity) {
@@ -142,11 +178,36 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
         initialMonth: _focus.month,
         onChanged: (y, m) {
           if (mounted) {
-            setState(() => _focus = DateTime(y, m, 1));
+            setState(() {
+              _userMoved = true;
+              final d = DateTime(y, m, 1);
+              _focus = d.isBefore(_minDate)
+                  ? _minDate
+                  : (d.isAfter(_maxDate) ? _maxDate : d);
+            });
           }
         },
       ),
     );
+  }
+
+  // bounds 随任意一次日历响应到达（ref.listen 回调里 setState 合法）。
+  void _applyBounds(CalendarResponse resp) {
+    final first = resp.firstDated == null
+        ? null
+        : DateTime.tryParse(resp.firstDated!);
+    final last = resp.lastDated == null
+        ? null
+        : DateTime.tryParse(resp.lastDated!);
+    if (first == null || last == null) return;
+    if (first == _boundFirst && last == _boundLast) return;
+    setState(() {
+      _boundFirst = first;
+      _boundLast = last;
+      if (!_userMoved) _focus = DateTime(last.year, last.month, 1);
+      if (_focus.isBefore(_minDate)) _focus = _minDate;
+      if (_focus.isAfter(_maxDate)) _focus = _maxDate;
+    });
   }
 
   @override
@@ -201,17 +262,17 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final isVip = _granularity == 'vip';
-    final data = isVip
-        ? null
-        : ref.watch(
-            calendarProvider(
-              CalendarQuery(
-                granularity: _granularity,
-                anchor: _anchor(),
-                perCell: _granularity == 'day' ? 50 : 3,
-              ),
-            ),
-          );
+    final query = CalendarQuery(
+      granularity: _granularity,
+      anchor: _anchor(),
+      perCell: _granularity == 'day' ? 50 : 3,
+    );
+    if (!isVip) {
+      ref.listen(calendarProvider(query), (_, next) {
+        next.whenData(_applyBounds);
+      });
+    }
+    final data = isVip ? null : ref.watch(calendarProvider(query));
 
     return Scaffold(
       appBar: AppBar(
@@ -253,14 +314,15 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                 ],
               ),
             ),
-            // 粒度切换：月/周/日（从日/周切回月 = 回到月网格）
+            // 粒度切换：月/周/VIP（日视图只经点格子下钻进入，不设段；
+            // 日视图里点「月」回月网格）
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: SegmentedButton<String>(
+                showSelectedIcon: false,
                 segments: const [
                   ButtonSegment(value: 'month', label: Text('月')),
                   ButtonSegment(value: 'week', label: Text('周')),
-                  ButtonSegment(value: 'day', label: Text('日')),
                   ButtonSegment(value: 'vip', label: Text('VIP')),
                 ],
                 selected: {_granularity},
@@ -342,9 +404,15 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
     }
     final firstWeekday = DateTime.parse(days.first.date).weekday - 1;
     final total = days.fold<int>(0, (s, c) => s + c.total);
-    final uni = days.fold<int>(0, (s, c) => s + c.universe);
+    final uni = days.fold<int>(
+      0,
+      (s, c) => s + (_suppressUniverse(c.date) ? 0 : c.universe),
+    );
+    final noEst = _noEstimate;
     if (total == 0 && uni == 0) {
-      return _empty('本月没有估计发书作品');
+      return _empty(noEst
+          ? '内置库当月无作品；该月数据不完整，全平台估计只到 $_estimateEnd'
+          : '本月没有估计发书作品');
     }
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
@@ -380,17 +448,30 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                 final c = days[i - firstWeekday];
                 final dayNum = int.parse(c.date.substring(8));
                 final has = c.total > 0;
+                // 尾部不完整月不估算：种子里即使还有估计数也不展示
+                final uni = _suppressUniverse(c.date) ? 0 : c.universe;
+                // 幽灵日（有估计、内置 0）：可见且可点——原实现整格透明
+                // 不可点，被读成「当天没人发书」（幽灵日进日视图看估计说明）。
+                final ghost = !has && uni > 0;
                 return GestureDetector(
-                  onTap: has ? () => _openDay(DateTime.parse(c.date)) : null,
+                  onTap: has || ghost
+                      ? () => _openDay(DateTime.parse(c.date))
+                      : null,
                   child: Container(
                     decoration: BoxDecoration(
-                      color: has ? scheme.surface : Colors.transparent,
+                      color: has || ghost ? scheme.surface : Colors.transparent,
                       borderRadius: BorderRadius.circular(8),
                       border: has
                           ? Border.all(
                               color: scheme.outline.withValues(alpha: .35),
                             )
-                          : null,
+                          : (ghost
+                                ? Border.all(
+                                    color: scheme.primary.withValues(
+                                      alpha: .4,
+                                    ),
+                                  )
+                                : null),
                     ),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -407,19 +488,19 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                         ),
                         if (has)
                           Text(
-                            '~${c.universe}',
-                            style: TextStyle(
-                              fontSize: 11,
+                            '${c.total}',
+                            style: const TextStyle(
+                              fontSize: 12,
                               fontWeight: FontWeight.w700,
-                              color: scheme.primary,
                             ),
                           ),
-                        if (has)
+                        if (uni > 0)
                           Text(
-                            '${c.total}内置',
+                            '~$uni',
+                            maxLines: 1,
                             style: TextStyle(
-                              fontSize: 9,
-                              color: scheme.onSurfaceVariant,
+                              fontSize: 10,
+                              color: scheme.primary.withValues(alpha: .85),
                             ),
                           ),
                       ],
@@ -432,7 +513,11 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
           const SizedBox(height: 8),
           Center(
             child: Text(
-              '本月：全平台估计 ~$uni 本 · 内置库 $total 本（可点击）',
+              noEst
+                  ? '本月：内置库 $total 本（可点击）· 数据不完整，全平台估计只到 $_estimateEnd'
+                  : uni > 0
+                  ? '本月：全平台估计 ~$uni 本 · 内置库 $total 本（可点击）'
+                  : '本月：内置库 $total 本（可点击）',
               style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
             ),
           ),
@@ -445,9 +530,14 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
 
   Widget _buildWeek(CalendarResponse resp, ColorScheme scheme) {
     final days = resp.cells;
-    final weekUni = days.fold<int>(0, (s, c) => s + c.universe);
+    final weekUni = days.fold<int>(
+      0,
+      (s, c) => s + (_suppressUniverse(c.date) ? 0 : c.universe),
+    );
     if (days.every((c) => c.total == 0) && weekUni == 0) {
-      return _empty('本周没有估计发书作品');
+      return _empty(_noEstimate
+          ? '内置库本周无作品；该周数据不完整，全平台估计只到 $_estimateEnd'
+          : '本周没有估计发书作品');
     }
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
@@ -456,8 +546,9 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
       itemBuilder: (context, i) {
         final c = days[i];
         final d = DateTime.parse(c.date);
+        final uni = _suppressUniverse(c.date) ? 0 : c.universe;
         return GestureDetector(
-          onTap: c.total > 0 ? () => _openDay(d) : null,
+          onTap: c.total > 0 || uni > 0 ? () => _openDay(d) : null,
           child: Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -486,10 +577,10 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                       ),
                     ),
                     const Spacer(),
-                    if (c.total > 0 || c.universe > 0)
+                    if (c.total > 0 || uni > 0)
                       Text(
-                        c.universe > 0
-                            ? '~${c.universe}本 · ${c.total}内置'
+                        uni > 0
+                            ? '估计~$uni本 · ${c.total}内置'
                             : '${c.total}本',
                         style: TextStyle(
                           fontSize: 11,
@@ -552,11 +643,15 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
 
   Widget _buildDay(CalendarResponse resp, ColorScheme scheme) {
     final day = resp.cells.single;
-    if (day.total == 0 && day.universe == 0) {
-      return _empty('当日没有估计发书作品');
+    final noEst = _suppressUniverse(day.date);
+    final uni = noEst ? 0 : day.universe;
+    if (day.total == 0 && uni == 0) {
+      return _empty(noEst
+          ? '内置库当日无作品；该日数据不完整，全平台估计只到 $_estimateEnd'
+          : '当日没有估计发书作品');
     }
     if (day.total == 0) {
-      return _empty('内置库当日无可点击作品（全平台估计 ~${day.universe} 本）');
+      return _empty('内置库当日无可点击作品（全平台估计 ~$uni 本）');
     }
     return Stack(
       children: [
@@ -571,8 +666,10 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                 child: Padding(
                   padding: const EdgeInsets.all(12),
                   child: Text(
-                    day.universe > 0
-                        ? '— 全平台估计当日发书 ~${day.universe} 本 · 内置库 ${day.total} 本，按收藏排序 —'
+                    uni > 0
+                        ? '— 全平台估计当日发书 ~$uni 本 · 内置库 ${day.total} 本，按收藏排序 —'
+                        : noEst
+                        ? '— 内置库 ${day.total} 本，按收藏排序 · 全平台估计只到 $_estimateEnd —'
                         : '— 内置库 ${day.total} 本，按收藏排序 —',
                     style: TextStyle(
                       fontSize: 11,

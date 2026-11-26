@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../pages/about_page.dart';
 import '../pages/author_page.dart';
 import '../pages/book_data_page.dart';
 import '../pages/book_detail_page.dart';
@@ -9,6 +10,7 @@ import '../pages/booklists_page.dart';
 import '../pages/boot_page.dart';
 import '../pages/browse_page.dart';
 import '../pages/contest_archive_page.dart';
+import '../pages/contest_awards_page.dart';
 import '../pages/contest_list_page.dart';
 import '../pages/roster_page.dart';
 import '../pages/classic_list_page.dart';
@@ -101,6 +103,7 @@ final router = GoRouter(
         StatefulShellBranch(
           routes: [
             GoRoute(path: '/settings', builder: (_, _) => const SettingsPage()),
+            GoRoute(path: '/about', builder: (_, _) => const AboutPage()),
             GoRoute(
               path: '/collected',
               builder: (_, _) => const CollectedPage(),
@@ -151,7 +154,10 @@ final router = GoRouter(
     GoRoute(
       path: '/contest-archive',
       builder: (context, state) => ContestListPage(
-          initialTab: state.uri.queryParameters['tab']),
+        initialTab: state.uri.queryParameters['tab'],
+        // 首页对话区入口：只看对话线归档（lane 组在引擎侧分类）。
+        initialLane: state.uri.queryParameters['lane'],
+      ),
     ),
     // 官方清单（形态二，按需 + 引擎按页缓存）；静态段必须在
     // /contests/:name 之前注册，否则 'roster' 会被当赛事名吃掉。
@@ -159,6 +165,16 @@ final router = GoRouter(
       path: '/contests/roster',
       builder: (_, state) => RosterPage(
         contest: state.uri.queryParameters['c'] ?? '',
+        // 档案页赛项行直达该赛道（不传则页面落回台账首轨）。
+        division: state.uri.queryParameters['d'],
+      ),
+    ),
+    // 获奖作品列表（2026-11-26）：档案页入口行的目的地；静态段同款
+    // 必须先于 /contests/:name 注册。
+    GoRoute(
+      path: '/contests/awards',
+      builder: (_, state) => ContestAwardsPage(
+        name: state.uri.queryParameters['c'] ?? '',
       ),
     ),
     GoRoute(

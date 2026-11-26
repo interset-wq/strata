@@ -1,0 +1,2046 @@
+{
+ "source": {
+  "project": "contest-achieve",
+  "repository": "https://github.com/light-nook-labs/contest-achieve",
+  "file": "docs/data/contests.json",
+  "captured_at": "2026-11-24T09:26:39+08:00",
+  "join": "contest_track_id == ledger track tag",
+  "license": "AGPL-3.0"
+ },
+ "aliases": {
+  "2026春征": "2026春季征文",
+  "超新星杯短篇": "“超新星杯”短篇大赛",
+  "2024主题短篇": "2024主题短篇征文",
+  "少年-二次元创想·短篇": "少年创想短篇"
+ },
+ "events": [
+  {
+   "name": "四征",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "长篇",
+     "tag": 275,
+     "gen": "old",
+     "roster": 877,
+     "awards": 1
+    },
+    {
+     "kind": "roster",
+     "division": "中篇",
+     "tag": 276,
+     "gen": "old",
+     "roster": 273,
+     "awards": 1
+    },
+    {
+     "kind": "roster",
+     "division": "短篇",
+     "tag": 277,
+     "gen": "old",
+     "roster": 354,
+     "awards": 1
+    }
+   ],
+   "year": 2016,
+   "start": "2016-07-08",
+   "end": "2016-10-06",
+   "result": "2016-12-01",
+   "note": "",
+   "url": "https://book.sfacg.com/zw2016/rule.html",
+   "series_upstream": "X征",
+   "roster_total": 1504,
+   "award_total": 3
+  },
+  {
+   "name": "五征",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "长篇",
+     "tag": 377,
+     "gen": "old",
+     "roster": 2424,
+     "awards": 0
+    },
+    {
+     "kind": "roster",
+     "division": "中篇",
+     "tag": 378,
+     "gen": "old",
+     "roster": 808,
+     "awards": 0
+    },
+    {
+     "kind": "roster",
+     "division": "短篇",
+     "tag": 379,
+     "gen": "old",
+     "roster": 732,
+     "awards": 0
+    },
+    {
+     "kind": "roster",
+     "division": "对话小说",
+     "tag": 380,
+     "gen": "old",
+     "roster": 237,
+     "awards": 0
+    }
+   ],
+   "year": 2017,
+   "start": "2017-07-07",
+   "end": "2017-10-07",
+   "result": "2017-12-15",
+   "note": "",
+   "url": "https://book.sfacg.com/zw2017/",
+   "series_upstream": "X征",
+   "roster_total": 4201,
+   "award_total": 0
+  },
+  {
+   "name": "六征",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "长篇",
+     "tag": 383,
+     "gen": "old",
+     "roster": 2929,
+     "awards": 12
+    },
+    {
+     "kind": "roster",
+     "division": "中篇",
+     "tag": 384,
+     "gen": "old",
+     "roster": 714,
+     "awards": 5
+    },
+    {
+     "kind": "roster",
+     "division": "短篇",
+     "tag": 385,
+     "gen": "old",
+     "roster": 611,
+     "awards": 4
+    },
+    {
+     "kind": "roster",
+     "division": "对话小说",
+     "tag": 386,
+     "gen": "old",
+     "roster": 173,
+     "awards": 4
+    }
+   ],
+   "year": 2018,
+   "start": "2018-07-05",
+   "end": "2018-10-05",
+   "result": "2018-12-03",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/zw2018/",
+   "series_upstream": "X征",
+   "roster_total": 4427,
+   "award_total": 25
+  },
+  {
+   "name": "七征",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "长篇",
+     "tag": 408,
+     "gen": "old",
+     "roster": 4272,
+     "awards": 13
+    },
+    {
+     "kind": "roster",
+     "division": "中篇",
+     "tag": 409,
+     "gen": "old",
+     "roster": 1359,
+     "awards": 5
+    },
+    {
+     "kind": "roster",
+     "division": "短篇",
+     "tag": 410,
+     "gen": "old",
+     "roster": 764,
+     "awards": 5
+    },
+    {
+     "kind": "roster",
+     "division": "对话类征文长篇",
+     "tag": 411,
+     "gen": "old",
+     "roster": 583,
+     "awards": 13
+    },
+    {
+     "kind": "roster",
+     "division": "对话类征文短篇",
+     "tag": 412,
+     "gen": "old",
+     "roster": 372,
+     "awards": 9
+    }
+   ],
+   "year": 2019,
+   "start": "2019-05-25",
+   "end": "2019-09-24",
+   "result": "2019-12-24",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/zw2019/",
+   "series_upstream": "X征",
+   "roster_total": 7350,
+   "award_total": 45
+  },
+  {
+   "name": "八征",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "长篇",
+     "tag": 418,
+     "gen": "old",
+     "roster": 4908,
+     "awards": 19
+    },
+    {
+     "kind": "roster",
+     "division": "中篇",
+     "tag": 419,
+     "gen": "old",
+     "roster": 1642,
+     "awards": 5
+    },
+    {
+     "kind": "roster",
+     "division": "短篇",
+     "tag": 420,
+     "gen": "old",
+     "roster": 826,
+     "awards": 5
+    }
+   ],
+   "year": 2020,
+   "start": "2020-05-17",
+   "end": "2020-10-07",
+   "result": "2021-01-15",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/zw2020/",
+   "series_upstream": "X征",
+   "roster_total": 7376,
+   "award_total": 29
+  },
+  {
+   "name": "九征",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "长篇",
+     "tag": 457,
+     "gen": "old",
+     "roster": 4532,
+     "awards": 22
+    },
+    {
+     "kind": "roster",
+     "division": "中篇",
+     "tag": 458,
+     "gen": "old",
+     "roster": 1268,
+     "awards": 5
+    },
+    {
+     "kind": "roster",
+     "division": "短篇",
+     "tag": 459,
+     "gen": "old",
+     "roster": 783,
+     "awards": 5
+    },
+    {
+     "kind": "roster",
+     "division": "对话小说",
+     "tag": 462,
+     "gen": "old",
+     "roster": 1954,
+     "awards": 2
+    }
+   ],
+   "year": 2021,
+   "start": "2021-05-14",
+   "end": "2021-10-07",
+   "result": "2022-01-14",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/zw2021/",
+   "series_upstream": "X征",
+   "roster_total": 8537,
+   "award_total": 34
+  },
+  {
+   "name": "十征",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "长篇",
+     "tag": 475,
+     "gen": "new",
+     "roster": 5301,
+     "awards": 20
+    },
+    {
+     "kind": "roster",
+     "division": "中篇",
+     "tag": 476,
+     "gen": "new",
+     "roster": 1472,
+     "awards": 5
+    },
+    {
+     "kind": "roster",
+     "division": "短篇",
+     "tag": 477,
+     "gen": "new",
+     "roster": 933,
+     "awards": 5
+    },
+    {
+     "kind": "roster",
+     "division": "对话小说",
+     "tag": 479,
+     "gen": "new",
+     "roster": 1691,
+     "awards": 4
+    }
+   ],
+   "year": 2022,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/zw2022/",
+   "series_upstream": "X征",
+   "roster_total": 9397,
+   "award_total": 34
+  },
+  {
+   "name": "十一征",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "长篇",
+     "tag": 653,
+     "gen": "new",
+     "roster": 4193,
+     "awards": 19
+    },
+    {
+     "kind": "roster",
+     "division": "中篇",
+     "tag": 654,
+     "gen": "new",
+     "roster": 1094,
+     "awards": 5
+    },
+    {
+     "kind": "roster",
+     "division": "短篇",
+     "tag": 655,
+     "gen": "new",
+     "roster": 750,
+     "awards": 5
+    }
+   ],
+   "year": 2023,
+   "start": "2023-05-04",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/zw20230504/pc",
+   "series_upstream": "X征",
+   "roster_total": 6037,
+   "award_total": 29
+  },
+  {
+   "name": "十二征",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "长篇",
+     "tag": 702,
+     "gen": "new",
+     "roster": 3938,
+     "awards": 19
+    },
+    {
+     "kind": "roster",
+     "division": "中篇",
+     "tag": 703,
+     "gen": "new",
+     "roster": 1186,
+     "awards": 5
+    },
+    {
+     "kind": "roster",
+     "division": "短篇",
+     "tag": 704,
+     "gen": "new",
+     "roster": 821,
+     "awards": 5
+    }
+   ],
+   "year": 2024,
+   "start": "2024-05-04",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/zw20240504/pc",
+   "series_upstream": "X征",
+   "roster_total": 5945,
+   "award_total": 29
+  },
+  {
+   "name": "十三征",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "长篇",
+     "tag": 752,
+     "gen": "new",
+     "roster": 3407,
+     "awards": 15
+    },
+    {
+     "kind": "roster",
+     "division": "中篇",
+     "tag": 753,
+     "gen": "new",
+     "roster": 767,
+     "awards": 5
+    },
+    {
+     "kind": "roster",
+     "division": "短篇",
+     "tag": 754,
+     "gen": "new",
+     "roster": 623,
+     "awards": 5
+    }
+   ],
+   "year": 2025,
+   "start": "2025-05-04",
+   "end": "2025-10-07",
+   "result": "2026-01-16",
+   "note": "终审公布 2026-01-16",
+   "url": "https://pages.sfacg.com/h5/act/zw20250504/pc",
+   "series_upstream": "X征",
+   "roster_total": 4797,
+   "award_total": 25
+  },
+  {
+   "name": "十四征",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "长篇",
+     "tag": 793,
+     "gen": "new",
+     "roster": 3583,
+     "awards": 0
+    },
+    {
+     "kind": "roster",
+     "division": "短篇",
+     "tag": 794,
+     "gen": "new",
+     "roster": 481,
+     "awards": 0
+    }
+   ],
+   "year": 2026,
+   "start": "2026-05-01",
+   "end": "2026-10-07",
+   "result": "2027-01-15",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/zw20260504/pc",
+   "series_upstream": "X征",
+   "roster_total": 4064,
+   "award_total": 0
+  },
+  {
+   "name": "冬季征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 381,
+     "gen": "old",
+     "roster": 2146,
+     "awards": 0
+    }
+   ],
+   "year": 2018,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/djzw2018/",
+   "series_upstream": "冬征",
+   "roster_total": 2146,
+   "award_total": 0
+  },
+  {
+   "name": "第二届冬季征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 406,
+     "gen": "old",
+     "roster": 2263,
+     "awards": 0
+    }
+   ],
+   "year": 2019,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/djzw2019/",
+   "series_upstream": "冬征",
+   "roster_total": 2263,
+   "award_total": 0
+  },
+  {
+   "name": "第三届冬季征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 415,
+     "gen": "old",
+     "roster": 3168,
+     "awards": 16
+    }
+   ],
+   "year": 2019,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/djzw2020/",
+   "series_upstream": "冬征",
+   "roster_total": 3168,
+   "award_total": 16
+  },
+  {
+   "name": "第四届冬季征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 454,
+     "gen": "old",
+     "roster": 3249,
+     "awards": 16
+    }
+   ],
+   "year": 2020,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "https://pages.sfacg.com/pc/act/djzw2021/",
+   "series_upstream": "冬征",
+   "roster_total": 3249,
+   "award_total": 16
+  },
+  {
+   "name": "第五届冬季征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 466,
+     "gen": "old",
+     "roster": 3563,
+     "awards": 16
+    }
+   ],
+   "year": 2021,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/djzw2022/",
+   "series_upstream": "冬征",
+   "roster_total": 3563,
+   "award_total": 16
+  },
+  {
+   "name": "第六届冬季征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 485,
+     "gen": "new",
+     "roster": 3698,
+     "awards": 16
+    }
+   ],
+   "year": 2022,
+   "start": "2022-12-05",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/zw20221205/",
+   "series_upstream": "冬征",
+   "roster_total": 3698,
+   "award_total": 16
+  },
+  {
+   "name": "第七届冬季征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 692,
+     "gen": "new",
+     "roster": 3024,
+     "awards": 15
+    }
+   ],
+   "year": 2023,
+   "start": "2023-12-04",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/zw20231204/",
+   "series_upstream": "冬征",
+   "roster_total": 3024,
+   "award_total": 15
+  },
+  {
+   "name": "第八届冬季征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 726,
+     "gen": "new",
+     "roster": 2757,
+     "awards": 10
+    }
+   ],
+   "year": 2024,
+   "start": "2024-12-06",
+   "end": "2025-02-28",
+   "result": "",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/zw/essayActivity_c49534b9-73b2-46c9-a33f-b8144b448662.html",
+   "series_upstream": "冬征",
+   "roster_total": 2757,
+   "award_total": 10
+  },
+  {
+   "name": "第九届冬季征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 774,
+     "gen": "new",
+     "roster": 2340,
+     "awards": 10
+    }
+   ],
+   "year": 2025,
+   "start": "2025-12-05",
+   "end": "2026-03-06",
+   "result": "",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/zw/essayActivity_373481c3-8fb0-4113-83fb-5058a816f828.html",
+   "series_upstream": "冬征",
+   "roster_total": 2340,
+   "award_total": 10
+  },
+  {
+   "name": "2022春季征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 473,
+     "gen": "new",
+     "roster": 3190,
+     "awards": 16
+    }
+   ],
+   "year": 2022,
+   "start": "2022-03-01",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/zw20220301/",
+   "series_upstream": "春征",
+   "roster_total": 3190,
+   "award_total": 16
+  },
+  {
+   "name": "2023春季征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 632,
+     "gen": "new",
+     "roster": 2636,
+     "awards": 21
+    }
+   ],
+   "year": 2023,
+   "start": "2023-03-01",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/zw20230301/",
+   "series_upstream": "春征",
+   "roster_total": 2636,
+   "award_total": 21
+  },
+  {
+   "name": "2024春季征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 699,
+     "gen": "new",
+     "roster": 2223,
+     "awards": 16
+    }
+   ],
+   "year": 2024,
+   "start": "2024-03-01",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/zw20240301/",
+   "series_upstream": "春征",
+   "roster_total": 2223,
+   "award_total": 16
+  },
+  {
+   "name": "2025春季征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 746,
+     "gen": "new",
+     "roster": 1708,
+     "awards": 10
+    }
+   ],
+   "year": 2025,
+   "start": "2025-03-01",
+   "end": "2025-05-03",
+   "result": "2025-07-11",
+   "note": "公布 2025-07-11",
+   "url": "https://pages.sfacg.com/h5/act/zw/essayActivity_d892261b-8719-4e3b-b01a-b84278b2996b.html",
+   "series_upstream": "春征",
+   "roster_total": 1708,
+   "award_total": 10
+  },
+  {
+   "name": "2026春季征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 789,
+     "gen": "new",
+     "roster": 1679,
+     "awards": 6
+    }
+   ],
+   "year": 2026,
+   "start": "2026-02-27",
+   "end": "2026-05-03",
+   "result": "2026-07-10",
+   "note": "公布 2026-07-10",
+   "url": "https://pages.sfacg.com/h5/act/zw/essayActivity_52f25c52-1de0-4608-90fc-293aac35a588.html",
+   "series_upstream": "春征",
+   "roster_total": 1679,
+   "award_total": 6
+  },
+  {
+   "name": "东方世界秋季征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 464,
+     "gen": "new",
+     "roster": 815,
+     "awards": 0
+    }
+   ],
+   "year": 2021,
+   "start": "2021-09-30",
+   "end": "2021-12-03",
+   "result": "2022-01-20",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/qjzw2021/",
+   "series_upstream": "秋征",
+   "roster_total": 815,
+   "award_total": 0
+  },
+  {
+   "name": "异世大陆秋季征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 465,
+     "gen": "new",
+     "roster": 1287,
+     "awards": 0
+    }
+   ],
+   "year": 2021,
+   "start": "2021-09-30",
+   "end": "2021-12-03",
+   "result": "2022-01-20",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/qjzw2021/",
+   "series_upstream": "秋征",
+   "roster_total": 1287,
+   "award_total": 0
+  },
+  {
+   "name": "少年的奇幻冒险",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 480,
+     "gen": "new",
+     "roster": 935,
+     "awards": 0
+    }
+   ],
+   "year": null,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "",
+   "series_upstream": "少年",
+   "roster_total": 935,
+   "award_total": 0
+  },
+  {
+   "name": "少年的无限幻想",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 481,
+     "gen": "new",
+     "roster": 1945,
+     "awards": 11
+    }
+   ],
+   "year": 2022,
+   "start": "2022-09-30",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/zw20220930/",
+   "series_upstream": "秋征",
+   "roster_total": 1945,
+   "award_total": 11
+  },
+  {
+   "name": "少年的幻想之旅",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 660,
+     "gen": "new",
+     "roster": 999,
+     "awards": 0
+    }
+   ],
+   "year": null,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "",
+   "series_upstream": "少年",
+   "roster_total": 999,
+   "award_total": 0
+  },
+  {
+   "name": "少年的奇迹历险",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 669,
+     "gen": "new",
+     "roster": 1575,
+     "awards": 21
+    }
+   ],
+   "year": 2023,
+   "start": "2023-09-30",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/zw20230930/",
+   "series_upstream": "秋征",
+   "roster_total": 1575,
+   "award_total": 21
+  },
+  {
+   "name": "“少年的幻想校园”主题征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 722,
+     "gen": "new",
+     "roster": 620,
+     "awards": 12
+    }
+   ],
+   "year": 2024,
+   "start": "2024-06-21",
+   "end": "2024-08-31",
+   "result": "2024-10-25",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/zw/essayActivity_7465fc4b-8c7e-4e23-a30c-721ec33ced8b.html",
+   "series_upstream": "少年",
+   "roster_total": 620,
+   "award_total": 12
+  },
+  {
+   "name": "少年创想长篇",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 747,
+     "gen": "new",
+     "roster": 605,
+     "awards": 8
+    }
+   ],
+   "year": null,
+   "start": "",
+   "end": "",
+   "result": "2025-07-11",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/zw/essayActivity_775951e5-ac60-4df4-a8d3-4ffb64173398.html",
+   "series_upstream": "少年",
+   "roster_total": 605,
+   "award_total": 8
+  },
+  {
+   "name": "少年创想短篇",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 748,
+     "gen": "new",
+     "roster": 223,
+     "awards": 3
+    }
+   ],
+   "year": null,
+   "start": "",
+   "end": "",
+   "result": "2025-07-11",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/zw/essayActivity_775951e5-ac60-4df4-a8d3-4ffb64173398.html",
+   "series_upstream": "少年",
+   "roster_total": 223,
+   "award_total": 3
+  },
+  {
+   "name": "2024秋季征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 725,
+     "gen": "new",
+     "roster": 1779,
+     "awards": 11
+    }
+   ],
+   "year": 2024,
+   "start": "2024-09-30",
+   "end": "2024-12-05",
+   "result": "",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/zw/essayActivity_0a10b388-bf92-410c-801a-59c91b853c3f.html",
+   "series_upstream": "秋征",
+   "roster_total": 1779,
+   "award_total": 11
+  },
+  {
+   "name": "2025秋季征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 772,
+     "gen": "new",
+     "roster": 1845,
+     "awards": 7
+    }
+   ],
+   "year": 2025,
+   "start": "2025-09-30",
+   "end": "2025-12-04",
+   "result": "",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/zw/essayActivity_d568a583-bde8-4f16-809a-8ab7097261be.html",
+   "series_upstream": "秋征",
+   "roster_total": 1845,
+   "award_total": 7
+  },
+  {
+   "name": "2026秋季征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 803,
+     "gen": "new",
+     "roster": 1673,
+     "awards": 0
+    }
+   ],
+   "year": 2026,
+   "start": "2026-09-29",
+   "end": "2026-12-03",
+   "result": "2027-02-16",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/zw/essayActivity_f2a2f388-2be0-45c1-9493-8ee660f1e31d.html",
+   "series_upstream": "秋征",
+   "roster_total": 1673,
+   "award_total": 0
+  },
+  {
+   "name": "楚楚动仁同人征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 278,
+     "gen": "old",
+     "roster": 49,
+     "awards": 0
+    }
+   ],
+   "year": null,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "https://book.sfacg.com/sp/migu",
+   "series_upstream": "独立",
+   "roster_total": 49,
+   "award_total": 0
+  },
+  {
+   "name": "少女前线征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 404,
+     "gen": "new",
+     "roster": 449,
+     "awards": 8
+    }
+   ],
+   "year": null,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/sfxsq/",
+   "series_upstream": "独立",
+   "roster_total": 449,
+   "award_total": 8
+  },
+  {
+   "name": "崩坏3征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 405,
+     "gen": "new",
+     "roster": 624,
+     "awards": 17
+    }
+   ],
+   "year": 2019,
+   "start": "2019-01-04",
+   "end": "2019-02-11",
+   "result": "2019-02-22",
+   "note": "公示 2019-02-22",
+   "url": "https://pages.sfacg.com/h5/act/sfxbbb/",
+   "series_upstream": "独立",
+   "roster_total": 624,
+   "award_total": 17
+  },
+  {
+   "name": "龙之谷征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 413,
+     "gen": "old",
+     "roster": 192,
+     "awards": 6
+    }
+   ],
+   "year": null,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/sfxlzg/",
+   "series_upstream": "独立",
+   "roster_total": 192,
+   "award_total": 6
+  },
+  {
+   "name": "校园恋爱征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 382,
+     "gen": "new",
+     "roster": 612,
+     "awards": 0
+    }
+   ],
+   "year": null,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/xyzw2018/",
+   "series_upstream": "独立",
+   "roster_total": 612,
+   "award_total": 0
+  },
+  {
+   "name": "校园都市征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 414,
+     "gen": "new",
+     "roster": 1248,
+     "awards": 12
+    }
+   ],
+   "year": null,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/xyzw2019/",
+   "series_upstream": "独立",
+   "roster_total": 1248,
+   "award_total": 12
+  },
+  {
+   "name": "幻想小说征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 417,
+     "gen": "new",
+     "roster": 3973,
+     "awards": 0
+    }
+   ],
+   "year": null,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/fantasyzw2020/",
+   "series_upstream": "独立",
+   "roster_total": 3973,
+   "award_total": 0
+  },
+  {
+   "name": "秋季恋爱征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 453,
+     "gen": "new",
+     "roster": 1158,
+     "awards": 0
+    }
+   ],
+   "year": null,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "",
+   "series_upstream": "独立",
+   "roster_total": 1158,
+   "award_total": 0
+  },
+  {
+   "name": "玄幻征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 456,
+     "gen": "new",
+     "roster": 1852,
+     "awards": 0
+    }
+   ],
+   "year": null,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "",
+   "series_upstream": "独立",
+   "roster_total": 1852,
+   "award_total": 0
+  },
+  {
+   "name": "穿越主题征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 463,
+     "gen": "new",
+     "roster": 675,
+     "awards": 0
+    }
+   ],
+   "year": null,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "",
+   "series_upstream": "独立",
+   "roster_total": 675,
+   "award_total": 0
+  },
+  {
+   "name": "战斗主题征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 467,
+     "gen": "new",
+     "roster": 235,
+     "awards": 0
+    }
+   ],
+   "year": null,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "",
+   "series_upstream": "独立",
+   "roster_total": 235,
+   "award_total": 0
+  },
+  {
+   "name": "失业魔王同人征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 468,
+     "gen": "old",
+     "roster": 15,
+     "awards": 7
+    }
+   ],
+   "year": null,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/fanszw202112/",
+   "series_upstream": "独立",
+   "roster_total": 15,
+   "award_total": 7
+  },
+  {
+   "name": "英雄再临同人征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 469,
+     "gen": "new",
+     "roster": 20,
+     "awards": 8
+    }
+   ],
+   "year": null,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/fanszw202112/",
+   "series_upstream": "独立",
+   "roster_total": 20,
+   "award_total": 8
+  },
+  {
+   "name": "奇幻世界主题征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 755,
+     "gen": "new",
+     "roster": 880,
+     "awards": 5
+    }
+   ],
+   "year": 2025,
+   "start": "2025-06-06",
+   "end": "2025-08-31",
+   "result": "2025-11-28",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/zw/essayActivity_e5950dc7-7f12-4fca-8049-8fd2afd9c0eb.html",
+   "series_upstream": "独立",
+   "roster_total": 880,
+   "award_total": 5
+  },
+  {
+   "name": "对话小说春节征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 471,
+     "gen": "new",
+     "roster": 567,
+     "awards": 0
+    }
+   ],
+   "year": null,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "",
+   "series_upstream": "对话",
+   "roster_total": 567,
+   "award_total": 0
+  },
+  {
+   "name": "对话小说情人节征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 472,
+     "gen": "new",
+     "roster": 317,
+     "awards": 0
+    }
+   ],
+   "year": null,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "",
+   "series_upstream": "对话",
+   "roster_total": 317,
+   "award_total": 0
+  },
+  {
+   "name": "对话小说开学季征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 474,
+     "gen": "new",
+     "roster": 361,
+     "awards": 0
+    }
+   ],
+   "year": null,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/dyzw20220331/",
+   "series_upstream": "对话",
+   "roster_total": 361,
+   "award_total": 0
+  },
+  {
+   "name": "对话小说青春幻想征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 478,
+     "gen": "new",
+     "roster": 219,
+     "awards": 0
+    }
+   ],
+   "year": null,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "",
+   "series_upstream": "对话",
+   "roster_total": 219,
+   "award_total": 0
+  },
+  {
+   "name": "分支对话小说征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 482,
+     "gen": "new",
+     "roster": 414,
+     "awards": 0
+    }
+   ],
+   "year": null,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "",
+   "series_upstream": "对话",
+   "roster_total": 414,
+   "award_total": 0
+  },
+  {
+   "name": "对话小说恋爱主题征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 484,
+     "gen": "new",
+     "roster": 268,
+     "awards": 0
+    }
+   ],
+   "year": null,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "",
+   "series_upstream": "对话",
+   "roster_total": 268,
+   "award_total": 0
+  },
+  {
+   "name": "春节征文长篇",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 622,
+     "gen": "new",
+     "roster": 183,
+     "awards": 0
+    }
+   ],
+   "year": null,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "",
+   "series_upstream": "独立",
+   "roster_total": 183,
+   "award_total": 0
+  },
+  {
+   "name": "春节征文短篇",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 623,
+     "gen": "new",
+     "roster": 89,
+     "awards": 0
+    }
+   ],
+   "year": null,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "",
+   "series_upstream": "独立",
+   "roster_total": 89,
+   "award_total": 0
+  },
+  {
+   "name": "春节征文分支对话",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 624,
+     "gen": "new",
+     "roster": 100,
+     "awards": 0
+    }
+   ],
+   "year": null,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "",
+   "series_upstream": "对话",
+   "roster_total": 100,
+   "award_total": 0
+  },
+  {
+   "name": "星穹小说家征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 633,
+     "gen": "new",
+     "roster": 401,
+     "awards": 0
+    }
+   ],
+   "year": 2023,
+   "start": "2023-03-29",
+   "end": "2023-05-08",
+   "result": "2023-05-19",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/dyzw20230329/",
+   "series_upstream": "对话",
+   "roster_total": 401,
+   "award_total": 0
+  },
+  {
+   "name": "“超新星杯”短篇大赛",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 634,
+     "gen": "new",
+     "roster": 672,
+     "awards": 6
+    }
+   ],
+   "year": 2023,
+   "start": "2023-04-01",
+   "end": "2023-04-30",
+   "result": "2023-05-11",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/zw20230331/",
+   "series_upstream": "独立",
+   "roster_total": 672,
+   "award_total": 6
+  },
+  {
+   "name": "征文大赛对话小说组",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 659,
+     "gen": "new",
+     "roster": 1093,
+     "awards": 0
+    }
+   ],
+   "year": null,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "",
+   "series_upstream": "对话",
+   "roster_total": 1093,
+   "award_total": 0
+  },
+  {
+   "name": "怪谈异闻主题征文长篇",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 675,
+     "gen": "new",
+     "roster": 372,
+     "awards": 0
+    }
+   ],
+   "year": null,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "",
+   "series_upstream": "独立",
+   "roster_total": 372,
+   "award_total": 0
+  },
+  {
+   "name": "怪谈异闻主题征文短篇",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 676,
+     "gen": "new",
+     "roster": 40,
+     "awards": 0
+    }
+   ],
+   "year": null,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "",
+   "series_upstream": "独立",
+   "roster_total": 40,
+   "award_total": 0
+  },
+  {
+   "name": "冬季恋曲征文活动",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 691,
+     "gen": "new",
+     "roster": 348,
+     "awards": 0
+    }
+   ],
+   "year": null,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "",
+   "series_upstream": "独立",
+   "roster_total": 348,
+   "award_total": 0
+  },
+  {
+   "name": "2024主题短篇征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 693,
+     "gen": "new",
+     "roster": 421,
+     "awards": 5
+    }
+   ],
+   "year": null,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/zw20240105/",
+   "series_upstream": "独立",
+   "roster_total": 421,
+   "award_total": 5
+  },
+  {
+   "name": "2024年对话小说春节征文",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 698,
+     "gen": "new",
+     "roster": 371,
+     "awards": 0
+    }
+   ],
+   "year": null,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "",
+   "series_upstream": "对话",
+   "roster_total": 371,
+   "award_total": 0
+  },
+  {
+   "name": "对话小说梦想季节征文活动",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 700,
+     "gen": "new",
+     "roster": 304,
+     "awards": 0
+    }
+   ],
+   "year": null,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "",
+   "series_upstream": "对话",
+   "roster_total": 304,
+   "award_total": 0
+  },
+  {
+   "name": "2024夏季征文大赛对话小说组",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 701,
+     "gen": "new",
+     "roster": 713,
+     "awards": 0
+    }
+   ],
+   "year": null,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "",
+   "series_upstream": "对话",
+   "roster_total": 713,
+   "award_total": 0
+  },
+  {
+   "name": "2025年对话小说新年征文活动",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 729,
+     "gen": "new",
+     "roster": 229,
+     "awards": 0
+    }
+   ],
+   "year": null,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "",
+   "series_upstream": "对话",
+   "roster_total": 229,
+   "award_total": 0
+  },
+  {
+   "name": "点鸭秋色回忆征文活动",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 724,
+     "gen": "new",
+     "roster": 224,
+     "awards": 18
+    }
+   ],
+   "year": null,
+   "start": "",
+   "end": "",
+   "result": "2024-11-15",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/zw/essayActivity_c7ff7adf-4f9d-416d-a5e0-796683eb6763.html",
+   "series_upstream": "对话",
+   "roster_total": 224,
+   "award_total": 18
+  },
+  {
+   "name": "点鸭秋之偶像季征文活动",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 661,
+     "gen": "new",
+     "roster": 395,
+     "awards": 0
+    }
+   ],
+   "year": null,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "",
+   "series_upstream": "对话",
+   "roster_total": 395,
+   "award_total": 0
+  },
+  {
+   "name": "征文大赛长篇",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 793,
+     "gen": "new",
+     "roster": 3583,
+     "awards": 0
+    }
+   ],
+   "year": 2026,
+   "start": "2026-05-01",
+   "end": "2026-10-07",
+   "result": "2027-01-15",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/zw20260504/pc",
+   "series_upstream": "X征",
+   "roster_total": 3583,
+   "award_total": 0
+  },
+  {
+   "name": "征文大赛短篇",
+   "tracks": [
+    {
+     "kind": "roster",
+     "division": "",
+     "tag": 794,
+     "gen": "new",
+     "roster": 481,
+     "awards": 0
+    }
+   ],
+   "year": 2026,
+   "start": "2026-05-01",
+   "end": "2026-10-07",
+   "result": "2027-01-15",
+   "note": "",
+   "url": "https://pages.sfacg.com/h5/act/zw20260504/pc",
+   "series_upstream": "X征",
+   "roster_total": 481,
+   "award_total": 0
+  },
+  {
+   "name": "一征",
+   "tracks": [
+    {
+     "kind": "award",
+     "division": "金奖",
+     "tag": 635,
+     "gen": "old",
+     "roster": 1,
+     "awards": 1
+    },
+    {
+     "kind": "award",
+     "division": "银奖",
+     "tag": 636,
+     "gen": "old",
+     "roster": 1,
+     "awards": 1
+    },
+    {
+     "kind": "award",
+     "division": "铜奖",
+     "tag": 637,
+     "gen": "old",
+     "roster": 3,
+     "awards": 3
+    }
+   ],
+   "year": 2013,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "",
+   "series_upstream": "X征",
+   "roster_total": null,
+   "award_total": 5
+  },
+  {
+   "name": "二征",
+   "tracks": [
+    {
+     "kind": "award",
+     "division": "金奖",
+     "tag": 638,
+     "gen": "old",
+     "roster": 1,
+     "awards": 1
+    },
+    {
+     "kind": "award",
+     "division": "银奖",
+     "tag": 639,
+     "gen": "old",
+     "roster": 2,
+     "awards": 2
+    },
+    {
+     "kind": "award",
+     "division": "铜奖",
+     "tag": 640,
+     "gen": "old",
+     "roster": 4,
+     "awards": 4
+    }
+   ],
+   "year": 2014,
+   "start": "",
+   "end": "",
+   "result": "",
+   "note": "",
+   "url": "",
+   "series_upstream": "X征",
+   "roster_total": null,
+   "award_total": 7
+  },
+  {
+   "name": "三征",
+   "tracks": [
+    {
+     "kind": "award",
+     "division": "长篇金奖",
+     "tag": 641,
+     "gen": "old",
+     "roster": 1,
+     "awards": 1
+    },
+    {
+     "kind": "award",
+     "division": "长篇银奖",
+     "tag": 642,
+     "gen": "old",
+     "roster": 1,
+     "awards": 1
+    },
+    {
+     "kind": "award",
+     "division": "长篇铜奖",
+     "tag": 643,
+     "gen": "old",
+     "roster": 2,
+     "awards": 3
+    },
+    {
+     "kind": "award",
+     "division": "中篇金奖",
+     "tag": 644,
+     "gen": "old",
+     "roster": 1,
+     "awards": 1
+    },
+    {
+     "kind": "award",
+     "division": "中篇银奖",
+     "tag": 645,
+     "gen": "old",
+     "roster": 1,
+     "awards": 1
+    },
+    {
+     "kind": "award",
+     "division": "中篇铜奖",
+     "tag": 646,
+     "gen": "old",
+     "roster": 1,
+     "awards": 1
+    },
+    {
+     "kind": "award",
+     "division": "短篇金奖",
+     "tag": 647,
+     "gen": "old",
+     "roster": 1,
+     "awards": 1
+    },
+    {
+     "kind": "award",
+     "division": "短篇银奖",
+     "tag": 648,
+     "gen": "old",
+     "roster": 1,
+     "awards": 1
+    },
+    {
+     "kind": "award",
+     "division": "短篇铜奖",
+     "tag": 649,
+     "gen": "old",
+     "roster": 4,
+     "awards": 5
+    }
+   ],
+   "year": 2015,
+   "start": "",
+   "end": "",
+   "result": "2015-12-15",
+   "note": "",
+   "url": "https://news.sfacg.com/Files/2015-12-15/f92f9252-2158-46b4-9459-67fa02b4428f.shtml",
+   "series_upstream": "X征",
+   "roster_total": null,
+   "award_total": 15
+  }
+ ]
+}

@@ -184,12 +184,17 @@ class _SearchPageState extends ConsumerState<SearchPage> {
       itemCount: list.length + (nidMiss ? 1 : 0) + _remoteExtraRows(),
       itemBuilder: (_, i) {
         if (i < list.length) return _localCard(context, scheme, list[i]);
-        i -= list.length;
-        if (nidMiss && i == 0) {
-          return _nidMissCard(context, scheme, _query!.substring(1));
+        // 本地结果之后：「未收录」行只在 nidMiss 时占位，全站行紧随其后。
+        // 索引换算必须先扣除实际存在的行数，否则普通查询会把第 0 行
+        // 换算成 -1，落到 _remoteItems[-2] 触发 RangeError。
+        var remoteRow = i - list.length;
+        if (nidMiss) {
+          if (remoteRow == 0) {
+            return _nidMissCard(context, scheme, _query!.substring(1));
+          }
+          remoteRow -= 1;
         }
-        i -= 1;
-        return _remoteRow(context, scheme, i, list.length);
+        return _remoteRow(context, scheme, remoteRow, list.length);
       },
     );
   }

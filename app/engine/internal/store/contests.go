@@ -10,9 +10,9 @@ import (
 
 // ContestGroup is one event-level contest aggregated from seed.books — the
 // data for the contest archive list and archive page
-// (docs/contest-display-in-app.md 形态一). Count and Forms cover
-// in-library (seed-admitted) books only; the roster API (P1) is the only
-// source for out-of-library participants.
+// (docs/contest-display-in-app.md 形态一). Count/Forms are in-library
+// (seed-admitted) books only; the ledger's official numbers are the other
+// half of the story and come from the embedded table (zero requests).
 type ContestGroup struct {
 	Name    string         `json:"name"`
 	Series  string         `json:"series"` // x|winter|spring|autumn|other
@@ -24,10 +24,10 @@ type ContestGroup struct {
 	Year    *int           `json:"year,omitempty"`
 	Start   *string        `json:"start,omitempty"`
 	End     *string        `json:"end,omitempty"`
-	Note    *string        `json:"note,omitempty"`
-	// Official = the official activity-page URL (contest_meta.go, mobile
-	// form); omitted when unverified — the archive page shows its jump
-	// entry only when present and never fabricates URLs.
+	// Result = the official 公布 date; in the future for an edition still
+	// running, which the archive page words as 预计.
+	Result   *string `json:"result,omitempty"`
+	Note     *string `json:"note,omitempty"`
 	Official *string `json:"official,omitempty"`
 	// Lane classifies other-series events for the home-tab lanes (user
 	// decision 2026-11-22: dialogue archives live in the home dialogue
@@ -35,36 +35,90 @@ type ContestGroup struct {
 	// (= theme) stays in the archive list's 其他 tab. Never set on the
 	// four season series.
 	Lane string `json:"lane,omitempty"`
-	// Roster = the event has at least one verified tagId (roster_tags.go);
-	// the archive page shows the 「查看官方清单」 entry from this flag.
-	// RosterTracks = the verified divisions for the roster page chips; empty
-	// (omitted) = single-track event.
-	Roster       bool     `json:"roster"`
-	RosterTracks []string `json:"roster_tracks,omitempty"`
+	// Roster = the event has at least one participation-list tag (ledger);
+	// the archive page shows the 「官方清单」 entry from this flag. Award-only
+	// events (一/二/三征, winner tags 635-649) keep it false and expose
+	// ListKind=award instead.
+	// Divisions = the verified tracks with their official counts, in
+	// official order; the archive page's per-track rows and the roster
+	// chips both read it. Single-track events carry one row named 全部.
+	Roster    bool             `json:"roster"`
+	Divisions []RosterDivision `json:"divisions,omitempty"`
+	// ListKind = "roster" | "award" | "" — which official list the event
+	// can fetch, so the UI labels entries 官方清单 vs 获奖名单.
+	ListKind string `json:"list_kind,omitempty"`
+	// RosterTotal = the official entry-list size summed over the event's
+	// tracks (contest-achieve, captured per tag): the number that replaces
+	// the in-library count as the archive list's headline. Nil when any
+	// track is unverified — never a partial sum.
+	RosterTotal *int `json:"roster_total,omitempty"`
+	// AwardTotal = the official winner count. The winner lists themselves are
+	// not in the app (docs/contest-display-in-app.md §6), so the UI sizes a
+	// reserved block with it and never renders it as participation.
+	AwardTotal *int `json:"award_total,omitempty"`
+}
+
+// zhengToEvent extracts the leading N征 token ("" when the name does not
+// start with one) — structural, so a new edition needs no code change.
+func zhengToEvent(raw string) string {
+	i := 0
+	for i < len(raw) {
+		r, size := utf8.DecodeRuneInString(raw[i:])
+		if !strings.ContainsRune("一二三四五六七八九十", r) {
+			break
+		}
+		i += size
+	}
+	if i == 0 || i >= len(raw) {
+		return ""
+	}
+	r, size := utf8.DecodeRuneInString(raw[i:])
+	if r != '征' {
+		return ""
+	}
+	return raw[:i+size]
 }
 
 // ContestEventName maps a raw contest string to its event-level name: the
 // N征 series collapses every division spelling (incl. 对话类:
-// 七征对话类征文长篇, 九征/十征对话小说) to the N征 token; every other contest
-// is a single event and is returned unchanged.
+// 七征对话类征文长篇, 九征/十征对话小说, 十四征-长篇) to the N征 token; every
+// other contest is a single event, alias-resolved through the ledger (the
+// seed carries two spellings for four editions).
 func ContestEventName(raw string) string {
-	for _, n := range []string{"十三征", "十二征", "十一征", "十征", "九征",
-		"八征", "七征", "六征", "五征", "四征", "三征", "二征", "一征"} {
-		if strings.HasPrefix(raw, n) {
-			return n
-		}
+	if tok := zhengToEvent(raw); tok != "" {
+		return tok
 	}
-	return raw
+	return LedgerCanonical(raw)
 }
 
 // contestEventMatch matches an event-level name against the raw column:
-// N征 events match every division spelling (prefix); other events are
-// single-division and match exactly.
+// N征 events match every division spelling (prefix); every other event
+// matches the exact spellings the seed carries for it — its own name plus the
+// alias spellings that point at it (「2026春季征文」/「2026春征」 are one
+// edition).
 func contestEventMatch(col, name string) (string, []any) {
 	if isZhengEvent(name) {
 		return col + " LIKE ? || '%'", []any{name}
 	}
-	return col + " = ?", []any{name}
+	vals := []string{name}
+	for alias, canonical := range ledger.Aliases {
+		if canonical == name {
+			vals = append(vals, alias)
+		}
+	}
+	if len(vals) == 1 {
+		return col + " = ?", []any{name}
+	}
+	holders := make([]byte, 0, len(vals)*2)
+	args := make([]any, 0, len(vals))
+	for i, v := range vals {
+		if i > 0 {
+			holders = append(holders, ',', ' ')
+		}
+		holders = append(holders, '?')
+		args = append(args, v)
+	}
+	return col + " IN (" + string(holders) + ")", args
 }
 
 // contestSeries buckets an event name for the archive list sections.
@@ -215,41 +269,26 @@ GROUP BY contest, form`)
 		if a.g.Series == "other" {
 			a.g.Lane = contestLane(name)
 		}
-		if m, ok := ContestMetaFor(name); ok {
-			if m.Year != 0 {
-				y := m.Year
-				a.g.Year = &y
-			}
-			if m.Start != "" {
-				v := m.Start
-				a.g.Start = &v
-			}
-			if m.End != "" {
-				v := m.End
-				a.g.End = &v
-			}
-			if m.Note != "" {
-				v := m.Note
-				a.g.Note = &v
-			}
-			if m.Official != "" {
-				v := m.Official
-				a.g.Official = &v
-			}
-		}
-		if tags := RosterTagsFor(name); tags != nil {
-			a.g.Roster = true
-			for _, tg := range tags {
-				if tg.Division != "" {
-					a.g.RosterTracks = append(a.g.RosterTracks, tg.Division)
-				}
-			}
+		if e, ok := LedgerEventFor(name); ok {
+			a.g.Year = e.Year
+			a.g.Start = emptyAsNil(e.Start)
+			a.g.End = emptyAsNil(e.End)
+			a.g.Result = emptyAsNil(e.Result)
+			a.g.Note = emptyAsNil(e.Note)
+			a.g.Official = emptyAsNil(e.URL)
+			a.g.RosterTotal = e.RosterTotal
+			a.g.AwardTotal = e.AwardTotal
+			a.g.Divisions = LedgerDivisions(name)
+			a.g.ListKind = LedgerListKind(name)
+			a.g.Roster = a.g.ListKind == LedgerKindRoster
 		}
 		out = append(out, a.g)
 	}
-	// Stable ordering (user decision 2026-11-22): tab section, then launch
-	// year ascending, then 第X届 ordinal (same-year winter editions), then
-	// name.
+	// Stable ordering (user decision 2026-11-26, was ascending): tab section,
+	// then launch year DESC — the archive is read as 「最近一届在前」 — then
+	// 第X届 ordinal DESC (same-year winter editions), then official entry-list
+	// size DESC (the 主题/其他 tab has no ordinal: same-year editions rank by
+	// scale), then name.
 	sort.Slice(out, func(i, j int) bool {
 		si, sj := seriesOrder[out[i].Series], seriesOrder[out[j].Series]
 		if si != sj {
@@ -257,15 +296,36 @@ GROUP BY contest, form`)
 		}
 		yi, yj := out[i].startYear(), out[j].startYear()
 		if yi != yj {
-			return yi < yj
+			return yi > yj
 		}
 		oi, oj := contestOrdinal(out[i].Name), contestOrdinal(out[j].Name)
 		if oi != oj {
-			return oi < oj
+			return oi > oj
+		}
+		ri, rj := deref(out[i].RosterTotal), deref(out[j].RosterTotal)
+		if ri != rj {
+			return ri > rj
 		}
 		return out[i].Name < out[j].Name
 	})
 	return out, nil
+}
+
+// deref reads an optional int as 0 for ordering (absent = last).
+func deref(p *int) int {
+	if p == nil {
+		return 0
+	}
+	return *p
+}
+
+// emptyAsNil turns an unfilled ledger field into an absent JSON field, so the
+// UI can tell 「官方未公示」 from a date.
+func emptyAsNil(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }
 
 // ContestBooks lists one contest's representative books: the per-form head

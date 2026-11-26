@@ -4,12 +4,12 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../widgets/back_to_top.dart';
 import '../widgets/default_cover.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/providers.dart';
 import '../data/api/strata_api.dart';
-import '../widgets/metric_badge.dart';
 
 /// 官方热销信号（docs/sfacg-live-ranks.md）：当前在已缓存官方热销榜上的
 /// nid 集合。被动信号——引擎从不为它抓取，未缓存/离线时为空集（不显示徽标）。
@@ -18,8 +18,24 @@ final _saleSetProvider = FutureProvider.autoDispose<Set<int>>((ref) async {
   return h.api.officialSaleSet();
 });
 
-/// 书籍详情页：种子数据 + 最新观测的 effective 展示，
-/// 附三态刷新（docs/05）与观测历史。
+/// 同作者作品（关联发现横滑）：`/author-books` 是纯 seed 查询（pool=seed，
+/// 无上游请求），离线可用。增益区块——加载中/失败/条数不足整行隐藏。
+final _authorWorksProvider = FutureProvider.autoDispose
+    .family<List<RankItem>, String>((ref, author) async {
+      final h = await ref.read(bootProvider.future);
+      return h.api.authorBooks(author: author, limit: 12);
+    });
+
+/// 相关推荐（docs/related-books.md §4）：`/related` 是纯 seed 分级召回，
+/// 离线可用。后端已排除锚点作者，与「其他作品」天然不相交，无需前端去重。
+final _relatedWorksProvider = FutureProvider.autoDispose
+    .family<List<RankItem>, int>((ref, nid) async {
+      final h = await ref.read(bootProvider.future);
+      return h.api.relatedBooks(nid: nid);
+    });
+
+/// 书籍详情页：种子数据 + 最新观测的 effective 展示，附三态刷新（docs/05）。
+/// 观测历史不在此页（AppBar 动作区入口进 `/book/:nid/data` 二级页）。
 class BookDetailPage extends ConsumerStatefulWidget {
   final int nid;
   const BookDetailPage({super.key, required this.nid});
@@ -29,10 +45,6 @@ class BookDetailPage extends ConsumerStatefulWidget {
 }
 
 class _BookDetailPageState extends ConsumerState<BookDetailPage> {
-  /// 官方兜底封面：部分作品在 CDN 无封面图（Big/{nid}.jpg 404）
-  static const _defaultCover =
-      'https://rs.sfacg.com/web/novel/images/NovelCover/Big/default.jpg';
-
   bool refreshing = false;
   bool _footprintLogged = false;
   // 榜单库外书自动补全（docs/08 §rank-seed）：每次进页至多一次。
@@ -41,27 +53,35 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
   bool _collectTried = false;
   bool _collecting = false;
   String? _collectError;
-  String? refreshMessage;
-  Color? refreshColor;
   // v6 统一 watchlist：onWatch = 在列表里，tracking = 激活（后台抓取）。
   bool onWatch = false;
   bool tracking = false;
-  Future<List<ObservationRow>>? observations;
 
   // 标题区点击复制：title 与 #id 各自可点（用户 2026-11-25）。
   final TapGestureRecognizer _titleTap = TapGestureRecognizer();
   final TapGestureRecognizer _idTap = TapGestureRecognizer();
 
+  // 详情页两屏以上，按 docs/16 长页约定提供回到顶部。
+  final ScrollController _scroll = ScrollController();
+  bool _showTop = false;
+
+  void _onScroll() {
+    final show = _scroll.offset > 500;
+    if (show != _showTop) setState(() => _showTop = show);
+  }
+
   @override
   void dispose() {
     _titleTap.dispose();
     _idTap.dispose();
+    _scroll.dispose();
     super.dispose();
   }
 
   @override
   void initState() {
     super.initState();
+    _scroll.addListener(_onScroll);
     // 以当前书的 watchlist 状态初始化（v6 统一列表，本地查询）。
     ref.read(bootProvider.future).then((h) async {
       final items = await h.api.watchList();
@@ -162,31 +182,33 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
     final detail = ref.watch(bookProvider(widget.nid));
     return Scaffold(
       appBar: AppBar(
-        // 设计稿 03：‹ 返回 + 居中"书籍详情" + 收藏心形
+        // 设计稿 03：‹ 返回 + 居中"书籍详情"。关注/追踪已移到常驻底部
+        // 动作栏（同一动作不在 AppBar 与页内各出现一次）。
         title: const Text('书籍详情'),
         centerTitle: true,
         actions: [
+          IconButton(
+            // 观测历史已从本页正文收进二级页（用户 2026-11-26）：入口
+            // 与其他出口动作同列，不再挤在标题里。
+            icon: const Icon(Icons.timeline),
+            tooltip: '观测数据',
+            onPressed: () => context.push('/book/${widget.nid}/data'),
+          ),
           IconButton(
             // 官方页面直达（docs/15）：系统浏览器打开移动版详情页。
             icon: const Icon(Icons.open_in_new),
             tooltip: '打开官方页面',
             onPressed: _openOfficial,
           ),
-          IconButton(
-            icon: Icon(tracking ? Icons.visibility : Icons.visibility_outlined),
-            tooltip: !onWatch
-                ? '加入追踪'
-                : (tracking ? '停止追踪' : '追踪更新'),
-            onPressed: _toggleTracking,
-          ),
-          IconButton(
-            icon:
-                Icon(onWatch ? Icons.bookmark : Icons.bookmark_add_outlined),
-            tooltip: onWatch ? '取消关注' : '关注此书',
-            onPressed: onWatch ? _removeWatch : _addWatch,
-          ),
         ],
       ),
+      bottomNavigationBar: _actionBar(),
+      floatingActionButton: _showTop
+          ? BackToTop(onTap: () => _scroll.animateTo(
+                0,
+                duration: const Duration(milliseconds: 400),
+                curve: Curves.easeOut))
+          : null,
       body: detail.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => _bookError(context, e),
@@ -204,7 +226,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
           if (!_autoCompleted && b['words'] == null) {
             _autoCompleted = true;
             WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) _refresh(context);
+              if (mounted) _refresh();
             });
           }
           // effective = 种子值被最新本地观测覆盖后的展示值（契约 08）。
@@ -218,19 +240,25 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                 data: (set) => set.contains(widget.nid),
                 orElse: () => false,
               );
-          // 种子 cover_url 存相对路径（无前缀，上游爬虫缺前缀为已知问题）：
-          // 有值拼 CDN 前缀；空值用官方默认封面兜底（用户拍板 2026-11-17）。
-          final raw = s(eff['cover_url'] ?? b['cover_url']);
-          final cover = (raw == null || raw.isEmpty)
-              ? _defaultCover
-              : raw.startsWith('http')
-                  ? raw
-                  : raw.startsWith('//')
-                      ? 'https:$raw'
-                      : 'https://rss.sfacg.com/web/novel/images/NovelCover/Big/$raw';
+          // 封面：URL 归一化与本地占位兜底统一交给 coverImage（种子
+          // cover_url 存相对路径是上游爬虫已知问题，空值走本地占位）。
+          final cover = s(eff['cover_url'] ?? b['cover_url']);
           return ListView(
+            controller: _scroll,
             padding: const EdgeInsets.all(16),
             children: [
+              // 授权作品提示上移到首屏：它改变这本书的全部统计语义，
+              // 不该读到简介以后才看到。
+              if (licensed)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Text(
+                    '授权作品：可搜索、可看详情，不参与榜单与统计',
+                    // 对比度修正（2026-11-26）：原 Colors.deepOrange #FF5722
+                    // 在卡面仅 3.11:1；#C2410F 5.09:1 过 AA。
+                    style: const TextStyle(color: Color(0xFFC2410F)),
+                  ),
+                ),
               // 书头：封面（朱砂错位投影）+ 标题/作者/徽章（设计稿 03）
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -339,84 +367,37 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                children: [
-                  for (final tag in d.tags) Chip(label: Text(tag)),
-                ],
-              ),
+              if (d.tags.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    for (final tag in d.tags) Chip(label: Text(tag)),
+                  ],
+                ),
+              ],
               if (s(eff['summary']) != null) ...[
                 const SizedBox(height: 12),
-                Text('\u4f5c\u54c1\u7b80\u4ecb',
+                Text('作品简介',
                     style: Theme.of(context).textTheme.titleSmall),
                 const SizedBox(height: 4),
-                Text(s(eff['summary'])!,
-                    style: TextStyle(
-                        fontSize: 12, color: scheme.onSurfaceVariant)),
-              ],
-              const SizedBox(height: 12),
-              if (licensed)
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 12),
-                  child: Text(
-                    '授权作品（is_licensed=1）：可搜索、可看详情，不参与榜单与统计',
-                    style: TextStyle(color: Colors.deepOrange),
-                  ),
+                Text(
+                  s(eff['summary'])!,
+                  style: TextStyle(
+                      fontSize: 12, color: scheme.onSurfaceVariant),
                 ),
-              // 核心数据卡（2026-11-26 重设计：六指标格+PR卡+元数据卡合一）
-              _coreDataCard(context, eff, b),
-              _contestCards(context, d, s(b['contest'])),
-              _officialCard(context, d, eff, b),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  FilledButton.icon(
-                    onPressed: refreshing ? null : () => _refresh(context),
-                    icon: refreshing
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Icon(Icons.refresh),
-                    label: const Text('刷新观测'),
-                  ),
-                  const SizedBox(width: 12),
-                  onWatch
-                      ? OutlinedButton.icon(
-                          onPressed: _removeWatch,
-                          icon: const Icon(Icons.bookmark),
-                          label: const Text('已关注'),
-                        )
-                      : OutlinedButton.icon(
-                          onPressed: _addWatch,
-                          icon: const Icon(Icons.bookmark_add_outlined),
-                          label: const Text('关注此书'),
-                        ),
-                ],
-              ),
-              if (refreshMessage != null) ...[
-                const SizedBox(height: 8),
-                Text(refreshMessage!,
-                    style: TextStyle(color: refreshColor)),
               ],
-              const Divider(height: 32),
-              Row(
-                children: [
-                  Expanded(
-                    child: Text('观测历史',
-                        style: Theme.of(context).textTheme.titleMedium),
-                  ),
-                  TextButton.icon(
-                    onPressed: () =>
-                        context.push('/book/${widget.nid}/data'),
-                    icon: const Icon(Icons.timeline, size: 18),
-                    label: const Text('图表'),
-                  ),
-                ],
-              ),
+              // 热度：只有平台四计数——自定义派生指标与同代分位一律不展示
+              // （用户裁定 2026-11-26）。
+              _coreDataCard(context, eff, b),
+              _contestCard(context, s(b['contest'])),
+              // 数据口径与来源：低频字段，默认折叠，排在发现区块之前
+              // （用户 2026-11-26）。
+              _provenanceCard(context, d, eff, b),
+              _relatedRail(context, s(eff['author'] ?? b['author'])),
+              // 相关推荐排在同作者之后：先「这个人还写了什么」，再「这类书还有什么」。
+              _similarRail(context),
               const SizedBox(height: 8),
-              _observationsList(),
             ],
           );
         },
@@ -424,46 +405,52 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
     );
   }
 
-  Future<void> _refresh(BuildContext context) async {
+  Future<void> _refresh() async {
     setState(() => refreshing = true);
+    String msg;
+    Color color;
     try {
       final handle = await ref.read(bootProvider.future);
       final r = await handle.api.refresh(widget.nid);
       final rd = r.detail ?? const <String, dynamic>{};
-      setState(() {
-        switch (r.state) {
-          case 'alive':
-            refreshMessage = '观测已写入（favs=${rd['favs'] ?? rd['markCount']}）';
-            refreshColor = Colors.green;
-          case 'dead':
-            refreshMessage = '官方页面不存在（未写观测）';
-            refreshColor = Colors.deepOrange;
-          case 'zombie':
-            refreshMessage = '该书当前不可阅读（未写观测）';
-            refreshColor = Colors.deepOrange;
-          case 'rate_limited':
-            final retry = rd['retry_after_seconds'] as int? ?? 0;
-            final hours = (retry / 3600).ceil();
-            refreshMessage =
-                '24 小时内已刷新过（约 $hours 小时后可再试，设置中可关闭限流）';
-            refreshColor = Colors.deepOrange;
-          default:
-            refreshMessage = '未知状态：${r.state}';
-            refreshColor = Colors.red;
-        }
-      });
+      switch (r.state) {
+        case 'alive':
+          msg = '观测已写入（favs=${rd['favs'] ?? rd['markCount']}）';
+          // 对比度修正（2026-11-26）：SnackBar 为彩色底 + 白字，
+          // 原 Colors.green #4CAF50 白字仅 2.78:1 → #2E7D32 5.13:1。
+          color = const Color(0xFF2E7D32);
+        case 'dead':
+          msg = '官方页面不存在（未写观测）';
+          // 原 Colors.deepOrange #FF5722 白字 3.16:1 → #C2410F 5.18:1。
+          color = const Color(0xFFC2410F);
+        case 'zombie':
+          msg = '该书当前不可阅读（未写观测）';
+          color = const Color(0xFFC2410F);
+        case 'rate_limited':
+          final retry = rd['retry_after_seconds'] as int? ?? 0;
+          final hours = (retry / 3600).ceil();
+          msg = '24 小时内已刷新过（约 $hours 小时后可再试，设置中可关闭限流）';
+          color = const Color(0xFFC2410F);
+        default:
+          msg = '未知状态：${r.state}';
+          // 原 Colors.red #F44336 白字 3.68:1 → #B3261E 6.54:1。
+          color = const Color(0xFFB3261E);
+      }
       ref.invalidate(bookProvider(widget.nid));
-      setState(() {
-        observations = handle.api.observations(widget.nid);
-      });
     } catch (e) {
-      setState(() {
-        refreshMessage = '刷新失败：$e';
-        refreshColor = Colors.red;
-      });
+      msg = '刷新失败：$e';
+      color = const Color(0xFFB3261E);
     } finally {
-      setState(() => refreshing = false);
+      if (mounted) setState(() => refreshing = false);
     }
+    // 反馈走 SnackBar（docs/16 待办）：底部动作栏常驻后，页内文字提示
+    // 会随内容滚走。
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      backgroundColor: color,
+      duration: const Duration(seconds: 3),
+    ));
   }
 
   /// 加入 watchlist（v6：只存，原「收藏/加入书架」）。
@@ -495,57 +482,6 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
       onWatch = true;
       tracking = next;
     });
-  }
-
-  Widget _observationsList() {
-    observations ??=
-        ref.read(bootProvider.future).then((h) => h.api.observations(widget.nid));
-    return FutureBuilder<List<ObservationRow>>(
-      future: observations,
-      builder: (context, snap) {
-        if (snap.connectionState != ConnectionState.done) {
-          return const Center(child: CircularProgressIndicator());
-        }
-        if (snap.hasError) {
-          return Text('观测加载失败：${snap.error}');
-        }
-        final items = snap.data ?? [];
-        if (items.isEmpty) {
-          return const Text('暂无本地观测，点上方「刷新观测」开始累积',
-              style: TextStyle(color: Colors.grey));
-        }
-        // 2026-11-26 重设计：只常驻最近 3 条，全部进图表页。
-        return Column(
-          children: [
-            for (final o in items.take(3))
-              ListTile(
-                dense: true,
-                title: Text(
-                    '${DateTime.fromMillisecondsSinceEpoch(o.observedAt * 1000)}'
-                    .replaceAll('.000', '')),
-                subtitle: Row(
-                  children: [
-                    MetricBadge(icon: MetricIcons.favs, text: '收藏 ${o.favs ?? '-'}'),
-                    const SizedBox(width: 10),
-                    MetricBadge(icon: MetricIcons.praises, text: '赞 ${o.praises ?? '-'}'),
-                    const SizedBox(width: 10),
-                    MetricBadge(icon: MetricIcons.words, text: '字数 ${o.words ?? '-'}'),
-                  ],
-                ),
-              ),
-            if (items.length > 3)
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton.icon(
-                  onPressed: () => context.push('/book/${widget.nid}/data'),
-                  icon: const Icon(Icons.timeline, size: 18),
-                  label: Text('查看全部 ${items.length} 条'),
-                ),
-              ),
-          ],
-        );
-      },
-    );
   }
 
   String? _num(Object? v) {
@@ -626,94 +562,210 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
     );
   }
 
-  /// 比赛信息卡片（用户 2026-11-25）：只要参加了比赛（books.contest 有
-  /// 届次文本）就出参赛卡；获奖标定（contest_awards）作为附加行。点击
-  /// 跳转赛事档案并定位到对应分类 tab。
-  Widget _contestCards(BuildContext context, BookDetail d, String? contest) {
-    final hasContest = contest != null && contest.isNotEmpty;
-    if (!hasContest && d.awards.isEmpty) return const SizedBox.shrink();
-    return Column(
-      children: [
-        if (hasContest)
-          Card(
-            margin: const EdgeInsets.only(top: 8),
-            child: ListTile(
-              dense: true,
-              leading: Icon(Icons.emoji_events,
-                  color: Colors.amber.shade700, size: 22),
-              title: Text(contest, style: const TextStyle(fontSize: 13.5)),
-              trailing: const Icon(Icons.chevron_right, size: 18),
-              onTap: () => context
-                  .push('/contest-archive?tab=${_contestTab(contest)}'),
-            ),
-          ),
-        for (final aw in d.awards)
-          Card(
-            margin: const EdgeInsets.only(top: 8),
-            child: ListTile(
-              dense: true,
-              leading: Icon(Icons.emoji_events,
-                  color: Colors.amber.shade700, size: 22),
-              title: Text('${aw.edition} ${aw.displayAward}',
-                  style: const TextStyle(fontSize: 13.5)),
-              trailing: const Icon(Icons.chevron_right, size: 18),
-              onTap: () => context
-                  .push('/contest-archive?tab=${_contestTab(aw.edition)}'),
-            ),
-          ),
-      ],
+  /// 上游时间戳是 ISO（`2024-07-04T20:33:36`）：更新留到分钟，建档只到日期。
+  static String? _fmtTs(String? iso, {bool withTime = false}) {
+    if (iso == null || iso.length < 10) return iso;
+    final date = iso.substring(0, 10);
+    if (withTime && iso.length >= 16) return '$date ${iso.substring(11, 16)}';
+    return date;
+  }
+
+  /// 赛事卡：一行一届次（`books.contest`，引擎已归一为届名），点击进该届
+  /// 档案页。不写「参赛」二字（这行存在即已参赛），也不加区块标题（一张卡
+  /// 只装一件事，标题是噪音）；获奖一律不显示：`contest_awards` 911 行里
+  /// 867 行是占位值「待逐档标定」，真获奖名全库只有 42 本，说不出信息量
+  /// （用户裁定 2026-11-26）。
+  Widget _contestCard(BuildContext context, String? contest) {
+    if (contest == null || contest.isEmpty) return const SizedBox.shrink();
+    return Card(
+      margin: const EdgeInsets.only(top: 12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: _contestRow(context, contest),
+      ),
     );
   }
 
-  /// 届次字面 → 赛事档案 tab：春/秋/冬直接认字，其余含 x 归 x征，
-  /// 萌神/无法识别的归「其他」。
-  static String _contestTab(String edition) {
-    if (edition.contains('春')) return 'spring';
-    if (edition.contains('秋')) return 'autumn';
-    if (edition.contains('冬')) return 'winter';
-    if (edition.toLowerCase().contains('x')) return 'x';
-    return 'other';
+  Widget _contestRow(BuildContext context, String edition) {
+    final scheme = Theme.of(context).colorScheme;
+    return ListTile(
+      dense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+      // 朱砂实心旗：金色 token（#A8834F）描线旗在纸面上只有 ~3:1 对比，
+      // 18px 下肉眼看就是灰的（真机截图 2026-11-26），换主色 + 实心才立得住。
+      leading: Icon(Icons.flag, size: 20, color: scheme.primary),
+      title: Text(edition, style: const TextStyle(fontSize: 13)),
+      trailing:
+          Icon(Icons.chevron_right, size: 18, color: scheme.onSurfaceVariant),
+      // 旧版跳分类 tab（tab 猜测器还把 X征 猜成「其他」）：这行说的是
+      // 某一届，就该落在那一届的档案页上。
+      onTap: () => context.push('/contests/${Uri.encodeComponent(edition)}'),
+    );
   }
 
-  /// 官方信息卡（2026-11-26 重设计：元数据卡 17 行 + PR 卡瘦身）——
-  /// 读者向字段常驻（评分/更新/建档/形式/入库估/同人/敏感）；工程口径
-  /// 字段（置信度/分类ID/允许下载/数据来源/数据截止/cqs 状态/featured）
-  /// 收进默认折叠的「详细信息」。PR 移入核心数据卡次级行。
-  Widget _officialCard(BuildContext context, BookDetail d,
+  /// 关联发现（其他作品横滑）：详情页此前除作者名外没有出口。
+  /// 增益区块——加载中 / 失败 / 不足两本就整行隐藏，绝不阻塞主内容。
+  Widget _relatedRail(BuildContext context, String? author) {
+    if (author == null || author.isEmpty) return const SizedBox.shrink();
+    return ref.watch(_authorWorksProvider(author)).maybeWhen(
+          data: (items) {
+            final others =
+                items.where((e) => e.nid != widget.nid).take(8).toList();
+            if (others.length < 2) return const SizedBox.shrink();
+            // 不带本数、不挂「作者页」按钮（作者页入口在上方作者名，
+            // 同一去处不在页内开两个口，用户 2026-11-26）。
+            return _coverRail(context, '其他作品', others);
+          },
+          orElse: () => const SizedBox.shrink(),
+        );
+  }
+
+  /// 相关推荐（同 form × 同世代 × 强标签重叠的分级召回，docs/related-books.md）：
+  /// 与「其他作品」分开成轨——一条讲作者的其它书，一条讲同类作品，
+  /// 混排会让人误以为推荐也是同一作者。增益区块，同样不足两本即隐藏。
+  /// 形态用横式条卡而非纯封面行：推荐的作者全是陌生人，只给封面+书名
+  /// 看不出"推的是谁"，多一行作者·年代才有判断依据（用户 2026-11-26）。
+  Widget _similarRail(BuildContext context) {
+    return ref.watch(_relatedWorksProvider(widget.nid)).maybeWhen(
+          data: (items) {
+            if (items.length < 2) return const SizedBox.shrink();
+            return _infoRail(context, '相关推荐', items);
+          },
+          orElse: () => const SizedBox.shrink(),
+        );
+  }
+
+  /// 封面横滑行（其他作品）：86dp 宽、书名 12px 三行——62dp 时 11px 两行
+  /// 装不下多数书名，一屏截成「转生异世界不吸…」（用户 2026-11-26 裁定放大）。
+  Widget _coverRail(
+      BuildContext context, String title, List<RankItem> items) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 178,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: items.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 10),
+              itemBuilder: (_, i) {
+                final it = items[i];
+                return GestureDetector(
+                  onTap: () => context.push('/book/${it.nid}'),
+                  child: SizedBox(
+                    width: 86,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: SizedBox(
+                            width: 86,
+                            height: 121,
+                            child: coverImage(it.coverUrl, it.nid),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(it.title,
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 12)),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 横式条卡轨（相关推荐）：200dp 宽卡 = 56×78 封面 + 书名最多三行 +
+  /// 一行作者·年代。封面与文字并排，书名才放得下长标题。
+  Widget _infoRail(
+      BuildContext context, String title, List<RankItem> items) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 8),
+          SizedBox(
+            height: 94,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: items.length,
+              separatorBuilder: (_, _) => const SizedBox(width: 10),
+              itemBuilder: (_, i) {
+                final it = items[i];
+                final sub = it.estYear >= 2000
+                    ? '${it.author} · ${it.estYear}'
+                    : it.author;
+                return GestureDetector(
+                  onTap: () => context.push('/book/${it.nid}'),
+                  child: Container(
+                    width: 200,
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: scheme.surface,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: scheme.outline),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(6),
+                          child: SizedBox(
+                            width: 56,
+                            height: 78,
+                            child: coverImage(it.coverUrl, it.nid),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(it.title,
+                                  maxLines: 3,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontSize: 13)),
+                              const SizedBox(height: 4),
+                              Text(sub,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      color: scheme.onSurfaceVariant)),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 数据口径与来源（原「官方信息」卡）：口径与官方时间戳，默认折叠，
+  /// 只在核对时展开；官方评分（point）已废弃不显示。
+  Widget _provenanceCard(BuildContext context, BookDetail d,
       Map<String, dynamic> eff, Map<String, dynamic> b) {
     String? s(Object? v) => v?.toString();
-    Widget row(String label, String? value) {
-      if (value == null || value.isEmpty || value == 'null') {
-        return const SizedBox.shrink();
-      }
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 3),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(label,
-                style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant)),
-            Flexible(
-              child: Text(value,
-                  textAlign: TextAlign.right,
-                  style: const TextStyle(fontSize: 12)),
-            ),
-          ],
-        ),
-      );
-    }
-
-    // 展示层用词（用户裁定 2026-11-26）：数据库枚举/工程口径不直接
-    // 露出——形式用中文名、快照代替数据截止、内置代替种子。
-    const formLabels = {
-      'long': '长篇',
-      'medium': '中篇',
-      'short': '短篇',
-      'dialogue': '对话',
-      'ip_collab': 'IP 联动',
-    };
     final formRaw = s(b['form']);
     return Card(
       margin: const EdgeInsets.only(top: 12),
@@ -722,31 +774,118 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
             .copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
           tilePadding: const EdgeInsets.symmetric(horizontal: 14),
-          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+          childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 10),
           initiallyExpanded: false,
-          title: Text('官方信息',
+          title: Text('数据口径与来源',
               style: Theme.of(context).textTheme.titleSmall),
           children: [
-            // 官方评分（point）不显示：官方已废弃该字段（sfacg-app-api.md），
-            // seed.books 也无此列——废弃数据对用户没有参考价值。
-            row('最后更新', s(eff['updated_at'] ?? b['updated_at'])),
-            row('官方建档时间', s(eff['add_time'])),
-            row('形式', formRaw == null
-                ? null
-                : (formLabels[formRaw] ?? formRaw)),
-            row('入库日期（估计）', s(b['est_date'])),
-            if (eff['category_id'] == 1) row('同人', '是'),
-            if (eff['is_sensitive'] == true) row('敏感标记', '是'),
-            // 工程口径：默认折叠，供核对口径用。
-            row('收录置信度', s(b['est_conf'])),
-            row('cqs 状态', s(b['cqs_state'])),
-            row('featured', b['featured'] == true ? '是（编辑精选）' : null),
-            row('官方分类 ID', s(d.meta?['type_id'] ?? eff['type_id'])),
-            row('允许下载', eff['allow_down'] == true ? '是' : null),
-            row('数据来源', d.source == 'local' ? '本地观测' : '内置'),
-            row('快照', d.dataEnd),
+            _metaRow(context, '数据来源',
+                d.source == 'local' ? '本地观测' : '内置'),
+            _metaRow(context, '快照', d.dataEnd),
+            _metaRow(context, '最后更新',
+                _fmtTs(s(eff['updated_at'] ?? b['updated_at']), withTime: true)),
+            _metaRow(context, '官方建档', _fmtTs(s(eff['add_time']))),
+            _metaRow(context, '形式',
+                formRaw == null ? null : (_formLabels[formRaw] ?? formRaw)),
+            _metaRow(context, '入库日期（估计）', s(b['est_date'])),
+            _metaRow(context, '收录置信度', s(b['est_conf'])),
+            _metaRow(context, 'cqs 状态', s(b['cqs_state'])),
+            _metaRow(context, '官方分类 ID',
+                s(d.meta?['type_id'] ?? eff['type_id'])),
+            _metaRow(context, '同人',
+                eff['category_id'] == 1 ? '是' : null),
+            _metaRow(context, '敏感标记',
+                eff['is_sensitive'] == true ? '是' : null),
+            _metaRow(context, '允许下载',
+                eff['allow_down'] == true ? '是' : null),
+            _metaRow(context, '编辑精选',
+                b['featured'] == true ? '是' : null),
           ],
         ),
+      ),
+    );
+  }
+
+  /// 标签 + 值一行；值为空整行不渲染（缺失字段不留空槽）。
+  Widget _metaRow(BuildContext context, String label, String? value,
+      {Widget? tail}) {
+    if ((value == null || value.isEmpty || value == 'null') && tail == null) {
+      return const SizedBox.shrink();
+    }
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+          Flexible(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (value != null && value.isNotEmpty && value != 'null')
+                  Flexible(
+                      child: Text(value,
+                          textAlign: TextAlign.right,
+                          style: const TextStyle(fontSize: 12))),
+                if (tail != null) ...[const SizedBox(width: 6), tail],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 形式枚举 → 中文展示名（docs/13）；数据库枚举不直接露出。
+  static const _formLabels = {
+    'long': '长篇',
+    'medium': '中篇',
+    'short': '短篇',
+    'dialogue': '对话',
+    'ip_collab': 'IP 联动',
+    'invalid': '无效',
+  };
+
+  /// 常驻底部动作栏：关注 / 追踪 / 刷新观测。此前同一动作在 AppBar 图标
+  /// 和页内按钮行各出现一次，滚动即沉底；收口后主操作始终一键可达。
+  Widget _actionBar() {
+    return SafeArea(
+      minimum: const EdgeInsets.fromLTRB(12, 6, 12, 10),
+      child: Row(
+        children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: onWatch ? _removeWatch : _addWatch,
+              icon: Icon(onWatch ? Icons.bookmark : Icons.bookmark_add_outlined,
+                  size: 18),
+              label: Text(onWatch ? '已关注' : '关注'),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: _toggleTracking,
+              icon:
+                  Icon(tracking ? Icons.visibility : Icons.visibility_outlined,
+                      size: 18),
+              label: Text(tracking ? '停止追踪' : '追踪'),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: FilledButton.icon(
+              onPressed: refreshing ? null : _refresh,
+              icon: refreshing
+                  ? const SizedBox(
+                      width: 15,
+                      height: 15,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.refresh, size: 18),
+              label: const Text('刷新'),
+            ),
+          ),
+        ],
       ),
     );
   }

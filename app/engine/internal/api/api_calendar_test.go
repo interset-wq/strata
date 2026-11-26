@@ -90,6 +90,20 @@ func TestCalendarWeekAndLicensed(t *testing.T) {
 	}
 }
 
+func TestCalendarBounds(t *testing.T) {
+	srv, _ := newTestServer(t)
+	code, body := reqJSON(t, "GET", srv.URL+"/strata/calendar?granularity=month&anchor=2021-01-01", "")
+	if code != http.StatusOK {
+		t.Fatalf("month = %d", code)
+	}
+	b := body["bounds"].(map[string]any)
+	// 左界来自 calendar_universe（2008-01-01 是正版书的日期，库内最早只有
+	// 2010）；右界两层同为 2025-01-01。UI 靠这两个数收导航，不用 gen_max。
+	if b["first"] != "2008-01-01" || b["last"] != "2025-01-01" {
+		t.Fatalf("bounds = %v, want 2008-01-01..2025-01-01", b)
+	}
+}
+
 func TestCalendarValidation(t *testing.T) {
 	srv, _ := newTestServer(t)
 	if code, _ := reqJSON(t, "GET", srv.URL+"/strata/calendar?granularity=hour&anchor=2010-01-01", ""); code != http.StatusBadRequest {

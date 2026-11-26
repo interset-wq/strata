@@ -517,7 +517,7 @@ class StrataApi {
   /// 一届赛事的官方清单一页（形态二，按需）：引擎按 (tag, page) 缓存
   /// （活跃 24h / 已结束 10 年——数据不变）并 join 本地 seed；接口失效回落库内子集
   /// （source=degraded，见 note）。多轨赛事传 division（档案页
-  /// rosterTracks），单轨留空。
+  /// divisions 的 name），单轨传「全部」。
   Future<RosterPage> roster({
     required String contest,
     String division = '',
@@ -631,6 +631,22 @@ class StrataApi {
       'limit': '$limit',
       'offset': '$offset',
       'order': order,
+    });
+    return (body['items'] as List)
+        .map((e) => RankItem.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// 相关推荐（docs/related-books.md §4）：以 [nid] 为锚点的强标签分级召回，
+  /// 纯 seed 本地查询（meta.pool=seed），无上游请求。后端已排除当前书、
+  /// 同作者、跨 form、授权书与无封面书。
+  Future<List<RankItem>> relatedBooks({
+    required int nid,
+    int limit = 8,
+  }) async {
+    final body = await _get('/related', {
+      'nid': '$nid',
+      'limit': '$limit',
     });
     return (body['items'] as List)
         .map((e) => RankItem.fromJson(e as Map<String, dynamic>))
@@ -1103,16 +1119,25 @@ class CalendarResponse {
   final String anchor; // day/week → YYYY-MM-DD（周一）；month → YYYY-MM
   final List<CalendarDay> cells;
 
+  /// 日历真正有数据的日子区间（两层并集：库内 est_date 与全平台
+  /// calendar_universe）。导航边界与默认落点用它，不用 gen_max 推出的
+  /// 12-31（那会让用户翻进空月）。null = 老种子无此字段。
+  final String? firstDated;
+  final String? lastDated;
+
   CalendarResponse.fromJson(Map<String, dynamic> m)
     : granularity = m['granularity'] as String,
       anchor = m['anchor'] as String,
       cells = (m['cells'] as List)
           .map((e) => CalendarDay.fromJson(e as Map<String, dynamic>))
-          .toList();
+          .toList(),
+      firstDated = (m['bounds'] as Map<String, dynamic>?)?['first'] as String?,
+      lastDated = (m['bounds'] as Map<String, dynamic>?)?['last'] as String?;
 }
 
-/// 赛事档案条目（/strata/contests）：赛事级聚合 + 官方日期（用户核实）。
-/// count/forms 只覆盖内置库（seed 收录）作品；库外参赛规模属 P1 清单 API。
+/// 赛事档案条目（/strata/contests）：赛事级聚合 + 引擎内嵌台账（官方规模、
+/// 赛程、URL，零请求）。count/forms 只覆盖内置库（seed 收录）作品；
+/// rosterTotal 是官方清单条目数，两者口径不同，页面必须分开标注。
 class ContestGroup {
   final String name;
   final String series; // x|winter|spring|autumn|other
@@ -1124,6 +1149,7 @@ class ContestGroup {
   final int? year; // 官方启动年份（静态表）
   final String? start; // 官方启动日（无则 null，UI 只显年份）
   final String? end;
+  final String? result; // 官方公布日；晚于今天 = 尚未公布（UI 说「预计」）
   final String? note; // 公布等后续节点
   /// 官方活动页 URL（引擎内嵌已验证静态表，源 docs/contest-roster-harvest
   /// §2）；null = 未验证（页面下线/未取到），档案页隐藏跳转入口、不编造。
@@ -1133,10 +1159,22 @@ class ContestGroup {
   /// 'ip'；'' = 主题类（列表页「其他」tab）。四季系列永无 lane。
   final String lane;
 
-  /// 可拉取官方清单（引擎有已验证 tagId 静态台账）；
-  /// rosterTracks = 已验证赛道（空 = 单轨，roster 请求 division 传空）。
+  /// 可拉取官方清单（引擎内嵌台账有已验证 tagId）；
+  /// divisions = 官方赛项（名称 + 清单条数，台账顺序），roster 请求的
+  /// division 传这里的 name（单轨赛事是「全部」）。
   final bool roster;
-  final List<String> rosterTracks;
+  final List<ContestDivision> divisions;
+
+  /// 官方可拉列表的种类：'roster'（参赛清单）| 'award'（获奖名单，仅
+  /// 一/二/三征——上游把获奖作品挂成独立 tagId 635–649）| ''（无列表）。
+  /// award 事件 roster 恒为 false，UI 只能说「获奖名单」，不能说参赛清单。
+  final String listKind;
+
+  /// 官方规模（台账，零请求）：rosterTotal = 各赛项官方清单条数之和，
+  /// 任一派别未核实即为 null（绝不给半截求和）；awardTotal = 官方获奖名
+  /// 额，只用于预留奖区块，永远不当参赛规模展示。
+  final int? rosterTotal;
+  final int? awardTotal;
 
   ContestGroup({
     required this.name,
@@ -1149,11 +1187,15 @@ class ContestGroup {
     this.year,
     this.start,
     this.end,
+    this.result,
     this.note,
     this.official,
     this.lane = '',
     this.roster = false,
-    this.rosterTracks = const [],
+    this.divisions = const [],
+    this.listKind = '',
+    this.rosterTotal,
+    this.awardTotal,
   });
 
   ContestGroup.fromJson(Map<String, dynamic> m)
@@ -1169,13 +1211,45 @@ class ContestGroup {
       year = (m['year'] as num?)?.toInt(),
       start = m['start'] as String?,
       end = m['end'] as String?,
+      result = m['result'] as String?,
       note = m['note'] as String?,
       official = m['official'] as String?,
       lane = m['lane'] as String? ?? '',
       roster = m['roster'] as bool? ?? false,
-      rosterTracks = (m['roster_tracks'] as List? ?? const [])
-          .map((e) => e as String)
-          .toList();
+      divisions = (m['divisions'] as List? ?? const [])
+          .map((e) => ContestDivision.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      listKind = m['list_kind'] as String? ?? '',
+      rosterTotal = (m['roster_total'] as num?)?.toInt(),
+      awardTotal = (m['award_total'] as num?)?.toInt();
+}
+
+/// 一届赛事的官方赛项（台账）：name 是 roster 请求的 division 参数，
+/// 单轨赛事固定叫「全部」；roster = 该赛项官方清单条数（未核实为 null），
+/// awards = 获奖名额（仅 award 赛项有），kind = 'roster' | 'award'。
+class ContestDivision {
+  final String name;
+  final int tag;
+  final String kind;
+  final int? roster;
+  final int? awards;
+
+  const ContestDivision({
+    required this.name,
+    required this.tag,
+    this.kind = '',
+    this.roster,
+    this.awards,
+  });
+
+  bool get isAward => kind == 'award';
+
+  ContestDivision.fromJson(Map<String, dynamic> m)
+    : name = m['name'] as String,
+      tag = (m['tag'] as num).toInt(),
+      kind = m['kind'] as String? ?? 'roster',
+      roster = (m['roster'] as num?)?.toInt(),
+      awards = (m['awards'] as num?)?.toInt();
 }
 
 /// 官方清单条目（/strata/roster）：清单 6 字段（nid/标题/作者/简介/封面/
@@ -1212,13 +1286,15 @@ class RosterItem {
 }
 
 /// 官方清单页：source=official（上游清单）| degraded（引擎回落库内子集，
-/// 见 note）。库外条目点击复用搜索页链路（/book/{nid} → 详情 + 自动收录）。
+/// 见 note）。list_kind = 'roster' | 'award'（获奖名单）。库外条目点击复用
+/// 搜索页链路（/book/{nid} → 详情 + 自动收录）。
 class RosterPage {
   final String contest;
   final String division;
   final int page;
   final int pages;
   final String source;
+  final String listKind;
   final String? note;
   final List<RosterItem> items;
 
@@ -1233,6 +1309,7 @@ class RosterPage {
       pages = (m['pages'] as num?)?.toInt() ?? 1,
       totalEstimate = (m['total_estimate'] as num?)?.toInt(),
       source = m['source'] as String? ?? 'official',
+      listKind = m['list_kind'] as String? ?? '',
       note = m['note'] as String?,
       items = (m['items'] as List)
           .map((e) => RosterItem.fromJson(e as Map<String, dynamic>))
@@ -1777,34 +1854,52 @@ class ObservationRow {
       source = m['source'] as String?;
 }
 
-/// 一条获奖记录（schema v5，docs/contest-display-in-app.md §6）。
-/// award 为表内原值：44 本已标定届次是具体奖项名，其余 867 本为
-/// 「待逐档标定」占位——展示层统一映射为「征文获奖」，不显示占位原文。
-class Award {
+/// 一届赛事的已核实获奖作品（contest-achieve awards.json，档案页展示）。
+/// awards 是真名数组（金/银/铜/推荐… ，同一 nid 可多奖项），不是旧的
+/// 「待逐档标定」占位；奖项只作展示，不进任何排序或打分（docs/contest-display-in-app.md §6）。
+/// in_seed=false 的书只有标题+奖项（库外获奖也照常列出，不伪造书目字段）。
+class ContestAward {
   final int nid;
-  final String edition;
-  final String award;
-  final String? category;
+  final String title;
+  final List<String> awards;
+  final String contest;
+  final String series;
+  final bool inSeed;
+  final String author;
+  final int? favs;
+  final String? coverUrl;
+  final int? estYear;
+  final String form;
 
-  Award.fromJson(Map<String, dynamic> m)
+  ContestAward.fromJson(Map<String, dynamic> m)
     : nid = m['nid'] as int,
-      edition = m['edition'] as String,
-      award = m['award'] as String,
-      category = m['category'] as String?;
-
-  /// 徽标文案（占位 → 征文获奖，docs §6）。
-  String get displayAward => award == '待逐档标定' ? '征文获奖' : award;
+      title = m['title'] as String,
+      awards = ((m['awards'] as List?) ?? const [])
+          .map((e) => e.toString())
+          .toList(),
+      contest = m['contest'] as String? ?? '',
+      series = m['series'] as String? ?? '',
+      inSeed = m['in_seed'] as bool? ?? false,
+      author = m['author'] as String? ?? '',
+      favs = (m['favs'] as num?)?.toInt(),
+      coverUrl = m['cover_url'] as String?,
+      estYear = (m['est_year'] as num?)?.toInt(),
+      form = m['form'] as String? ?? '';
 }
 
-/// /contests/books 响应：代表作（items）。获奖清单已从档案页移除（用户
-/// 裁定 2026-11-22：参赛者的 top10 大概就是获奖者；获奖徽标保留在书籍
-/// 详情页）；引擎仍返回 awards 键，端上不再解析。
+/// /contests/books 响应：代表作（items）+ 该届已核实获奖作品（awards，
+/// 引擎按奖项等级排序）。获奖区块只在档案页显示；详情页徽标不恢复（用户
+/// 裁定 2026-11-26）。
 class ContestBooks {
   final List<RankItem> items;
+  final List<ContestAward> awards;
 
   ContestBooks.fromJson(Map<String, dynamic> m)
     : items = (m['items'] as List)
           .map((e) => RankItem.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      awards = ((m['awards'] as List?) ?? const [])
+          .map((e) => ContestAward.fromJson(e as Map<String, dynamic>))
           .toList();
 }
 
@@ -1818,9 +1913,6 @@ class BookDetail {
   // meta 非空；种子书无观测时两者皆空，有观测时 local 非空。
   final Map<String, dynamic>? local;
   final Map<String, dynamic>? meta;
-  // 种子侧获奖记录（schema v5）：仅徽标素材，永不参与排序/打分。
-  // 种子书详情恒有该字段（空列表 = 无获奖）；库外 overlay 无此字段。
-  final List<Award> awards;
 
   BookDetail.fromJson(Map<String, dynamic> m)
     : source = m['source'] as String,
@@ -1829,12 +1921,7 @@ class BookDetail {
       tags = (m['tags'] as List).cast<String>(),
       effective = m['effective'] as Map<String, dynamic>?,
       local = m['local'] as Map<String, dynamic>?,
-      meta = m['meta'] as Map<String, dynamic>?,
-      awards =
-          (m['awards'] as List?)
-              ?.map((e) => Award.fromJson(e as Map<String, dynamic>))
-              .toList() ??
-          const [];
+      meta = m['meta'] as Map<String, dynamic>?;
 }
 
 /// 官方榜单一行（三来源共用，docs/sfacg-live-ranks.md）。

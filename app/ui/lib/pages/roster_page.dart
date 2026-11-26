@@ -11,13 +11,19 @@ import '../widgets/default_cover.dart';
 /// 参赛清单（引擎按 (tag, page) 缓存 24h/10 年 + 本地 join），无限滚动；
 /// 保持官方返回顺序，无排序控件（v1 定案）。
 ///
+/// 2026-11-26：一/二/三征的上游 tagId 是获奖作品标签（635-649），同一
+/// 链路改挂「获奖名单 · X」标题——口径永远是获奖名单，不是参赛清单。
+///
 /// 库外作品点击复用搜索页链路（/book/{nid} → 详情覆盖层 + 自动收录）。
 /// 降级（无 tagId / 接口失效）：引擎回落库内子集（source=degraded），
 /// 页面顶部提示条——不空白、不清空已显示值。
 class RosterPage extends ConsumerStatefulWidget {
-  const RosterPage({super.key, required this.contest});
+  const RosterPage({super.key, required this.contest, this.division});
 
   final String contest;
+
+  /// 档案页赛项行带进来的赛道；null = 由本页取台账首轨。
+  final String? division;
 
   @override
   ConsumerState<RosterPage> createState() => _RosterPageState();
@@ -27,7 +33,8 @@ class _RosterPageState extends ConsumerState<RosterPage> {
   final _scroll = ScrollController();
   bool _showTop = false;
 
-  // 赛道（division）在档案组加载后解析：单轨事件 = ''，多轨默认第一轨。
+  // 赛道（division）在档案组加载后解析：取台账首轨名（单轨事件 = 「全部」，
+  // 引擎把它认回空赛道），多轨默认第一轨。
   String _division = '';
   bool _divisionReady = false;
 
@@ -37,6 +44,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
   int _pages = 1;
   int? _totalEstimate; // 当前 division 的官方全量规模估算（约 N 篇）
   String _source = '';
+  String _sourceKind = ''; // 响应里的 list_kind（roster | award）
   String? _note;
   bool _loading = true;
   bool _loadingMore = false;
@@ -46,6 +54,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
   @override
   void initState() {
     super.initState();
+    _division = widget.division ?? '';
     _scroll.addListener(_onScroll);
   }
 
@@ -103,6 +112,7 @@ class _RosterPageState extends ConsumerState<RosterPage> {
         _pages = r.pages;
         _totalEstimate = r.totalEstimate;
         _source = r.source;
+        _sourceKind = r.listKind;
         _note = r.note;
         _loading = false;
         _loadingMore = false;
@@ -144,80 +154,35 @@ class _RosterPageState extends ConsumerState<RosterPage> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    // 档案组提供 divisions（赛道 chip + 官方条数）和 list_kind（参赛清单
+    // 还是获奖名单）；首次解析默认赛道。标题要在 Scaffold 层就定口径，
+    // 所以这里 watch，而不是缩在 body 的 Consumer 里。
+    ContestGroup? group;
+    for (final g
+        in ref.watch(contestArchiveProvider).value ?? const <ContestGroup>[]) {
+      if (g.name == widget.contest) {
+        group = g;
+        break;
+      }
+    }
+    if (group != null && !_divisionReady) {
+      _divisionReady = true;
+      // 档案页赛项行已经指定赛道时不覆盖，只有裸入口才落回首轨。
+      if (_division.isEmpty && group.divisions.isNotEmpty) {
+        _division = group.divisions.first.name;
+      }
+      _loadPage(1, reset: true);
+    }
+    final award = (group?.listKind ?? _sourceKind) == 'award';
+    // 档案组未就绪时先叫「清单」，不抢先说错口径。
+    final title = group == null
+        ? '清单 · ${widget.contest}'
+        : '${award ? '获奖名单' : '官方清单'} · ${widget.contest}';
     return Scaffold(
-      appBar: AppBar(title: Text('官方清单 · ${widget.contest}')),
+      appBar: AppBar(title: Text(title)),
       body: Stack(
         children: [
-          Consumer(builder: (context, ref, _) {
-            // 档案组提供 roster_tracks（赛道 chip）；首次解析默认赛道。
-            ContestGroup? group;
-            for (final g in ref.watch(contestArchiveProvider).value ??
-                const <ContestGroup>[]) {
-              if (g.name == widget.contest) {
-                group = g;
-                break;
-              }
-            }
-            if (group != null && !_divisionReady) {
-              _divisionReady = true;
-              if (group.rosterTracks.isNotEmpty) {
-                _division = group.rosterTracks.first;
-              }
-              _loadPage(1, reset: true);
-            }
-            final tracks = group?.rosterTracks ?? const <String>[];
-            return Column(
-              children: [
-                if (tracks.length > 1)
-                  SizedBox(
-                    height: 44,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      children: [
-                        for (final d in tracks)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: ChoiceChip(
-                              label: Text(d,
-                                  style: const TextStyle(fontSize: 12)),
-                              selected: _division == d,
-                              showCheckmark: false,
-                              onSelected: (_) => _switchDivision(d),
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                if (_totalEstimate != null && _source == 'official')
-                  Padding(
-                    padding: const EdgeInsets.only(left: 16, top: 2),
-                    child: Text(
-                      '约 $_totalEstimate 篇参赛',
-                      style: TextStyle(
-                          fontSize: 11, color: scheme.onSurfaceVariant),
-                    ),
-                  ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 6),
-                  child: SegmentedButton<int>(
-                    segments: const [
-                      ButtonSegment(value: 0, label: Text('全部')),
-                      ButtonSegment(value: 1, label: Text('仅库内')),
-                      ButtonSegment(value: 2, label: Text('仅库外')),
-                    ],
-                    selected: {_filter},
-                    showSelectedIcon: false,
-                    onSelectionChanged: (sel) =>
-                        setState(() => _filter = sel.first),
-                  ),
-                ),
-                if (_source == 'degraded') _noteBar(scheme),
-                Expanded(child: _body(scheme)),
-              ],
-            );
-          }),
+          _content(scheme, group, award),
           if (_showTop)
             Positioned(
               right: 16,
@@ -235,14 +200,76 @@ class _RosterPageState extends ConsumerState<RosterPage> {
     );
   }
 
+  Widget _content(ColorScheme scheme, ContestGroup? group, bool award) {
+    final tracks = group?.divisions ?? const <ContestDivision>[];
+    // 当前赛道的台账条数（2026-11-24 官方清单快照，零请求）。
+    int? ledgerCount;
+    for (final d in tracks) {
+      if (d.name == _division) ledgerCount = d.roster;
+    }
+    return Column(
+      children: [
+        if (tracks.length > 1)
+          SizedBox(
+            height: 44,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              children: [
+                for (final d in tracks)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ChoiceChip(
+                      label: Text(d.name, style: const TextStyle(fontSize: 12)),
+                      selected: _division == d.name,
+                      showCheckmark: false,
+                      onSelected: (_) => _switchDivision(d.name),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        if (_source == 'official' &&
+            (ledgerCount != null || _totalEstimate != null))
+          Padding(
+            padding: const EdgeInsets.only(left: 16, top: 2),
+            // 口径：这是官方清单条目数，不是参赛总量（v1 只接得到清单），
+            // 所以写「清单 N 条」不写「N 篇参赛」；台账缺数时才退回本次
+            // 响应 pages×size 的上界（约）。获奖名单同一口径。
+            child: Text(
+              ledgerCount != null
+                  ? '${award ? '获奖名单' : '官方清单'} $ledgerCount 条'
+                  : '${award ? '获奖名单' : '官方清单'}约 $_totalEstimate 条',
+              style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
+            ),
+          ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          child: SegmentedButton<int>(
+            segments: const [
+              ButtonSegment(value: 0, label: Text('全部')),
+              ButtonSegment(value: 1, label: Text('仅库内')),
+              ButtonSegment(value: 2, label: Text('仅库外')),
+            ],
+            selected: {_filter},
+            showSelectedIcon: false,
+            onSelectionChanged: (sel) => setState(() => _filter = sel.first),
+          ),
+        ),
+        if (_source == 'degraded') _noteBar(scheme, award),
+        Expanded(child: _body(scheme)),
+      ],
+    );
+  }
+
   /// 降级提示条（引擎回落库内子集时显示 note）。
-  Widget _noteBar(ColorScheme scheme) {
+  Widget _noteBar(ColorScheme scheme, bool award) {
     return Container(
       width: double.infinity,
       color: scheme.tertiaryContainer,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Text(
-        _note ?? '仅库内作品，清单不完整',
+        _note ?? (award ? '仅库内作品，获奖名单不完整' : '仅库内作品，清单不完整'),
         style:
             TextStyle(fontSize: 11.5, color: scheme.onTertiaryContainer),
       ),

@@ -3,8 +3,10 @@ package store
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"strconv"
+	"strings"
 	"testing"
 
 	"strata/engine/internal/appshell"
@@ -188,6 +190,14 @@ func sameNidOrder(a, b []FeaturedBook) bool {
 // composed-banner carousel draws from the form's favs head pool with the
 // BannerPick date hash, so consecutive days differ and the same seed
 // stays deterministic.
+func orderKey(items []RankItem) string {
+	ids := make([]string, len(items))
+	for i, it := range items {
+		ids[i] = fmt.Sprintf("%d", it.NID)
+	}
+	return strings.Join(ids, ",")
+}
+
 func TestCoverCarouselDailyRotation(t *testing.T) {
 	st := openTestStore(t)
 	ctx := context.Background()
@@ -211,36 +221,30 @@ func TestCoverCarouselDailyRotation(t *testing.T) {
 	if len(a) != 2 {
 		t.Fatalf("head pool = %d, want 2", len(a))
 	}
-	b, err := st.CoverCarousel(ctx, "long", 100, 20261120)
-	if err != nil {
-		t.Fatal(err)
-	}
-	same := len(a) == len(b)
-	if same {
-		for i := range a {
-			if a[i].NID != b[i].NID {
-				same = false
-				break
-			}
+	// 8 consecutive days must produce more than one distinct ordering
+	// (2026-11-26: with the multiplicative permutation a two-book pool can
+	// coincidentally agree on adjacent days, so assert variety over a week).
+	seen := []string{orderKey(a)}
+	for day := 20261120; day <= 20261126; day++ {
+		b, err := st.CoverCarousel(ctx, "long", 100, int64(day))
+		if err != nil {
+			t.Fatal(err)
 		}
+		seen = append(seen, orderKey(b))
 	}
-	if same {
-		t.Fatalf("consecutive-day orders identical: %+v", a)
+	distinct := map[string]bool{}
+	for _, s := range seen {
+		distinct[s] = true
 	}
+	if len(distinct) < 2 {
+		t.Fatalf("8 consecutive days all identical: %+v", a)
+	}
+	// Same seed stays deterministic.
 	c, err := st.CoverCarousel(ctx, "long", 100, 20261119)
 	if err != nil {
 		t.Fatal(err)
 	}
-	sameAgain := len(a) == len(c)
-	if sameAgain {
-		for i := range a {
-			if a[i].NID != c[i].NID {
-				sameAgain = false
-				break
-			}
-		}
-	}
-	if !sameAgain {
+	if orderKey(c) != orderKey(a) {
 		t.Fatalf("same seed, different order: %+v vs %+v", a, c)
 	}
 }
@@ -476,20 +480,24 @@ VALUES (5555, 'Newly Found', 'Author Z', NULL, 'search', 1700000000)`); err != n
 func TestNormalizeContest(t *testing.T) {
 	cases := map[string]string{
 		// N征系列：篇幅赛项并入母赛事（用户 2026-11-21：只有 x征 多赛项）
-		"六征长篇":      "六征",
-		"六征中篇":      "六征",
-		"六征短篇":      "六征",
-		"十三征长篇":     "十三征",
-		"七征对话类征文长篇": "七征对话类征文",
-		"七征对话类征文短篇": "七征对话类征文",
-		"九征对话小说":    "九征对话小说", // 无篇幅后缀：原样
+		"六征长篇":  "六征",
+		"六征中篇":  "六征",
+		"六征短篇":  "六征",
+		"十三征长篇": "十三征",
+		// 2026-11-26: every N征 division spelling collapses to the edition —
+		// the 对话类/对话 suffixes are tracks of the same event, not events.
+		"七征对话类征文长篇": "七征",
+		"七征对话类征文短篇": "七征",
+		"九征对话小说":    "九征",
+		"十四征-长篇":    "十四征",
 		"十征":        "十征",
-		// 非 N征 赛事：一律原样
+		// 非 N征 赛事：一律原样（除台账里的别名拼写）
 		"冬季征文":       "冬季征文",
 		"怪谈异闻主题征文长篇": "怪谈异闻主题征文长篇",
 		"春节征文长篇":     "春节征文长篇",
 		"2025春季征文":   "2025春季征文",
 		"“超新星杯”短篇大赛": "“超新星杯”短篇大赛",
+		"超新星杯短篇":     "“超新星杯”短篇大赛",
 		"崩坏3征文":      "崩坏3征文",
 		"征长篇":        "征长篇", // 无数字前缀不算 N征
 		"":           "",
@@ -854,7 +862,7 @@ func TestFacets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(ptypes) != 1 || ptypes[0].Name != "免费" || ptypes[0].Count != 15 {
+	if len(ptypes) != 1 || ptypes[0].Name != "免费" || ptypes[0].Count != 16 {
 		t.Fatalf("ptypes: %+v", ptypes)
 	}
 	if len(genres) != 5 || genres[0].Name != "都市" || genres[0].Count != 6 {

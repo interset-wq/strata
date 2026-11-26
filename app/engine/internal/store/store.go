@@ -2550,6 +2550,39 @@ func (s *Store) UniverseCountByDay(ctx context.Context, from, to string) (map[st
 	return out, rows.Err()
 }
 
+// CalendarBounds returns the dates the release calendar can actually show:
+// the union of the in-library layer (books.est_date, same is_licensed filter
+// as BooksByDateRange) and the whole-platform layer (calendar_universe).
+// Both layers must be covered or the UI clips a month that has data on one
+// side; empty tables yield "" and the caller falls back to the manifest
+// generation range.
+func (s *Store) CalendarBounds(ctx context.Context) (first, last string, err error) {
+	var bFirst, bLast, uFirst, uLast sql.NullString
+	if err = s.DB.QueryRowContext(ctx,
+		`SELECT MIN(est_date), MAX(est_date) FROM books WHERE is_licensed = 0`).
+		Scan(&bFirst, &bLast); err != nil {
+		return "", "", err
+	}
+	if err = s.DB.QueryRowContext(ctx,
+		`SELECT MIN(day), MAX(day) FROM calendar_universe`).
+		Scan(&uFirst, &uLast); err != nil {
+		return "", "", err
+	}
+	first, last = bFirst.String, bLast.String
+	for _, v := range []string{uFirst.String, uLast.String} {
+		if v == "" {
+			continue
+		}
+		if first == "" || v < first {
+			first = v
+		}
+		if last == "" || v > last {
+			last = v
+		}
+	}
+	return first, last, nil
+}
+
 // RetentionDays is the observation retention window (docs 02 §3.1:
 // keep 180 days, delete in bulk, no VACUUM).
 const RetentionDays = 180
@@ -3016,21 +3049,13 @@ func strPtr(v sql.NullString) *string {
 	return &s
 }
 
-// NormalizeContest collapses multi-division contest names to the
-// event-level name (user 2026-11-21): only the N征 series is multi-division
-// (六征 splits into 长篇/中篇/短篇; 七征 also carries a 对话类 division), so
-// the trailing 篇幅 suffix is stripped only from N征* names — every other
-// contest name is returned unchanged (it is a single-event contest).
+// NormalizeContest collapses a raw contest label to its event-level name
+// (user 2026-11-21, ledger 2026-11-26): the N征 series strips whatever the
+// site wrote after 征 (六征长篇, 十四征-短篇, 七征-赛道2 …) and every other
+// label resolves through the ledger alias map (2026春征 → 2026春季征文), so
+// one edition is one name wherever the API speaks contest.
 func NormalizeContest(s string) string {
-	if !isZhengEvent(s) {
-		return s
-	}
-	for _, suf := range []string{"长篇", "中篇", "短篇"} {
-		if strings.HasSuffix(s, suf) {
-			return strings.TrimSuffix(s, suf)
-		}
-	}
-	return s
+	return ContestEventName(s)
 }
 
 // isZhengEvent reports whether s starts with a Chinese-numeral 征 event

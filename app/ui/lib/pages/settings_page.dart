@@ -2,10 +2,12 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../core/providers.dart';
 import '../data/api/strata_api.dart';
@@ -43,9 +45,11 @@ final testBookProvider =
   return handle.api.testBook();
 });
 
-/// 设置页：外观、数据状态、口径说明、关于。
+/// 设置页：阅读 / 数据 / 抓取 / 开发者 / 关于五组，一组一张卡、卡内行同构
+/// （2026-11-26 改版：旧页 8 张卡 8 个衬线大标题、两种「数据」同名分组、
+/// 主题独占三行高度，节奏乱；现按分组小标题 + 一行一事收口。
+/// 关于组 = App 信息页 + GitHub 仓库 / Issues + QQ 群号复制）。
 class SettingsPage extends ConsumerWidget {
-
   const SettingsPage({super.key});
 
   @override
@@ -57,189 +61,60 @@ class SettingsPage extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('设置')),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.bookmark_added_outlined),
-              title: const Text('收录的书'),
-              subtitle: const Text('搜索全站自动收录的新书'),
-              onTap: () => context.push('/collected'),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text('外观', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          Card(
-            child: RadioGroup<ThemeMode>(
-              groupValue: mode,
-              onChanged: (m) =>
-                  ref.read(themeModeProvider.notifier).state = m!,
-              child: Column(
-                children: [
-                  RadioListTile<ThemeMode>(
-                    value: ThemeMode.system,
-                    title: const Text('跟随系统'),
-                  ),
-                  RadioListTile<ThemeMode>(
-                    value: ThemeMode.light,
-                    title: const Text('浅色（纸面）'),
-                  ),
-                  RadioListTile<ThemeMode>(
-                    value: ThemeMode.dark,
-                    title: const Text('深色（夜读）'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text('数据', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          Card(
-            child: meta.when(
-              loading: () => const Padding(
-                padding: EdgeInsets.all(16),
-                child: Center(child: CircularProgressIndicator()),
-              ),
-              error: (e, _) => Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text('引擎未就绪：$e',
-                    style: TextStyle(color: scheme.error, fontSize: 12)),
-              ),
-              data: (m) => Padding(
-                padding: const EdgeInsets.all(14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _row(context, '种子版本', m.manifest.seedVersion),
-                    _row(context, '收录书目', '${m.manifest.bookCount} 本'),
-                    _row(context, '数据截止', m.manifest.contentEnd),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text('抓取', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          Card(
-            child: ref.watch(detailRateLimitProvider).when(
-                  loading: () => const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Center(child: CircularProgressIndicator()),
-                  ),
-                  error: (e, _) => Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Text('引擎未就绪：$e',
-                        style: TextStyle(color: scheme.error, fontSize: 12)),
-                  ),
-                  data: (st) => Column(
-                    children: [
-                      SwitchListTile(
-                        title: const Text('详情刷新限流（24 小时一次）'),
-                        subtitle: Text(
-                          st.detailRateLimitEnabled
-                              ? '同一本书每天最多向官方发起一次刷新请求'
-                              : '已关闭——可随时手动刷新（请节制）',
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                        value: st.detailRateLimitEnabled,
-                        onChanged: (v) async {
-                          await ref
-                              .read(bootProvider.future)
-                              .then((h) => h.api.setDetailRateLimitEnabled(v));
-                          ref.invalidate(detailRateLimitProvider);
-                        },
-                      ),
-                      // App API 增强通路（docs/05 §3.5）：开关持久化为引擎
-                      // 设置项；认证是 App 内置凭据自签（sfacg-app-api.md §1），
-                      // 无需用户输入任何凭据。
-                      SwitchListTile(
-                        title: const Text('App API 增强抓取'),
-                        subtitle: Text(
-                          st.appApiEnabled
-                              ? '刷新优先走 App API（精确字数/评分等），失败自动回落'
-                              : '关闭——刷新只走移动版页面（默认）',
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                        value: st.appApiEnabled,
-                        onChanged: (v) async {
-                          await ref
-                              .read(bootProvider.future)
-                              .then((h) => h.api.setAppAPIEnabled(v));
-                          ref.invalidate(detailRateLimitProvider);
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-          ),
-          const SizedBox(height: 16),
-          Text('数据', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.ios_share),
-              title: const Text('导出数据'),
-              subtitle: const Text(
-                  '观察 / 关注 / 浏览足迹 → JSON 文件分享出去备份（无云同步）',
-                  style: TextStyle(fontSize: 12)),
-              onTap: () => _exportData(context, ref),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text('测试工具', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          Card(
-            child: ref.watch(testBookProvider).when(
-              loading: () => const Padding(
-                padding: EdgeInsets.all(16),
-                child: Center(child: CircularProgressIndicator()),
-              ),
-              error: (e, _) => Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text('引擎未就绪：$e',
-                    style: TextStyle(color: scheme.error, fontSize: 12)),
-              ),
-              data: (tb) => Column(
-                children: [
-                  SwitchListTile(
-                    title: const Text('工作台测试书'),
-                    subtitle: Text(
-                      tb.present
-                          ? '已注入「${tb.title}」：${tb.rows ?? 0} 条模拟观测，关注 tab 可见'
-                          : '注入一本带 60 天模拟观测数据的虚构书，用于开发作者工作台',
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                    value: tb.present,
-                    onChanged: (v) async {
-                      final h = await ref.read(bootProvider.future);
-                      try {
-                        if (v) {
-                          await h.api.injectTestBook();
-                        } else {
-                          await h.api.removeTestBook();
-                        }
-                      } finally {
-                        // 成败都重新同步开关状态
-                        ref.invalidate(testBookProvider);
-                      }
-                    },
-                  ),
-                  _seedDateTile(context, ref),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text('口径说明', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          _label(context, '阅读'),
+          _card(context, [
+            _navRow(context,
+                icon: Icons.palette_outlined,
+                title: '主题',
+                value: _modeLabel(mode),
+                onTap: () => _pickTheme(context, ref, mode)),
+          ]),
+          _label(context, '数据'),
+          _card(context, [
+            _valueRow(context, '种子版本', meta, (m) => m.manifest.seedVersion),
+            _valueRow(context, '收录书目', meta,
+                (m) => '${m.manifest.bookCount} 本'),
+            _valueRow(context, '数据截止', meta, (m) => m.manifest.contentEnd),
+          ]),
+          _card(context, [
+            _navRow(context,
+                icon: Icons.bookmark_added_outlined,
+                iconColor: scheme.secondary,
+                title: '收录的书',
+                subtitle: '搜索全站自动收录的新书',
+                onTap: () => context.push('/collected')),
+            _navRow(context,
+                icon: Icons.ios_share,
+                title: '导出数据',
+                subtitle: '观察 / 关注 / 浏览足迹 → JSON 文件备份（无云同步）',
+                onTap: () => _exportData(context, ref)),
+          ]),
+          _label(context, '抓取'),
+          _card(context, [
+            _switchRow(context, ref,
+                title: '详情刷新限流（24 小时一次）',
+                subtitleOf: (st) => st.detailRateLimitEnabled
+                    ? '同一本书每天最多向官方发起一次刷新请求'
+                    : '已关闭——可随时手动刷新（请节制）',
+                watch: detailRateLimitProvider,
+                read: (st) => st.detailRateLimitEnabled,
+                write: (h, v) => h.api.setDetailRateLimitEnabled(v)),
+            _switchRow(context, ref,
+                title: 'App API 增强抓取',
+                subtitleOf: (st) => st.appApiEnabled
+                    ? '刷新优先走 App API（精确字数/评分等），失败自动回落'
+                    : '关闭——刷新只走移动版页面（默认）',
+                watch: detailRateLimitProvider,
+                read: (st) => st.appApiEnabled,
+                // App API 是内置凭据自签（sfacg-app-api.md §1），无需用户输入。
+                write: (h, v) => h.api.setAppAPIEnabled(v)),
+          ]),
+          _card(context, [
+            _fold(context,
+                icon: Icons.info_outline,
+                title: '口径说明',
                 children: [
                   _note(context, '种子数据随 App 一次性分发，长期不更新——'
                       '榜单与统计反映的是数据截止时点的快照'),
@@ -247,23 +122,67 @@ class SettingsPage extends ConsumerWidget {
                       '保留 180 天，不上传任何服务器'),
                   _note(context, '详情刷新走全局限速（1 秒间隔），'
                       '前台操作优先，失败不重试'),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text('关于', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 8),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                ]),
+          ]),
+          _label(context, '开发者'),
+          _card(context, [
+            _fold(context,
+                icon: Icons.developer_mode_outlined,
+                title: '测试工具',
+                // 里面是整行控件，行自带 14 缩进，不再叠加 childrenPadding
+                childrenPadding: const EdgeInsets.only(bottom: 6),
                 children: [
-                  _row(context, '名称', '书层 Strata'),
-                  _row(context, '许可', 'AGPL-3.0'),
-                  _row(context, '数据来源', 'SFACG 菠萝包轻小说公开页面'),
-                ],
+                  _switchRow(context, ref,
+                      title: '工作台测试书',
+                      subtitleOf: (tb) => tb.present
+                          ? '已注入「${tb.title}」：${tb.rows ?? 0} 条模拟观测，关注 tab 可见'
+                          : '注入一本带 60 天模拟观测数据的虚构书，用于开发作者工作台',
+                      watch: testBookProvider,
+                      read: (tb) => tb.present,
+                      write: (h, v) async {
+                        if (v) {
+                          await h.api.injectTestBook();
+                        } else {
+                          await h.api.removeTestBook();
+                        }
+                      }),
+                  _seedDateRow(context, ref),
+                ]),
+          ]),
+          _label(context, '关于'),
+          _card(context, [
+            _navRow(context,
+                icon: Icons.info_outline,
+                title: 'App 信息',
+                subtitle: '版本、许可与数据来源',
+                onTap: () => context.push('/about')),
+            _navRow(context,
+                icon: Icons.code,
+                title: 'GitHub 仓库',
+                subtitle: 'github.com/interset-wq/strata',
+                onTap: () => _openUrl(context,
+                    'https://github.com/interset-wq/strata')),
+            _navRow(context,
+                icon: Icons.bug_report_outlined,
+                title: '问题反馈',
+                subtitle: 'GitHub Issues：报告问题与功能建议',
+                onTap: () => _openUrl(context,
+                    'https://github.com/interset-wq/strata/issues')),
+            _navRow(context,
+                icon: Icons.forum_outlined,
+                title: 'QQ 群',
+                subtitle: '点击复制群号',
+                value: '881041631',
+                showChevron: false,
+                onTap: () => _copyQq(context)),
+          ]),
+          Padding(
+            padding: const EdgeInsets.only(top: 18),
+            child: Center(
+              child: Text(
+                '书层 Strata · AGPL-3.0\n数据来自 SFACG 菠萝包轻小说公开页面',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant, height: 1.6),
               ),
             ),
           ),
@@ -272,21 +191,216 @@ class SettingsPage extends ConsumerWidget {
     );
   }
 
-  // 测试种子日期（用户裁定 2026-11-26）：覆盖轮播/大图精选的日期
-  // 种子键（null = 跟随今天），用于人工验证按日轮换逻辑是否生效。
-  Widget _seedDateTile(BuildContext context, WidgetRef ref) {
+  static String _modeLabel(ThemeMode m) => switch (m) {
+        ThemeMode.system => '跟随系统',
+        ThemeMode.light => '浅色（纸面）',
+        ThemeMode.dark => '深色（夜读）',
+      };
+
+  Future<void> _openUrl(BuildContext context, String url) async {
+    var ok = false;
+    try {
+      ok = await launchUrl(Uri.parse(url),
+          mode: LaunchMode.externalApplication);
+    } catch (_) {}
+    if (!context.mounted || ok) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(const SnackBar(content: Text('无法打开浏览器')));
+  }
+
+  Future<void> _copyQq(BuildContext context) async {
+    await Clipboard.setData(const ClipboardData(text: '881041631'));
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('群号已复制'), duration: Duration(seconds: 1)));
+  }
+
+  /// 主题选择：一行收口，进底部面板选（旧页用整张 RadioListTile 卡占三行）。
+  void _pickTheme(BuildContext context, WidgetRef ref, ThemeMode current) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (final m in ThemeMode.values)
+            ListTile(
+              title: Text(_modeLabel(m)),
+              trailing: m == current
+                  ? Icon(Icons.check, color: Theme.of(ctx).colorScheme.primary)
+                  : null,
+              onTap: () {
+                ref.read(themeModeProvider.notifier).state = m;
+                Navigator.of(ctx).pop();
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _label(BuildContext context, String text) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 14, 4, 6),
+      child: Text(text,
+          style: TextStyle(
+              fontSize: 11,
+              letterSpacing: 1,
+              color: scheme.onSurfaceVariant)),
+    );
+  }
+
+  /// 一组一张卡：卡内只放行，行间一根分隔线（左侧留 14 缩进，不顶到圆角）。
+  Widget _card(BuildContext context, List<Widget> rows) {
+    final scheme = Theme.of(context).colorScheme;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        children: [
+          for (var i = 0; i < rows.length; i++) ...[
+            if (i > 0)
+              Container(
+                height: 1,
+                margin: const EdgeInsets.only(left: 14),
+                color: scheme.outline,
+              ),
+            rows[i],
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// 只读键值行（无图标：三行同图标是噪音，值右对齐即可扫）。
+  /// 引擎未就绪时值位显示状态，不整卡报错（旧页三张卡各转各的圈）。
+  Widget _valueRow(BuildContext context, String label, AsyncValue<Meta> meta,
+      String Function(Meta m) pick) {
+    final scheme = Theme.of(context).colorScheme;
+    final value = meta.maybeWhen(
+        data: pick, orElse: () => meta.isLoading ? '…' : '引擎未就绪');
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+      child: Row(
+        children: [
+          Expanded(
+              child: Text(label,
+                  style: TextStyle(
+                      fontSize: 13, color: scheme.onSurfaceVariant))),
+          Flexible(
+            child: Text(value,
+                textAlign: TextAlign.right,
+                style: const TextStyle(fontSize: 13)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _navRow(BuildContext context,
+      {required IconData icon,
+      required String title,
+      String? subtitle,
+      String? value,
+      bool showChevron = true,
+      Color? iconColor,
+      required VoidCallback onTap}) {
+    final scheme = Theme.of(context).colorScheme;
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+      leading: Icon(icon, size: 20, color: iconColor ?? scheme.onSurfaceVariant),
+      title: Text(title, style: const TextStyle(fontSize: 13)),
+      subtitle: subtitle == null
+          ? null
+          : Text(subtitle, style: const TextStyle(fontSize: 11, height: 1.4)),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (value != null)
+            Text(value, style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+          if (showChevron)
+            Icon(Icons.chevron_right, size: 20, color: scheme.onSurfaceVariant),
+        ],
+      ),
+      onTap: onTap,
+    );
+  }
+
+  /// 开关行：状态说明由数据本身给（开/关各说一句，含注入书名等实况），
+  /// 引擎未就绪时整行禁用。
+  Widget _switchRow<T>(BuildContext context, WidgetRef ref,
+      {required String title,
+      required String Function(T data) subtitleOf,
+      required FutureProvider<T> watch,
+      required bool Function(T data) read,
+      required Future<void> Function(EngineHandle h, bool v) write}) {
+    final async = ref.watch(watch);
+    final on = async.maybeWhen(data: read, orElse: () => false);
+    return SwitchListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+      title: Text(title, style: const TextStyle(fontSize: 13)),
+      subtitle: Text(
+          async.maybeWhen(
+              data: subtitleOf,
+              orElse: () => async.isLoading ? '读取中…' : '引擎未就绪'),
+          style: const TextStyle(fontSize: 11, height: 1.4)),
+      value: on,
+      onChanged: async is AsyncData<T>
+          ? (v) async {
+              final h = await ref.read(bootProvider.future);
+              await write(h, v);
+              ref.invalidate(watch);
+            }
+          : null,
+    );
+  }
+
+  Widget _fold(BuildContext context,
+      {required IconData icon,
+      required String title,
+      required List<Widget> children,
+      EdgeInsets childrenPadding =
+          const EdgeInsets.fromLTRB(14, 0, 14, 12)}) {
+    final scheme = Theme.of(context).colorScheme;
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        initiallyExpanded: false,
+        tilePadding: const EdgeInsets.symmetric(horizontal: 14),
+        childrenPadding: childrenPadding,
+        leading: Icon(icon, size: 20, color: scheme.onSurfaceVariant),
+        title: Text(title, style: const TextStyle(fontSize: 13)),
+        children: children,
+      ),
+    );
+  }
+
+  Widget _note(BuildContext context, String text) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Text(text,
+          style: TextStyle(
+              fontSize: 11, color: scheme.onSurfaceVariant, height: 1.6)),
+    );
+  }
+
+  // 测试种子日期（用户裁定 2026-11-26）：覆盖轮播/大图精选的日期种子键
+  // （null = 跟随今天），用于人工验证按日轮换逻辑是否生效。
+  Widget _seedDateRow(BuildContext context, WidgetRef ref) {
     final override = ref.watch(seedDateOverrideProvider);
     final now = DateTime.now();
+    final set = override != null && override.isNotEmpty;
     return ListTile(
-      leading: const Icon(Icons.date_range),
-      title: const Text('测试种子日期'),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+      leading: const Icon(Icons.date_range, size: 20),
+      title: Text('测试种子日期', style: const TextStyle(fontSize: 13)),
       subtitle: Text(
-        override != null && override.isNotEmpty
-            ? '覆盖为 $override（轮播/大图精选按此日期抽签）'
+        set ? '覆盖为 $override（轮播/大图精选按此日期抽签）'
             : '跟随今天（${now.year * 10000 + now.month * 100 + now.day}）',
-        style: const TextStyle(fontSize: 12),
+        style: const TextStyle(fontSize: 11, height: 1.4),
       ),
-      trailing: (override != null && override.isNotEmpty)
+      trailing: set
           ? TextButton(
               onPressed: () =>
                   ref.read(seedDateOverrideProvider.notifier).state = null,
@@ -304,47 +418,6 @@ class SettingsPage extends ConsumerWidget {
         ref.read(seedDateOverrideProvider.notifier).state =
             '${picked.year * 10000 + picked.month * 100 + picked.day}';
       },
-    );
-  }
-
-  Widget _row(BuildContext context, String label, String value) {
-    final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label,
-              style:
-                  TextStyle(fontSize: 13, color: scheme.onSurfaceVariant)),
-          Flexible(
-            child: Text(value,
-                textAlign: TextAlign.right,
-                style: const TextStyle(fontSize: 13)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _note(BuildContext context, String text) {
-    final scheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 2, right: 8),
-            child: Icon(Icons.info_outline, size: 13, color: scheme.secondary),
-          ),
-          Expanded(
-            child: Text(text,
-                style: TextStyle(
-                    fontSize: 12, color: scheme.onSurfaceVariant, height: 1.5)),
-          ),
-        ],
-      ),
     );
   }
 }

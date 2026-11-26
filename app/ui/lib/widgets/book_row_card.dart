@@ -70,8 +70,10 @@ class BookRowCard extends StatelessWidget {
                             .titleLarge
                             ?.copyWith(fontSize: 13.5)),
                     const SizedBox(height: 3),
+                    // 空值段不显示（2026-11-26）：获奖页库外行没有作者/
+                    // 代系——直接拼接会出「· 未分类 · 0」的坏串。
                     Text(
-                      '${item.author} · ${item.genre ?? '未分类'} · ${item.estYear}',
+                      _subParts(item).join(' · '),
                       style: TextStyle(
                           fontSize: 11, color: scheme.onSurfaceVariant),
                     ),
@@ -84,9 +86,12 @@ class BookRowCard extends StatelessWidget {
                           bookBadge(context, item.contest!,
                               fg: scheme.primary,
                               bg: scheme.primary.withValues(alpha: .12)),
-                        bookBadge(context, '收藏 ${wanText(item.favs)}',
-                            fg: scheme.onSurfaceVariant,
-                            icon: MetricIcons.favs),
+                        // 0 收藏不显示徽标（与 clicks 同口径）：库外书没有
+                        // 种子收藏量，显示「收藏 0」会误导。
+                        if (item.favs > 0)
+                          bookBadge(context, '收藏 ${wanText(item.favs)}',
+                              fg: scheme.onSurfaceVariant,
+                              icon: MetricIcons.favs),
                         // 空值不显示（与 BookRowTile 同口径）：库外/未收录
                         // 书没有种子点击量，显示 0 会误导（用户 2026-11-22
                         // 反馈「全是 0」即由此来）。
@@ -103,6 +108,15 @@ class BookRowCard extends StatelessWidget {
         ),
       ),
     );
+  }
+  /// 作者行的分段文本：空段跳过（库外书无作者/代系），全空显示「—」。
+  static List<String> _subParts(RankItem item) {
+    final parts = <String>[];
+    if (item.author.isNotEmpty) parts.add(item.author);
+    if (item.genre != null && item.genre!.isNotEmpty) parts.add(item.genre!);
+    if (item.estYear > 0) parts.add('${item.estYear}');
+    if (parts.isEmpty) parts.add('—');
+    return parts;
   }
 }
 

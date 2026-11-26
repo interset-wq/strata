@@ -177,7 +177,7 @@ class _Body extends ConsumerWidget {
               data: (res) => Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _awards(context, res.awards),
+                  _awardsEntry(context, res.awards),
                   if (group != null && group.divisions.length > 1)
                     _divisions(context, group),
                   _represents(context, res.items),
@@ -190,81 +190,24 @@ class _Body extends ConsumerWidget {
     );
   }
 
-  /// 已核实获奖作品（官方名单，docs 口径见 contest-display-in-app.md）：
-  /// 按奖项等级排序，奖项只作展示、不进打分。所有行可点 → /book/nid：
-  /// 内置库内书直接出详情；库外书走详情页自动收录链路（用户裁定 2026-11-25
-  /// 收录书与内置书地位均等——app 没有「库外不可看」的概念）。
-  Widget _awards(BuildContext context, List<ContestAward> awards) {
-    final scheme = Theme.of(context).colorScheme;
+  /// 获奖作品入口行（用户裁定 2026-11-26）：不再内联名单——入口行带
+  /// 条数，点行进独立列表页（/contests/awards，通用榜单行渲染）。
+  /// 无已核实获奖时整行不画。
+  Widget _awardsEntry(BuildContext context, List<ContestAward> awards) {
     if (awards.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _section(context, '获奖作品', '官方已核实 · 按奖项等级排序'),
-        Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(
-            border: Border.all(color: scheme.outlineVariant),
-            borderRadius: BorderRadius.circular(8),
+        _rows(context, [
+          _RowData(
+            title: '获奖作品名单',
+            value: '${fmtCount(awards.length)} 条',
+            onTap: () => context.push(
+              '/contests/awards?c=${Uri.encodeComponent(name)}',
+            ),
           ),
-          child: Column(
-            children: [
-              for (final (i, a) in awards.indexed) ...[
-                if (i > 0) Divider(height: 1, color: scheme.outlineVariant),
-                InkWell(
-                  onTap: () => context.push('/book/${a.nid}'),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 10),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        SizedBox(
-                          width: 52,
-                          child: Text(
-                            a.awards.join('·'),
-                            style: TextStyle(
-                              fontSize: 10.5,
-                              color: scheme.secondary,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                a.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 13),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                a.inSeed
-                                    ? '${a.author}${a.estYear != null ? ' · ${a.estYear}' : ''}'
-                                        '${a.favs != null ? ' · 收藏 ${fmtCount(a.favs)}' : ''}'
-                                    : '获奖作品 · 点按自动收录',
-                                style: TextStyle(
-                                  fontSize: 10.5,
-                                  color: scheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Icon(Icons.chevron_right,
-                            size: 18, color: scheme.outline),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
+        ]),
       ],
     );
   }

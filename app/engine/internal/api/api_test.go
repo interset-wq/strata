@@ -214,7 +214,7 @@ func TestErasExplorer(t *testing.T) {
 func TestHealthz(t *testing.T) {
 	srv, _ := newTestServer(t)
 	body := getJSON(t, srv.URL+"/strata/healthz", http.StatusOK)
-	if body["book_count"].(float64) != 16 || body["seed_version"] != "test-1" {
+	if body["book_count"].(float64) != 17 || body["seed_version"] != "test-1" {
 		t.Fatalf("body = %v", body)
 	}
 }
