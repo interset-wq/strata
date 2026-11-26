@@ -135,19 +135,26 @@ jobs:
           git commit -m "ci: failure log [skip ci]" || true
           git push || true
 
-      - name: Create pre-release
+      - name: Create release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Re-publishes are expected: when the tag was re-pointed, the
-          # release already exists and `gh release create` fails — fall back
-          # to replacing the APK asset (--clobber), then re-assert the
-          # pre-release flag (an older publish may have lost it).
+          # Both shapes are supported (2026-11-26): pre-release tags
+          # (vX.Y.Z-pre.N) publish as pre-releases; plain version tags
+          # publish as full releases. Re-publishes are expected: when the
+          # tag was re-pointed, the release already exists and
+          # `gh release create` fails — fall back to replacing the APK
+          # asset (--clobber).
+          case "$GITHUB_REF_NAME" in
+            *pre*)
+              flags=(--prerelease); suffix=" (Android pre-release)";;
+            *)
+              flags=(); suffix=" (Android)";;
+          esac
           gh release create "$GITHUB_REF_NAME" \
             app/ui/build/app/outputs/flutter-apk/app-release.apk \
-            --title "$GITHUB_REF_NAME (Android pre-release)" \
+            --title "$GITHUB_REF_NAME$suffix" \
             --notes "Embedded Go engine + Flutter shell (arm64, Android 8+). Bundled seed: see app/ui/assets/manifest.json for the exact version and book count." \
-            --prerelease \
+            "${flags[@]}" \
           || gh release upload "$GITHUB_REF_NAME" \
             app/ui/build/app/outputs/flutter-apk/app-release.apk --clobber
-          gh release edit "$GITHUB_REF_NAME" --prerelease
