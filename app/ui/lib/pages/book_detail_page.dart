@@ -586,77 +586,40 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
   }
 
   /// 核心数据卡（2026-11-26 重设计：六指标格 + PR 卡 + 元数据卡的数字
-  /// 部分三卡合一）：主行 = 平台累计指标（点击/收藏/点赞/字数）；
-  /// 次级行 = 端上可算的派生指标（PR/CQS/CPS/长度归一），null 自动隐藏。
+  /// 部分三卡合一）：主行 = 平台累计指标（点击/收藏/点赞/字数）。
+  /// 自定义派生指标（PR/CQS/CPS/长度归一）不展示——用户看不懂
+  /// （用户裁定 2026-11-26）。
   Widget _coreDataCard(BuildContext context, Map<String, dynamic> eff,
       Map<String, dynamic> b) {
     String v(String key) => _num(eff[key] ?? b[key]) ?? '—';
     final scheme = Theme.of(context).colorScheme;
-    String? opt(String key) {
-      final raw = b[key]?.toString();
-      if (raw == null || raw.isEmpty || raw == 'null') return null;
-      return raw;
-    }
-
-    final secondary = [
-      if (opt('pr') != null) ('PR 赞/藏', opt('pr')!),
-      if (opt('cqs') != null) ('CQS', opt('cqs')!),
-      if (opt('cps') != null) ('CPS', opt('cps')!),
-      if (opt('len_norm') != null) ('长度归一', opt('len_norm')!),
-    ];
     return Card(
       margin: const EdgeInsets.only(top: 12),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-        child: Column(
+        child: Row(
           children: [
-            Row(
-              children: [
-                for (final (label, key) in const [
-                  ('点击', 'clicks'),
-                  ('收藏', 'favs'),
-                  ('点赞', 'praises'),
-                  ('字数', 'words'),
-                ])
-                  Expanded(
-                    child: Column(
-                      children: [
-                        Text(label,
-                            style: TextStyle(
-                                fontSize: 10,
-                                color: scheme.onSurfaceVariant)),
-                        const SizedBox(height: 3),
-                        Text(v(key),
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleLarge
-                                ?.copyWith(fontSize: 15)),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-            if (secondary.isNotEmpty) ...[
-              const Divider(height: 16),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                child: Row(
+            for (final (label, key) in const [
+              ('点击', 'clicks'),
+              ('收藏', 'favs'),
+              ('点赞', 'praises'),
+              ('字数', 'words'),
+            ])
+              Expanded(
+                child: Column(
                   children: [
-                    for (final (label, value) in secondary) ...[
-                      Text('$label ',
-                          style: TextStyle(
-                              fontSize: 10, color: scheme.onSurfaceVariant)),
-                      Text(value,
-                          style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: scheme.secondary)),
-                      const SizedBox(width: 12),
-                    ],
+                    Text(label,
+                        style: TextStyle(
+                            fontSize: 10, color: scheme.onSurfaceVariant)),
+                    const SizedBox(height: 3),
+                    Text(v(key),
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleLarge
+                            ?.copyWith(fontSize: 15)),
                   ],
                 ),
               ),
-            ],
           ],
         ),
       ),
@@ -742,6 +705,17 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
       );
     }
 
+    // 展示层用词（用户裁定 2026-11-26）：数据库枚举/工程口径不直接
+    // 露出——形式用中文名、快照代替数据截止、内置代替种子。
+    const formLabels = {
+      'long': '长篇',
+      'medium': '中篇',
+      'short': '短篇',
+      'dialogue': '对话',
+      'ip_collab': 'IP 联动',
+    };
+    final formRaw = s(b['form']);
+    final point = double.tryParse(s(eff['point']) ?? '');
     return Card(
       margin: const EdgeInsets.only(top: 12),
       child: Theme(
@@ -754,10 +728,14 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
           title: Text('官方信息',
               style: Theme.of(context).textTheme.titleSmall),
           children: [
-            row('官方评分', s(eff['point'])),
-            row('官方更新时间', s(eff['updated_at'] ?? b['updated_at'])),
+            // 评分美观显示：保留 2 位小数。
+            if (point != null)
+              row('官方评分', point.toStringAsFixed(2)),
+            row('最后更新', s(eff['updated_at'] ?? b['updated_at'])),
             row('官方建档时间', s(eff['add_time'])),
-            row('形式', s(b['form'])),
+            row('形式', formRaw == null
+                ? null
+                : (formLabels[formRaw] ?? formRaw)),
             row('入库日期（估计）', s(b['est_date'])),
             if (eff['category_id'] == 1) row('同人', '是'),
             if (eff['is_sensitive'] == true) row('敏感标记', '是'),
@@ -767,8 +745,8 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
             row('featured', b['featured'] == true ? '是（编辑精选）' : null),
             row('官方分类 ID', s(d.meta?['type_id'] ?? eff['type_id'])),
             row('允许下载', eff['allow_down'] == true ? '是' : null),
-            row('数据来源', d.source == 'local' ? '本地观测' : '种子'),
-            row('数据截止', d.dataEnd),
+            row('数据来源', d.source == 'local' ? '本地观测' : '内置'),
+            row('快照', d.dataEnd),
           ],
         ),
       ),
