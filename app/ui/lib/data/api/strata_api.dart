@@ -500,6 +500,15 @@ class StrataApi {
         .toList();
   }
 
+  /// 关注通知（watch_events，user.db v12）：未读数 + 事件列表（新→旧，
+  /// 已 join seed 书名）。全部已读幂等。
+  Future<Map<String, dynamic>> notifications() async =>
+      await _get('/notifications') as Map<String, dynamic>;
+
+  Future<void> notificationsRead() async {
+    await _post('/notifications/read');
+  }
+
   /// 一届赛事的代表作 + 该届库内获奖作品（schema v5）：各 form 头部按
   /// favs（经典累计，NULL 殿后，E.30），per 限每形态条数；奖项字段
   /// 同样不参与排序。

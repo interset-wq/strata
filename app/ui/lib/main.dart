@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'app/router.dart';
 import 'app/theme.dart';
+import 'core/notify.dart';
 import 'core/providers.dart';
 
 void main() {
@@ -15,6 +16,8 @@ class StrataApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeModeProvider);
+    // 关注通知轮询（boot 就绪后立即拉一次，之后每 5 分钟一次）。
+    ref.watch(notificationsPollerProvider);
     final online = ref.watch(connectivityProvider).maybeWhen(
           data: isOnline,
           // Don't flash a false offline state while the first check is

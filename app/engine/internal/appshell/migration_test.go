@@ -53,9 +53,10 @@ func TestUserDBUpgradesOldVersion(t *testing.T) {
 	// renames shelf_lists to watch_lists (count-neutral); v7 adds
 	// author_profiles (on-demand author data, docs/author-profile-
 	// on-demand §4); v9 adds official_ranks_cache (persistent
-	// official-boards cache, docs/sfacg-live-ranks.md).
-	if tables != 14 {
-		t.Fatalf("tables = %d, want 14", tables)
+	// official-boards cache, docs/sfacg-live-ranks.md); v12 adds
+	// watch_events (follow-tab notifications).
+	if tables != 15 {
+		t.Fatalf("tables = %d, want 15", tables)
 	}
 }
 

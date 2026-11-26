@@ -7,7 +7,10 @@ import (
 	"path/filepath"
 )
 
-// userSchemaVersion: v11 adds the runtime-metric columns to discovered
+// userSchemaVersion: v12 adds watch_events (follow-tab notifications:
+// one row per tracked book's observed change — words/favs/status —
+// written by the background watcher, surfaced via /strata/notifications).
+// v11 adds the runtime-metric columns to discovered
 // (est_year/form/cqs/cps/len_norm — app/docs/18-runtime-metrics.md P2,
 // computed once when a discovered row gains detail numbers). v7 adds
 // author_profiles (on-demand author data, docs/author-profile-on-demand
@@ -16,7 +19,7 @@ import (
 // works list replays on cache hits). v9/v10 were the retired
 // adaptation-works columns; the number stays at 10 so existing user.db
 // files keep opening without a downgrade.
-const userSchemaVersion = 11
+const userSchemaVersion = 12
 
 // userSchemaV5 is the v5-era full user.db DDL: additive across
 // versions (v1 → v5), replayed idempotently on every schema pass — a
@@ -237,6 +240,23 @@ func EnsureUserDB(path string) error {
 	// 写不进（2026-11-25 用户报告的"收录后没有计算值"根因）。
 	if err := migrateDiscoveredMetrics(db); err != nil {
 		return fmt.Errorf("migrate discovered metrics: %w", err)
+	}
+	// v12: watch_events (follow-tab notifications, 2026-11-26) — one row per
+	// tracked book's observed change (words/favs/status), written by the
+	// background watcher, surfaced via /strata/notifications. Idempotent
+	// replay like the discovered metric columns: version-gated databases
+	// where the bump was only a number must still get the table.
+	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS watch_events(
+  nid        INTEGER NOT NULL,
+  kind       TEXT NOT NULL,
+  old_value  TEXT,
+  new_value  TEXT,
+  created_at INTEGER NOT NULL,
+  read       INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY(nid, kind, created_at)
+);
+CREATE INDEX IF NOT EXISTS idx_watch_events_read ON watch_events(read, created_at);`); err != nil {
+		return fmt.Errorf("migrate watch_events: %w", err)
 	}
 	if err := migrateBookMetaMetrics(db); err != nil {
 		return fmt.Errorf("migrate book_meta metrics: %w", err)

@@ -12,6 +12,7 @@ import '../pages/browse_page.dart';
 import '../pages/contest_archive_page.dart';
 import '../pages/contest_awards_page.dart';
 import '../pages/contest_list_page.dart';
+import '../pages/notifications_page.dart';
 import '../pages/roster_page.dart';
 import '../pages/classic_list_page.dart';
 import '../pages/discover_page.dart';
@@ -168,6 +169,11 @@ final router = GoRouter(
         // 档案页赛项行直达该赛道（不传则页面落回台账首轨）。
         division: state.uri.queryParameters['d'],
       ),
+    ),
+    // 关注通知列表（2026-11-26）：关注页铃铛入口；静态段先于 /contests/:name。
+    GoRoute(
+      path: '/notifications',
+      builder: (_, _) => const NotificationsPage(),
     ),
     // 获奖作品列表（2026-11-26）：档案页入口行的目的地；静态段同款
     // 必须先于 /contests/:name 注册。

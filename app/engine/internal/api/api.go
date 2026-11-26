@@ -152,6 +152,8 @@ func NewServer(s *store.Store) *Server {
 	group.GET("/books/:nid/observations", srv.observations)
 	group.GET("/watchlist", srv.watchList)
 	group.GET("/watchlist/heatmap", srv.watchHeatmap)
+	group.GET("/notifications", srv.notificationsList)
+	group.POST("/notifications/read", srv.notificationsRead)
 	group.GET("/eras-explorer", srv.erasExplorer)
 	group.POST("/watchlist/:nid", srv.watchAdd)
 	group.PUT("/watchlist/:nid", srv.watchSetActive)
@@ -1313,6 +1315,31 @@ func (s *Server) recommend(c *gin.Context) {
 		"items":       items,
 		"next_cursor": next,
 	})
+}
+
+// notificationsList returns follow events (watch_events, user.db v12)
+// newest first, with the unread count for the bell badge.
+func (s *Server) notificationsList(c *gin.Context) {
+	items, err := s.store.Notifications(c.Request.Context(), 200)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	unread, err := s.store.UnreadNotifications(c.Request.Context())
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"unread": unread, "items": items})
+}
+
+// notificationsRead flips every follow event to read (idempotent).
+func (s *Server) notificationsRead(c *gin.Context) {
+	if err := s.store.MarkNotificationsRead(c.Request.Context(), time.Now().Unix()); err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
 // watchList returns the author's tracked books joined with seed metadata.

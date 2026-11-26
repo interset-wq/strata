@@ -61,7 +61,17 @@ class _WatchlistPageState extends ConsumerState<WatchlistPage> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('我的关注')),
+      appBar: AppBar(
+        title: const Text('我的关注'),
+        // 关注通知入口（2026-11-26）：系统通知/cron 抓到的更新事件列表。
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.notifications_outlined),
+            tooltip: '关注通知',
+            onPressed: () => context.push('/notifications'),
+          ),
+        ],
+      ),
       body: FutureBuilder<List<WatchItem>>(
         future: _items,
         builder: (context, snap) {
