@@ -115,11 +115,11 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final banners = ref.watch(bannerProvider(carouselProviderKey(_form)));
+    final banners = ref.watch(bannerProvider(carouselProviderKey(ref, _form)));
     return Scaffold(
       body: RefreshIndicator(
         onRefresh: () async {
-          ref.invalidate(bannerProvider(carouselProviderKey(_form)));
+          ref.invalidate(bannerProvider(carouselProviderKey(ref, _form)));
           ref.invalidate(boardProvider);
           ref.invalidate(serialShowcaseProvider(_form));
           ref.invalidate(finishedShowcaseProvider(_form));
@@ -129,8 +129,8 @@ class _HomePageState extends ConsumerState<HomePage> {
           ref.invalidate(yearGroupsProvider);
           ref.invalidate(genreGroupsProvider);
           ref.invalidate(formRandomPreviewProvider);
-          ref.invalidate(largeImageProvider(carouselDayKey()));
-          await ref.read(bannerProvider(carouselProviderKey(_form)).future);
+          ref.invalidate(largeImageProvider(carouselDayKey(ref)));
+          await ref.read(bannerProvider(carouselProviderKey(ref, _form)).future);
         },
         child: SafeArea(bottom: false, child: _buildBody(context, banners)),
       ),
@@ -396,7 +396,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           child: Center(
             child: TextButton(
               onPressed: () =>
-                  ref.invalidate(bannerProvider(carouselProviderKey(_form))),
+                  ref.invalidate(bannerProvider(carouselProviderKey(ref, _form))),
               child: const Text('轮播加载失败，点按重试'),
             ),
           ),
@@ -879,7 +879,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   // 对话/短篇 tab 轮播：无 featured 定制图，封面实时合成纸墨 banner
   // （见 widgets/cover_banner.dart）。静态收藏序（不随日期变），按 form 分池。
   Widget _coverBannerCarousel(String form) {
-    final list = ref.watch(coverCarouselProvider(carouselProviderKey(form)));
+    final list = ref.watch(coverCarouselProvider(carouselProviderKey(ref, form)));
     return list.when(
       loading: () => const Padding(
         padding: EdgeInsets.symmetric(horizontal: 16),
@@ -1095,7 +1095,7 @@ class _LargeImageSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final items = ref.watch(largeImageProvider(carouselDayKey()));
+    final items = ref.watch(largeImageProvider(carouselDayKey(ref)));
     return items.when(
       loading: () => const SizedBox(
         height: 120,

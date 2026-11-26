@@ -202,28 +202,33 @@ class SettingsPage extends ConsumerWidget {
                 child: Text('引擎未就绪：$e',
                     style: TextStyle(color: scheme.error, fontSize: 12)),
               ),
-              data: (tb) => SwitchListTile(
-                title: const Text('工作台测试书'),
-                subtitle: Text(
-                  tb.present
-                      ? '已注入「${tb.title}」：${tb.rows ?? 0} 条模拟观测，关注 tab 可见'
-                      : '注入一本带 60 天模拟观测数据的虚构书，用于开发作者工作台',
-                  style: const TextStyle(fontSize: 12),
-                ),
-                value: tb.present,
-                onChanged: (v) async {
-                  final h = await ref.read(bootProvider.future);
-                  try {
-                    if (v) {
-                      await h.api.injectTestBook();
-                    } else {
-                      await h.api.removeTestBook();
-                    }
-                  } finally {
-                    // 成败都重新同步开关状态
-                    ref.invalidate(testBookProvider);
-                  }
-                },
+              data: (tb) => Column(
+                children: [
+                  SwitchListTile(
+                    title: const Text('工作台测试书'),
+                    subtitle: Text(
+                      tb.present
+                          ? '已注入「${tb.title}」：${tb.rows ?? 0} 条模拟观测，关注 tab 可见'
+                          : '注入一本带 60 天模拟观测数据的虚构书，用于开发作者工作台',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    value: tb.present,
+                    onChanged: (v) async {
+                      final h = await ref.read(bootProvider.future);
+                      try {
+                        if (v) {
+                          await h.api.injectTestBook();
+                        } else {
+                          await h.api.removeTestBook();
+                        }
+                      } finally {
+                        // 成败都重新同步开关状态
+                        ref.invalidate(testBookProvider);
+                      }
+                    },
+                  ),
+                  _seedDateTile(context, ref),
+                ],
               ),
             ),
           ),
@@ -264,6 +269,41 @@ class SettingsPage extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+
+  // 测试种子日期（用户裁定 2026-11-26）：覆盖轮播/大图精选的日期
+  // 种子键（null = 跟随今天），用于人工验证按日轮换逻辑是否生效。
+  Widget _seedDateTile(BuildContext context, WidgetRef ref) {
+    final override = ref.watch(seedDateOverrideProvider);
+    final now = DateTime.now();
+    return ListTile(
+      leading: const Icon(Icons.date_range),
+      title: const Text('测试种子日期'),
+      subtitle: Text(
+        override != null && override.isNotEmpty
+            ? '覆盖为 $override（轮播/大图精选按此日期抽签）'
+            : '跟随今天（${now.year * 10000 + now.month * 100 + now.day}）',
+        style: const TextStyle(fontSize: 12),
+      ),
+      trailing: (override != null && override.isNotEmpty)
+          ? TextButton(
+              onPressed: () =>
+                  ref.read(seedDateOverrideProvider.notifier).state = null,
+              child: const Text('恢复今天'),
+            )
+          : null,
+      onTap: () async {
+        final picked = await showDatePicker(
+          context: context,
+          initialDate: now,
+          firstDate: DateTime(2020),
+          lastDate: DateTime(now.year + 1),
+        );
+        if (picked == null) return;
+        ref.read(seedDateOverrideProvider.notifier).state =
+            '${picked.year * 10000 + picked.month * 100 + picked.day}';
+      },
     );
   }
 

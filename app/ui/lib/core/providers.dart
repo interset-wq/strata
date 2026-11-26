@@ -87,16 +87,25 @@ bool carouselIsFixed(String form) {
   return carouselForm == 'medium' || carouselForm == 'ip_collab';
 }
 
+/// 测试种子日期覆盖（YYYYMMDD 字符串；null = 跟随今天）。设置页
+/// 「测试种子日期」选择器写入——用于人工验证轮播/大图精选的按日
+/// 轮换逻辑（用户裁定 2026-11-26）。
+final seedDateOverrideProvider = StateProvider<String?>((ref) => null);
+
 /// 本地日期键（YYYYMMDD）：轮播随机种子的来源。必须放进 family 键——
 /// 常驻 family 的 `DateTime.now()` 只在进程首次求值时捕获一次，进程活过
 /// 午夜就永远停在昨天的抽签上（2026-11-23 用户报告的回归）。
-String carouselDayKey() {
+/// 设置页可用 seedDateOverrideProvider 覆盖（测试用）。
+String carouselDayKey(WidgetRef ref) {
+  final override = ref.watch(seedDateOverrideProvider);
+  if (override != null && override.isNotEmpty) return override;
   final now = DateTime.now();
   return '${now.year * 10000 + now.month * 100 + now.day}';
 }
 
 /// 轮播 provider 的 family 键：form + 当日日期键，新的一天产生新键。
-String carouselProviderKey(String form) => '$form@${carouselDayKey()}';
+String carouselProviderKey(WidgetRef ref, String form) =>
+    '$form@${carouselDayKey(ref)}';
 
 final bannerProvider = FutureProvider.autoDispose
     .family<List<FeaturedItem>, String>((ref, formDay) async {
