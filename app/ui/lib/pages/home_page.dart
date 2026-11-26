@@ -129,6 +129,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           ref.invalidate(yearGroupsProvider);
           ref.invalidate(genreGroupsProvider);
           ref.invalidate(formRandomPreviewProvider);
+          ref.invalidate(largeImageProvider(carouselDayKey()));
           await ref.read(bannerProvider(carouselProviderKey(_form)).future);
         },
         child: SafeArea(bottom: false, child: _buildBody(context, banners)),
@@ -1094,7 +1095,7 @@ class _LargeImageSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final items = ref.watch(largeImageProvider);
+    final items = ref.watch(largeImageProvider(carouselDayKey()));
     return items.when(
       loading: () => const SizedBox(
         height: 120,

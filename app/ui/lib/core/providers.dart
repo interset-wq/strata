@@ -258,16 +258,19 @@ final genreGroupsProvider = FutureProvider.family<GenreGroupsResult, String>((
 
 /// 大图精选：全形态 featured 池的每日后段（文字在图下方，点图全屏查看）。
 /// 不受首页形态 tab 影响，也不与形态轮播共用池子。
-final largeImageProvider = FutureProvider<List<FeaturedItem>>((ref) async {
-  final handle = await ref.watch(bootProvider.future);
-  final now = DateTime.now();
-  final seed = now.year * 10000 + now.month * 100 + now.day;
-  return handle.api.banners(
-    seed: seed,
-    limit: largeImageCount,
-    offset: bannerCarouselCount,
-  );
-});
+/// 键必须含日期（与轮播 carouselProviderKey 同款）：常驻 provider 的
+/// DateTime.now() 只在进程首次求值时捕获一次，进程活过午夜就永远停在
+/// 旧种子上（2026-11-26 用户报告的多天不更新回归；2026-11-23 轮播同款）。
+final largeImageProvider = FutureProvider.autoDispose
+    .family<List<FeaturedItem>, String>((ref, dayKey) async {
+      final handle = await ref.watch(bootProvider.future);
+      final seed = int.parse(dayKey);
+      return handle.api.banners(
+        seed: seed,
+        limit: largeImageCount,
+        offset: bannerCarouselCount,
+      );
+    });
 
 /// 图片全屏查看器的当前图集（首页大图精选打开查看器前写入）。
 final imageViewerProvider = StateProvider<List<FeaturedItem>>(
