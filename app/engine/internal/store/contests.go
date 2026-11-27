@@ -335,13 +335,18 @@ func emptyAsNil(s string) *string {
 // 形态一). perForm caps each form; the covers overlay applies (docs/05 §3).
 func (s *Store) ContestBooks(ctx context.Context, name string, perForm int) ([]RankItem, error) {
 	clause, args := contestEventMatch("b.contest", name)
+	// 2026-11-27: rows carry the full classic-ranking field set
+	// (status/price_type/words/praises added) — the shared BookRowTile
+	// renders the status/price badges and the metric strip, which the old
+	// lightweight SELECT silently dropped.
 	query := `
 SELECT b.nid, b.title, b.author, b.genre, b.est_year, b.clicks, b.favs,
-       b.contest, b.form,
+       b.contest, b.form, b.status, b.price_type, b.words, b.praises,
        COALESCE(c.cover, NULLIF(b.cover_url, '')) AS cover_url
 FROM (
   SELECT b.nid, b.title, b.author, b.genre, b.est_year, b.clicks, b.favs,
-         b.contest, b.form, b.cover_url,
+         b.contest, b.form, b.status, b.price_type, b.words, b.praises,
+         b.cover_url,
          ROW_NUMBER() OVER (PARTITION BY b.form
            ORDER BY (b.favs IS NULL) ASC, b.favs DESC, b.nid) AS rn
   FROM seed.books b
@@ -365,10 +370,15 @@ ORDER BY (b.favs IS NULL) ASC, b.favs DESC, b.nid`
 			gen     sql.NullString
 			clicks  sql.NullInt64
 			favs    sql.NullInt64
+			status  sql.NullString
+			price   sql.NullString
+			words   sql.NullInt64
+			praises sql.NullInt64
 			contest sql.NullString
 		)
 		if err := rows.Scan(&item.NID, &item.Title, &item.Author, &gen,
 			&item.EstYear, &clicks, &favs, &contest, &item.Form,
+			&status, &price, &words, &praises,
 			&item.CoverURL); err != nil {
 			return nil, err
 		}
@@ -377,6 +387,10 @@ ORDER BY (b.favs IS NULL) ASC, b.favs DESC, b.nid`
 		item.Clicks = intPtr(clicks)
 		item.Favs = intPtr(favs)
 		item.Contest = contestPtr(contest)
+		item.Status = strPtr(status)
+		item.PriceType = strPtr(price)
+		item.Words = intPtr(words)
+		item.Praises = intPtr(praises)
 		items = append(items, item)
 	}
 	return items, rows.Err()
