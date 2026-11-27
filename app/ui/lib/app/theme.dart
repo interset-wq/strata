@@ -7,11 +7,13 @@ abstract final class StrataTokens {
   static const lightBg = Color(0xFFF6F2E9);
   static const lightSurface = Color(0xFFFFFDF8);
   static const lightInk = Color(0xFF211E17);
-  static const lightInk2 = Color(0xFF6E6656);
+  // 对比度二次修正（2026-11-27 用户反馈）：ink2 #6E6656 在米色纸面仅
+  // ~4.7:1，小字号下用户仍看不清——再加深至 #514A39（~7:1）。
+  static const lightInk2 = Color(0xFF514A39);
   // 对比度修正（2026-11-26）：ink3 原 #A29A88 在纸面仅 2.5:1（不达
-  // WCAG AA 4.5:1，底部导航未选中/弱提示几乎看不清）；加深为 #726C5B
-  // 后 4.7–5.2:1，同时保留「比 ink2 更浅」的文字层级。
-  static const lightInk3 = Color(0xFF726C5B);
+  // WCAG AA 4.5:1，底部导航未选中/弱提示几乎看不清）；2026-11-27 随
+  // ink2 一并再加深至 #5A5344（~6.5:1），保留「比 ink2 略浅」的层级。
+  static const lightInk3 = Color(0xFF5A5344);
   static const lightHairline = Color(0xFFE6DFCE);
   // 朱砂主色 #BF3B2B → #B03B2E（对比度修正 2026-11-26）：纸面 4.85→5.35、
   // 卡面 5.33→5.88、软朱砂底 4.39→4.84，全部过 AA；顺带与 App 图标底
@@ -29,10 +31,12 @@ abstract final class StrataTokens {
   static const darkBg = Color(0xFF181511);
   static const darkSurface = Color(0xFF221E18);
   static const darkInk = Color(0xFFEDE6D6);
-  static const darkInk2 = Color(0xFFAFA48E);
+  // 对比度二次修正（2026-11-27 用户反馈）：深色 ink2 #AFA48E 提亮至
+  // #C6BCA6（深棕底上 ~7:1）。
+  static const darkInk2 = Color(0xFFC6BCA6);
   // 对比度修正（2026-11-26）：深色 ink3 原 #7C7462 在卡面 3.58:1（临界
-  // 以下）；提亮为 #99907C 后 5.2–5.8:1。
-  static const darkInk3 = Color(0xFF99907C);
+  // 以下）；2026-11-27 随 ink2 一并提亮至 #ADA287，保留层级。
+  static const darkInk3 = Color(0xFFADA287);
   static const darkHairline = Color(0xFF332E25);
   static const darkCinnabar = Color(0xFFE06A55);
   // 深色软朱砂底 #3A2621 → #301D19（2026-11-26）：朱砂字在其上 4.30→4.84。
