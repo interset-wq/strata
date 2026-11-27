@@ -1097,6 +1097,16 @@ class CalendarItem {
   final String estDate; // YYYY-MM-DD
   final String estConf; // exact|high|mid|low（docs/14 §1.3 精度分档）
 
+  /// 经典榜单行所需字段（2026-11-27：周视图行与经典榜单统一后，
+  /// 引擎 CalendarBook �齐了这些列）。
+  final int estYear;
+  final String? status;
+  final String? priceType;
+  final int? words;
+  final int? clicks;
+  final int? praises;
+  final List<String> tags;
+
   CalendarItem.fromJson(Map<String, dynamic> m)
     : nid = m['nid'] as int,
       title = m['title'] as String,
@@ -1105,7 +1115,16 @@ class CalendarItem {
       favs = m['favs'] as int,
       coverUrl = m['cover_url'] as String?,
       estDate = m['est_date'] as String,
-      estConf = m['est_conf'] as String? ?? 'mid';
+      estConf = m['est_conf'] as String? ?? 'mid',
+      estYear = (m['est_year'] as num?)?.toInt() ?? 0,
+      status = m['status'] as String?,
+      priceType = m['price_type'] as String?,
+      words = (m['words'] as num?)?.toInt(),
+      clicks = (m['clicks'] as num?)?.toInt(),
+      praises = (m['praises'] as num?)?.toInt(),
+      tags = ((m['tags'] as List?) ?? const [])
+          .map((e) => e.toString())
+          .toList();
 }
 
 class CalendarDay {

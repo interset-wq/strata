@@ -2458,16 +2458,25 @@ FROM observations WHERE nid = ? ORDER BY observed_at DESC`, nid)
 
 // CalendarBook is one seed book on the release calendar (docs/14 P1):
 // est_date dating + conf tier. Display-only; the recommendation layer
-// never consumes calendar data.
+// never consumes calendar data. 2026-11-27: rows carry the full
+// classic-ranking field set (est_year/status/price_type/words/clicks/
+// praises/tags) so the week view can render the shared BookRowTile.
 type CalendarBook struct {
-	NID      int64   `json:"nid"`
-	Title    string  `json:"title"`
-	Author   string  `json:"author"`
-	Genre    *string `json:"genre"`
-	Favs     int64   `json:"favs"`
-	CoverURL *string `json:"cover_url"`
-	EstDate  string  `json:"est_date"`
-	EstConf  string  `json:"est_conf"`
+	NID       int64    `json:"nid"`
+	Title     string   `json:"title"`
+	Author    string   `json:"author"`
+	Genre     *string  `json:"genre"`
+	Favs      int64    `json:"favs"`
+	CoverURL  *string  `json:"cover_url"`
+	EstDate   string   `json:"est_date"`
+	EstConf   string   `json:"est_conf"`
+	EstYear   int64    `json:"est_year"`
+	Status    *string  `json:"status"`
+	PriceType *string  `json:"price_type"`
+	Words     *int64   `json:"words"`
+	Clicks    *int64   `json:"clicks"`
+	Praises   *int64   `json:"praises"`
+	Tags      []string `json:"tags"`
 }
 
 // CalendarDay is one date cell of the release calendar. Items carries
@@ -2492,7 +2501,12 @@ type CalendarDay struct {
 // (docs/14 §1.3). est_date carries no index on purpose: the full seed
 // scan is <10 ms on 30k rows.
 func (s *Store) BooksByDateRange(ctx context.Context, from, to string, excludeLow bool, perCell int) ([]CalendarDay, error) {
-	q := `SELECT nid, title, author, genre, favs, cover_url, est_date, est_conf
+	// 2026-11-27: rows carry the full classic-ranking field set — the week
+	// view renders the shared BookRowTile, which shows status/price badges,
+	// est_year and the four-metric strip.
+	q := `SELECT nid, title, author, genre, favs, cover_url, est_date, est_conf,
+       est_year, status, price_type, words, clicks, praises,
+       (SELECT GROUP_CONCAT(bt.tag) FROM book_tags bt WHERE bt.nid = books.nid) AS tags
 FROM books
 WHERE est_date >= ? AND est_date <= ? AND is_licensed = 0`
 	args := []any{from, to}
@@ -2511,8 +2525,15 @@ ORDER BY est_date ASC, favs DESC, nid ASC`
 	cur := ""
 	for rows.Next() {
 		var b CalendarBook
-		if err := rows.Scan(&b.NID, &b.Title, &b.Author, &b.Genre, &b.Favs, &b.CoverURL, &b.EstDate, &b.EstConf); err != nil {
+		var tags sql.NullString
+		if err := rows.Scan(&b.NID, &b.Title, &b.Author, &b.Genre, &b.Favs, &b.CoverURL, &b.EstDate, &b.EstConf,
+			&b.EstYear, &b.Status, &b.PriceType, &b.Words, &b.Clicks, &b.Praises, &tags); err != nil {
 			return nil, err
+		}
+		if tags.Valid && tags.String != "" {
+			b.Tags = strings.Split(tags.String, ",")
+		} else {
+			b.Tags = []string{}
 		}
 		if b.EstDate != cur {
 			days = append(days, CalendarDay{Date: b.EstDate})
