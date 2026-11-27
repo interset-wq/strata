@@ -603,7 +603,6 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                   'praises': it.praises,
                   'tags': it.tags,
                 }),
-                trailing: _ConfBadge(conf: it.estConf),
               ),
           ],
         );
@@ -808,7 +807,6 @@ class _CalendarBookRow extends StatelessWidget {
         'favs': item.favs,
         'cover_url': item.coverUrl,
       }),
-      trailing: _ConfBadge(conf: item.estConf),
       onTap: onOpen,
     );
   }
@@ -894,41 +892,6 @@ class _VipBadge extends StatelessWidget {
       child: Text(
         '主编推荐',
         style: TextStyle(fontSize: 10, color: scheme.primary),
-      ),
-    );
-  }
-}
-
-/// est_conf 精度徽标（docs/14 §1.3）：exact = 官方 addTime（精确）；
-/// high/mid = 内插估计（中位误差 2 天）→「估计」。low 档不出现在日/周视图。
-class _ConfBadge extends StatelessWidget {
-  final String conf;
-
-  const _ConfBadge({required this.conf});
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final exact = conf == 'exact';
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-      decoration: BoxDecoration(
-        color: exact
-            ? scheme.primary.withValues(alpha: .12)
-            : scheme.onSurface.withValues(alpha: .05),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(
-          color: exact
-              ? scheme.primary.withValues(alpha: .5)
-              : scheme.outline.withValues(alpha: .3),
-        ),
-      ),
-      child: Text(
-        exact ? '精确' : '估计',
-        style: TextStyle(
-          fontSize: 10,
-          color: exact ? scheme.primary : scheme.onSurfaceVariant,
-        ),
       ),
     );
   }
