@@ -47,7 +47,7 @@ class ContestRowCard extends StatelessWidget {
                     fontSize: 11.5,
                     fontFamily: g.year == null ? null : 'serif',
                     color: g.year == null
-                        ? scheme.outline
+                        ? scheme.onSurfaceVariant
                         : scheme.onSurfaceVariant,
                   ),
                 ),
@@ -90,7 +90,13 @@ class ContestRowCard extends StatelessWidget {
               child: Text(
                 g.count == 0 ? '—' : fmtCount(g.count),
                 textAlign: TextAlign.end,
-                style: TextStyle(fontSize: 11.5, color: scheme.outline),
+                // 对比度修正（2026-11-27 用户四次反馈）：原 outline 色
+                //（#E6DFCE）在米色 bg 上几乎隐形，改全深字加粗。
+                style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                  color: scheme.onSurface,
+                ),
               ),
             ),
             const SizedBox(width: 10),

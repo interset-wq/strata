@@ -175,7 +175,9 @@ class _ContestListPageState extends ConsumerState<ContestListPage>
   /// X征 tab 出现（那一列就是左轨）。
   Widget _columns(BuildContext context, ColorScheme scheme,
       {required bool rail}) {
-    final label = TextStyle(fontSize: 10.5, color: scheme.outline);
+    // 对比度修正（2026-11-27 用户四次反馈）：表头原 outline 色（#E6DFCE）
+    // 在米色 bg 上几乎隐形——「在库」列标签是用户看不清的主体。
+    final label = TextStyle(fontSize: 10.5, color: scheme.onSurfaceVariant);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
       child: Row(
