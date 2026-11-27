@@ -56,6 +56,23 @@ class StrataTheme {
     final scheme = ColorScheme.light(
       primary: isLight ? StrataTokens.lightCinnabar : StrataTokens.darkCinnabar,
       onPrimary: const Color(0xFFFFF8F0),
+      // Container 三组（2026-11-27 用户裁定）：不显式定义时 M3 从金棕
+      // secondary 派生出棕底 + 默认黑字，对比度过低（比赛行「待公布」
+      // 徽标/作者榜头像兜底/roster 徽标）。统一浅底深字高对比。
+      primaryContainer:
+          isLight ? StrataTokens.lightCinnabarSoft : StrataTokens.darkCinnabarSoft,
+      onPrimaryContainer:
+          isLight ? const Color(0xFF7A2419) : StrataTokens.darkCinnabar,
+      secondaryContainer:
+          isLight ? const Color(0xFFF0E7D2) : const Color(0xFF2E2820),
+      onSecondaryContainer:
+          isLight ? StrataTokens.lightGold : StrataTokens.darkGold,
+      tertiary: isLight ? StrataTokens.lightGreen : StrataTokens.darkGreen,
+      onTertiary: const Color(0xFFFFF8F0),
+      tertiaryContainer:
+          isLight ? const Color(0xFFE2EBE4) : const Color(0xFF1F2A24),
+      onTertiaryContainer:
+          isLight ? StrataTokens.lightGreen : StrataTokens.darkGreen,
       secondary: isLight ? StrataTokens.lightGold : StrataTokens.darkGold,
       surface: isLight ? StrataTokens.lightSurface : StrataTokens.darkSurface,
       onSurface: isLight ? StrataTokens.lightInk : StrataTokens.darkInk,
