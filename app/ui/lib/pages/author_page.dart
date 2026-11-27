@@ -449,47 +449,10 @@ class _AuthorPageState extends ConsumerState<AuthorPage> {
     );
   }
 
+  /// 库内书行（2026-11-26 统一）：与经典榜单同款行（BookRowTile），
+  /// 年份分组头由调用方负责。
   Widget _bookRow(BuildContext context, RankItem b, ColorScheme scheme) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: InkWell(
-        onTap: () => context.push('/book/${b.nid}'),
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Row(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: coverImage(b.coverUrl, b.nid,
-                    width: 44, height: 62),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(b.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodyLarge),
-                    const SizedBox(height: 4),
-                    Text(
-                      [
-                        if (b.estDate != null && b.estDate!.isNotEmpty)
-                          b.estDate!,
-                        if (b.status != null) b.status!,
-                      ].join(' · '),
-                      style: TextStyle(
-                          fontSize: 12, color: scheme.onSurfaceVariant),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    return BookRowTile(item: b);
   }
 }
 
@@ -684,9 +647,9 @@ class _RepresentsBlock extends StatelessWidget {
 }
 
 /// 库外作品行（作者页「其他作品」区块，docs/author-profile-on-demand §6）：
-/// 官方作品集只有 nid + 标题（无 form/分位）——2026-11-26 统一为经典榜单
-/// 行（BookRowTile）+「未收录」徽标；点击 = rankSeed 预写 + 进详情页
-/// （与官方榜单/清单页同一条库外收录链路）。
+/// 官方作品集只有 nid + 标题（无 form/分位），封面走确定性兜底；点击 =
+/// rankSeed 预写 + 进详情页（与官方榜单/清单页同一条库外收录链路）。
+/// 不使用通用榜单行（用户裁定 2026-11-27：经典行仅用于库内书）。
 class _OffWorkRow extends ConsumerWidget {
   final AuthorWork work;
   final String author;
@@ -695,26 +658,51 @@ class _OffWorkRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return BookRowTile(
-      item: RankItem.fromJson({
-        'rank': 0,
-        'nid': work.nid,
-        'title': work.title,
-      }),
-      extraTags: const ['未收录'],
-      onTap: () async {
-        try {
-          final h = await ref.read(bootProvider.future);
-          await h.api.rankSeed(
-            nid: work.nid,
-            title: work.title,
-            author: author,
-            coverUrl: '',
-          );
-        } catch (_) {}
-        if (!context.mounted) return;
-        context.push('/book/${work.nid}');
-      },
+    final scheme = Theme.of(context).colorScheme;
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+        onTap: () async {
+          try {
+            final h = await ref.read(bootProvider.future);
+            await h.api.rankSeed(
+              nid: work.nid,
+              title: work.title,
+              author: author,
+              coverUrl: '',
+            );
+          } catch (_) {}
+          if (!context.mounted) return;
+          context.push('/book/${work.nid}');
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: coverImage(null, work.nid, width: 44, height: 62),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(work.title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodyLarge),
+                    const SizedBox(height: 4),
+                    Text('库外 · ${work.nid}',
+                        style: TextStyle(
+                            fontSize: 12, color: scheme.onSurfaceVariant)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
