@@ -182,13 +182,20 @@ class _AuthorRankPageState extends ConsumerState<AuthorRankPage> {
                                       backgroundImage: (a.avatar != null)
                                           ? NetworkImage(a.avatar!)
                                           : null,
-                                      child: Text(
-                                        _firstChar(a.author),
-                                        style: TextStyle(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w600,
-                                            color: scheme.onPrimaryContainer),
-                                      ),
+                                      // 有头像时不渲染 child：CircleAvatar 的
+                                      // child 画在 backgroundImage 之上，首字
+                                      // 符会一直盖在加载完成的头像上（bug 修
+                                      // 复，2026-11-27）。
+                                      child: (a.avatar != null)
+                                          ? null
+                                          : Text(
+                                              _firstChar(a.author),
+                                              style: TextStyle(
+                                                  fontSize: 15,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: scheme
+                                                      .onPrimaryContainer),
+                                            ),
                                     ),
                                     Positioned(
                                       right: -2,
