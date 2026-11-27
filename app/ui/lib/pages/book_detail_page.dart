@@ -345,9 +345,14 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                           spacing: 6,
                           children: [
                             if (s(eff['status'] ?? b['status']) != null)
-                              _badge(context,
-                                  s(eff['status'] ?? b['status'])!,
-                                  filled: true),
+                              GestureDetector(
+                                // 点状态跳经典榜同 tab + 预置状态筛选（2026-11-27）。
+                                onTap: () => context.push(
+                                    '/classic-list?title=${Uri.encodeComponent('经典榜单')}&form=${Uri.encodeComponent(s(eff['form'] ?? b['form']) ?? 'long')}&metric-switchable=1&status=${Uri.encodeComponent(s(eff['status'] ?? b['status'])!)}'),
+                                child: _badge(context,
+                                    s(eff['status'] ?? b['status'])!,
+                                    filled: true),
+                              ),
                             // 价格类型与状态同款徽标，紧随其后（用户 2026-11-25）。
                             if (s(eff['price_type'] ?? b['price_type']) != null)
                               _badge(context,
@@ -356,8 +361,13 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                             if (onSale)
                               _badge(context, '官方热销', filled: true),
                             if (s(eff['genre'] ?? b['genre']) != null)
-                              _badge(context,
-                                  s(eff['genre'] ?? b['genre'])!),
+                              GestureDetector(
+                                // 点题材跳经典榜同 tab + 预置题材筛选（2026-11-27）。
+                                onTap: () => context.push(
+                                    '/classic-list?title=${Uri.encodeComponent('经典榜单')}&form=${Uri.encodeComponent(s(eff['form'] ?? b['form']) ?? 'long')}&metric-switchable=1&genre=${Uri.encodeComponent(s(eff['genre'] ?? b['genre'])!)}'),
+                                child: _badge(context,
+                                    s(eff['genre'] ?? b['genre'])!),
+                              ),
                             if (s(b['est_year']) != null)
                               _badge(context, '${s(b['est_year'])}'),
                           ],
@@ -372,7 +382,13 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                 Wrap(
                   spacing: 8,
                   children: [
-                    for (final tag in d.tags) Chip(label: Text(tag)),
+                    // 点标签跳经典榜同 tab + 预置标签筛选（2026-11-27）。
+                    for (final tag in d.tags)
+                      GestureDetector(
+                        onTap: () => context.push(
+                            '/classic-list?title=${Uri.encodeComponent('经典榜单')}&form=${Uri.encodeComponent(s(eff['form'] ?? b['form']) ?? 'long')}&metric-switchable=1&tags=${Uri.encodeComponent(tag)}'),
+                        child: Chip(label: Text(tag)),
+                      ),
                   ],
                 ),
               ],

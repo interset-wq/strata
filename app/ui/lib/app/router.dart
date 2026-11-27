@@ -275,6 +275,13 @@ final router = GoRouter(
           order: q['order'] ?? 'favs',
           contestSwitchable: (q['contest-switchable'] ?? '') == '1',
           metricSwitchable: (q['metric-switchable'] ?? '') == '1',
+          // 入口预置筛选（2026-11-27 详情页标签跳转）：tags 逗号分隔多选。
+          initialGenre: q['genre'],
+          initialStatus: q['status'],
+          initialTags: (q['tags'] ?? '')
+              .split(',')
+              .where((t) => t.isNotEmpty)
+              .toList(),
         );
       },
     ),

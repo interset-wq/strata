@@ -22,6 +22,11 @@ class ClassicListPage extends ConsumerStatefulWidget {
   final bool contestSwitchable;
   final bool metricSwitchable;
 
+  /// 入口预置筛选（2026-11-27 详情页标签跳转）：题材 / 状态 / 标签多选。
+  final String? initialGenre;
+  final String? initialStatus;
+  final List<String> initialTags;
+
   const ClassicListPage({
     super.key,
     required this.title,
@@ -31,6 +36,9 @@ class ClassicListPage extends ConsumerStatefulWidget {
     this.order = 'favs',
     this.contestSwitchable = false,
     this.metricSwitchable = false,
+    this.initialGenre,
+    this.initialStatus,
+    this.initialTags = const [],
   });
 
   @override
@@ -61,6 +69,10 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
     super.initState();
     _currentContest = widget.contest;
     _wordsBand = widget.wordsBand;
+    // 入口预置筛选（详情页标签跳转）：与筛选面板同一状态位。
+    _currentGenre = widget.initialGenre;
+    _fStatus = widget.initialStatus;
+    _fTags = widget.initialTags;
     const metrics = ['clicks', 'favs', 'praises', 'words'];
     _currentOrder = widget.metricSwitchable
         ? (metrics.contains(widget.order) ? widget.order : 'clicks')
