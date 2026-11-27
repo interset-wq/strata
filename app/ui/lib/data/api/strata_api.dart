@@ -1441,13 +1441,16 @@ class RankItem {
   final String cqsState;
 
   RankItem.fromJson(Map<String, dynamic> m)
-    : rank = m['rank'] as int,
+    : rank = m['rank'] as int? ?? 0,
       nid = m['nid'] as int,
-      title = m['title'] as String,
-      author = m['author'] as String,
+      title = m['title'] as String? ?? '',
+      // author/est_year/favs 容错（2026-11-26）：关注/作者/搜索/日历页
+      // 用 map 组装 RankItem 复用通用行，缺省键（库外书无作者/年份）
+      // 不能炸——硬 cast 曾抛 "Null is not a subtype of String"。
+      author = m['author'] as String? ?? '',
       genre = m['genre'] as String?,
-      estYear = m['est_year'] as int,
-      favs = m['favs'] as int,
+      estYear = (m['est_year'] as num?)?.toInt() ?? 0,
+      favs = (m['favs'] as num?)?.toInt() ?? 0,
       contest = m['contest'] as String?,
       coverUrl = m['cover_url'] as String?,
       status = m['status'] as String?,
