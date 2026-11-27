@@ -7,7 +7,7 @@ import '../core/format.dart';
 import '../core/providers.dart';
 import '../data/api/strata_api.dart';
 import '../widgets/back_to_top.dart';
-import '../widgets/book_row_card.dart';
+import '../widgets/book_row_tile.dart';
 
 /// 单届赛事档案（docs/contest-display-in-app.md 形态一）：本地零请求视图。
 ///
@@ -245,7 +245,9 @@ class _Body extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Column(
               children: [
-                for (final it in byForm[f]!) BookRowCard(item: it),
+                // 序号变体（用户裁定 2026-11-27）：代表作带衬线排名序号。
+                for (final it in byForm[f]!)
+                  BookRowTile(item: it, showRank: true),
               ],
             ),
           ),

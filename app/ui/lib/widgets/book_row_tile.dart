@@ -30,6 +30,10 @@ class BookRowTile extends StatelessWidget {
   /// 作者行点击（搜索页：点作者名重搜）；null = 不可点。
   final VoidCallback? onAuthorTap;
 
+  /// 序号变体（2026-11-27 用户裁定）：行首显示衬线排名序号（前三名
+  /// primary 高亮，仿 BookRowCard 的衬线排名样式）。
+  final bool showRank;
+
   const BookRowTile({
     super.key,
     required this.item,
@@ -38,6 +42,7 @@ class BookRowTile extends StatelessWidget {
     this.extraTags = const [],
     this.onTap,
     this.onAuthorTap,
+    this.showRank = false,
   });
 
   static String wan(int? n) {
@@ -128,6 +133,26 @@ class BookRowTile extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // 序号变体（2026-11-27）：衬线排名序号，前三名 primary 高亮
+            // （与 BookRowCard 的衬线排名同款样式）。
+            if (showRank && item.rank > 0) ...[
+              SizedBox(
+                width: 26,
+                child: Text(
+                  '${item.rank}',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontFamily: 'serif',
+                    fontSize: item.rank <= 3 ? 20 : 18,
+                    fontWeight: FontWeight.w700,
+                    color: item.rank <= 3
+                        ? scheme.primary
+                        : scheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+            ],
             SizedBox(
               width: 48,
               height: 64,
