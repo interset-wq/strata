@@ -353,11 +353,16 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                                     s(eff['status'] ?? b['status'])!,
                                     filled: true),
                               ),
-                            // 价格类型与状态同款徽标，紧随其后（用户 2026-11-25）。
+                            // 价格类型与状态同款徽标，紧随其后（用户 2026-11-25）；
+                            // 点价格跳经典榜同 tab + 预置价格筛选（2026-11-27）。
                             if (s(eff['price_type'] ?? b['price_type']) != null)
-                              _badge(context,
-                                  s(eff['price_type'] ?? b['price_type'])!,
-                                  filled: true),
+                              GestureDetector(
+                                onTap: () => context.push(
+                                    '/classic-list?title=${Uri.encodeComponent('经典榜单')}&form=${Uri.encodeComponent(s(eff['form'] ?? b['form']) ?? 'long')}&metric-switchable=1&ptype=${Uri.encodeComponent(s(eff['price_type'] ?? b['price_type'])!)}'),
+                                child: _badge(context,
+                                    s(eff['price_type'] ?? b['price_type'])!,
+                                    filled: true),
+                              ),
                             if (onSale)
                               _badge(context, '官方热销', filled: true),
                             if (s(eff['genre'] ?? b['genre']) != null)
@@ -369,7 +374,12 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
                                     s(eff['genre'] ?? b['genre'])!),
                               ),
                             if (s(b['est_year']) != null)
-                              _badge(context, '${s(b['est_year'])}'),
+                              GestureDetector(
+                                // 点年份跳经典榜同 tab + 预置年份轴（2026-11-27）。
+                                onTap: () => context.push(
+                                    '/classic-list?title=${Uri.encodeComponent('经典榜单')}&form=${Uri.encodeComponent(s(eff['form'] ?? b['form']) ?? 'long')}&metric-switchable=1&year=${s(b['est_year'])!}'),
+                                child: _badge(context, '${s(b['est_year'])}'),
+                              ),
                           ],
                         ),
                       ],

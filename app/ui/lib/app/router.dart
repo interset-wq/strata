@@ -282,6 +282,8 @@ final router = GoRouter(
               .split(',')
               .where((t) => t.isNotEmpty)
               .toList(),
+          initialYear: int.tryParse(q['year'] ?? ''),
+          initialPtype: q['ptype'],
         );
       },
     ),

@@ -27,6 +27,10 @@ class ClassicListPage extends ConsumerStatefulWidget {
   final String? initialStatus;
   final List<String> initialTags;
 
+  /// 入口预置筛选（2026-11-27 详情页年份/收费类型跳转）：年份轴 / 价格。
+  final int? initialYear;
+  final String? initialPtype;
+
   const ClassicListPage({
     super.key,
     required this.title,
@@ -39,6 +43,8 @@ class ClassicListPage extends ConsumerStatefulWidget {
     this.initialGenre,
     this.initialStatus,
     this.initialTags = const [],
+    this.initialYear,
+    this.initialPtype,
   });
 
   @override
@@ -73,6 +79,8 @@ class _ClassicListPageState extends ConsumerState<ClassicListPage> {
     _currentGenre = widget.initialGenre;
     _fStatus = widget.initialStatus;
     _fTags = widget.initialTags;
+    _fPtype = widget.initialPtype;
+    _currentYear = widget.initialYear;
     const metrics = ['clicks', 'favs', 'praises', 'words'];
     _currentOrder = widget.metricSwitchable
         ? (metrics.contains(widget.order) ? widget.order : 'clicks')
