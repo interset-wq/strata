@@ -338,10 +338,12 @@ func (s *Store) ContestBooks(ctx context.Context, name string, perForm int) ([]R
 	// 2026-11-27: rows carry the full classic-ranking field set
 	// (status/price_type/words/praises added) — the shared BookRowTile
 	// renders the status/price badges and the metric strip, which the old
-	// lightweight SELECT silently dropped.
+	// lightweight SELECT silently dropped. 2026-11-27b: plus tags
+	// (GROUP_CONCAT book_tags) — the tags row of the shared tile was empty.
 	query := `
 SELECT b.nid, b.title, b.author, b.genre, b.est_year, b.clicks, b.favs,
        b.contest, b.form, b.status, b.price_type, b.words, b.praises,
+       (SELECT GROUP_CONCAT(bt.tag) FROM book_tags bt WHERE bt.nid = b.nid) AS tags,
        COALESCE(c.cover, NULLIF(b.cover_url, '')) AS cover_url
 FROM (
   SELECT b.nid, b.title, b.author, b.genre, b.est_year, b.clicks, b.favs,
@@ -375,10 +377,11 @@ ORDER BY (b.favs IS NULL) ASC, b.favs DESC, b.nid`
 			words   sql.NullInt64
 			praises sql.NullInt64
 			contest sql.NullString
+			tags    sql.NullString
 		)
 		if err := rows.Scan(&item.NID, &item.Title, &item.Author, &gen,
 			&item.EstYear, &clicks, &favs, &contest, &item.Form,
-			&status, &price, &words, &praises,
+			&status, &price, &words, &praises, &tags,
 			&item.CoverURL); err != nil {
 			return nil, err
 		}
@@ -391,6 +394,11 @@ ORDER BY (b.favs IS NULL) ASC, b.favs DESC, b.nid`
 		item.PriceType = strPtr(price)
 		item.Words = intPtr(words)
 		item.Praises = intPtr(praises)
+		if tags.Valid && tags.String != "" {
+			item.Tags = strings.Split(tags.String, ",")
+		} else {
+			item.Tags = []string{}
+		}
 		items = append(items, item)
 	}
 	return items, rows.Err()
