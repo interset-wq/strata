@@ -104,12 +104,11 @@ class ContestRowCard extends StatelessWidget {
               width: colOfficial,
               child: Text(
                 // 获奖事件（一/二/三征）没有参赛清单：参赛总数未知（台账
-                // roster_total 为空），不把获奖名额冒充总数（用户裁定
-                // 2026-11-27）；这一列改显获奖名额——
-                // 「—」会被读成缺数据，尾注会点名这届只有获奖名单。
+                // roster_total 为空），直接写「未知」——不把获奖名额冒充
+                // 总数（用户裁定 2026-11-27）。
                 g.listKind != 'award'
                     ? fmtCount(g.rosterTotal)
-                    : (g.awardTotal == null ? '未知' : '${fmtCount(g.awardTotal)}获奖'),
+                    : '未知',
                 textAlign: TextAlign.end,
                 style: TextStyle(
                   fontSize: g.listKind != 'award' ? 14 : 11,

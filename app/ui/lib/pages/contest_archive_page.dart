@@ -259,17 +259,17 @@ class _Body extends ConsumerWidget {
   /// 赛项区（≥2 轨）：一行一赛道，右数 = 该赛道官方清单条数，点行进对应
   /// 清单。赛道数与在库形态不同源（种子标签与官方分轨命名并非一一对应），
   /// 所以行里不并在库小字——硬凑映射就是假数。
-  /// 获奖事件（一/二/三征）同区换口径：每行是一个奖项，右数是获奖名额，
-  /// 点行进获奖名单。
+  /// 获奖事件（一/二/三征）不渲染本区（用户裁定 2026-11-27）：奖项分区
+  /// 是其他比赛没有的形态，且参赛总数未知，整块删去与其余届一致。
   Widget _divisions(BuildContext context, ContestGroup g) {
-    final award = g.listKind == 'award';
+    if (g.listKind == 'award') return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _section(
             context,
-            award ? '奖项' : '赛项',
-            award ? '数字为该奖项获奖名额 · 点行看获奖名单' : '数字为该赛道官方清单条数 · 点行看清单'),
+            '赛项',
+            '数字为该赛道官方清单条数 · 点行看清单'),
         _rows(context, [
           for (final d in g.divisions)
             _RowData(
