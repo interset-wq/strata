@@ -1092,6 +1092,14 @@ func (s *Server) roster(c *gin.Context) {
 		return
 	}
 	division := c.Query("division")
+	// scope=inlibrary: the 仅库内 view queries the seed directly (user
+	// ruling 2026-11-27) — the contest tag already carries the event, and
+	// walking the official list's pages surfaces only the handful of
+	// in-library books that happen to sit on the fetched page.
+	if c.Query("scope") == "inlibrary" {
+		s.rosterInLibrary(c, event, division)
+		return
+	}
 	page := 1
 	if raw := c.Query("page"); raw != "" {
 		v, err := strconv.Atoi(raw)
@@ -1170,6 +1178,47 @@ func (s *Server) roster(c *gin.Context) {
 		resp["total_estimate"] = est
 	}
 	c.JSON(http.StatusOK, resp)
+}
+
+// rosterInLibrary serves the 仅库内 view straight from the seed (user
+// ruling 2026-11-27): the contest tag already carries the event, so
+// walking the official list's pages surfaces only the handful of
+// in-library books that happen to sit on the fetched page. Same response
+// shape as /strata/roster (source=inlibrary).
+func (s *Server) rosterInLibrary(c *gin.Context, event, division string) {
+	const perPage = 50
+	page := 1
+	if raw := c.Query("page"); raw != "" {
+		v, err := strconv.Atoi(raw)
+		if err != nil || v < 1 {
+			fail(c, http.StatusBadRequest, "invalid_argument", "page must be >= 1")
+			return
+		}
+		page = v
+	}
+	if division == "全部" {
+		division = ""
+	}
+	items, total, err := s.store.RosterLocalBooksPaged(
+		c.Request.Context(), event, division, perPage, (page-1)*perPage)
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	pages := (total + perPage - 1) / perPage
+	if pages < 1 {
+		pages = 1
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"contest":   event,
+		"division":  division,
+		"page":      page,
+		"pages":     pages,
+		"source":    "inlibrary",
+		"list_kind": store.LedgerListKind(event),
+		"total":     total,
+		"items":     items,
+	})
 }
 
 // rosterJoin attaches local enrichment to the official page: in-library

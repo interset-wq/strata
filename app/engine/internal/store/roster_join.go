@@ -12,18 +12,25 @@ import (
 // the roster fields — no form/percentile badges, nothing fabricated
 // (docs/12 red line); CategoryID is a division hint only, never form.
 type RosterItem struct {
-	NID        int    `json:"nid"`
-	Title      string `json:"title"`
-	Author     string `json:"author,omitempty"`
-	Intro      string `json:"intro,omitempty"`
-	Cover      string `json:"cover,omitempty"`
-	CategoryID int    `json:"category_id,omitempty"`
-	InLibrary  bool   `json:"in_library"`
-	Form       string `json:"form,omitempty"`
-	Favs       *int64 `json:"favs,omitempty"`
-	Status     string `json:"status,omitempty"`
-	EstYear    int    `json:"est_year,omitempty"`
-	Words      *int64 `json:"words,omitempty"`
+	NID        int      `json:"nid"`
+	Title      string   `json:"title"`
+	Author     string   `json:"author,omitempty"`
+	Intro      string   `json:"intro,omitempty"`
+	Cover      string   `json:"cover,omitempty"`
+	CategoryID int      `json:"category_id,omitempty"`
+	InLibrary  bool     `json:"in_library"`
+	Form       string   `json:"form,omitempty"`
+	Favs       *int64   `json:"favs,omitempty"`
+	Status     string   `json:"status,omitempty"`
+	EstYear    int      `json:"est_year,omitempty"`
+	Words      *int64   `json:"words,omitempty"`
+	// Full classic-row fields for the 仅库内 direct-db view (user ruling
+	// 2026-11-27): the shared BookRowTile renders them.
+	Genre     *string  `json:"genre,omitempty"`
+	PriceType *string  `json:"price_type,omitempty"`
+	Clicks    *int64   `json:"clicks,omitempty"`
+	Praises   *int64   `json:"praises,omitempty"`
+	Tags      []string `json:"tags,omitempty"`
 }
 
 // BookLite is the enrichment subset of one seed.books row for the roster
@@ -127,4 +134,81 @@ LIMIT 2000`
 		items = append(items, item)
 	}
 	return items, rows.Err()
+}
+
+// RosterLocalBooksPaged is the paginated, full-field variant of
+// RosterLocalBooks for the roster page's 仅库内 view (user ruling
+// 2026-11-27: query the seed directly instead of walking the official
+// list's pages — the contest tag already carries the event, so the
+// in-library view is a plain db page over favs DESC). Returns the page
+// rows and the total row count for the pager.
+func (s *Store) RosterLocalBooksPaged(ctx context.Context, event, division string, limit, offset int) ([]RosterItem, int, error) {
+	clause, args := contestEventMatch("b.contest", event)
+	if division != "" {
+		clause += " AND b.contest = ?"
+		args = append(args, event+division)
+	}
+	base := `FROM seed.books b LEFT JOIN covers c ON c.nid = b.nid
+WHERE b.is_licensed = 0 AND ` + clause
+	var total int
+	if err := s.DB.QueryRowContext(ctx,
+		`SELECT COUNT(*) `+base, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	query := `
+SELECT b.nid, b.title, b.author, b.genre, b.form, b.favs, b.status,
+       b.est_year, b.words, b.clicks, b.praises, b.price_type,
+       (SELECT GROUP_CONCAT(bt.tag) FROM book_tags bt WHERE bt.nid = b.nid) AS tags,
+       COALESCE(c.cover, NULLIF(b.cover_url, '')) AS cover
+FROM seed.books b
+LEFT JOIN covers c ON c.nid = b.nid
+WHERE b.is_licensed = 0 AND ` + clause + `
+ORDER BY (b.favs IS NULL) ASC, b.favs DESC, b.nid
+LIMIT ? OFFSET ?`
+	args = append(args, limit, offset)
+	rows, err := s.DB.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	items := make([]RosterItem, 0, limit)
+	for rows.Next() {
+		var (
+			item    RosterItem
+			gen     sql.NullString
+			favs    sql.NullInt64
+			words   sql.NullInt64
+			clicks  sql.NullInt64
+			praises sql.NullInt64
+			price   sql.NullString
+			tags    sql.NullString
+			cover   sql.NullString
+			author  sql.NullString
+			status  sql.NullString
+		)
+		var nid int64
+		if err := rows.Scan(&nid, &item.Title, &author, &gen, &item.Form,
+			&favs, &status, &item.EstYear, &words, &clicks, &praises,
+			&price, &tags, &cover); err != nil {
+			return nil, 0, err
+		}
+		item.NID = int(nid)
+		item.Author = author.String
+		item.Status = status.String
+		item.Cover = cover.String
+		item.InLibrary = true
+		item.Favs = intPtr(favs)
+		item.Words = intPtr(words)
+		item.Genre = strPtr(gen)
+		item.PriceType = strPtr(price)
+		item.Clicks = intPtr(clicks)
+		item.Praises = intPtr(praises)
+		if tags.Valid && tags.String != "" {
+			item.Tags = strings.Split(tags.String, ",")
+		} else {
+			item.Tags = []string{}
+		}
+		items = append(items, item)
+	}
+	return items, total, rows.Err()
 }

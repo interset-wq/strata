@@ -95,8 +95,12 @@ class _MockResponse implements HttpClientResponse {
     bool? cancelOnError,
   }) {
     return Stream<Uint8List>.fromIterable([Uint8List.fromList(_pixelPng)])
-        .listen(onData,
-            onError: onError, onDone: onDone, cancelOnError: cancelOnError);
+        .listen(
+          onData,
+          onError: onError,
+          onDone: onDone,
+          cancelOnError: cancelOnError,
+        );
   }
 
   @override
@@ -232,19 +236,62 @@ void main() {
     });
 
     List<RankItem> twoWorks() => [
-      RankItem.fromJson({'rank': 1, 'nid': 1001, 'title': '测试之书', 'author': '测试作者', 'est_year': 2019, 'favs': 1, 'form': 'long'}),
-      RankItem.fromJson({'rank': 2, 'nid': 2002, 'title': '银盐时代', 'author': '测试作者', 'est_year': 2021, 'favs': 2, 'form': 'long'}),
-      RankItem.fromJson({'rank': 3, 'nid': 2003, 'title': '第七种沉默', 'author': '测试作者', 'est_year': 2022, 'favs': 3, 'form': 'long'}),
+      RankItem.fromJson({
+        'rank': 1,
+        'nid': 1001,
+        'title': '测试之书',
+        'author': '测试作者',
+        'est_year': 2019,
+        'favs': 1,
+        'form': 'long',
+      }),
+      RankItem.fromJson({
+        'rank': 2,
+        'nid': 2002,
+        'title': '银盐时代',
+        'author': '测试作者',
+        'est_year': 2021,
+        'favs': 2,
+        'form': 'long',
+      }),
+      RankItem.fromJson({
+        'rank': 3,
+        'nid': 2003,
+        'title': '第七种沉默',
+        'author': '测试作者',
+        'est_year': 2022,
+        'favs': 3,
+        'form': 'long',
+      }),
     ];
 
     // 相关推荐：同 form、别的作者（后端已排除锚点作者）。
     List<RankItem> twoSimilar() => [
-      RankItem.fromJson({'rank': 1, 'nid': 3001, 'title': '雾中列车', 'author': '他人甲', 'est_year': 2020, 'favs': 900, 'form': 'long'}),
-      RankItem.fromJson({'rank': 2, 'nid': 3002, 'title': '北城以北', 'author': '他人乙', 'est_year': 2021, 'favs': 700, 'form': 'long'}),
+      RankItem.fromJson({
+        'rank': 1,
+        'nid': 3001,
+        'title': '雾中列车',
+        'author': '他人甲',
+        'est_year': 2020,
+        'favs': 900,
+        'form': 'long',
+      }),
+      RankItem.fromJson({
+        'rank': 2,
+        'nid': 3002,
+        'title': '北城以北',
+        'author': '他人乙',
+        'est_year': 2021,
+        'favs': 700,
+        'form': 'long',
+      }),
     ];
 
-    Future<void> pumpDetail(WidgetTester tester,
-        {BookDetail? detail, List<RankItem>? related}) async {
+    Future<void> pumpDetail(
+      WidgetTester tester, {
+      BookDetail? detail,
+      List<RankItem>? related,
+    }) async {
       HttpOverrides.global = _MockHttpOverrides();
       addTearDown(() => HttpOverrides.global = null);
       tester.view.physicalSize = const Size(1080, 4800);
@@ -252,20 +299,26 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
-      final api = _FakeApi(
-        detail ?? seedDetail(),
-        twoWorks(),
-        [
-          ObservationRow.fromJson({'observed_at': 1764000000, 'favs': 45000, 'praises': 82000, 'words': 1560000}),
-          ObservationRow.fromJson({'observed_at': 1763913600, 'favs': 44800, 'praises': 81700, 'words': 1550000}),
-        ],
-        similar: related ?? const [],
-      );
+      final api = _FakeApi(detail ?? seedDetail(), twoWorks(), [
+        ObservationRow.fromJson({
+          'observed_at': 1764000000,
+          'favs': 45000,
+          'praises': 82000,
+          'words': 1560000,
+        }),
+        ObservationRow.fromJson({
+          'observed_at': 1763913600,
+          'favs': 44800,
+          'praises': 81700,
+          'words': 1550000,
+        }),
+      ], similar: related ?? const []);
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
             bootProvider.overrideWith(
-              (ref) async => EngineHandle(api: api, seedVersion: 'test', bookCount: 3),
+              (ref) async =>
+                  EngineHandle(api: api, seedVersion: 'test', bookCount: 3),
             ),
           ],
           child: const MaterialApp(home: BookDetailPage(nid: 1001)),
@@ -289,10 +342,14 @@ void main() {
       expect(y(tester, find.text('作品简介')), lessThan(heatY));
       expect(y(tester, find.text('第十二届征文')), greaterThan(heatY));
       // 口径卡排在发现区块之前（用户 2026-11-26）
-      expect(y(tester, find.text('数据口径与来源')),
-          greaterThan(y(tester, find.text('第十二届征文'))));
-      expect(y(tester, find.text('其他作品')),
-          greaterThan(y(tester, find.text('数据口径与来源'))));
+      expect(
+        y(tester, find.text('数据口径与来源')),
+        greaterThan(y(tester, find.text('第十二届征文'))),
+      );
+      expect(
+        y(tester, find.text('其他作品')),
+        greaterThan(y(tester, find.text('数据口径与来源'))),
+      );
       // 横滑标题不带本数、不再挂「作者页」按钮（入口只有作者名一处）
       expect(find.text('作者页'), findsNothing);
       expect(find.byIcon(Icons.arrow_forward), findsNothing);
@@ -426,8 +483,10 @@ void main() {
       expect(find.text('相关推荐'), findsOneWidget);
       expect(find.text('雾中列车'), findsOneWidget);
       expect(find.text('北城以北'), findsOneWidget);
-      expect(y(tester, find.text('相关推荐')),
-          greaterThan(y(tester, find.text('其他作品'))));
+      expect(
+        y(tester, find.text('相关推荐')),
+        greaterThan(y(tester, find.text('其他作品'))),
+      );
       // 条卡第二行报作者与年代：推荐的作者是陌生人，只给书名无从判断（用户 2026-11-26）
       expect(find.text('他人甲 · 2020'), findsOneWidget);
       expect(find.text('他人乙 · 2021'), findsOneWidget);
@@ -464,24 +523,28 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            metaProvider.overrideWith((ref) async => Meta.fromJson({
-              'manifest': {
-                'schema_version': 9,
-                'seed_version': 'v9',
-                'content_end': '2026-11-24',
-                'built_at': '2026-11-25',
-                'book_count': 246000,
-                'licensed_count': 47,
-                'tag_count': 30,
-                'tag_rows': 100,
-                'gen_min': 2007,
-                'gen_max': 2026,
-              },
-              'seed_meta': <String, dynamic>{},
-            })),
+            metaProvider.overrideWith(
+              (ref) async => Meta.fromJson({
+                'manifest': {
+                  'schema_version': 9,
+                  'seed_version': 'v9',
+                  'content_end': '2026-11-24',
+                  'built_at': '2026-11-25',
+                  'book_count': 246000,
+                  'licensed_count': 47,
+                  'tag_count': 30,
+                  'tag_rows': 100,
+                  'gen_min': 2007,
+                  'gen_max': 2026,
+                },
+                'seed_meta': <String, dynamic>{},
+              }),
+            ),
             detailRateLimitProvider.overrideWith(
               (ref) async => EngineSettings(
-                  detailRateLimitEnabled: true, windowSeconds: 86400),
+                detailRateLimitEnabled: true,
+                windowSeconds: 86400,
+              ),
             ),
             testBookProvider.overrideWith(
               (ref) async => const TestBook(nid: 900001, present: false),
@@ -499,8 +562,10 @@ void main() {
         expect(find.text(g), findsOneWidget);
       }
       expect(find.text('外观'), findsNothing);
-      expect(find.text('书层 Strata · AGPL-3.0\n数据来自 SFACG 菠萝包轻小说公开页面'),
-          findsOneWidget);
+      expect(
+        find.text('书层 Strata · AGPL-3.0\n数据来自 SFACG 菠萝包轻小说公开页面'),
+        findsOneWidget,
+      );
       // 主题不再占三行 RadioListTile
       expect(find.byType(RadioListTile<ThemeMode>), findsNothing);
       expect(find.text('主题'), findsOneWidget);
@@ -519,8 +584,7 @@ void main() {
     });
 
     testWidgets('App 信息页：版本 / 许可 / 数据来源 / 离线声明', (tester) async {
-      await tester.pumpWidget(
-          const MaterialApp(home: AboutPage()));
+      await tester.pumpWidget(const MaterialApp(home: AboutPage()));
       expect(find.text('书层 Strata'), findsOneWidget);
       expect(find.text('版本 1.0.0（build 1）'), findsOneWidget);
       expect(find.text('AGPL-3.0（开源）'), findsOneWidget);
@@ -641,17 +705,30 @@ void main() {
 
     List<Map<String, dynamic>> twoBooks() => [
       {
-        'rank': 1, 'nid': 1001, 'title': '魔王小姐请再忍耐一下',
-        'author': '香草和布丁', 'est_year': 2011, 'favs': 33521, 'form': 'long',
+        'rank': 1,
+        'nid': 1001,
+        'title': '魔王小姐请再忍耐一下',
+        'author': '香草和布丁',
+        'est_year': 2011,
+        'favs': 33521,
+        'form': 'long',
       },
       {
-        'rank': 2, 'nid': 1002, 'title': '夺舍失败后',
-        'author': '太阳花田里的树', 'est_year': 2012, 'favs': 29266, 'form': 'long',
+        'rank': 2,
+        'nid': 1002,
+        'title': '夺舍失败后',
+        'author': '太阳花田里的树',
+        'est_year': 2012,
+        'favs': 29266,
+        'form': 'short',
       },
     ];
 
-    Future<void> pumpList(WidgetTester tester, List<ContestGroup> gs,
-        {String? lane}) async {
+    Future<void> pumpList(
+      WidgetTester tester,
+      List<ContestGroup> gs, {
+      String? lane,
+    }) async {
       HttpOverrides.global = _MockHttpOverrides();
       addTearDown(() => HttpOverrides.global = null);
       tester.view.physicalSize = const Size(600, 2400);
@@ -660,11 +737,13 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            bootProvider.overrideWith((ref) async => EngineHandle(
-              api: _FakeContestApi(gs),
-              seedVersion: 'test',
-              bookCount: 3,
-            )),
+            bootProvider.overrideWith(
+              (ref) async => EngineHandle(
+                api: _FakeContestApi(gs),
+                seedVersion: 'test',
+                bookCount: 3,
+              ),
+            ),
           ],
           child: MaterialApp(home: ContestListPage(initialLane: lane)),
         ),
@@ -672,9 +751,12 @@ void main() {
       await tester.pumpAndSettle();
     }
 
-    Future<void> pumpArchive(WidgetTester tester, ContestGroup g,
-        {List<Map<String, dynamic>>? books,
-        List<Map<String, dynamic>>? awards}) async {
+    Future<void> pumpArchive(
+      WidgetTester tester,
+      ContestGroup g, {
+      List<Map<String, dynamic>>? books,
+      List<Map<String, dynamic>>? awards,
+    }) async {
       HttpOverrides.global = _MockHttpOverrides();
       addTearDown(() => HttpOverrides.global = null);
       tester.view.physicalSize = const Size(600, 3000);
@@ -686,12 +768,17 @@ void main() {
         ProviderScope(
           key: ValueKey('archive-${g.name}'),
           overrides: [
-            bootProvider.overrideWith((ref) async => EngineHandle(
-              api: _FakeContestApi([g],
-                  books: books ?? const [], awards: awards ?? const []),
-              seedVersion: 'test',
-              bookCount: 3,
-            )),
+            bootProvider.overrideWith(
+              (ref) async => EngineHandle(
+                api: _FakeContestApi(
+                  [g],
+                  books: books ?? const [],
+                  awards: awards ?? const [],
+                ),
+                seedVersion: 'test',
+                bookCount: 3,
+              ),
+            ),
           ],
           child: MaterialApp(home: ContestArchivePage(name: g.name)),
         ),
@@ -708,20 +795,24 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            bootProvider.overrideWith((ref) async => EngineHandle(
-              api: _FakeContestApi(
-                [g],
-                rosterKind: g.listKind,
-                rosterItems: [
-                  {
-                    'nid': 9990101, 'title': '金奖作品', 'author': '作者甲',
-                    'in_library': false,
-                  },
-                ],
+            bootProvider.overrideWith(
+              (ref) async => EngineHandle(
+                api: _FakeContestApi(
+                  [g],
+                  rosterKind: g.listKind,
+                  rosterItems: [
+                    {
+                      'nid': 9990101,
+                      'title': '金奖作品',
+                      'author': '作者甲',
+                      'in_library': false,
+                    },
+                  ],
+                ),
+                seedVersion: 'test',
+                bookCount: 3,
               ),
-              seedVersion: 'test',
-              bookCount: 3,
-            )),
+            ),
           ],
           child: MaterialApp(home: roster_page.RosterPage(contest: g.name)),
         ),
@@ -747,11 +838,12 @@ void main() {
       expect(find.text('7,350'), findsOneWidget);
       expect(find.text('2025'), findsOneWidget); // 十三征的年代轨
       expect(find.text('2019'), findsOneWidget);
-      expect(top(tester, find.text('十三征')) <
-          top(tester, find.text('七征')), isTrue);
+      expect(
+        top(tester, find.text('十三征')) < top(tester, find.text('七征')),
+        isTrue,
+      );
       // 副题走官方赛程（压到月），不是旧的「N 本」在库口径句。
-      expect(find.textContaining('开赛 2025.05 · 截止 2025.10'),
-          findsOneWidget);
+      expect(find.textContaining('开赛 2025.05 · 截止 2025.10'), findsOneWidget);
     });
 
     testWidgets('列表：旧口径说明行删除，合计移到尾部', (tester) async {
@@ -766,51 +858,82 @@ void main() {
       );
     });
 
-    testWidgets('列表：获奖事件官方列显名额，合计只点名不计入', (tester) async {
+    testWidgets('列表：获奖事件官方列显未知，合计只点名不计入', (tester) async {
       await pumpList(tester, [oneZheng()]);
       await tester.tap(find.text('X征'));
       await tester.pumpAndSettle();
-      // 没有参赛清单就显获奖名额（纯数字，用户 2026-11-26 去掉「名」单位），
-      // 「—」会被读成缺数据。
-      expect(find.text('5'), findsOneWidget);
+      // 获奖名额不是参赛总数（用户 2026-11-27 裁定）：官方列写「未知」，
+      // 不把 5 个奖名额冒充 5 条清单。
+      expect(find.text('未知'), findsOneWidget);
+      expect(find.text('5'), findsNothing);
       expect(find.text('5 名'), findsNothing);
-      expect(
-        find.textContaining('1 届只有获奖名单，未计入'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('1 届只有获奖名单，未计入'), findsOneWidget);
     });
 
-    testWidgets('档案：赛程三点 + 规模三数 + 覆盖率 + 赛项行', (tester) async {
+    testWidgets('lane=short：短篇征文归档只显短篇线，标题正确', (tester) async {
+      final shortContest = ContestGroup.fromJson({
+        'name': '超新星杯短篇',
+        'series': 'other',
+        'lane': 'short',
+        'count': 87,
+        'forms': {'short': 87},
+        'tracks': ['超新星杯短篇'],
+        'year': 2024,
+        'year_min': 2024,
+        'year_max': 2024,
+      });
+      await pumpList(tester, [spring2025(), shortContest], lane: 'short');
+
+      expect(find.text('短篇征文归档'), findsOneWidget);
+      expect(find.text('超新星杯短篇'), findsOneWidget);
+      // lane 视图忽略 series 过滤，且不混入非 short lane 的赛事。
+      expect(find.text('2025春季征文'), findsNothing);
+      expect(find.text('赛事档案'), findsNothing);
+      // 跨系列筛选不显示系列 tab：否则从短篇入口进来顶部却选中「主题」
+      // （用户 2026-11-27 报的 bug），对话/IP 入口同理。
+      expect(find.text('春季'), findsNothing);
+      expect(find.text('主题'), findsNothing);
+    });
+
+    testWidgets('档案：头部压成元信息 + 覆盖，赛程不再进详情', (tester) async {
       await pumpArchive(tester, thirteen(), books: twoBooks());
 
-      expect(find.text('投稿开始'), findsOneWidget);
-      expect(find.text('投稿截止'), findsOneWidget);
-      expect(find.text('结果公布'), findsOneWidget);
-      expect(find.text('2025-05-04'), findsOneWidget);
-      // 三数：官方清单为主，获奖名额来自台账（名单本身不渲染）。
-      expect(find.text('4,797'), findsOneWidget);
-      expect(find.text('25'), findsOneWidget);
-      expect(find.text('官方获奖'), findsOneWidget);
-      // 335/4797 = 7.0%：差距本身就是「清单入口为什么常驻」的答案。
-      expect(find.textContaining('库内覆盖 7.0%'), findsOneWidget);
-      expect(find.textContaining('还有 4,462 条不在内置库'), findsOneWidget);
-      // 赛项行：只有大数 = 官方清单条数，不硬凑在库映射。
-      expect(find.text('赛项'), findsOneWidget);
-      expect(find.text('3,407'), findsOneWidget);
-      expect(find.text('767'), findsOneWidget);
-      // 旧版三个整宽按钮的字面与口径说明行都不留。
+      // 年份 / 系列 / 在库形态压成一行，不再逐形态报数。
+      expect(find.textContaining('2025 年 · X征'), findsOneWidget);
+      expect(find.textContaining('长篇 / 中篇 / 短篇 / 对话'), findsOneWidget);
+      expect(find.text('在库 335 · 覆盖 7.0%'), findsOneWidget);
+      expect(find.text('参赛清单 4,797 →'), findsOneWidget);
+
+      // 代表作按 form 分组；两本不同 form 时各有小标题。
+      expect(find.text('代表作'), findsOneWidget);
+      expect(find.text('长篇'), findsOneWidget);
+      expect(find.text('短篇'), findsOneWidget);
+      expect(find.text('魔王小姐请再忍耐一下'), findsOneWidget);
+      expect(find.text('夺舍失败后'), findsOneWidget);
+
+      // 赛程、官方清单条数、赛项行、覆盖率条、旧动作区全部退出详情页。
+      expect(find.text('投稿开始'), findsNothing);
+      expect(find.text('投稿截止'), findsNothing);
+      expect(find.text('结果公布'), findsNothing);
+      expect(find.textContaining('预计'), findsNothing);
+      expect(find.text('官方清单'), findsNothing);
+      expect(find.text('赛项'), findsNothing);
+      expect(find.text('3,407'), findsNothing);
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+      expect(find.text('浏览在库作品'), findsNothing);
       expect(find.text('浏览全部作品'), findsNothing);
-      expect(find.text('查看官方清单'), findsNothing);
-      expect(find.textContaining('上方计数为在库规模'), findsNothing);
     });
 
-    testWidgets('档案：动作区带数、结果未公布说「预计」、无清单接口不装能用',
-        (tester) async {
+    testWidgets('档案：AppBar 只留奖杯/外链 icon，参赛清单入口不随代表作消失', (tester) async {
       await pumpArchive(tester, thirteen(), books: twoBooks());
-      expect(find.text('浏览在库作品'), findsOneWidget);
-      expect(find.text('335 本'), findsOneWidget);
-      expect(find.text('4,797 条'), findsOneWidget);
-      expect(find.text('官方活动页'), findsOneWidget); // 已验证 URL 才出现
+      expect(find.byTooltip('获奖记录'), findsOneWidget);
+      expect(find.byTooltip('官方活动页'), findsOneWidget);
+      expect(find.byIcon(Icons.emoji_events), findsOneWidget);
+      expect(find.byIcon(Icons.open_in_new), findsOneWidget);
+      expect(find.text('参赛清单 4,797 →'), findsOneWidget);
+      // 官方活动页 / 获奖作品不再占正文。
+      expect(find.text('官方活动页'), findsNothing);
+      expect(find.text('获奖作品'), findsNothing);
 
       final running = ContestGroup.fromJson({
         'name': '十四征',
@@ -832,73 +955,72 @@ void main() {
         'roster_total': 4064,
       });
       await pumpArchive(tester, running);
-      expect(find.text('预计结果公布'), findsOneWidget);
-      // 在库 0 本：浏览动作没有可去，覆盖率换成「唯一书目来源」那句。
-      expect(find.text('库里还没有'), findsOneWidget);
-      expect(find.textContaining('本地在库 0 本'), findsOneWidget);
+      // 在库 0 本：不摆代表作，但参赛清单仍是唯一书目来源，入口保留。
+      expect(find.text('在库 0 · 覆盖 0.0%'), findsOneWidget);
+      expect(find.text('参赛清单 4,064 →'), findsOneWidget);
       expect(find.text('代表作'), findsNothing);
 
       await pumpArchive(tester, noRoster());
-      expect(find.textContaining('这一届没有参赛清单接口'), findsOneWidget);
-      expect(find.text('接口无清单'), findsOneWidget);
-      expect(find.text('赛项'), findsNothing); // 无 tagId 就不摆空区块
+      expect(find.text('在库 125 · 无参赛清单接口'), findsOneWidget);
+      expect(find.text('参赛清单 →'), findsNothing);
+      expect(find.text('参赛清单 4,064 →'), findsNothing);
+      expect(find.text('代表作'), findsNothing);
+      expect(find.byTooltip('官方活动页'), findsNothing);
     });
 
-    testWidgets('档案：一/二/三征按获奖口径——奖项名额 + 获奖名单入口',
-        (tester) async {
+    testWidgets('档案：award-only 只留奖杯 icon，不再铺获奖名额/名单', (tester) async {
       await pumpArchive(tester, oneZheng());
-      // 主数换成获奖名额；不出现「官方清单」的缺数格。
-      expect(find.text('获奖名额'), findsOneWidget);
-      expect(find.text('官方清单'), findsNothing);
-      // 统计格与动作行各一处名额数（纯数字，不挂「名」单位）。
-      expect(find.text('5'), findsNWidgets(2));
-      // 赛项区改叫奖项，右数是名额（铜奖 3），不是 tag 列表条数。
-      expect(find.text('奖项'), findsOneWidget);
-      expect(find.text('数字为该奖项获奖名额 · 点行看获奖名单'), findsOneWidget);
-      expect(find.text('3'), findsOneWidget);
-      // 动作区：获奖名单入口带名额，不再有禁用的「接口无清单」。
-      expect(find.text('获奖名单'), findsOneWidget);
-      expect(find.text('5 名'), findsNothing);
-      expect(find.text('接口无清单'), findsNothing);
-      // 覆盖率句说清官方只公布获奖名单。
-      expect(find.text('这一届官方只公布获奖名单，没有参赛清单条目数。'),
-          findsOneWidget);
+      expect(find.text('在库 2 · 官方只公布获奖名单'), findsOneWidget);
+      expect(find.byTooltip('获奖记录'), findsOneWidget);
+      expect(find.byIcon(Icons.emoji_events), findsOneWidget);
+      expect(find.byTooltip('官方活动页'), findsNothing);
+
+      // 获奖名单走 AppBar；正文不再有统计格、奖项行、获奖名单入口。
+      expect(find.text('获奖名额'), findsNothing);
+      expect(find.text('获奖名单'), findsNothing);
+      expect(find.text('奖项'), findsNothing);
+      expect(find.text('5'), findsNothing);
+      expect(find.text('参赛清单'), findsNothing);
+      expect(find.text('代表作'), findsNothing);
     });
 
-    testWidgets('档案：获奖作品区块——真名数组、库内可点、库外只列标题',
-        (tester) async {
-      await pumpArchive(tester, thirteen(), books: twoBooks(), awards: [
-        {
-          'nid': 999001,
-          'title': '已核实的金奖作品',
-          'awards': ['金奖'],
-          'contest': '十三征-长篇',
-          'series': 'X征',
-          'in_seed': true,
-          'author': '测试作者',
-          'favs': 1200,
-          'est_year': 2025,
-          'form': 'long',
-        },
-        {
-          'nid': 999002,
-          'title': '库外获奖作品',
-          'awards': ['铜奖', '推荐奖'],
-          'contest': '十三征-短篇',
-          'series': 'X征',
-          'in_seed': false,
-        },
-      ]);
-      expect(find.text('获奖作品'), findsOneWidget);
-      expect(find.textContaining('contest-achieve 已核实'), findsOneWidget);
-      expect(find.text('已核实的金奖作品'), findsOneWidget);
-      expect(find.text('金奖'), findsOneWidget);
-      expect(find.text('测试作者 · 2025 · 收藏 1,200'), findsOneWidget);
-      // 库外获奖也列出，双奖项合并一格，且不伪造书目字段/不写「待逐档标定」。
-      expect(find.text('库外获奖作品'), findsOneWidget);
-      expect(find.text('铜奖·推荐奖'), findsOneWidget);
-      expect(find.text('获奖作品 · 不在内置库'), findsOneWidget);
-      expect(find.textContaining('待逐档标定'), findsNothing);
+    testWidgets('档案：获奖作品不进正文，只留 AppBar 奖杯入口', (tester) async {
+      await pumpArchive(
+        tester,
+        thirteen(),
+        books: twoBooks(),
+        awards: [
+          {
+            'nid': 999001,
+            'title': '已核实的金奖作品',
+            'awards': ['金奖'],
+            'contest': '十三征-长篇',
+            'series': 'X征',
+            'in_seed': true,
+            'author': '测试作者',
+            'favs': 1200,
+            'est_year': 2025,
+            'form': 'long',
+          },
+          {
+            'nid': 999002,
+            'title': '库外获奖作品',
+            'awards': ['铜奖', '推荐奖'],
+            'contest': '十三征-短篇',
+            'series': 'X征',
+            'in_seed': false,
+          },
+        ],
+      );
+      expect(find.byTooltip('获奖记录'), findsOneWidget);
+      expect(find.byTooltip('官方活动页'), findsOneWidget);
+      expect(find.text('获奖作品'), findsNothing);
+      expect(find.text('已核实的金奖作品'), findsNothing);
+      expect(find.text('库外获奖作品'), findsNothing);
+      expect(find.text('铜奖·推荐奖'), findsNothing);
+      expect(find.text('金奖'), findsNothing);
+      expect(find.textContaining('contest-achieve'), findsNothing);
+      expect(find.text('参赛清单 4,797 →'), findsOneWidget);
     });
 
     testWidgets('名单页：获奖事件标题与条数按获奖名单口径', (tester) async {
@@ -918,10 +1040,13 @@ class _FakeApi extends StrataApi {
   final List<ObservationRow> _obs;
   final List<RankItem> _related;
 
-  _FakeApi(this._detail, this._works, this._obs,
-      {List<RankItem> similar = const []})
-      : _related = similar,
-        super('http://127.0.0.1:1');
+  _FakeApi(
+    this._detail,
+    this._works,
+    this._obs, {
+    List<RankItem> similar = const [],
+  }) : _related = similar,
+       super('http://127.0.0.1:1');
 
   @override
   Future<BookDetail> book(int nid) async => _detail;
@@ -948,8 +1073,10 @@ class _FakeApi extends StrataApi {
       author == '测试作者' ? _works : const [];
 
   @override
-  Future<List<RankItem>> relatedBooks(
-      {required int nid, int limit = 8}) async => // 真端点已排除锚点/同作者/跨 form。
+  Future<List<RankItem>> relatedBooks({
+    required int nid,
+    int limit = 8,
+  }) async => // 真端点已排除锚点/同作者/跨 form。
       _related;
 }
 
@@ -984,14 +1111,14 @@ class _FakeContestApi extends StrataApi {
     required String contest,
     String division = '',
     int page = 1,
-  }) async =>
-      RosterPage.fromJson({
-        'contest': contest,
-        'division': division,
-        'page': 1,
-        'pages': 1,
-        'source': 'official',
-        'list_kind': rosterKind,
-        'items': rosterItems,
-      });
+    String scope = '',
+  }) async => RosterPage.fromJson({
+    'contest': contest,
+    'division': division,
+    'page': 1,
+    'pages': 1,
+    'source': 'official',
+    'list_kind': rosterKind,
+    'items': rosterItems,
+  });
 }

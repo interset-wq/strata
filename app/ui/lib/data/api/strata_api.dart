@@ -531,11 +531,13 @@ class StrataApi {
     required String contest,
     String division = '',
     int page = 1,
+    String scope = '',
   }) async {
     final body = await _get('/roster', {
       'contest': contest,
       'division': division,
       'page': '$page',
+      if (scope.isNotEmpty) 'scope': scope,
     });
     return RosterPage.fromJson(body);
   }
@@ -1184,7 +1186,7 @@ class ContestGroup {
   final String? official;
 
   /// other 系列事件的首页 tab 归属（用户裁定 2026-11-22）：'dialogue' /
-  /// 'ip'；'' = 主题类（列表页「其他」tab）。四季系列永无 lane。
+  /// 'ip'；'' = 主题类（列表页「主题」tab）。四季系列永无 lane。
   final String lane;
 
   /// 可拉取官方清单（引擎内嵌台账有已验证 tagId）；
@@ -1298,6 +1300,13 @@ class RosterItem {
   final int? estYear;
   final int? words;
 
+  /// 经典榜单行全字段（scope=inlibrary 直查 db 时返回，2026-11-27）。
+  final String? genre;
+  final String? priceType;
+  final int? clicks;
+  final int? praises;
+  final List<String> tags;
+
   RosterItem.fromJson(Map<String, dynamic> m)
     : nid = m['nid'] as int,
       title = m['title'] as String,
@@ -1310,7 +1319,14 @@ class RosterItem {
       favs = (m['favs'] as num?)?.toInt(),
       status = m['status'] as String?,
       estYear = (m['est_year'] as num?)?.toInt(),
-      words = (m['words'] as num?)?.toInt();
+      words = (m['words'] as num?)?.toInt(),
+      genre = m['genre'] as String?,
+      priceType = m['price_type'] as String?,
+      clicks = (m['clicks'] as num?)?.toInt(),
+      praises = (m['praises'] as num?)?.toInt(),
+      tags = ((m['tags'] as List?) ?? const [])
+          .map((e) => e.toString())
+          .toList();
 }
 
 /// 官方清单页：source=official（上游清单）| degraded（引擎回落库内子集，
@@ -1651,33 +1667,18 @@ class RemoteSearchResult {
           .toList();
 }
 
-/// contest（征文）→ 联动 IP 展示名（崩坏3征文 → 崩坏3，
-/// 失业魔王同人征文 → 失业魔王）。contest 为空返回 null（无征文标）。
+/// contest（征文）→ 联动 IP 展示名。2026-11-27 用户定：contest 列已由我方
+/// 统一命名（崩坏3同人 / 点鸭星穹 / xx主题），展示层完整显示原样，不再去
+/// 「征文/同人征文」后缀——旧的后缀规则会把新名裁错，且是 UI 重复卡片的
+/// 根源之一。contest 为空返回 null（无征文标）。
 String? contestIpLabel(String? contest) {
   if (contest == null || contest.isEmpty) return null;
-  var s = contest;
-  if (s.endsWith('同人征文')) {
-    s = s.substring(0, s.length - 4);
-  } else if (s.endsWith('征文')) {
-    s = s.substring(0, s.length - 2);
-  }
-  return s.isEmpty ? contest : s;
+  return contest;
 }
 
-/// contest（征文）→ 短篇 tab 比赛 chip 的紧凑标签：
-/// 去「征文」/「同人征文」后缀（2025春季征文 → 2025春季），「超新星杯」
-/// 特殊处理（“超新星杯”短篇大赛 → 超新星杯）。入参已是引擎归一化后的
-/// 赛事名（六征长篇/中篇/短篇 → 六征，仅 N征 系列，用户 2026-11-21）。
-String contestChipLabel(String contest) {
-  if (contest.contains('超新星杯')) return '超新星杯';
-  var s = contest;
-  if (s.endsWith('同人征文')) {
-    s = s.substring(0, s.length - 4);
-  } else if (s.endsWith('征文')) {
-    s = s.substring(0, s.length - 2);
-  }
-  return s.isEmpty ? contest : s;
-}
+/// contest（征文）→ 短篇 tab 比赛 chip 标签。入参是引擎归一化后的赛事名，
+/// 2026-11-27 起完整显示原样（2025春征 / 超新星杯短篇 / 点鸭星穹）。
+String contestChipLabel(String contest) => contest;
 
 /// IP 分组卡片：contest（征文）→ 联动 IP，count 本数，
 /// top_* 是该组收藏最高的一本；IP tab 只用 topTitle 做卡片文案，
@@ -1705,8 +1706,8 @@ class IpGroup {
     topCover: j['top_cover'] as String?,
   );
 
-  /// 展示名：由 contest 推导（崩坏3征文 → 崩坏3）。
-  String get label => contestIpLabel(contest) ?? contest;
+  /// 展示名：2026-11-27 起完整显示 contest 原样（崩坏3同人）。
+  String get label => contest;
 }
 
 /// IP 分组结果：total = 池总量，groups = 按征文（contest）聚合、

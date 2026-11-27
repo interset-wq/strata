@@ -99,6 +99,9 @@ class _RosterPageState extends ConsumerState<RosterPage> {
         contest: widget.contest,
         division: _division,
         page: page,
+        // 仅库内：直查 db（用户裁定 2026-11-27）——官方清单分页只能看到
+        // 恰好落在已拉取页里的那几本库内书；contest 标签本身就在 seed。
+        scope: _filter == 1 ? 'inlibrary' : '',
       );
       if (!mounted || _division != _loadedDivision) return; // 换轨后的旧响应
       setState(() {
@@ -262,7 +265,11 @@ class _RosterPageState extends ConsumerState<RosterPage> {
             ],
             selected: {_filter},
             showSelectedIcon: false,
-            onSelectionChanged: (sel) => setState(() => _filter = sel.first),
+            onSelectionChanged: (sel) {
+              setState(() => _filter = sel.first);
+              // 仅库内切换数据源（官方清单分页 ↔ seed 直查分页），必须重载。
+              _loadPage(1, reset: true);
+            },
           ),
         ),
         if (_source == 'degraded') _noteBar(scheme, award),
@@ -346,15 +353,22 @@ class _RosterPageState extends ConsumerState<RosterPage> {
         // 仅库内：代表作同款经典榜单行（无序号，用户裁定 2026-11-27）；
         // 全部/仅库外保持自绘行（带官方简介与库外徽标）。
         if (_filter == 1) {
+          final it = items[i];
           return BookRowTile(
             item: RankItem.fromJson({
               'rank': 0,
-              'nid': items[i].nid,
-              'title': items[i].title,
-              'author': items[i].author,
-              'favs': items[i].favs ?? 0,
-              'cover_url': items[i].coverUrl,
-              'status': items[i].status,
+              'nid': it.nid,
+              'title': it.title,
+              'author': it.author,
+              'genre': it.genre,
+              'favs': it.favs ?? 0,
+              'cover_url': it.coverUrl,
+              'status': it.status,
+              'est_year': it.estYear,
+              'words': it.words,
+              'clicks': it.clicks,
+              'praises': it.praises,
+              'tags': it.tags,
             }),
           );
         }
