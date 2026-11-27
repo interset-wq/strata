@@ -100,6 +100,8 @@ class BookRowTile extends StatelessWidget {
         : null;
     final bookTags = <String>[];
     for (final t in item.tags) {
+      // 萌神 tag 一律不显示（用户裁定 2026-11-27：列表里是排名噪音）。
+      if (t.endsWith('萌神')) continue;
       if (t != genre && !bookTags.contains(t)) bookTags.add(t);
     }
 
@@ -277,8 +279,9 @@ class BookRowTile extends StatelessWidget {
                         for (final t in extraTags) _tagPill(context, t),
                         if (genre != null)
                           _tagPill(context, genre, deep: true),
-                        for (final t in bookTags.take(genre == null ? 3 : 2))
-                          _tagPill(context, t),
+                        // 全量显示（用户裁定 2026-11-27：原 take(2/3) 只用
+                        // 半行空间；Wrap 自动换行，萌神 tag 已过滤）。
+                        for (final t in bookTags) _tagPill(context, t),
                       ],
                     ),
                   ],
