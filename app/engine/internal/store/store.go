@@ -1012,6 +1012,7 @@ func (s *Store) QuantBooks(ctx context.Context, form, board string,
   SELECT seed.books.nid, seed.books.title, seed.books.author, seed.books.genre,
          seed.books.est_year, seed.books.status, seed.books.price_type,
          seed.books.words, seed.books.clicks, seed.books.favs,
+         seed.books.praises,
          seed.books.cqs, seed.books.cps, seed.books.cqs_state,
          COALESCE(c.cover, NULLIF(seed.books.cover_url, '')) AS cover_url
   FROM seed.books
@@ -1021,7 +1022,7 @@ func (s *Store) QuantBooks(ctx context.Context, form, board string,
   UNION ALL
   SELECT discovered.nid, discovered.title, discovered.author, discovered.genre,
          discovered.est_year, NULL, NULL, discovered.words, NULL,
-         discovered.favs, discovered.cqs, discovered.cps,
+         discovered.favs, discovered.praises, discovered.cqs, discovered.cps,
          discovered.cqs_state,
          COALESCE(c.cover, NULLIF(discovered.cover_url, '')) AS cover_url
   FROM discovered
@@ -1030,7 +1031,7 @@ func (s *Store) QuantBooks(ctx context.Context, form, board string,
   UNION ALL
   SELECT book_meta.nid, book_meta.title, book_meta.author, book_meta.genre,
          book_meta.est_year, NULL, book_meta.price_type, book_meta.words,
-         NULL, book_meta.favs, book_meta.cqs, book_meta.cps,
+         NULL, book_meta.favs, book_meta.praises, book_meta.cqs, book_meta.cps,
          book_meta.cqs_state,
          COALESCE(c.cover, NULLIF(book_meta.cover_url, '')) AS cover_url
   FROM book_meta
@@ -1046,15 +1047,16 @@ func (s *Store) QuantBooks(ctx context.Context, form, board string,
 	items := make([]RankItem, 0, limit)
 	for rows.Next() {
 		var (
-			item                     RankItem
-			gen, status, price, cover sql.NullString
-			words, clicks, favs       sql.NullInt64
-			cqs, cps                  sql.NullFloat64
-			state                     sql.NullString
+			item                       RankItem
+			gen, status, price, cover  sql.NullString
+			words, clicks, favs        sql.NullInt64
+			praises                    sql.NullInt64
+			cqs, cps                   sql.NullFloat64
+			state                      sql.NullString
 		)
 		if err := rows.Scan(&item.NID, &item.Title, &item.Author, &gen,
 			&item.EstYear, &status, &price, &words, &clicks, &favs,
-			&cqs, &cps, &state, &cover); err != nil {
+			&praises, &cqs, &cps, &state, &cover); err != nil {
 			return nil, err
 		}
 		item.Rank = len(items) + offset + 1
@@ -1064,6 +1066,7 @@ func (s *Store) QuantBooks(ctx context.Context, form, board string,
 		item.Words = intPtr(words)
 		item.Clicks = intPtr(clicks)
 		item.Favs = intPtr(favs)
+		item.Praises = intPtr(praises)
 		item.CQS = floatPtr(cqs)
 		item.CPS = floatPtr(cps)
 		item.CQSState = state.String
