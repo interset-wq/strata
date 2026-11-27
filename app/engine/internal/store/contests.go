@@ -344,7 +344,8 @@ func (s *Store) ContestBooks(ctx context.Context, name string, perForm int) ([]R
 SELECT b.nid, b.title, b.author, b.genre, b.est_year, b.clicks, b.favs,
        b.contest, b.form, b.status, b.price_type, b.words, b.praises,
        (SELECT GROUP_CONCAT(bt.tag) FROM book_tags bt WHERE bt.nid = b.nid) AS tags,
-       COALESCE(c.cover, NULLIF(b.cover_url, '')) AS cover_url
+       COALESCE(c.cover, NULLIF(b.cover_url, '')) AS cover_url,
+       b.rn
 FROM (
   SELECT b.nid, b.title, b.author, b.genre, b.est_year, b.clicks, b.favs,
          b.contest, b.form, b.status, b.price_type, b.words, b.praises,
@@ -378,14 +379,17 @@ ORDER BY (b.favs IS NULL) ASC, b.favs DESC, b.nid`
 			praises sql.NullInt64
 			contest sql.NullString
 			tags    sql.NullString
+			rn      int
 		)
 		if err := rows.Scan(&item.NID, &item.Title, &item.Author, &gen,
 			&item.EstYear, &clicks, &favs, &contest, &item.Form,
 			&status, &price, &words, &praises, &tags,
-			&item.CoverURL); err != nil {
+			&item.CoverURL, &rn); err != nil {
 			return nil, err
 		}
-		item.Rank = len(items) + 1
+		// 序号 = form 内排名（rn，用户裁定 2026-11-27：各形态列表序号
+		// 都从 1 开始），不是跨 form 的全局行号。
+		item.Rank = rn
 		item.Genre = strPtr(gen)
 		item.Clicks = intPtr(clicks)
 		item.Favs = intPtr(favs)
