@@ -9,7 +9,6 @@ import '../core/providers.dart';
 import '../data/api/strata_api.dart';
 import '../widgets/back_to_top.dart';
 import '../widgets/book_row_tile.dart';
-import '../widgets/default_cover.dart';
 
 /// 发书日历（docs/14 P1，底部导航替换搜索 tab）：
 /// 「同期出发的作品」——按 est_date 聚合 seed 书浏览。粒度段为月/周/VIP，
@@ -546,19 +545,16 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
         final c = days[i];
         final d = DateTime.parse(c.date);
         final uni = _suppressUniverse(c.date) ? 0 : c.universe;
-        return GestureDetector(
-          onTap: c.total > 0 || uni > 0 ? () => _openDay(d) : null,
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: scheme.surface,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: scheme.outline.withValues(alpha: .25)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+        // 2026-11-27 统一：周视图的书行与经典榜单同款行（BookRowTile，
+        // 置信度徽标走 trailing 槽）；日期头保留聚合信息，点行进日视图。
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            GestureDetector(
+              onTap: c.total > 0 || uni > 0 ? () => _openDay(d) : null,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(4, 0, 4, 4),
+                child: Row(
                   children: [
                     Text(
                       '${d.month}月${d.day}日',
@@ -589,50 +585,22 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                       ),
                   ],
                 ),
-                for (final it in c.items)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 10),
-                    child: Row(
-                      children: [
-                        SizedBox(
-                          width: 34,
-                          height: 46,
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(4),
-                            child: _miniCover(it),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                it.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(fontSize: 12),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                it.author,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  color: scheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        _ConfBadge(conf: it.estConf),
-                      ],
-                    ),
-                  ),
-              ],
+              ),
             ),
-          ),
+            for (final it in c.items)
+              BookRowTile(
+                item: RankItem.fromJson({
+                  'rank': 0,
+                  'nid': it.nid,
+                  'title': it.title,
+                  'author': it.author,
+                  'genre': it.genre,
+                  'favs': it.favs,
+                  'cover_url': it.coverUrl,
+                }),
+                trailing: _ConfBadge(conf: it.estConf),
+              ),
+          ],
         );
       },
     );
@@ -791,17 +759,6 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
           },
         );
       },
-    );
-  }
-
-  Widget _miniCover(CalendarItem it) {
-    final coverUrl = it.coverUrl;
-    if (coverUrl == null || coverUrl.isEmpty) {
-      return defaultCover(it.nid);
-    }
-    return coverImage(
-      coverImageUrl(coverUrl) == null ? null : coverUrl,
-      it.nid,
     );
   }
 
