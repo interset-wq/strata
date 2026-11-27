@@ -517,10 +517,18 @@ class _Header extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
+            // 对比度修正（2026-11-27 用户反馈）：原 onSurfaceVariant 10.5
+            // 小字在米色底上看不清，改 onSurface 加粗。
             Text('在库 ${fmtCount(g.count)}',
-                style: TextStyle(fontSize: 10.5, color: scheme.onSurfaceVariant)),
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: scheme.onSurface)),
             Text('官方清单 ${fmtCount(off)}',
-                style: TextStyle(fontSize: 10.5, color: scheme.onSurfaceVariant)),
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: scheme.onSurface)),
           ],
         ),
         const SizedBox(height: 4),
@@ -576,7 +584,8 @@ class _Schedule extends StatelessWidget {
     if (parts.isEmpty) {
       return Text(
         '官方未公示赛程日期',
-        style: TextStyle(fontSize: 11.5, color: scheme.outline),
+        // 对比度修正（2026-11-27）：outline 在米色底上近乎隐形。
+        style: TextStyle(fontSize: 11.5, color: scheme.onSurfaceVariant),
       );
     }
     return Text(
