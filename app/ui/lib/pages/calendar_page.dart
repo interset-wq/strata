@@ -544,14 +544,14 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
       itemBuilder: (context, i) {
         final c = days[i];
         final d = DateTime.parse(c.date);
-        final uni = _suppressUniverse(c.date) ? 0 : c.universe;
         // 2026-11-27 统一：周视图的书行与经典榜单同款行（BookRowTile，
         // 置信度徽标走 trailing 槽）；日期头保留聚合信息，点行进日视图。
+        // 「估计」全平台数已删（用户裁定：不显示）。
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             GestureDetector(
-              onTap: c.total > 0 || uni > 0 ? () => _openDay(d) : null,
+              onTap: c.total > 0 ? () => _openDay(d) : null,
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(4, 0, 4, 4),
                 child: Row(
@@ -572,11 +572,9 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                       ),
                     ),
                     const Spacer(),
-                    if (c.total > 0 || uni > 0)
+                    if (c.total > 0)
                       Text(
-                        uni > 0
-                            ? '估计~$uni本 · ${c.total}内置'
-                            : '${c.total}本',
+                        '${c.total}本',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
@@ -640,11 +638,9 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                 child: Padding(
                   padding: const EdgeInsets.all(12),
                   child: Text(
-                    uni > 0
-                        ? '— 全平台估计当日发书 ~$uni 本 · 内置库 ${day.total} 本，按收藏排序 —'
-                        : noEst
-                        ? '— 内置库 ${day.total} 本，按收藏排序 · 全平台估计只到 $_estimateEnd —'
-                        : '— 内置库 ${day.total} 本，按收藏排序 —',
+                    // 2026-11-27：全平台「估计」数已删（用户裁定），
+                    // 只显示内置库口径。
+                    '— 内置库 ${day.total} 本，按收藏排序 —',
                     style: TextStyle(
                       fontSize: 11,
                       color: scheme.onSurfaceVariant,
