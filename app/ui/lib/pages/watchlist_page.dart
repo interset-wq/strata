@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../widgets/default_cover.dart';
+import '../widgets/book_row_tile.dart';
 
 import '../core/providers.dart';
 import '../data/api/strata_api.dart';
@@ -166,8 +166,9 @@ class _WatchlistPageState extends ConsumerState<WatchlistPage> {
   }
 }
 
-/// 统一卡：封面 + 标题/作者/题材 + 状态徽标（追踪于/保存于 N 天前）+
-/// 追踪切换 / 移除。点卡进详情（观测时序在详情页看）。
+/// 统一行（2026-11-26 书籍列表统一）：与经典榜单同款行（BookRowTile），
+/// 「追踪于/保存于 N 天前」与观测/追踪/移除操作收进右侧 trailing 槽，
+/// 「对照」徽标走 extraTags。点卡进详情（观测时序在详情页看）。
 class _WatchCard extends StatelessWidget {
   final WatchItem item;
   final VoidCallback onToggle;
@@ -182,103 +183,37 @@ class _WatchCard extends StatelessWidget {
     final added = DateTime.fromMillisecondsSinceEpoch(item.addedAt * 1000);
     final days = DateTime.now().difference(added).inDays;
     final when = days <= 0 ? '今天' : days == 1 ? '昨天' : '$days 天前';
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: InkWell(
-        onTap: () => context.push('/book/${item.nid}'),
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
+    return BookRowTile(
+      item: RankItem.fromJson({
+        'rank': 0,
+        'nid': item.nid,
+        'title': item.title,
+        'author': item.genre != null
+            ? '${item.author} · ${item.genre}'
+            : item.author,
+        'cover_url': item.coverUrl,
+      }),
+      extraTags: item.role == 'peer' ? const ['对照'] : const [],
+      trailing: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(
+            item.active ? '追踪于 $when' : '保存于 $when',
+            style: TextStyle(
+                fontSize: 10,
+                color: item.active ? scheme.primary : scheme.onSurfaceVariant),
+          ),
+          const SizedBox(height: 4),
+          // 观测数据快捷入口（docs/07 工作台直达路径）+ 追踪切换（v6）+ 移除
+          Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              // 无封面数据：书脊字占位（与发现流一致）
-              Container(
-                width: 52,
-                height: 72,
-                decoration: BoxDecoration(
-                  color: scheme.surface,
-                  border:
-                      Border.all(color: scheme.outline.withValues(alpha: .4)),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                alignment: Alignment.center,
-                child: defaultCover(item.nid, radius: 6),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(item.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleLarge
-                                  ?.copyWith(fontSize: 14)),
-                        ),
-                        // 对照书徽标（role=peer，docs/07 §1；对照折线在
-                        // 各书数据页「同期对照」区块）
-                        if (item.role == 'peer') ...[
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 1),
-                            decoration: BoxDecoration(
-                                color: scheme.secondary
-                                    .withValues(alpha: .15),
-                                borderRadius: BorderRadius.circular(999)),
-                            child: Text('对照',
-                                style: TextStyle(
-                                    fontSize: 9.5,
-                                    color: scheme.secondary,
-                                    fontWeight: FontWeight.w600)),
-                          ),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      item.genre != null
-                          ? '${item.author} · ${item.genre}'
-                          : item.author,
-                      style: TextStyle(
-                          fontSize: 11, color: scheme.onSurfaceVariant),
-                    ),
-                    const SizedBox(height: 5),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 1),
-                      decoration: BoxDecoration(
-                          border: Border.all(
-                              color: (item.active
-                                      ? scheme.primary
-                                      : scheme.outline)
-                                  .withValues(alpha: .5)),
-                          borderRadius: BorderRadius.circular(999)),
-                      child: Text(
-                        item.active ? '追踪于 $when' : '保存于 $when',
-                        style: TextStyle(
-                            fontSize: 10,
-                            color: item.active
-                                ? scheme.primary
-                                : scheme.onSurfaceVariant),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              // 观测数据快捷入口（docs/07 工作台直达路径）
               IconButton(
                 icon: Icon(Icons.timeline,
                     size: 18, color: scheme.onSurfaceVariant),
                 tooltip: '观测数据',
                 onPressed: () => context.push('/book/${item.nid}/data'),
               ),
-              // 追踪切换（v6：激活 = 后台抓取，未激活 = 只存）
               IconButton(
                 icon: Icon(
                     item.active
@@ -298,7 +233,7 @@ class _WatchCard extends StatelessWidget {
               ),
             ],
           ),
-        ),
+        ],
       ),
     );
   }

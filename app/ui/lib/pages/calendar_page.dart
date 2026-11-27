@@ -10,7 +10,6 @@ import '../data/api/strata_api.dart';
 import '../widgets/back_to_top.dart';
 import '../widgets/book_row_tile.dart';
 import '../widgets/default_cover.dart';
-import '../widgets/metric_badge.dart';
 
 /// 发书日历（docs/14 P1，底部导航替换搜索 tab）：
 /// 「同期出发的作品」——按 est_date 聚合 seed 书浏览。粒度段为月/周/VIP，
@@ -837,91 +836,28 @@ class _CalendarBookRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final coverUrl = item.coverUrl;
-    final hasCover = coverUrl != null && coverUrl.isNotEmpty;
-    final sub = [
-      item.author,
-      if (item.genre != null && item.genre!.isNotEmpty) item.genre!,
-    ].join('  ');
-    return InkWell(
+    // 2026-11-26 统一：日历书行与经典榜单同款行（BookRowTile），
+    // 定年置信度徽标收进右侧 trailing 槽。
+    return BookRowTile(
+      item: RankItem.fromJson({
+        'rank': 0,
+        'nid': item.nid,
+        'title': item.title,
+        'author': item.author,
+        'genre': item.genre,
+        'favs': item.favs,
+        'cover_url': item.coverUrl,
+      }),
+      trailing: _ConfBadge(conf: item.estConf),
       onTap: onOpen,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 3),
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: scheme.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: scheme.outline.withValues(alpha: .25)),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: 48,
-              height: 64,
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: hasCover
-                    ? coverImage(coverUrl, item.nid)
-                    : defaultCover(item.nid),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    sub,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 11, color: scheme.secondary),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      Icon(
-                        MetricIcons.favs,
-                        size: 13,
-                        color: scheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 3),
-                      Text(
-                        BookRowTile.wan(item.favs),
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: scheme.onSurfaceVariant,
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                      _ConfBadge(conf: item.estConf),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
 
-/// VIP 签约升卡（docs/14 §1.5）：第一行通用卡（封面+标题+徽标+tags），
-/// 第二行完整 intro 容器（官方 <br> 转换行，不截断）；库外书点击先
-/// rank-seed 预写收录再进详情页（详情页 words==null 自动 refresh 补全）。
+/// VIP 签约升卡（docs/14 §1.5）：第一行经典榜单行（BookRowTile，主编
+/// 推荐徽标走 trailing、库外提示走 extraTags），第二行完整 intro 容器
+/// （官方 <br> 转换行，不截断）；库外书点击先 rank-seed 预写收录再进
+/// 详情页（详情页 words==null 自动 refresh 补全）。
 class _PreorderRow extends StatelessWidget {
   final PreorderItem item;
   final VoidCallback onOpen;
@@ -936,139 +872,47 @@ class _PreorderRow extends StatelessWidget {
         : null;
     // 官方 intro 是内嵌 <br> 的 HTML 片段，转真实换行后全文展示。
     final intro = item.intro.replaceAll(RegExp(r'<br\s*/?>'), '\n').trim();
-    return InkWell(
-      onTap: onOpen,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 3),
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: scheme.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: scheme.outline.withValues(alpha: .25)),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        BookRowTile(
+          item: RankItem.fromJson({
+            'rank': 0,
+            'nid': item.nid,
+            'title': item.title,
+            // author 可空（库外预购无作者）：空串走通用行的空段跳过，
+            // 不用 null-aware element——RankItem.fromJson 的 author 是
+            // required String，键缺失会 cast 崩。
+            'author': author ?? '',
+            'favs': item.inLibFavs ?? 0,
+            'cover_url': item.cover,
+            'tags': item.tags,
+          }),
+          trailing: item.isMainPush ? const _VipBadge() : null,
+          extraTags: item.inSeed ? const [] : const ['库外作品'],
+          onTap: onOpen,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(
-                  width: 48,
-                  height: 64,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: coverImage(item.cover, item.nid),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Flexible(
-                            child: Text(
-                              item.title,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                          if (item.isMainPush) ...[
-                            const SizedBox(width: 6),
-                            const _VipBadge(),
-                          ],
-                        ],
-                      ),
-                      if (author != null) ...[
-                        const SizedBox(height: 3),
-                        Text(
-                          author,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: scheme.secondary,
-                          ),
-                        ),
-                      ],
-                      if (item.tags.isNotEmpty) ...[
-                        const SizedBox(height: 3),
-                        Text(
-                          item.tags.join('  '),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: scheme.primary,
-                          ),
-                        ),
-                      ],
-                      if (item.inSeed && (item.inLibFavs ?? 0) > 0) ...[
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Icon(
-                              MetricIcons.favs,
-                              size: 13,
-                              color: scheme.onSurfaceVariant,
-                            ),
-                            const SizedBox(width: 3),
-                            Text(
-                              BookRowTile.wan(item.inLibFavs),
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: scheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                      if (!item.inSeed) ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          '库外作品 · 点击自动收录进详情',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: scheme.onSurfaceVariant.withValues(
-                              alpha: .7,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            if (intro.isNotEmpty) ...[
-              const SizedBox(height: 8),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: scheme.onSurface.withValues(alpha: .04),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  intro,
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    height: 1.5,
-                    color: scheme.onSurface.withValues(alpha: .85),
-                  ),
+        if (intro.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: scheme.onSurface.withValues(alpha: .04),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                intro,
+                style: TextStyle(
+                  fontSize: 11.5,
+                  height: 1.5,
+                  color: scheme.onSurface.withValues(alpha: .85),
                 ),
               ),
-            ],
-          ],
-        ),
-      ),
+            ),
+          ),
+      ],
     );
   }
 }

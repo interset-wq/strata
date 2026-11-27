@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../core/providers.dart';
 import '../data/api/strata_api.dart';
 import '../widgets/back_to_top.dart';
+import '../widgets/book_row_tile.dart';
 import '../widgets/default_cover.dart';
 
 /// 形式中文名与固定序（赛事档案页同款口径，docs/17 §7）。
@@ -683,8 +684,9 @@ class _RepresentsBlock extends StatelessWidget {
 }
 
 /// 库外作品行（作者页「其他作品」区块，docs/author-profile-on-demand §6）：
-/// 官方作品集只有 nid + 标题（无 form/分位），封面走确定性兜底；点击 =
-/// rankSeed 预写 + 进详情页（与官方榜单/清单页同一条库外收录链路）。
+/// 官方作品集只有 nid + 标题（无 form/分位）——2026-11-26 统一为经典榜单
+/// 行（BookRowTile）+「未收录」徽标；点击 = rankSeed 预写 + 进详情页
+/// （与官方榜单/清单页同一条库外收录链路）。
 class _OffWorkRow extends ConsumerWidget {
   final AuthorWork work;
   final String author;
@@ -693,51 +695,26 @@ class _OffWorkRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final scheme = Theme.of(context).colorScheme;
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: InkWell(
-        onTap: () async {
-          try {
-            final h = await ref.read(bootProvider.future);
-            await h.api.rankSeed(
-              nid: work.nid,
-              title: work.title,
-              author: author,
-              coverUrl: '',
-            );
-          } catch (_) {}
-          if (!context.mounted) return;
-          context.push('/book/${work.nid}');
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Row(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: coverImage(null, work.nid, width: 44, height: 62),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(work.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodyLarge),
-                    const SizedBox(height: 4),
-                    Text('库外 · ${work.nid}',
-                        style: TextStyle(
-                            fontSize: 12, color: scheme.onSurfaceVariant)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    return BookRowTile(
+      item: RankItem.fromJson({
+        'rank': 0,
+        'nid': work.nid,
+        'title': work.title,
+      }),
+      extraTags: const ['未收录'],
+      onTap: () async {
+        try {
+          final h = await ref.read(bootProvider.future);
+          await h.api.rankSeed(
+            nid: work.nid,
+            title: work.title,
+            author: author,
+            coverUrl: '',
+          );
+        } catch (_) {}
+        if (!context.mounted) return;
+        context.push('/book/${work.nid}');
+      },
     );
   }
 }

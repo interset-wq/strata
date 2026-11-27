@@ -4,8 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../core/providers.dart';
 import '../data/api/strata_api.dart';
+import '../widgets/book_row_tile.dart';
 import '../widgets/default_cover.dart';
-import '../widgets/metric_badge.dart';
 
 /// 搜索页（docs/08 §search + §search-remote）：L1 段为内置库 LIKE 搜索
 /// （真封面 + 作者名入口），官方全站搜索手动触发（30 条硬上限、静默限流
@@ -269,83 +269,22 @@ class _SearchPageState extends ConsumerState<SearchPage> {
   }
 
   Widget _localCard(BuildContext context, ColorScheme scheme, SearchItem it) {
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: InkWell(
-        onTap: () => context.push('/book/${it.nid}'),
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: coverImage(it.coverUrl, it.nid,
-                    width: 52, height: 72),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(it.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleLarge
-                                  ?.copyWith(fontSize: 13.5)),
-                        ),
-                        if (!it.inSeed) _badge(context, '新书'),
-                      ],
-                    ),
-                    const SizedBox(height: 3),
-                    InkWell(
-                      // 作者入口：点作者名重搜（与作者页同语义入口）。
-                      onTap: () {
-                        _controller.text = it.author;
-                        _submit(it.author);
-                      },
-                      child: Text(it.author,
-                          style: TextStyle(
-                              fontSize: 11,
-                              color: scheme.primary,
-                              decoration: TextDecoration.underline,
-                              decorationColor:
-                                  scheme.primary.withValues(alpha: .4))),
-                    ),
-                    const SizedBox(height: 5),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 1),
-                      decoration: BoxDecoration(
-                          border: Border.all(
-                              color:
-                                  scheme.outline.withValues(alpha: .5)),
-                          borderRadius: BorderRadius.circular(999)),
-                      child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(MetricIcons.favs,
-                                size: 11,
-                                color: scheme.onSurfaceVariant),
-                            const SizedBox(width: 2),
-                            Text('收藏 ${_wan(it.favs ?? 0)}',
-                                style: TextStyle(
-                                    fontSize: 10,
-                                    color: scheme.onSurfaceVariant)),
-                          ]),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+    // 2026-11-26 统一：搜索结果与经典榜单同款行（BookRowTile）——
+    // 「新书」走 extraTags 徽标，作者名点按重搜（onAuthorTap 变体）。
+    return BookRowTile(
+      item: RankItem.fromJson({
+        'rank': 0,
+        'nid': it.nid,
+        'title': it.title,
+        'author': it.author,
+        'favs': it.favs ?? 0,
+        'cover_url': it.coverUrl,
+      }),
+      extraTags: it.inSeed ? const [] : const ['新书'],
+      onAuthorTap: () {
+        _controller.text = it.author;
+        _submit(it.author);
+      },
     );
   }
 
@@ -481,7 +420,3 @@ class _SearchPageState extends ConsumerState<SearchPage> {
   }
 }
 
-String _wan(int n) {
-  if (n >= 10000) return '${(n / 10000).toStringAsFixed(0)}万';
-  return '$n';
-}

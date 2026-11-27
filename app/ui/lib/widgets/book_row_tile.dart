@@ -15,7 +15,30 @@ class BookRowTile extends StatelessWidget {
   /// 每本需要 IP 标识（IP 二级页的“其他”旧深链）。
   final String? ipLabel;
 
-  const BookRowTile({super.key, required this.item, this.ipLabel});
+  /// 右侧操作槽（2026-11-26 统一变体）：关注页放观测/追踪/移除按钮，
+  /// 日历页放置信度徽标等——列表行式与经典榜单一致，操作按页面定制。
+  final Widget? trailing;
+
+  /// tags 行附加徽标（如「新书」「未收录」「对照」）：页面级状态 pill，
+  /// 排在 IP 徽标之后、题材之前。
+  final List<String> extraTags;
+
+  /// 覆盖整行点击（默认 /book/{nid}）：库外链路（rank-seed 预写 +
+  /// 详情）等需要自定义跳转前置动作的页面使用。
+  final VoidCallback? onTap;
+
+  /// 作者行点击（搜索页：点作者名重搜）；null = 不可点。
+  final VoidCallback? onAuthorTap;
+
+  const BookRowTile({
+    super.key,
+    required this.item,
+    this.ipLabel,
+    this.trailing,
+    this.extraTags = const [],
+    this.onTap,
+    this.onAuthorTap,
+  });
 
   static String wan(int? n) {
     if (n == null) return '';
@@ -92,7 +115,7 @@ class BookRowTile extends StatelessWidget {
     final ip = ipLabel;
 
     return InkWell(
-      onTap: () => context.push('/book/${item.nid}'),
+      onTap: onTap ?? () => context.push('/book/${item.nid}'),
       borderRadius: BorderRadius.circular(12),
       child: Container(
         margin: const EdgeInsets.symmetric(vertical: 5),
@@ -143,18 +166,28 @@ class BookRowTile extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 3),
-                  // 作者行：作者（左）…… 状态徽标 · 代系（右对齐；
-                  // 缺失不显示）
+                  // 作者行：作者（左，onAuthorTap 时可点重搜）…… 状态
+                  // 徽标 · 代系（右对齐；缺失不显示）
                   Row(
                     children: [
                       Expanded(
-                        child: Text(
-                          item.author,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style:
-                              TextStyle(fontSize: 11, color: scheme.secondary),
-                        ),
+                        child: onAuthorTap != null
+                            ? InkWell(
+                                onTap: onAuthorTap,
+                                child: Text(item.author,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        color: scheme.secondary,
+                                        decoration: TextDecoration.underline,
+                                        decorationColor: scheme.secondary
+                                            .withValues(alpha: .4))))
+                            : Text(item.author,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                    fontSize: 11, color: scheme.secondary)),
                       ),
                       // 年份在前、状态徽标在后，gap 与 tags 行一致（4px）。
                       // 完结与年份用明确灰底（用户 2026-11-25：不要白/近白底）
@@ -215,12 +248,19 @@ class BookRowTile extends StatelessWidget {
                               ),
                             ),
                           ),
+                        // 页面级附加徽标（新书/未收录/对照等变体）。
+                        for (final t in extraTags) _tagPill(context, t),
                         if (genre != null)
                           _tagPill(context, genre, deep: true),
                         for (final t in bookTags.take(genre == null ? 3 : 2))
                           _tagPill(context, t),
                       ],
                     ),
+                  ],
+                  // 右侧操作槽（关注页按钮/日历置信度徽标等变体）。
+                  if (trailing != null) ...[
+                    const SizedBox(height: 6),
+                    trailing!,
                   ],
                   if (metrics.isNotEmpty) ...[
                     const SizedBox(height: 6),
