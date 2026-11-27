@@ -5,14 +5,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/providers.dart';
 import '../data/api/strata_api.dart';
 import '../widgets/back_to_top.dart';
+import '../widgets/book_row_tile.dart';
 import '../widgets/default_cover.dart';
 
-/// 官方清单浏览页（docs/contest-display-in-app.md 形态二）：按需拉官方
+/// 参赛清单浏览页（docs/contest-display-in-app.md 形态二）：按需拉官方
 /// 参赛清单（引擎按 (tag, page) 缓存 24h/10 年 + 本地 join），无限滚动；
-/// 保持官方返回顺序，无排序控件（v1 定案）。
+/// 全部/仅库外保持官方返回顺序，无排序控件（v1 定案）；仅库内改用代表作
+/// 同款 [BookRowTile]（无序号），按库内累计 favs 降序显示。
 ///
-/// 2026-11-26：一/二/三征的上游 tagId 是获奖作品标签（635-649），同一
-/// 链路改挂「获奖名单 · X」标题——口径永远是获奖名单，不是参赛清单。
+/// 2026-11-27：标题与条目数行统一写「参赛清单」；一/二/三征的上游 tagId
+/// 是获奖作品标签（635-649），同一链路仍挂「获奖名单 · X」标题。
 ///
 /// 库外作品点击复用搜索页链路（/book/{nid} → 详情覆盖层 + 自动收录）。
 /// 降级（无 tagId / 接口失效）：引擎回落库内子集（source=degraded），
@@ -143,7 +145,12 @@ class _RosterPageState extends ConsumerState<RosterPage> {
   List<RosterItem> get _visible {
     switch (_filter) {
       case 1:
-        return _items.where((it) => it.inLibrary).toList();
+        final list = _items.where((it) => it.inLibrary).toList()
+          ..sort((a, b) {
+            final fav = (b.favs ?? -1).compareTo(a.favs ?? -1);
+            return fav != 0 ? fav : a.nid.compareTo(b.nid);
+          });
+        return list;
       case 2:
         return _items.where((it) => !it.inLibrary).toList();
       default:
@@ -174,10 +181,12 @@ class _RosterPageState extends ConsumerState<RosterPage> {
       _loadPage(1, reset: true);
     }
     final award = (group?.listKind ?? _sourceKind) == 'award';
-    // 档案组未就绪时先叫「清单」，不抢先说错口径。
+    // 标题带赛道（group 就绪后）：「参赛清单 · 十四征 · 长篇」；换轨即更新。
+    final divisionLabel =
+        (_division.isEmpty || _division == '全部') ? '' : ' · $_division';
     final title = group == null
-        ? '清单 · ${widget.contest}'
-        : '${award ? '获奖名单' : '官方清单'} · ${widget.contest}';
+        ? '参赛清单 · ${widget.contest}'
+        : '${award ? '获奖名单' : '参赛清单'} · ${group.name}$divisionLabel';
     return Scaffold(
       appBar: AppBar(title: Text(title)),
       body: Stack(
@@ -233,13 +242,13 @@ class _RosterPageState extends ConsumerState<RosterPage> {
             (ledgerCount != null || _totalEstimate != null))
           Padding(
             padding: const EdgeInsets.only(left: 16, top: 2),
-            // 口径：这是官方清单条目数，不是参赛总量（v1 只接得到清单），
-            // 所以写「清单 N 条」不写「N 篇参赛」；台账缺数时才退回本次
-            // 响应 pages×size 的上界（约）。获奖名单同一口径。
+            // 口径：这是清单条目数，不是参赛总量（v1 只接得到清单），
+            // 所以写「参赛清单 N 条」不写「N 篇参赛」；台账缺数时才退回
+            // 本次响应 pages×size 的上界（约）。获奖名单同一口径。
             child: Text(
               ledgerCount != null
-                  ? '${award ? '获奖名单' : '官方清单'} $ledgerCount 条'
-                  : '${award ? '获奖名单' : '官方清单'}约 $_totalEstimate 条',
+                  ? '${award ? '获奖名单' : '参赛清单'} $ledgerCount 条'
+                  : '${award ? '获奖名单' : '参赛清单'}约 $_totalEstimate 条',
               style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
             ),
           ),
@@ -333,6 +342,21 @@ class _RosterPageState extends ConsumerState<RosterPage> {
                     ),
                   ),
                 );
+        }
+        // 仅库内：代表作同款经典榜单行（无序号，用户裁定 2026-11-27）；
+        // 全部/仅库外保持自绘行（带官方简介与库外徽标）。
+        if (_filter == 1) {
+          return BookRowTile(
+            item: RankItem.fromJson({
+              'rank': 0,
+              'nid': items[i].nid,
+              'title': items[i].title,
+              'author': items[i].author,
+              'favs': items[i].favs ?? 0,
+              'cover_url': items[i].coverUrl,
+              'status': items[i].status,
+            }),
+          );
         }
         return _RosterRow(item: items[i]);
       },
