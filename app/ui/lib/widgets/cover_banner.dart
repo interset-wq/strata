@@ -153,7 +153,7 @@ class _CoverPlaceholder extends StatelessWidget {
       color: scheme.surfaceContainerHighest,
       child: Center(
         child: Icon(Icons.image_not_supported_outlined,
-            size: 32, color: scheme.outline),
+            size: 32, color: scheme.onSurfaceVariant),
       ),
     );
   }

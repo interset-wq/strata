@@ -39,7 +39,7 @@ class _BannerLargeCardState extends ConsumerState<BannerLargeCard> {
       color: scheme.primary.withValues(alpha: .06),
       child: Center(
         child: Icon(Icons.image_not_supported_outlined,
-            size: 36, color: scheme.outline),
+            size: 36, color: scheme.onSurfaceVariant),
       ),
     );
 

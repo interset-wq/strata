@@ -121,7 +121,7 @@ class ContestRowCard extends StatelessWidget {
                 ),
               ),
             ),
-            Icon(Icons.chevron_right, size: 18, color: scheme.outline),
+            Icon(Icons.chevron_right, size: 18, color: scheme.onSurfaceVariant),
           ],
         ),
       ),

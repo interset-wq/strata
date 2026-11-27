@@ -390,7 +390,7 @@ class _Body extends ConsumerWidget {
                 const Spacer(),
                 Text(r.value ?? '', style: TextStyle(fontSize: 12, color: muted)),
                 if (r.enabled)
-                  Icon(Icons.chevron_right, size: 18, color: scheme.outline),
+                  Icon(Icons.chevron_right, size: 18, color: scheme.onSurfaceVariant),
               ],
             ),
           ),
