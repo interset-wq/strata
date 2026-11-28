@@ -159,11 +159,16 @@ CREATE TABLE IF NOT EXISTS book_meta(
 -- One row per nid records the last outbound detail-fetch attempt. An attempt
 -- is stamped BEFORE the request so failures still count against the 24h
 -- cooldown; state is updated afterwards for diagnostics.
+-- 每次尝试一行（2026-11-28：限额改按天计数——开=1 次/天、关=5 次/天，
+-- nid 主键的单行制无法表达多次尝试）。
 CREATE TABLE IF NOT EXISTS refresh_attempts(
-  nid          INTEGER PRIMARY KEY,
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  nid          INTEGER NOT NULL,
   attempted_at INTEGER NOT NULL,
   state        TEXT NOT NULL DEFAULT 'pending'
 );
+CREATE INDEX IF NOT EXISTS idx_refresh_attempts_nid
+  ON refresh_attempts(nid, attempted_at);
 
 -- Local browsing footprints: one row per nid, viewed_at bumped on every
 -- detail-page open. Pure local data, never uploaded.

@@ -1860,12 +1860,21 @@ func (s *Server) reserveDetailRefresh(ctx context.Context, nid int64, now time.T
 	if err != nil {
 		return nil, false, err
 	}
-	// 限额按天计（用户裁定 2026-11-28）：0 点重置，不做 24h 滚动窗——
-	// 同一自然日内已刷新过即 rate_limited，跨天自动恢复
-	// （retry_after = 距下一个 0 点的秒数）。
+	// 限额按自然日计数（用户裁定 2026-11-28）：0 点重置。限流开 =
+	// 每本书每天 1 次请求；关 = 每天最多 5 次（请求会触发爬虫，次数
+	// 过多没有意义且容易风控）。retry_after = 距下一个 0 点的秒数。
 	if enabled && attempt != nil {
-		attempted := time.Unix(attempt.AttemptedAt, 0).In(now.Location())
-		if attempted.Year() == now.Year() && attempted.YearDay() == now.YearDay() {
+		dailyLimit := 5
+		if enabled {
+			dailyLimit = 1
+		}
+		dayStart := time.Date(now.Year(), now.Month(), now.Day(),
+			0, 0, 0, 0, now.Location()).Unix()
+		count, err := s.store.RefreshAttemptsToday(ctx, nid, dayStart)
+		if err != nil {
+			return nil, false, err
+		}
+		if count >= dailyLimit {
 			nextMidnight := time.Date(now.Year(), now.Month(), now.Day()+1,
 				0, 0, 0, 0, now.Location()).Unix()
 			return gin.H{

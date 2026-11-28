@@ -94,10 +94,10 @@ class SettingsPage extends ConsumerWidget {
           _label(context, '抓取'),
           _card(context, [
             _switchRow(context, ref,
-                title: '详情刷新限流（24 小时一次）',
+                title: '每日刷新限额',
                 subtitleOf: (st) => st.detailRateLimitEnabled
-                    ? '同一本书每天最多向官方发起一次刷新请求'
-                    : '已关闭——可随时手动刷新（请节制）',
+                    ? '开启：每本书每天最多 1 次刷新请求（0 点重置）'
+                    : '关闭：每本书每天最多 5 次刷新请求（0 点重置）',
                 watch: detailRateLimitProvider,
                 read: (st) => st.detailRateLimitEnabled,
                 write: (h, v) => h.api.setDetailRateLimitEnabled(v)),

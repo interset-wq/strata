@@ -2851,7 +2851,8 @@ FROM book_meta WHERE nid = ?`
 func (s *Store) RefreshAttempt(ctx context.Context, nid int64) (*RefreshAttempt, error) {
 	var a RefreshAttempt
 	err := s.DB.QueryRowContext(ctx, `
-SELECT nid, attempted_at, state FROM refresh_attempts WHERE nid = ?`, nid).
+SELECT nid, attempted_at, state FROM refresh_attempts WHERE nid = ?
+ORDER BY attempted_at DESC, id DESC LIMIT 1`, nid).
 		Scan(&a.NID, &a.AttemptedAt, &a.State)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
@@ -2862,19 +2863,29 @@ SELECT nid, attempted_at, state FROM refresh_attempts WHERE nid = ?`, nid).
 	return &a, nil
 }
 
-// RecordRefreshAttempt stamps an outbound detail request. It is written
-// before the request so a failure still consumes the cooldown window.
+// RefreshAttemptsToday counts the refresh attempts of one book since
+// dayStartUnix (local midnight). The daily quota reads it: 1 attempt/day
+// with the limiter on, 5/day with it off (user ruling 2026-11-28).
+func (s *Store) RefreshAttemptsToday(ctx context.Context, nid, dayStartUnix int64) (int, error) {
+	var n int
+	err := s.DB.QueryRowContext(ctx, `
+SELECT COUNT(*) FROM refresh_attempts WHERE nid = ? AND attempted_at >= ?`,
+		nid, dayStartUnix).Scan(&n)
+	return n, err
+}
+
+// RecordRefreshAttempt stamps an outbound detail request. One row per
+// attempt (2026-11-28: the daily quota counts rows, so repeated attempts
+// must not collapse into one).
 func (s *Store) RecordRefreshAttempt(ctx context.Context, nid, attemptedAt int64, state string) error {
 	_, err := s.DB.ExecContext(ctx, `
-INSERT INTO refresh_attempts(nid, attempted_at, state) VALUES (?, ?, ?)
-ON CONFLICT(nid) DO UPDATE SET
-  attempted_at=excluded.attempted_at, state=excluded.state`,
+INSERT INTO refresh_attempts(nid, attempted_at, state) VALUES (?, ?, ?)`,
 		nid, attemptedAt, state)
 	return err
 }
 
-// FinishRefreshAttempt updates the state of the attempt that is still current.
-// If a newer attempt has already been stamped, the update is a no-op.
+// FinishRefreshAttempt updates the state of the most recent pending
+// attempt (stamp-then-finish: the update targets the latest row).
 func (s *Store) FinishRefreshAttempt(ctx context.Context, nid, attemptedAt int64, state string) error {
 	_, err := s.DB.ExecContext(ctx, `
 UPDATE refresh_attempts SET state = ? WHERE nid = ? AND attempted_at = ?`,
