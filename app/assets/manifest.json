@@ -1,8 +1,8 @@
 {
-  "schema_version": 10,
-  "seed_version": "20261127.44",
+  "schema_version": 11,
+  "seed_version": "20261128.45",
   "content_end": "2026-11-24",
-  "built_at": "2026-11-27T12:13:05+00:00",
+  "built_at": "2026-11-28T02:51:18+00:00",
   "book_count": 18654,
   "licensed_count": 47,
   "tag_count": 103,
@@ -129,7 +129,7 @@
   ],
   "source": {
     "dataset": "local:dataset/out/books.jsonl",
-    "dataset_sha256": "f57af9a4ec16e5df849d259628f2e3a3f67f0d92b3d2afa30ee65748bab9052a",
+    "dataset_sha256": "9219f6a8a4611999b24bb4d320bf7cfa91138e6a5acf44d9b0af64d612960e3d",
     "analysis_rows": 258796,
     "dropped_rows": 2466,
     "upstream": "light-nook-labs/novel_hub",
@@ -138,13 +138,13 @@
   "files": {
     "db": {
       "name": "seed.db",
-      "bytes": 14983168,
-      "sha256": "36befe6e7b05b022465ecfad6d5921ebfd2c4c7aad069d2a25aa669cf46104f1"
+      "bytes": 15499264,
+      "sha256": "5d05a1ea2d76c2eeedbfeed3935efa0ca5f872b489de4239cc2190a054d151e3"
     },
     "gz": {
       "name": "seed.db.gz",
-      "bytes": 6240599,
-      "sha256": "78bfd9b838e38851700aac9ab05e65c21cd7d63ab1a21dfea2a87e5ffdf7315f"
+      "bytes": 6273271,
+      "sha256": "f3f4b58e2bc2c63e8a2d804d8611979adb8c6271ce3520d9de3697e8b2b5c94c"
     }
   }
 }

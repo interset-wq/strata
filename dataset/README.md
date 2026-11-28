@@ -3,7 +3,11 @@
 > **定位**：全量书籍目录的**唯一真源**，供 app 种子构建与后续产品使用。
 > **不是分析口径**——不做授权剔除、不做存活判定、不按收藏/字数过滤，一本书都不丢。
 > 报告与统计仍走 `analysis/pipeline/build_csv.py` 的 15 列宽表口径，两者不要混用。
-> **来源**：`novel_hub`（`light-nook-labs/novel_hub`）的原始 jsonl 快照，内容上界 **2026-05-03**。
+> **来源**：`novel_hub`（`light-nook-labs/novel_hub`）的原始 jsonl + 后续批次补爬。
+> **快照时间 = 爬虫爬取时间**（唯一定义）：novel_hub 来源统一用其数据集 release 发布时间
+> **2026-05-27**（归档库 `database.db` 的 `db_update` 全库同此值）；补爬来源各用本批爬取时间
+> （`observed_at`）。故数据集内**存在多个快照时间**，不是一个统一值。
+> **内容上界 2026-05-03** 是 `max(last_update)`（书的内容更新时间），与快照时间是两个概念。
 
 ## 1. 目录
 
@@ -13,7 +17,7 @@ dataset/
 ├── author_ids.jsonl  nid → authorId 证据（App API 探测，用于同账号判定，见 §5）
 ├── README.md         本文件：口径、字段、规则、已知偏差
 └── out/              构建产物（gitignore，可随时重建）
-    ├── books.jsonl   每行一本书，15 字段，tags 为数组 —— 唯一真源
+    ├── books.jsonl   每行一本书，16 字段（末列 db_update=快照时间），tags 为数组 —— 唯一真源
     ├── books.csv     同字段扁平表，tags 用 `|` 连接、banner 为 0/1（UTF-8 BOM，方便 Excel）
     ├── cleanup.jsonl 清洗审计：非法字符、授权/App API 封面覆盖、共享封面归还（153,614 行）
     └── manifest.json 输入 sha256、行数、去重数、字段表、输出 sha256
@@ -28,24 +32,37 @@ cd dataset && uv run python build.py
 
 产物体积：`books.jsonl` 96 MB / `books.csv` 45 MB，**不入库**，由源 jsonl 重建。
 
-## 2. 当前批次（`version: 20261124.9`）
+## 2. 当前批次（`version: 20261128.17`）
 
-> 数据集从不全量刷新：批次版本标记**最近一次部分更新**，不代表全站快照日期。
-> 快照本身仍止于 2026-05-03（`content_upper_bound` 由主源计算，排除所有补充书）。
+> 数据集从不全量刷新：版本 `20261128.17` 取**最大日期**命名（最近一次部分更新），
+> **不是快照时间、也不代表全库爬取于该日**。
+> 快照时间（= 爬虫爬取时间）是每行的 `db_update` 列，**逐本记录、按来源分批**：
+> novel_hub 批次 `2026-05-27 22:53:10.440786`（release 导入时刻，归档库 `db_update`
+> 全库同值；导出 jsonl 未带该列，构建时按实查值回填），补爬批次各用本批逐本
+> `observed_at`。`manifest.snapshot_times` 给出实际分布。
+> `content_upper_bound` = 2026-05-03（`max(last_update)`，排除补充书）是**内容上界**，不是快照时间。
+
+| 来源批次 | `db_update`（快照时间） | 行数 | 说明 |
+|---|---|---:|---|
+| novel_hub 原始 22 个 meta jsonl | `2026-05-27 22:53:10.440786` | 248,230 | release 发布时间；归档库 `db_update` 全库同一个值，构建时按实查值回填 |
+| 月榜遗漏书 `rank_missing.jsonl` | `2026-11-19` | 108 | App API 当期补爬，逐本 `observed_at` |
+| 征文新书 `contest_new.jsonl` | `2026-11-23`(3,998) / `2026-11-24`(369) / `2026-11-26`(8,557) | 12,924 | 清单发现 + 详情补爬，逐本 `observed_at` |
+
+> 快照时间 ≠ 内容上界 ≠ 版本日期：三者分别是「什么时候爬的」「书内容更新到哪」「数据集版本命名取的最大日期」，不可互推。逐本书的快照时间取 `db_update`，不是统一标成版本日期。
 
 | 指标 | 值 |
 |---|---:|
-| 输入 | 22 个 jsonl / **249,832 行** + App API 全字段样本 114,381 行 + 逐本采集 11,367 行 + authorId 证据 55 行 + **月榜遗漏书 108 行（E.14）** + **征文新书 4,367 行（E.29/E.33）**（sha256 见 `manifest.json`） |
-| 书籍 | **252,705 本**（= 248,338 + 4,367 征文新书；新书 `nid` 770k–788k，`est_year=2026`） |
-| 合并的重复行 | 1,602 行（1,525 个 `nid` 被抓过多次） |
+| 输入 | 22 个 jsonl / **249,832 行** + App API 全字段样本 114,381 行 + 逐本采集 11,367 行 + authorId 证据 55 行 + **月榜遗漏书 108 行（E.14）** + **征文新书 12,924 行（E.29/E.33/E.34）**（sha256 见 `manifest.json`） |
+| 书籍 | **261,262 本**（= 248,230 novel_hub + 108 月榜遗漏 + 12,924 征文新书） |
+| 合并的重复行 | 1,602 行 |
 | 有标签的书 | 234,883 |
-| **有封面** | **171,841 本（68.00%）** |
-| 封面为空 | 80,864 本 = 快照默认图 + 共享伪影置空（两类有交集，明细见 `out/manifest.json` 的 `counts`） |
+| **有封面** | **178,874 本（68.47%）** |
+| 封面为空 | 82,388 本 = 快照默认图 + 共享伪影置空（两类有交集，明细见 `out/manifest.json` 的 `counts`） |
 | 授权封面覆盖 | 47 本 |
 | 月榜遗漏书（E.14） | 108 本：月榜（2013-03 起）上榜但缺失于 5 月快照；计数为 **2026-11 App API 当期值**（`observed_at` 逐本记录，不计入 `content_upper_bound`）；由 `analysis/fetchers/build_rank_missing_supplement.py` 产出 `rank_missing.jsonl` |
-| 征文新书（E.29/E.33） | 4,367 本：14 征（tag 793/794）3,998 本 `observed_at=2026-11-23`，2026 春征（tag 789）369 本 `observed_at=2026-11-24`；均由清单 API 发现、App API + mobile web 详情补采。计数为当期值（不计入 `content_upper_bound`），由 `analysis/fetchers/harvest_contest.py` 产出 `contest_new.jsonl`。**E.30 起 2026 为正常世代**，与其他年份一样走种子筛选，不是全量直接进入 |
+| 征文新书（E.29/E.33/E.34） | 12,924 本：14 征（tag 793/794）3,998 本 `observed_at=2026-11-23`，2026 春征（tag 789）369 本 `observed_at=2026-11-24`，E.34 union 中短篇赛事补采 8,557 本 `observed_at=2026-11-26`；均由清单 API 发现、App API + mobile web 详情补采。计数为当期值（不计入 `content_upper_bound`），由 `analysis/fetchers/harvest_contest.py` 产出 `contest_new.jsonl`。**E.30 起 2026 为正常世代**，与其他年份一样走种子筛选，不是全量直接进入 |
 
-## 3. 字段（15 个，字段名沿用源 jsonl，不改名）
+## 3. 字段（16 个；前 15 个字段名沿用源 jsonl，不改名）
 
 | 字段 | 类型 | 说明 |
 | --- | --- | --- |
@@ -64,6 +81,7 @@ cd dataset && uv run python build.py
 | `cover` | str | 封面**完整 URL**，空串 = 源站默认图或无图 |
 | `banner` | bool | 是否上过 banner 位 |
 | `tags` | array[str] | 标签，保持源顺序，不去重 |
+| `db_update` | str | **快照时间 = 爬取时间**（非源 jsonl 字段，构建时回填）：novel_hub 批次 `2026-05-27 22:53:10.440786`（release 导入时刻，归档库 `db_update` 全库同值），补爬批次为各自逐本 `observed_at`（`2026-11-19` / `11-23` / `11-24` / `11-26`）。逐本不同值，不是版本日期、不是内容上界 |
 
 ## 4. 规则（只有这些，不做别的）
 

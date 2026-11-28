@@ -380,7 +380,7 @@ def merge_contest_sm(records: dict[int, dict]) -> dict | None:
     tag 集合真源为 `contest_scope.short_medium_tags()`，与 roster union 同锚点；
     与主源 / 月榜补充 nid 必须互斥，15 源字段必须齐全。manifest 记 sha256
     + 放行 tag + observed_at 供复核。计数为 2026-11 当期值，晚于
-    2026-05-03 快照上界（与 rank_missing 同类时点差异）。
+    2026-05-03 内容上界（与 rank_missing 同类时点差异）。
     """
     if not C.CONTEST_NEW.exists():
         return None
@@ -420,7 +420,7 @@ def merge_contest_sm(records: dict[int, dict]) -> dict | None:
             "sha256": digest,
             "observed_at": sorted(observed)[-1] if observed else None,
             "note": "中短篇赛事 roster 补采（E.34 union 26 tag）；App API + mobile web，"
-                    "计数为 2026-11 当期值，晚于 2026-05-03 快照上界；"
+                    "计数为 2026-11 当期值，晚于 2026-05-03 内容上界；"
                     "只并入中短篇赛事 tag，长篇赛道 793/春征 789 留档不进分析口径"}
 
 

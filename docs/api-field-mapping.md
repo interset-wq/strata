@@ -19,7 +19,7 @@
 
 ## 1. 逐字段对照表
 
-`novels.csv` = 分析主表 15 列；`books` = 种子表 28 列（v3 加 `form`/`lqs`/`lqs_pctl`/`vel_pctl`）。
+`novels.csv` = 分析主表 15 列；`books` = 种子表 26 列（v3 加 `form`，v8 去 `lqs`/`lqs_pctl`/`vel_pctl`，v11 加 `db_update` 逐本快照时间）。
 证据列为 110,370 对快照现算。
 
 | App 字段 | 本项目对应 | 关系判定 | 实测证据 | 刷新可行性 |

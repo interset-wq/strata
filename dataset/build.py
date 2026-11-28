@@ -1,6 +1,14 @@
 """构建正式书籍数据集：novel_hub 原始 jsonl → 唯一真源 `books.jsonl` + 派生 `books.csv`。
 
 口径（2026-11-18 用户定）：
+- **快照时间 = 爬虫爬取时间**（唯一定义，2026-11-28 用户定），输出 `db_update` 列即
+  这一时刻：novel_hub 来源统一用其数据集 release 发布时间 **2026-05-27**（归档库
+  `db_update` 全库同值 `2026-05-27 22:53:10`；导出 jsonl 未带该列，构建时按实查值
+  回填）；补爬来源各用本批逐本 `observed_at`（rank_missing 2026-11-19、contest_new
+  2026-11-23/24/26）。故本数据集**含多个快照时间**，不是统一标成版本日期。下列
+  「5 月快照」均指 novel_hub 那批（快照时间 2026-05-27），不是内容上界
+  `max(last_update)=2026-05-03`，更不是版本日期（取最大日期命名，如 20261128.17）
+  ——三者不可互推。
 - **不 drop 任何书**：本数据集不是分析口径，不做授权剔除、不做存活判定、不按收藏/字数过滤。
   唯一被"合并"的是同一个 `nid` 的多行抓取记录（同一本书被重复抓到），不是删书。
 - **只做最基本的字符串处理**：NFC 规范化、控制符/零宽字符→空格、连续空白折叠、去首尾空白。
@@ -46,7 +54,7 @@
                                          [--rank-missing PATH] [--contest-new PATH] [--out DIR]
 
 产物（`dataset/out/`，不入库）：
-    books.jsonl     每行一本书，15 字段，tags 仍是数组
+    books.jsonl     每行一本书，16 字段（末列 db_update=快照时间），tags 仍是数组
     books.csv       同字段扁平表，tags 用 `|` 连接，banner 为 0/1
     cleanup.jsonl   清洗审计：被替换的字符、被置空的默认封面、被覆盖的授权封面
     manifest.json   输入 sha256、行数、去重数、字段表、输出 sha256
@@ -62,6 +70,7 @@ import json
 import re
 import sys
 import unicodedata
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -78,8 +87,12 @@ OUT_DEFAULT = Path(__file__).resolve().parent / "out"
 FIELDS = [
     "nid", "novel_title", "author", "price_type", "contest", "genre",
     "click_num", "word_num", "status", "last_update", "praise_num", "like_num",
-    "cover", "banner", "tags",
+    "cover", "banner", "tags", "db_update",
 ]
+# novel_hub 归档库 `novel.db_update` 全库同值——release 被导入的时刻，即这一批的快照时间。
+# generate_static.py 的 `.only()` 未带该列，故原始 jsonl 没有它；这里按实查值回填。
+# 补爬两批不用此常量，各用本批逐本 `observed_at`（见 main() 的 rank/contest 读入段）。
+NOVEL_HUB_DB_UPDATE = "2026-05-27 22:53:10.440786"
 TEXT_FIELDS = ["novel_title", "author", "price_type", "contest", "genre", "status", "last_update"]
 INT_FIELDS = ["click_num", "word_num", "praise_num", "like_num"]
 
@@ -212,6 +225,7 @@ def load_records(pattern: str) -> tuple[list[dict], list[dict], list[dict]]:
                     if t2:
                         cleaned.append(t2)
                 rec["tags"] = cleaned
+                rec["db_update"] = NOVEL_HUB_DB_UPDATE
                 records.append(rec)
         inputs.append({"path": str(p.relative_to(ROOT)).replace("\\", "/"),
                        "lines": lines, "sha256": digest})
@@ -438,6 +452,10 @@ def verify(records: list[dict], licensed: dict[int, str], expected: dict[int, st
                 problems.append(f"标签未清洗：nid={rec['nid']} tag={t!r}")
     if dead:
         problems.append(f"{dead} 条默认封面未置空")
+    missing_snapshot = [r["nid"] for r in records if not r.get("db_update")]
+    if missing_snapshot:
+        problems.append(f"{len(missing_snapshot)} 本缺 db_update 快照时间"
+                        f"（例 nid={missing_snapshot[0]}）")
     expected.update(licensed)
     if expected:
         by_nid = {r["nid"]: r["cover"] for r in records}
@@ -521,7 +539,7 @@ def main() -> None:
     ap.add_argument("--names", default=str(NAMES_DEFAULT),
                     help="我们的赛事命名映射 jsonl（tag→name；传空串禁用）")
     ap.add_argument("--out", default=str(OUT_DEFAULT), help="产物目录")
-    ap.add_argument("--version", default="20261124.9", help="数据集版本号")
+    ap.add_argument("--version", default="20261128.17", help="数据集版本号")
     args = ap.parse_args()
 
     records, inputs, audit = load_records(args.src)
@@ -549,12 +567,13 @@ def main() -> None:
                 rec["cover"] = clean_text(raw.get("cover"), "cover", audit, nid)
                 rec["banner"] = bool(raw.get("banner"))
                 rec["tags"] = []
+                rec["db_update"] = str(raw.get("observed_at") or "2026-11-19")
                 records.append(rec)
         inputs.append({"path": str(rank_path.resolve().relative_to(ROOT)).replace("\\", "/"),
                        "lines": n, "sha256": digest, "role": "rank_missing",
                        "observed_at": "2026-11-19",
                        "note": "月榜遗漏书（报告10 §A）；计数为 2026-11 App API 当期值，"
-                               "晚于 2026-05-03 快照上界，见 build.py 文档头"})
+                               "晚于 2026-05-03 内容上界，见 build.py 文档头"})
 
     # 征文清单新书：est_year=2026 出界，只进全量目录供 app 搜索/看详情，不进分析口径与推荐池。
     contest_path = Path(args.contest_new) if args.contest_new else None
@@ -587,6 +606,7 @@ def main() -> None:
                 rec["banner"] = bool(raw.get("banner"))
                 rec["tags"] = [ct for t in (raw.get("tags") or [])
                                if (ct := clean_text(t, "tags", audit, nid))]
+                rec["db_update"] = str(raw.get("observed_at") or "2026-11-24")
                 records.append(rec)
         inputs.append({"path": str(contest_path.resolve().relative_to(ROOT)).replace("\\", "/"),
                        "lines": n, "sha256": digest, "role": "contest_new",
@@ -654,10 +674,13 @@ def main() -> None:
              and r["nid"] not in contest_nids),
             default="",
         ),
-        # 补充书的 last_update 是 2026-11 观测值（晚于快照上界），不计入上界；
+        # 补充书的 last_update 是 2026-11 观测值（晚于内容上界），不计入上界；
         # 数值仍保留在行内，属事实记录而非快照内容。
         "rank_missing_observed": ("2026-11-19" if rank_nids else None),
         "contest_new_observed": (max(contest_observed) if contest_observed else None),
+        # 逐行快照时间（爬取时间）实际分布：novel_hub 一批 + 补爬各批；与版本日期、
+        # 内容上界无关。校验用：每个值都能对应到 inputs 的一个来源批次。
+        "snapshot_times": dict(sorted(Counter(r["db_update"] for r in books).items())),
         # contest 重写：全库先清空 → (参赛名单 ∪ 自建获奖清单)(nid→tag) +
         # 我们自己的 contest_names.jsonl(tag→name) 赋值；无参赛记录保持空。
         # 只继承 contest-achieve 的 tagId 与获奖清单，命名不依赖其字段。

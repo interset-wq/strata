@@ -231,11 +231,13 @@ def cover_timestamp(cover_url) -> pd.Series:
 
 
 def snapshot_bounds(df: pd.DataFrame) -> dict:
-    """数据内容上界——由数据集自身推导，不引用任何外部快照日期。
+    """数据内容上界——由数据集自身推导，不引用任何外部爬取日期。
 
-    原始 jsonl 的 ``max(last_update)`` 即**抓取完成时刻**：此后上架的新书
-    不在库内，因此它同时是「新书可见性」的截止线与「末次更新距今」的
-    计时基准。数据集内最新 nid 的定年日给出可见作品的创建日上界。
+    ``max(last_update)`` 是**书的内容更新时间上界**（不是快照时间/爬取时间：
+    后者是 novel_hub release 2026-05-27 与各补爬批次 `observed_at`，见
+    `dataset/README.md`）。此后上架的新书不在库内，因此它同时是「新书可见性」
+    的截止线与「末次更新距今」的计时基准。数据集内最新 nid 的定年日给出
+    可见作品的创建日上界。
 
     返回:
         content_end: 最新章节更新时间（内容上界）

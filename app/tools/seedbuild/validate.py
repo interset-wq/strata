@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pandas as pd
 
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 11  # v11: books.db_update per-book snapshot time
 EXPECTED_TABLES = {"books", "book_tags", "seed_meta", "deep_ranks",
                    "calendar_universe", "contest_awards", "author_ranks",
                    "calib_fav_bounds", "calib_len_anchors",
@@ -158,6 +158,12 @@ def check_db(db_path: Path, seed: pd.DataFrame, meta: dict) -> None:
             "SELECT value FROM seed_meta WHERE key='schema_version'").fetchone()[0]
         if int(schema_version) != SCHEMA_VERSION:
             _fail(errors, f"schema_version {schema_version} != {SCHEMA_VERSION}")
+        # v11: 每本必须有快照时间（爬取时刻），详情页据此显示逐本快照。
+        no_snapshot = conn.execute(
+            "SELECT COUNT(*) FROM books WHERE db_update IS NULL OR db_update = ''"
+        ).fetchone()[0]
+        if no_snapshot:
+            _fail(errors, f"{no_snapshot} rows without db_update snapshot time")
         meta_book_count = conn.execute(
             "SELECT value FROM seed_meta WHERE key='book_count'").fetchone()[0]
         if int(meta_book_count) != books:

@@ -39,6 +39,7 @@ type Book struct {
 	Featured   bool     `json:"featured"`
 	CoverURL   *string  `json:"cover_url"`
 	UpdatedAt  *string  `json:"updated_at"`
+	DBUpdate   *string  `json:"db_update"`
 	EstYear    int      `json:"est_year"`
 	EstDate    string   `json:"est_date"`
 	EstConf    string   `json:"est_conf"`
@@ -183,7 +184,7 @@ func (s *Store) SeedMeta(ctx context.Context) (map[string]string, error) {
 func (s *Store) Book(ctx context.Context, nid int64) (*BookDetail, error) {
 	const q = `
 SELECT nid, title, author, genre, price_type, status, contest, words, clicks,
-       favs, praises, featured, cover_url, updated_at, est_year, est_date,
+       favs, praises, featured, cover_url, updated_at, db_update, est_year, est_date,
        est_conf, tags, pr, form, cqs, cqs_state, cps, len_norm,
        is_licensed
 FROM seed.books WHERE nid = ?`
@@ -192,7 +193,7 @@ FROM seed.books WHERE nid = ?`
 		b                                        Book
 		genre, priceType, status, contest, cover sql.NullString
 		words, clicks, favs, praises, featured   sql.NullInt64
-		updatedAt, tags                          sql.NullString
+		updatedAt, dbUpdate, tags                sql.NullString
 		pr                                       sql.NullFloat64
 		form                                     string
 		isLicensed                               sql.NullInt64
@@ -201,7 +202,7 @@ FROM seed.books WHERE nid = ?`
 	)
 	err := s.DB.QueryRowContext(ctx, q, nid).Scan(
 		&b.NID, &b.Title, &b.Author, &genre, &priceType, &status, &contest,
-		&words, &clicks, &favs, &praises, &featured, &cover, &updatedAt,
+		&words, &clicks, &favs, &praises, &featured, &cover, &updatedAt, &dbUpdate,
 		&b.EstYear, &b.EstDate, &b.EstConf, &tags,
 		&pr, &form, &cqs, &cqsState, &cps, &lenNorm, &isLicensed,
 	)
@@ -222,6 +223,7 @@ FROM seed.books WHERE nid = ?`
 	b.Featured = featured.Valid && featured.Int64 != 0
 	b.CoverURL = strPtr(cover)
 	b.UpdatedAt = strPtr(updatedAt)
+	b.DBUpdate = strPtr(dbUpdate)
 	b.Tags = strPtr(tags)
 	b.PR = floatPtr(pr)
 	b.Cqs = floatPtr(cqs)

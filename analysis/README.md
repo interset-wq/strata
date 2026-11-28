@@ -148,8 +148,10 @@ df = pd.read_csv(paths.CSV_FILE)
 
 1. **原始数据集唯一**：`meta*.jsonl` 是唯一原始来源；归档数据库、早期 `quarry/` 文档与
    其他分片均不用于结论。`out/novels.csv` 由其规范化派生。
-2. **内容上界 2026-05-03**：由 `eras.snapshot_bounds()` 现算，不是外部快照日期；
-   `max(last_update)` 是扫描起点，不是每本书的读取时刻。
+2. **内容上界 2026-05-03**：由 `eras.snapshot_bounds()` 现算，是 `max(last_update)`
+   （书的内容更新时间），**不是快照时间/爬取时间，也不是版本日期**。快照时间 =
+   爬虫爬取时间：novel_hub 来源统一取 release **2026-05-27**，补爬批次各取自己的
+   `observed_at`（见 `dataset/README.md`）；`max(last_update)` 是扫描起点，不是每本书的读取时刻。
 3. **年份来自定年，不来自 `updated_at`**：后者是末次更新时间，老书一次编辑可晚于创建十年以上。
    `updated_at` 只能当「时长」用（与内容上界相减 = 断更时长，不依赖定年）。
 4. **正版日轻剔除**：作者 ∈ {天闻角川, 天闻角川2号机, 丸山黄金, HJ文库}（`config.LICENSED_LN_AUTHORS`）。

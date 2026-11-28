@@ -831,6 +831,14 @@ func TestWriteHTMLPersistsEveryField(t *testing.T) {
 			t.Fatalf("effective[%s] = %v, want %v", key, got, want)
 		}
 	}
+	// 逐本快照时间：seed 为 2026-05-27，详情页刷新写入 observedAt=1800000000
+	// 后 effective.db_update 必须变成该次抓取时刻（2027-01-15 08:00:00 UTC）。
+	if got := eff["db_update"]; got != "2027-01-15 08:00:00" {
+		t.Fatalf("effective[db_update] = %v, want refreshed snapshot time", got)
+	}
+	if detail.Book.DBUpdate == nil || *detail.Book.DBUpdate != "2026-05-27 22:53:10" {
+		t.Fatalf("seed book.db_update must stay read-only: %v", detail.Book.DBUpdate)
+	}
 }
 
 func TestWriteAppPersistsEveryField(t *testing.T) {

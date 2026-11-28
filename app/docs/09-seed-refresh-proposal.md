@@ -975,3 +975,10 @@ E.1–E.8 的书数与版本由本节取代；时间渠道取消的决定不变�
 - **产物**：dataset `20261127.16`（107,689 本有参赛记录、153,573 本空，101 种 contest 值）；
   种子 `20261127.44` = 18,654 本、P1–P15 全 PASS、覆盖 96.42%，双资产 sha256 一致。
   获奖名单 `contest_awards.json` 的 event 键与 entry.contest 均走同一映射（41 events / 609 本不变）。
+
+### E.44 逐本快照时间入库 + 详情页刷新更新（2026-11-28 用户定）
+
+- **起因**：dataset `20261128.17` 已逐本带 `db_update`（快照时间 = 爬虫爬取时间，novel_hub 批 2026-05-27、补爬批各自 `observed_at`）。用户要求种子也必须有这一列，且详情页每次刷新都更新快照时间。
+- **产物**：种子 `20261128.45`（`schema_version=11`），books 表 26 列（新增 `db_update`），18,654 本全非空、P1–P15 全 PASS、双资产 sha256 一致；书目集合与准入规则不变。
+- **实现**：`build_seed.py` 从 dataset records 按 nid 映射 `db_update`（该列在 15 列分析白名单之外，需单独 map + 非空断言）；`validate.py` 版本=11 + 非空断言；Go `store.Book` 加 `DBUpdate`、`Book()` SELECT 加列；`api.go::effective()` 输出 seed 值，本地 `book_meta.fetched_at>0` 时覆盖为本次抓取时刻（UTC `2006-01-02 15:04:05`），out-of-seed 分支同理；Flutter `BookDetail` 加 `dbUpdate`、详情「数据口径与来源」快照行显示逐本值（空值回退全局 `dataEnd`）。
+- **语义**：seed `db_update` = 数据集构建时的快照时间；刷新后的本地 `db_update` = 本次爬取时刻。两者都是快照时间、只是时点不同，本地值优先。seed.db 只读不改，刷新只写 user.db。

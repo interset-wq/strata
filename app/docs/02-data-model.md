@@ -227,7 +227,7 @@ UI 必须区分 `src`（种子基线 vs 本地刷新时间）。`user_stats` 是
 ## 5. 种子构建流水线
 
 ```
-dataset/out/books.jsonl (自有 15 列书目，含 108 本 E.14 月榜遗漏补充)
+dataset/out/books.jsonl (自有 16 列书目 = 15 业务列 + db_update 快照时间，含 108 本 E.14 月榜遗漏补充)
   ① 清洗成分析口径（剔除 47 本正版日轻）→ ② 定年 eras.estimate → 过滤 est_year∈[2007,2025]
   ③ 分位（仅构建期现算：选种/深榜 pctl 列/优质判定；v9 起不写种子列，E.30）→ ④ pr
   ⑤ 选种（V3，质量锚，无时间渠道）：favs Top20k ∪ 月榜归档 ∪ banner 全集

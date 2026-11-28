@@ -420,6 +420,11 @@ func (s *Server) book(c *gin.Context) {
 			"cps":        meta.Cps,
 			"len_norm":   meta.LenNorm,
 		}
+		snapshot := ""
+		if meta.FetchedAt > 0 {
+			snapshot = time.Unix(meta.FetchedAt, 0).UTC().Format("2006-01-02 15:04:05")
+		}
+		book["db_update"] = snapshot
 		eff := gin.H{
 			"title":      meta.Title,
 			"author":     meta.Author,
@@ -435,6 +440,7 @@ func (s *Server) book(c *gin.Context) {
 			"updated_at": meta.UpdatedAt,
 			"add_time":   meta.AddTime,
 			"point":      meta.Point,
+			"db_update":  snapshot,
 		}
 		// nid dating for discovered books (docs/metrics-definitions §1.1):
 		// interpolated from the embedded anchor table — the same
@@ -510,8 +516,14 @@ func effective(d *store.BookDetail) gin.H {
 		"status":     b.Status,
 		"cover_url":  b.CoverURL,
 		"updated_at": b.UpdatedAt,
+		"db_update":  b.DBUpdate,
 	}
 	if m != nil {
+		// 每次详情页刷新都会写 book_meta.fetched_at（= 本次爬取时刻）。
+		// 快照时间取本地值覆盖 seed 的打包时刻，故刷新后即更新。
+		if m.FetchedAt > 0 {
+			out["db_update"] = time.Unix(m.FetchedAt, 0).UTC().Format("2006-01-02 15:04:05")
+		}
 		overlayStr(out, "title", m.Title)
 		overlayStr(out, "author", m.Author)
 		overlayInt(out, "author_id", m.AuthorID)

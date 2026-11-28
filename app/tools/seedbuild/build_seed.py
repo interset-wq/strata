@@ -15,8 +15,9 @@ version / content_end mark the last partial update (2026-11-24) rather than a
 full snapshot date. Count assertions below fail loudly if the upstream dataset
 moves without the calibre being re-decided.
 
-V3 (2026-11-19): the book source is `dataset/out/books.jsonl` (our own 15-column
-catalogue, App-verified covers), admission is `seed_policy.admit()` (quality
+V3 (2026-11-19): the book source is `dataset/out/books.jsonl` (our own 16-column
+catalogue — 15 business columns plus `db_update` snapshot time; the loader takes
+only the whitelisted business columns, App-verified covers), admission is `seed_policy.admit()` (quality
 anchors + every deep-rank book, **no new-book discovery channel**), and `form` is a build-time column. The 2026-11-19 follow-up removed the time channels
 entirely: new books are structurally disadvantaged by cumulative favourites, so
 a dedicated channel for them is unfair to the older library. E.31 replaces the
@@ -70,8 +71,8 @@ SCHEMA = Path(__file__).resolve().parent / "schema.sql"
 DATASET = REPO / "dataset" / "out" / "books.jsonl"
 AWARD_CSV = ANALYSIS / "out" / "contest_awards_normalized.csv"
 
-SCHEMA_VERSION = 10  # v10: additive author_ranks table (docs/author-rank.md §9) — stable-output authors per form, top100
-SEED_VERSION = "20261127.44"  # .44: contest 改用我们自己的 contest_names.jsonl 命名（tagId 继承 contest-achieve，命名不再依赖它；dataset 20261127.16）；数量不变
+SCHEMA_VERSION = 11  # v11: books.db_update per-book snapshot time (crawl time) from dataset; detail-page refresh overlays it from user.db
+SEED_VERSION = "20261128.45"  # .45: seed carries db_update (dataset 20261128.17) so detail page shows per-book snapshot time; detail refresh updates user.db book_meta.db_update. Book set/admission unchanged from .44
 CONTENT_END = pd.Timestamp("2026-11-24")  # 数据集从不全量刷新：标注最近一次部分更新时间，非快照上界
 GEN_MIN, GEN_MAX = 2007, 2026  # E.30: 2026 由"出界"改为正常世代，与其他年份一样走 admit 渠道筛选
 
@@ -120,6 +121,7 @@ COVER_PREFIX = re.compile(
 FINAL_COLUMNS = [
     "nid", "title", "author", "genre", "price_type", "status", "contest",
     "words", "clicks", "favs", "praises", "featured", "cover_url", "updated_at",
+    "db_update",
     "est_year", "est_date", "est_conf", "tags",
     "pr",
     "form",
@@ -427,6 +429,13 @@ def build_frames() -> tuple[pd.DataFrame, dict]:
     if seed["form"].isna().any():
         raise SystemExit(f"{int(seed['form'].isna().sum())} rows missing form")
     seed = seed.rename(columns={"id": "nid"})
+    # db_update 不在 15 列分析白名单（clean_row 固定列），从原始 records 逐本映射。
+    # 逐本快照时间：novel_hub 批 2026-05-27 release 导入时刻，补爬批各自 observed_at。
+    db_update_by_nid = {nid: row.get("db_update") for nid, row in records.items()}
+    seed["db_update"] = seed["nid"].map(db_update_by_nid)
+    if seed["db_update"].isna().any():
+        bad = seed.loc[seed["db_update"].isna(), "nid"].tolist()[:10]
+        raise SystemExit(f"seed books missing db_update: {bad}")
     seed = seed[FINAL_COLUMNS].sort_values("nid").reset_index(drop=True)
     seed["est_date"] = pd.to_datetime(seed["est_date"]).dt.strftime("%Y-%m-%d")
     # Coverage uses the eligible denominator (E.11 连载 short/medium + E.12

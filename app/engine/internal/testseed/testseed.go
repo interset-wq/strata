@@ -22,7 +22,7 @@ CREATE TABLE books(
   nid INTEGER PRIMARY KEY, title TEXT NOT NULL, author TEXT NOT NULL,
   genre TEXT, price_type TEXT, status TEXT, contest TEXT, words INTEGER,
   clicks INTEGER, favs INTEGER, praises INTEGER, featured INTEGER,
-  cover_url TEXT, updated_at TEXT, est_year INTEGER NOT NULL,
+  cover_url TEXT, updated_at TEXT, db_update TEXT, est_year INTEGER NOT NULL,
   est_date TEXT NOT NULL, est_conf TEXT NOT NULL, tags TEXT,
   pr REAL,
   form TEXT NOT NULL DEFAULT 'long',
@@ -144,11 +144,11 @@ func Build(assetsDir, dataDir string) (*appshell.Manifest, error) {
 		}
 		_, err := db.Exec(`
 INSERT INTO books(nid,title,author,genre,price_type,status,contest,words,clicks,
- favs,praises,featured,cover_url,updated_at,est_year,est_date,est_conf,tags,
+	favs,praises,featured,cover_url,updated_at,db_update,est_year,est_date,est_conf,tags,
  pr,
  cqs,cqs_state,cps,len_norm,is_licensed)
 VALUES(?,?,?,?, '免费', ?, NULL, ?, 1000, ?, 10, ?, NULL, '2026-04-01T00:00:00',
- ?, ?, 'high', '热血|战斗', ?, ?,?,?,?,?)`,
+ '2026-05-27 22:53:10', ?, ?, 'high', '热血|战斗', ?, ?,?,?,?,?)`,
 			b.nid, b.title, b.author, b.genre, b.status, b.words, b.favs,
 			b.featured, b.year, fmt.Sprintf("%d-01-01", b.year),
 			pctl,

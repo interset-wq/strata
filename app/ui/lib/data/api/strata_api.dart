@@ -1957,6 +1957,9 @@ class ContestBooks {
 class BookDetail {
   final String source; // seed | local
   final String dataEnd;
+  /// 逐本快照时间（爬虫爬取时刻）：内置书来自 seed.db_update，详情页刷新后
+  /// 由 user.db book_meta.fetched_at 覆盖；库外收录书取 fetched_at。
+  final String? dbUpdate;
   final Map<String, dynamic> book;
   final List<String> tags;
   final Map<String, dynamic>? effective;
@@ -1968,6 +1971,8 @@ class BookDetail {
   BookDetail.fromJson(Map<String, dynamic> m)
     : source = m['source'] as String,
       dataEnd = m['data_end'] as String,
+      dbUpdate = m['db_update'] as String? ??
+          (m['effective'] as Map<String, dynamic>?)?['db_update'] as String?,
       book = m['book'] as Map<String, dynamic>,
       tags = (m['tags'] as List).cast<String>(),
       effective = m['effective'] as Map<String, dynamic>?,
