@@ -95,6 +95,7 @@ class _WatchlistPageState extends ConsumerState<WatchlistPage> {
         onChanged: _reload,
         onEditNote: () => _editNote(item),
         onMoveGroup: () => _moveToGroup(item),
+        onToggle: () => _toggle(item),
       ),
     );
   }
@@ -594,34 +595,14 @@ class _WatchCard extends StatelessWidget {
                             ? scheme.primary
                             : scheme.onSurfaceVariant),
                   ),
-                  const SizedBox(height: 4),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        icon: Icon(Icons.timeline,
-                            size: 18, color: scheme.onSurfaceVariant),
-                        tooltip: '观测数据',
-                        onPressed: () => context.push('/book/${item.nid}/data'),
-                      ),
-                      IconButton(
-                        icon: Icon(
-                            item.active
-                                ? Icons.visibility
-                                : Icons.visibility_outlined,
-                            color: item.active
-                                ? scheme.primary
-                                : scheme.onSurfaceVariant),
-                        tooltip: item.active ? '停止追踪' : '追踪更新',
-                        onPressed: onToggle,
-                      ),
-                      IconButton(
-                        icon: Icon(Icons.more_vert,
-                            size: 18, color: scheme.onSurfaceVariant),
-                        tooltip: '更多',
-                        onPressed: onSheet,
-                      ),
-                    ],
+                  const SizedBox(height: 8),
+                  // 信息增强统一行（用户裁定 2026-11-28）：行上只留一个
+                  // ⋮，备注/移组/追踪/移除全收进面板。
+                  IconButton(
+                    icon: Icon(Icons.more_vert,
+                        size: 20, color: scheme.onSurfaceVariant),
+                    tooltip: '更多',
+                    onPressed: onSheet,
                   ),
                 ],
               ),
@@ -630,18 +611,20 @@ class _WatchCard extends StatelessWidget {
   }
 }
 
-/// 条目操作面板：备注 / 移动分组 / 取消关注。
+/// 条目操作面板：备注 / 移动分组 / 追踪切换 / 取消关注。
 class _ItemSheet extends ConsumerWidget {
   final WatchItem item;
   final VoidCallback onChanged;
   final VoidCallback onEditNote;
   final VoidCallback onMoveGroup;
+  final VoidCallback onToggle;
 
   const _ItemSheet(
       {required this.item,
       required this.onChanged,
       required this.onEditNote,
-      required this.onMoveGroup});
+      required this.onMoveGroup,
+      required this.onToggle});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -671,6 +654,11 @@ class _ItemSheet extends ConsumerWidget {
               Navigator.pop(context);
               onMoveGroup();
             },
+          ),
+          ListTile(
+            leading: Icon(item.active ? Icons.visibility_off : Icons.visibility),
+            title: Text(item.active ? '停止追踪' : '追踪更新'),
+            onTap: () => act((h) => h.api.watchSetActive(item.nid, !item.active)),
           ),
           ListTile(
             leading: const Icon(Icons.delete_outline),
