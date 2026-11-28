@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../app/theme.dart';
 
-/// App 信息页（设置 › 关于）：版本、许可与数据来源。纯静态信息，
+/// App 信息页（设置 › 关于）：开源 app 常用风格——intro、技术栈、许可、
+/// 数据来源。版本号从包配置读取（pubspec version/build），不再硬编码；
 /// 不依赖引擎；链接入口（GitHub / Issues / QQ 群）留在设置页。
 class AboutPage extends StatelessWidget {
   const AboutPage({super.key});
@@ -12,44 +14,118 @@ class AboutPage extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(title: const Text('App 信息')),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 32, 16, 24),
+      body: FutureBuilder<PackageInfo>(
+        future: PackageInfo.fromPlatform(),
+        builder: (context, snap) {
+          final info = snap.data;
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(16, 32, 16, 24),
+            children: [
+              Text(
+                '书层 Strata',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontFamily: StrataTokens.serif,
+                  fontSize: 26,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                info == null
+                    ? '读取版本号…'
+                    : '版本 ${info.version}（build ${info.buildNumber}）',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+              ),
+              const SizedBox(height: 24),
+              _section(
+                context,
+                '简介',
+                '离线优先的找书 app：内置二十余年书目快照（24.8 万本），'
+                '经典榜单、比赛归档与作者榜全部本地查询；官方清单、详情刷新'
+                '与作者追踪按需在线补充。无账号、无云同步，观测数据只保存在本机。',
+              ),
+              _section(
+                context,
+                '技术栈',
+                null,
+                children: [
+                  _row(context, '界面', 'Flutter（Material 3）'),
+                  _divider(context),
+                  _row(context, '引擎', 'Go · dart:ffi · localhost HTTP'),
+                  _divider(context),
+                  _row(context, '存储', 'SQLite（纯 Go 驱动，无 cgo）'),
+                  _divider(context),
+                  _row(context, '状态与路由', 'Riverpod · go_router'),
+                ],
+              ),
+              _section(
+                context,
+                '许可',
+                null,
+                children: [
+                  _row(context, '本应用', 'AGPL-3.0'),
+                  _divider(context),
+                  InkWell(
+                    onTap: () => showLicensePage(
+                      context: context,
+                      applicationName: '书层 Strata',
+                      applicationVersion: info?.version ?? '',
+                    ),
+                    child: _row(context, '开源许可', '查看全部 ›'),
+                  ),
+                ],
+              ),
+              _section(
+                context,
+                '数据来源',
+                null,
+                children: [
+                  _row(context, '书目', 'SFACG 菠萝包轻小说公开页面'),
+                  _divider(context),
+                  _row(
+                      context, '数据形态', '一次性内置种子 + 本机观测，不取正文'),
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _section(BuildContext context, String title, String? body,
+      {List<Widget>? children}) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            '书层 Strata',
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontFamily: StrataTokens.serif,
-              fontSize: 26,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+          Text(title,
+              style: TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.w600,
+                  color: scheme.onSurfaceVariant)),
           const SizedBox(height: 6),
-          Text(
-            '版本 1.0.0（build 1）',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
-          ),
-          const SizedBox(height: 24),
           Card(
+            margin: EdgeInsets.zero,
             child: Column(
               children: [
-                _row(context, '许可', 'AGPL-3.0（开源）'),
-                _divider(context),
-                _row(context, '数据来源', 'SFACG 菠萝包轻小说公开页面'),
-                _divider(context),
-                _row(context, '数据形态', '一次性内置种子 + 本机观测'),
+                if (body != null)
+                  Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Text(
+                      body,
+                      style: TextStyle(
+                          fontSize: 12.5,
+                          color: scheme.onSurface,
+                          height: 1.6),
+                    ),
+                  )
+                else ...?children,
               ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            '完全离线运行：内置只读种子库是收录书目的快照，关注、观察与'
-            '浏览足迹只保存在本机。无账号、无云同步，不上传任何用户数据。',
-            style: TextStyle(
-              fontSize: 11,
-              color: scheme.onSurfaceVariant,
-              height: 1.6,
             ),
           ),
         ],
@@ -86,7 +162,7 @@ class AboutPage extends StatelessWidget {
     return Container(
       height: 1,
       margin: const EdgeInsets.only(left: 14),
-      color: scheme.outline,
+      color: scheme.outline.withValues(alpha: .5),
     );
   }
 }
