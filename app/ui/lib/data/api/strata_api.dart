@@ -1620,6 +1620,15 @@ class SearchItem {
   /// false = 自动收录的库外书（discovered 覆盖层），est_year/favs 为空。
   final bool inSeed;
 
+  /// 经典榜单行全字段（2026-11-28：搜索结果统一走 BookRowTile）；
+  /// 库外行为 NULL，渲染时按空处理。
+  final String? status;
+  final String? priceType;
+  final int? words;
+  final int? clicks;
+  final int? praises;
+  final List<String> tags;
+
   SearchItem.fromJson(Map<String, dynamic> m)
     : nid = m['nid'] as int,
       title = m['title'] as String,
@@ -1628,7 +1637,15 @@ class SearchItem {
       estYear = m['est_year'] as int,
       favs = m['favs'] as int?,
       coverUrl = m['cover_url'] as String?,
-      inSeed = m['in_seed'] as bool? ?? true;
+      inSeed = m['in_seed'] as bool? ?? true,
+      status = m['status'] as String?,
+      priceType = m['price_type'] as String?,
+      words = (m['words'] as num?)?.toInt(),
+      clicks = (m['clicks'] as num?)?.toInt(),
+      praises = (m['praises'] as num?)?.toInt(),
+      tags = ((m['tags'] as List?) ?? const [])
+          .map((e) => e.toString())
+          .toList();
 }
 
 /// 官方搜索结果行（docs/08 §search-remote）：[inSeed] = 内置库命中；

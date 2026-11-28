@@ -2160,16 +2160,20 @@ func (s *Store) Search(ctx context.Context, q string, limit int) ([]SearchItem, 
 	if n, ok := parseNIDQuery(q); ok {
 		// nid 精确（docs/08 §search）：种子 + 已收录并集，nid = q。
 		rows, err = s.DB.QueryContext(ctx, `
-SELECT nid, title, author, genre, est_year, favs, cover_url, in_seed FROM (
+SELECT nid, title, author, genre, est_year, favs, cover_url, in_seed,
+       status, price_type, words, clicks, praises, tags FROM (
   SELECT b.nid AS nid, b.title AS title, b.author AS author, b.genre AS genre,
          b.est_year AS est_year, b.favs AS favs,
          COALESCE(c.cover, NULLIF(b.cover_url, '')) AS cover_url,
-         1 AS in_seed
+         1 AS in_seed, b.status AS status, b.price_type AS price_type,
+         b.words AS words, b.clicks AS clicks, b.praises AS praises,
+         (SELECT GROUP_CONCAT(bt.tag) FROM book_tags bt WHERE bt.nid = b.nid) AS tags
   FROM seed.books b
   LEFT JOIN covers c ON c.nid = b.nid
   WHERE b.nid = ?
   UNION ALL
-  SELECT d.nid, d.title, d.author, d.genre, NULL, d.favs, d.cover_url, 0
+  SELECT d.nid, d.title, d.author, d.genre, NULL, d.favs, d.cover_url, 0,
+         NULL, NULL, NULL, NULL, NULL, NULL
   FROM discovered d
   WHERE d.nid = ?
 )
@@ -2179,20 +2183,25 @@ LIMIT ?`, n, n, limit)
 		const esc = `\\`
 		pattern := "%" + strings.NewReplacer("%", esc+"%", "_", esc+"_", "\\", esc+esc).Replace(q) + "%"
 		rows, err = s.DB.QueryContext(ctx, `
-SELECT nid, title, author, genre, est_year, favs, cover_url, in_seed FROM (
+SELECT nid, title, author, genre, est_year, favs, cover_url, in_seed,
+       status, price_type, words, clicks, praises, tags FROM (
   SELECT b.nid AS nid, b.title AS title, b.author AS author, b.genre AS genre,
          b.est_year AS est_year, b.favs AS favs,
          COALESCE(c.cover, NULLIF(b.cover_url, '')) AS cover_url,
-         1 AS in_seed
+         1 AS in_seed, b.status AS status, b.price_type AS price_type,
+         b.words AS words, b.clicks AS clicks, b.praises AS praises,
+         (SELECT GROUP_CONCAT(bt.tag) FROM book_tags bt WHERE bt.nid = b.nid) AS tags
   FROM seed.books b
   LEFT JOIN covers c ON c.nid = b.nid
   WHERE (b.title LIKE ? ESCAPE '\' OR b.author LIKE ? ESCAPE '\')
   UNION ALL
-  SELECT d.nid, d.title, d.author, d.genre, NULL, d.favs, d.cover_url, 0
+  SELECT d.nid, d.title, d.author, d.genre, NULL, d.favs, d.cover_url, 0,
+         NULL, NULL, NULL, NULL, NULL, NULL
   FROM discovered d
   WHERE (d.title LIKE ? ESCAPE '\' OR d.author LIKE ? ESCAPE '\')
   UNION ALL
-  SELECT m.nid, m.title, m.author, m.genre, m.est_year, m.favs, m.cover_url, 0
+  SELECT m.nid, m.title, m.author, m.genre, m.est_year, m.favs, m.cover_url, 0,
+         NULL, NULL, NULL, NULL, m.praises, NULL
   FROM book_meta m
   WHERE (m.title LIKE ? ESCAPE '\' OR m.author LIKE ? ESCAPE '\')
     AND m.nid NOT IN (SELECT nid FROM discovered)
@@ -2211,9 +2220,14 @@ LIMIT ?`, pattern, pattern, pattern, pattern, pattern, pattern, limit)
 			gen, cover    sql.NullString
 			estYear, favs sql.NullInt64
 			inSeed        int
+			status, price sql.NullString
+			words, clicks sql.NullInt64
+			praises       sql.NullInt64
+			tags          sql.NullString
 		)
 		if err := rows.Scan(&item.NID, &item.Title, &item.Author, &gen,
-			&estYear, &favs, &cover, &inSeed); err != nil {
+			&estYear, &favs, &cover, &inSeed, &status, &price, &words,
+			&clicks, &praises, &tags); err != nil {
 			return nil, err
 		}
 		item.Genre = strPtr(gen)
@@ -2223,6 +2237,16 @@ LIMIT ?`, pattern, pattern, pattern, pattern, pattern, pattern, limit)
 		item.Favs = intPtr(favs)
 		item.CoverURL = strPtr(cover)
 		item.InSeed = inSeed != 0
+		item.Status = status.String
+		item.PriceType = strPtr(price)
+		item.Words = intPtr(words)
+		item.Clicks = intPtr(clicks)
+		item.Praises = intPtr(praises)
+		if tags.Valid && tags.String != "" {
+			item.Tags = strings.Split(tags.String, ",")
+		} else {
+			item.Tags = []string{}
+		}
 		items = append(items, item)
 	}
 	return items, rows.Err()
@@ -2422,6 +2446,14 @@ type SearchItem struct {
 	// discovery overlay (auto-collected official-search hits). False
 	// rows carry no est_year/favs until a detail fetch.
 	InSeed bool `json:"in_seed"`
+	// Classic-row display fields (2026-11-28: the search page renders the
+	// shared BookRowTile); out-of-library rows carry NULLs.
+	Status     string   `json:"status,omitempty"`
+	PriceType  *string  `json:"price_type,omitempty"`
+	Words      *int64   `json:"words,omitempty"`
+	Clicks     *int64   `json:"clicks,omitempty"`
+	Praises    *int64   `json:"praises,omitempty"`
+	Tags       []string `json:"tags,omitempty"`
 }
 
 // InsertObservation appends an alive-state observation (docs/05 §5.1: the
