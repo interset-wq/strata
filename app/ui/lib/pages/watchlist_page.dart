@@ -584,8 +584,8 @@ class _WatchCard extends StatelessWidget {
             ? Icon(
                 selected ? Icons.check_circle : Icons.circle_outlined,
                 color: selected ? scheme.primary : scheme.onSurfaceVariant)
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+            : Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     item.active ? '追踪于 $when' : '保存于 $when',
@@ -595,10 +595,12 @@ class _WatchCard extends StatelessWidget {
                             ? scheme.primary
                             : scheme.onSurfaceVariant),
                   ),
-                  const SizedBox(height: 8),
-                  // 信息增强统一行（用户裁定 2026-11-28）：行上只留一个
-                  // ⋮，备注/移组/追踪/移除全收进面板。
+                  const SizedBox(width: 2),
+                  // 信息增强统一行（用户裁定 2026-11-28）：状态文字与 ⋮
+                  // 同行，备注/移组/追踪/移除收进面板。
                   IconButton(
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
                     icon: Icon(Icons.more_vert,
                         size: 20, color: scheme.onSurfaceVariant),
                     tooltip: '更多',
