@@ -21,6 +21,13 @@ class AboutPage extends StatelessWidget {
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 32, 16, 24),
             children: [
+              // App logo（与启动图标同源资源）。
+              Image.asset(
+                'assets/icon/app-icon-foreground.png',
+                width: 72,
+                height: 72,
+              ),
+              const SizedBox(height: 10),
               Text(
                 '书层 Strata',
                 textAlign: TextAlign.center,
@@ -42,30 +49,39 @@ class AboutPage extends StatelessWidget {
               _section(
                 context,
                 '简介',
-                '离线优先的找书 app：内置二十余年书目快照（24.8 万本），'
-                '经典榜单、比赛归档与作者榜全部本地查询；官方清单、详情刷新'
-                '与作者追踪按需在线补充。无账号、无云同步，观测数据只保存在本机。',
+                // 与 GitHub 仓库 intro 保持一致（用户裁定 2026-11-27）。
+                'Offline-first light-novel discovery app for SFACG: '
+                'Flutter UI + embedded Go engine (FFI), a 248k-book local '
+                'bibliography, and on-demand official lists & author '
+                'tracking. AGPL-3.0.',
+                icon: Icons.auto_stories,
               ),
               _section(
                 context,
                 '技术栈',
                 null,
+                icon: Icons.code,
                 children: [
-                  _row(context, '界面', 'Flutter（Material 3）'),
+                  _row(context, '界面', 'Flutter（Material 3）',
+                      icon: Icons.widgets),
                   _divider(context),
-                  _row(context, '引擎', 'Go · dart:ffi · localhost HTTP'),
+                  _row(context, '引擎', 'Go · dart:ffi · localhost HTTP',
+                      icon: Icons.terminal),
                   _divider(context),
-                  _row(context, '存储', 'SQLite（纯 Go 驱动，无 cgo）'),
+                  _row(context, '存储', 'SQLite（纯 Go 驱动，无 cgo）',
+                      icon: Icons.storage),
                   _divider(context),
-                  _row(context, '状态与路由', 'Riverpod · go_router'),
+                  _row(context, '状态与路由', 'Riverpod · go_router',
+                      icon: Icons.account_tree),
                 ],
               ),
               _section(
                 context,
                 '许可',
                 null,
+                icon: Icons.gavel,
                 children: [
-                  _row(context, '本应用', 'AGPL-3.0'),
+                  _row(context, '本应用', 'AGPL-3.0', icon: Icons.copyright),
                   _divider(context),
                   InkWell(
                     onTap: () => showLicensePage(
@@ -73,7 +89,8 @@ class AboutPage extends StatelessWidget {
                       applicationName: '书层 Strata',
                       applicationVersion: info?.version ?? '',
                     ),
-                    child: _row(context, '开源许可', '查看全部 ›'),
+                    child: _row(context, '开源许可', '查看全部 ›',
+                        icon: Icons.article),
                   ),
                 ],
               ),
@@ -81,11 +98,13 @@ class AboutPage extends StatelessWidget {
                 context,
                 '数据来源',
                 null,
+                icon: Icons.public,
                 children: [
-                  _row(context, '书目', 'SFACG 菠萝包轻小说公开页面'),
+                  _row(context, '书目', 'SFACG 菠萝包轻小说公开页面',
+                      icon: Icons.menu_book),
                   _divider(context),
-                  _row(
-                      context, '数据形态', '一次性内置种子 + 本机观测，不取正文'),
+                  _row(context, '数据形态', '一次性内置种子 + 本机观测，不取正文',
+                      icon: Icons.shield),
                 ],
               ),
             ],
@@ -96,18 +115,26 @@ class AboutPage extends StatelessWidget {
   }
 
   Widget _section(BuildContext context, String title, String? body,
-      {List<Widget>? children}) {
+      {List<Widget>? children, IconData? icon}) {
     final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title,
-              style: TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.w600,
-                  color: scheme.onSurfaceVariant)),
+          Row(
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 14, color: scheme.onSurfaceVariant),
+                const SizedBox(width: 4),
+              ],
+              Text(title,
+                  style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: scheme.onSurfaceVariant)),
+            ],
+          ),
           const SizedBox(height: 6),
           Card(
             margin: EdgeInsets.zero,
@@ -133,12 +160,17 @@ class AboutPage extends StatelessWidget {
     );
   }
 
-  Widget _row(BuildContext context, String label, String value) {
+  Widget _row(BuildContext context, String label, String value,
+      {IconData? icon}) {
     final scheme = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
       child: Row(
         children: [
+          if (icon != null) ...[
+            Icon(icon, size: 15, color: scheme.onSurfaceVariant),
+            const SizedBox(width: 8),
+          ],
           Expanded(
             child: Text(
               label,
