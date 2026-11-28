@@ -57,6 +57,7 @@ class _CollectedPageState extends ConsumerState<CollectedPage> {
         await h.api.watchAdd(it.nid, active: active);
       }
       if (!mounted) return;
+      ref.invalidate(watchlistProvider);
       setState(() => _watching[it.nid] = active);
     } catch (_) {
       // 切换失败保持原状（网络/引擎忙），不打断列表。

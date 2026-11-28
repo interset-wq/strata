@@ -75,6 +75,13 @@ type Server struct {
 	// shared limiter (foreground lane) via crawl.FetchPreOrder.
 	preorderFetch func(ctx context.Context, client *http.Client, l *crawl.Limiter,
 		date string, foreground bool) ([]crawl.PreOrderItem, error)
+
+	// 24h per-issue cache + seam for the VIP-release feature endpoint
+	// (vipPush H5, docs/sfacg-endpoints.md §7.6). Distinct from preorder:
+	// same Saturday issue key, different upstream and payload.
+	vippushCache *vippushState
+	vippushFetch func(ctx context.Context, client *http.Client, l *crawl.Limiter,
+		date string, foreground bool) ([]crawl.VipPushItem, error)
 }
 
 const (
@@ -84,7 +91,7 @@ const (
 	// watchDefaultActivePref：详情页「关注」的默认行为（用户裁定
 	// 2026-11-28）——true = 关注并加入定时刷新，false = 仅关注。
 	watchDefaultActivePref = "watch_default_active"
-	discoverKPref       = "discover_k"
+	discoverKPref          = "discover_k"
 )
 
 // New builds the production HTTP engine (see NewServer for the seams the
@@ -137,6 +144,11 @@ func NewServer(s *store.Store) *Server {
 			l *crawl.Limiter, date string, foreground bool) ([]crawl.PreOrderItem, error) {
 			return crawl.FetchPreOrder(ctx, client, l, date, foreground)
 		},
+		vippushCache: &vippushState{entries: map[string]vippushEntry{}},
+		vippushFetch: func(ctx context.Context, client *http.Client,
+			l *crawl.Limiter, date string, foreground bool) ([]crawl.VipPushItem, error) {
+			return crawl.FetchVipPush(ctx, client, l, date, foreground)
+		},
 	}
 	group := r.Group("/strata")
 	group.GET("/healthz", srv.healthz)
@@ -155,11 +167,18 @@ func NewServer(s *store.Store) *Server {
 	group.GET("/books/:nid/observations", srv.observations)
 	group.GET("/watchlist", srv.watchList)
 	group.GET("/watchlist/heatmap", srv.watchHeatmap)
+	group.GET("/watchlist/groups", srv.watchGroups)
+	group.POST("/watchlist/groups", srv.watchGroupCreate)
+	group.PUT("/watchlist/groups/:gid", srv.watchGroupRename)
+	group.DELETE("/watchlist/groups/:gid", srv.watchGroupDelete)
 	group.GET("/notifications", srv.notificationsList)
 	group.POST("/notifications/read", srv.notificationsRead)
 	group.GET("/eras-explorer", srv.erasExplorer)
 	group.POST("/watchlist/:nid", srv.watchAdd)
 	group.PUT("/watchlist/:nid", srv.watchSetActive)
+	group.PUT("/watchlist/:nid/note", srv.watchSetNote)
+	group.PUT("/watchlist/:nid/list", srv.watchSetList)
+	group.PUT("/watchlist/:nid/interval", srv.watchSetInterval)
 	group.DELETE("/watchlist/:nid", srv.watchRemove)
 	group.GET("/rankings/favs", srv.rankingFavs)
 	group.GET("/rankings/board", srv.rankingBoard)
@@ -191,6 +210,7 @@ func NewServer(s *store.Store) *Server {
 	group.GET("/cover-carousel", srv.coverCarousel)
 	group.GET("/calendar", srv.calendar)
 	group.GET("/preorder", srv.preorder)
+	group.GET("/vippush", srv.vipPush)
 	group.GET("/ip-groups", srv.ipGroups)
 	group.GET("/facets", srv.facets)
 	group.GET("/year-groups", srv.yearGroups)
@@ -1442,6 +1462,141 @@ func (s *Server) watchList(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"meta": gin.H{"pool": "user"}, "items": items})
 }
 
+// watchSetNote updates the free-form note on one watchlist entry.
+func (s *Server) watchSetNote(c *gin.Context) {
+	nid, err := strconv.ParseInt(c.Param("nid"), 10, 64)
+	if err != nil || nid <= 0 {
+		fail(c, http.StatusBadRequest, "invalid_argument", "nid must be a positive integer")
+		return
+	}
+	var body struct {
+		Note string `json:"note"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		fail(c, http.StatusBadRequest, "invalid_argument", "note is required")
+		return
+	}
+	if err := s.store.WatchSetNote(c.Request.Context(), nid, body.Note); err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+// watchSetList moves an entry into a user group; 0 = ungrouped.
+func (s *Server) watchSetList(c *gin.Context) {
+	nid, err := strconv.ParseInt(c.Param("nid"), 10, 64)
+	if err != nil || nid <= 0 {
+		fail(c, http.StatusBadRequest, "invalid_argument", "nid must be a positive integer")
+		return
+	}
+	var body struct {
+		ListID int64 `json:"list_id"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		fail(c, http.StatusBadRequest, "invalid_argument", "list_id is required")
+		return
+	}
+	if err := s.store.WatchSetList(c.Request.Context(), nid, body.ListID); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			fail(c, http.StatusNotFound, "not_found", "group does not exist")
+			return
+		}
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+// watchSetInterval sets the poll interval (seconds) of one entry.
+func (s *Server) watchSetInterval(c *gin.Context) {
+	nid, err := strconv.ParseInt(c.Param("nid"), 10, 64)
+	if err != nil || nid <= 0 {
+		fail(c, http.StatusBadRequest, "invalid_argument", "nid must be a positive integer")
+		return
+	}
+	var body struct {
+		Interval int64 `json:"interval"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		fail(c, http.StatusBadRequest, "invalid_argument", "interval is required")
+		return
+	}
+	if body.Interval <= 0 {
+		fail(c, http.StatusBadRequest, "invalid_argument", "interval must be positive")
+		return
+	}
+	if err := s.store.WatchSetInterval(c.Request.Context(), nid, body.Interval); err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+// watchGroups lists user-defined groups with their entry counts.
+func (s *Server) watchGroups(c *gin.Context) {
+	groups, err := s.store.WatchGroups(c.Request.Context())
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"groups": groups})
+}
+
+// watchGroupCreate creates a named group and returns its id.
+func (s *Server) watchGroupCreate(c *gin.Context) {
+	var body struct {
+		Name string `json:"name"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil || strings.TrimSpace(body.Name) == "" {
+		fail(c, http.StatusBadRequest, "invalid_argument", "name is required")
+		return
+	}
+	id, err := s.store.WatchGroupCreate(c.Request.Context(),
+		strings.TrimSpace(body.Name), time.Now().Unix())
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"id": id})
+}
+
+// watchGroupRename renames a group; missing ids are a no-op.
+func (s *Server) watchGroupRename(c *gin.Context) {
+	gid, err := strconv.ParseInt(c.Param("gid"), 10, 64)
+	if err != nil || gid <= 0 {
+		fail(c, http.StatusBadRequest, "invalid_argument", "gid must be a positive integer")
+		return
+	}
+	var body struct {
+		Name string `json:"name"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil || strings.TrimSpace(body.Name) == "" {
+		fail(c, http.StatusBadRequest, "invalid_argument", "name is required")
+		return
+	}
+	if err := s.store.WatchGroupRename(c.Request.Context(), gid,
+		strings.TrimSpace(body.Name)); err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+// watchGroupDelete removes a group; its entries return to ungrouped.
+func (s *Server) watchGroupDelete(c *gin.Context) {
+	gid, err := strconv.ParseInt(c.Param("gid"), 10, 64)
+	if err != nil || gid <= 0 {
+		fail(c, http.StatusBadRequest, "invalid_argument", "gid must be a positive integer")
+		return
+	}
+	if err := s.store.WatchGroupDelete(c.Request.Context(), gid); err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
 // erasExplorer serves the offline generation aggregates (est_year × genre
 // books and same-generation P50 favourites) — pure seed data, no network.
 func (s *Server) erasExplorer(c *gin.Context) {
@@ -1890,31 +2045,29 @@ func (s *Server) reserveDetailRefresh(ctx context.Context, nid int64, now time.T
 		return nil, false, err
 	}
 	// 限额按自然日计数（用户裁定 2026-11-28）：0 点重置。限流开 =
-	// 每本书每天 1 次请求；关 = 每天最多 5 次（请求会触发爬虫，次数
-	// 过多没有意义且容易风控）。retry_after = 距下一个 0 点的秒数。
-	if enabled && attempt != nil {
-		dailyLimit := 5
-		if enabled {
-			dailyLimit = 1
-		}
-		dayStart := time.Date(now.Year(), now.Month(), now.Day(),
+	// 每本书每天 1 次请求；关 = 每天最多 5 次。无论开关都必须计数——
+	// 不让用户越过请求频率（请求触发爬虫，次数多易风控且耗电）。
+	dailyLimit := 5
+	if enabled {
+		dailyLimit = 1
+	}
+	dayStart := time.Date(now.Year(), now.Month(), now.Day(),
+		0, 0, 0, 0, now.Location()).Unix()
+	count, err := s.store.RefreshAttemptsToday(ctx, nid, dayStart)
+	if err != nil {
+		return nil, false, err
+	}
+	if attempt != nil && count >= dailyLimit {
+		nextMidnight := time.Date(now.Year(), now.Month(), now.Day()+1,
 			0, 0, 0, 0, now.Location()).Unix()
-		count, err := s.store.RefreshAttemptsToday(ctx, nid, dayStart)
-		if err != nil {
-			return nil, false, err
-		}
-		if count >= dailyLimit {
-			nextMidnight := time.Date(now.Year(), now.Month(), now.Day()+1,
-				0, 0, 0, 0, now.Location()).Unix()
-			return gin.H{
-				"state":               "rate_limited",
-				"written":             false,
-				"rate_limit_enabled":  true,
-				"last_attempt_at":     attempt.AttemptedAt,
-				"next_allowed_at":     nextMidnight,
-				"retry_after_seconds": nextMidnight - now.Unix(),
-			}, false, nil
-		}
+		return gin.H{
+			"state":               "rate_limited",
+			"written":             false,
+			"rate_limit_enabled":  enabled,
+			"last_attempt_at":     attempt.AttemptedAt,
+			"next_allowed_at":     nextMidnight,
+			"retry_after_seconds": nextMidnight - now.Unix(),
+		}, false, nil
 	}
 	if err := s.store.RecordRefreshAttempt(ctx, nid, now.Unix(), "pending"); err != nil {
 		return nil, false, err

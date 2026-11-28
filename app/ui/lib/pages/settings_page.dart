@@ -31,12 +31,8 @@ Future<void> _exportData(BuildContext context, WidgetRef ref) async {
   }
 }
 
-/// 详情刷新限流开关的数据源：引擎 /settings。
-final detailRateLimitProvider =
-    FutureProvider.autoDispose<EngineSettings>((ref) async {
-  final handle = await ref.watch(bootProvider.future);
-  return handle.api.settings();
-});
+/// 详情刷新限流开关的数据源：引擎 /settings（定义移至 core/providers.dart，
+/// 详情页也在监听它——settings 改开关后解除刷新按钮禁用）。
 
 /// 工作台测试书开关的数据源：引擎 /dev/test-book（docs/07 开发辅助）。
 final testBookProvider =

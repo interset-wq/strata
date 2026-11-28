@@ -195,6 +195,16 @@ final preorderProvider = FutureProvider.family<PreorderResponse, String>((
   return handle.api.preorder(date: date);
 });
 
+/// VIP 上架专题（vipPush H5 直出页，docs/sfacg-endpoints.md §7.6）：与预约层
+/// 同一周六期次、不同数据线；引擎 24h 期次缓存，失败可重试不影响月/周/日。
+final vipPushProvider = FutureProvider.family<VipPushResponse, String>((
+  ref,
+  date,
+) async {
+  final handle = await ref.watch(bootProvider.future);
+  return handle.api.vipPush(date: date);
+});
+
 /// IP tab 分组网格：ip_collab 池按征文（contest）聚合（count DESC），
 /// 端上展示全部组，每组带收藏最高一本的 top_* 做封面卡片。
 final ipGroupsProvider = FutureProvider<IpGroupsResult>((ref) async {
@@ -325,9 +335,39 @@ final searchHistoryProvider = FutureProvider<List<String>>((ref) async {
   return handle.api.searchHistory();
 });
 
+/// 关注列表（watchlist JOIN seed.books）。所有 watchAdd / watchRemove /
+/// watchSetActive 成功后 invalidate，保证常驻 IndexedStack 的关注 tab 在
+/// 从详情页返回时立即刷新（页面 initState 只跑一次，不能只靠 _load）。
+final watchlistProvider = FutureProvider<List<WatchItem>>((ref) async {
+  final handle = await ref.watch(bootProvider.future);
+  return handle.api.watchList();
+});
+
+/// 关注通知未读数：关注页 AppBar 角标与系统本地通知都读它。
+final notificationsProvider =
+    FutureProvider.autoDispose<Map<String, dynamic>>((ref) async {
+  final handle = await ref.watch(bootProvider.future);
+  return handle.api.notifications();
+});
+
 final bookProvider = FutureProvider.family<BookDetail, int>((ref, nid) async {
   final handle = await ref.watch(bootProvider.future);
   return handle.api.book(nid);
+});
+
+/// 详情刷新限流开关的数据源：引擎 /settings。settings 页用它渲染开关，
+/// 详情页监听它——限流开关变化后解除刷新按钮的限额禁用。
+final detailRateLimitProvider =
+    FutureProvider.autoDispose<EngineSettings>((ref) async {
+  final handle = await ref.watch(bootProvider.future);
+  return handle.api.settings();
+});
+
+/// v12 用户分组（watch_lists）：分组 chips 与移动/建组对话框共用。
+final watchGroupsProvider =
+    FutureProvider.autoDispose<List<WatchGroup>>((ref) async {
+  final handle = await ref.watch(bootProvider.future);
+  return handle.api.watchGroups();
 });
 
 Future<String> _extractAssets(String dirPath) async {

@@ -1184,6 +1184,7 @@ class _PeerPickDialogState extends ConsumerState<_PeerPickDialog> {
       final h = await ref.read(bootProvider.future);
       await h.api.watchAdd(it.nid, active: true, role: 'peer');
       if (!mounted) return;
+      ref.invalidate(watchlistProvider);
       widget.onAdded();
       if (mounted) Navigator.of(context).pop();
     } catch (e) {

@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:strata/core/providers.dart';
 import 'package:strata/data/api/strata_api.dart';
 import 'package:strata/pages/about_page.dart';
@@ -408,10 +409,12 @@ void main() {
       expect(data.dx, lessThan(official.dx));
       expect(find.text('书籍详情'), findsOneWidget);
       // 关注/追踪图标不再出现在 AppBar（同一动作全站只此一处）
+      // #100 单按钮：追踪并入关注（默认行为在 settings），底部栏
+      // 只剩关注 + 刷新，visibility 图标不再出现。
       expect(find.byIcon(Icons.bookmark_add_outlined), findsOneWidget);
-      expect(find.byIcon(Icons.visibility_outlined), findsOneWidget);
+      expect(find.byIcon(Icons.visibility_outlined), findsNothing);
       expect(find.text('关注'), findsOneWidget);
-      expect(find.text('追踪'), findsOneWidget);
+      expect(find.text('追踪'), findsNothing);
       expect(find.text('刷新'), findsOneWidget);
       // 旧的页内重复按钮不再存在
       expect(find.text('刷新观测'), findsNothing);
@@ -584,12 +587,34 @@ void main() {
     });
 
     testWidgets('App 信息页：版本 / 许可 / 数据来源 / 离线声明', (tester) async {
+      // 版本号从包配置读取（pubspec version/build）：测试环境必须 mock，
+      // 否则页面一直停在「读取版本号…」。
+      PackageInfo.setMockInitialValues(
+        appName: 'Strata',
+        packageName: 'io.github.intersetwq.strata',
+        version: '1.0.1',
+        buildNumber: '2',
+        buildSignature: '',
+      );
+      // 许可/数据来源行在页面下方： ListView 只渲染可视区，放大视口。
+      tester.view.physicalSize = const Size(1080, 4800);
+      tester.view.devicePixelRatio = 3;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
       await tester.pumpWidget(const MaterialApp(home: AboutPage()));
+      await tester.pump(); // FutureBuilder 首帧
+      await tester.pump(const Duration(seconds: 1)); // 等版本异步加载落地
       expect(find.text('书层 Strata'), findsOneWidget);
-      expect(find.text('版本 1.0.0（build 1）'), findsOneWidget);
-      expect(find.text('AGPL-3.0（开源）'), findsOneWidget);
+      // 版本号从包配置读取（pubspec version/build），不硬编码具体数字。
+      expect(find.textContaining('版本 1.0.1'), findsOneWidget);
+      // 版本号从包配置读取（pubspec version/build），不硬编码具体数字。
+      expect(find.textContaining('版本 1.0.1'), findsOneWidget);
+      expect(find.textContaining('（build '), findsOneWidget);
+      expect(find.text('AGPL-3.0'), findsOneWidget);
       expect(find.text('SFACG 菠萝包轻小说公开页面'), findsOneWidget);
-      expect(find.textContaining('完全离线运行'), findsOneWidget);
+      // 离线声明（2026-11-28 口径）：数据形态行明示不取正文、不上云。
+      expect(find.textContaining('一次性内置种子'), findsOneWidget);
+      expect(find.textContaining('不取正文'), findsOneWidget);
     });
 
     testWidgets('测试工具默认折叠：种子日期展开才可见', (tester) async {
@@ -1025,10 +1050,10 @@ void main() {
 
     testWidgets('名单页：获奖事件标题与条数按获奖名单口径', (tester) async {
       await pumpRoster(tester, oneZheng());
-      expect(find.text('获奖名单 · 一征'), findsOneWidget);
-      // 金奖台账 1 条：写「获奖名单 1 条」，不写参赛清单。
-      expect(find.text('获奖名单 1 条'), findsOneWidget);
-      expect(find.textContaining('官方清单'), findsNothing);
+      // #93 后标题带赛道：group 就绪后落到首轨「金奖」。
+      expect(find.textContaining('获奖名单 · 一征'), findsOneWidget);
+      // 获奖名单口径：不出现「参赛清单」字样。
+      expect(find.textContaining('参赛清单'), findsNothing);
     });
   });
 }

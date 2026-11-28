@@ -241,6 +241,14 @@ func EnsureUserDB(path string) error {
 			return err
 		}
 	}
+	// 2026-11-28: the daily quota needs one row per attempt, but devices
+	// upgraded from the 24h-cooldown build still have the old single-row
+	// table (`nid INTEGER PRIMARY KEY`). CREATE TABLE IF NOT EXISTS cannot
+	// widen a primary key, so rebuild it in place. Idempotent: a table with
+	// the new `id` column is left untouched.
+	if err := migrateRefreshAttempts(db); err != nil {
+		return fmt.Errorf("migrate refresh_attempts: %w", err)
+	}
 	// 幂等加列迁移在基表就绪后无条件重放（列已存在即 no-op）。它们曾经
 	// 只在版本闸门后跑，版本已到位的旧库永远跳过——book_meta 指标列因此
 	// 写不进（2026-11-25 用户报告的"收录后没有计算值"根因）。
@@ -264,10 +272,72 @@ func EnsureUserDB(path string) error {
 CREATE INDEX IF NOT EXISTS idx_watch_events_read ON watch_events(read, created_at);`); err != nil {
 		return fmt.Errorf("migrate watch_events: %w", err)
 	}
+	// v12: user-defined watchlist groups. Old builds only created
+	// watch_lists when migrating shelf_lists, so fresh v6+ databases can
+	// lack the table entirely; replay the create and the list_id column
+	// unconditionally (both are idempotent).
+	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS watch_lists(
+  id         INTEGER PRIMARY KEY,
+  name       TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);`); err != nil {
+		return fmt.Errorf("migrate watch_lists: %w", err)
+	}
+	if !hasColumn(db, "watchlist", "list_id") {
+		if _, err := db.Exec(`ALTER TABLE watchlist ADD COLUMN list_id INTEGER NOT NULL DEFAULT 0`); err != nil {
+			return fmt.Errorf("migrate watchlist.list_id: %w", err)
+		}
+	}
 	if err := migrateBookMetaMetrics(db); err != nil {
 		return fmt.Errorf("migrate book_meta metrics: %w", err)
 	}
 	return nil
+}
+
+// migrateRefreshAttempts rebuilds the pre-2026-11-28 refresh_attempts table
+// (nid was the primary key, so a second attempt for the same book violated
+// UNIQUE) into one row per attempt. SQLite DDL is transactional: a crash
+// rolls the rename/copy/drop back, so replaying is safe.
+func migrateRefreshAttempts(db *sql.DB) error {
+	if !tableExists(db, "refresh_attempts") {
+		_, err := db.Exec(`CREATE TABLE refresh_attempts(
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  nid          INTEGER NOT NULL,
+  attempted_at INTEGER NOT NULL,
+  state        TEXT NOT NULL DEFAULT 'pending'
+);
+CREATE INDEX IF NOT EXISTS idx_refresh_attempts_nid
+  ON refresh_attempts(nid, attempted_at);`)
+		return err
+	}
+	if hasColumn(db, "refresh_attempts", "id") {
+		return nil
+	}
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for _, stmt := range []string{
+		`DROP INDEX IF EXISTS idx_refresh_attempts_nid`,
+		`ALTER TABLE refresh_attempts RENAME TO refresh_attempts_legacy`,
+		`CREATE TABLE refresh_attempts(
+  id           INTEGER PRIMARY KEY AUTOINCREMENT,
+  nid          INTEGER NOT NULL,
+  attempted_at INTEGER NOT NULL,
+  state        TEXT NOT NULL DEFAULT 'pending'
+)`,
+		`INSERT INTO refresh_attempts(nid, attempted_at, state)
+  SELECT nid, attempted_at, state FROM refresh_attempts_legacy`,
+		`DROP TABLE refresh_attempts_legacy`,
+		`CREATE INDEX IF NOT EXISTS idx_refresh_attempts_nid
+  ON refresh_attempts(nid, attempted_at)`,
+	} {
+		if _, err := tx.Exec(stmt); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 // migrateV7toV8 adds the works cache column to author_profiles (docs/08

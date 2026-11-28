@@ -184,6 +184,11 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+    // settings 限流开关变化后解除按钮禁用（用户裁定 2026-11-28：关限流
+    // 恢复 5 次/天——禁用态不能跨口径残留）。
+    ref.listen(detailRateLimitProvider, (_, _) {
+      if (_rateLimited && mounted) setState(() => _rateLimited = false);
+    });
     final detail = ref.watch(bookProvider(widget.nid));
     return Scaffold(
       appBar: AppBar(
@@ -456,7 +461,8 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
       final rd = r.detail ?? const <String, dynamic>{};
       switch (r.state) {
         case 'alive':
-          msg = '观测已写入（favs=${rd['favs'] ?? rd['markCount']}）';
+          final obs = rd['favs'] ?? rd['markCount'];
+          msg = obs == null ? '观测已写入' : '观测已写入（favs=$obs）';
           // 对比度修正（2026-11-26）：SnackBar 为彩色底 + 白字，
           // 原 Colors.green #4CAF50 白字仅 2.78:1 → #2E7D32 5.13:1。
           color = const Color(0xFF2E7D32);
@@ -469,11 +475,10 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
           color = const Color(0xFFC2410F);
         case 'rate_limited':
           // 超出请求限额直接禁用按钮（用户裁定 2026-11-28）：本会话内
-          // 不再允许点击，0 点后引擎限额自动恢复。
+          // 不再允许点击，0 点后引擎限额自动恢复。文案不带小时数——
+          // ceil 到 24 会出现「约 24 小时后（0 点）」这类矛盾表述。
           setState(() => _rateLimited = true);
-          final retry = rd['retry_after_seconds'] as int? ?? 0;
-          final hours = (retry / 3600).ceil();
-          msg = '今日限额已用，约 $hours 小时后（0 点）自动恢复';
+          msg = '今日限额已用，0 点后自动恢复';
           color = const Color(0xFFC2410F);
         default:
           msg = '未知状态：${r.state}';
@@ -504,12 +509,14 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
     // 「关注并定时刷新」（watch_default_active）——单按钮统一入口。
     final settings = await handle.api.settings();
     await handle.api.watchAdd(widget.nid, active: settings.watchDefaultActive);
+    ref.invalidate(watchlistProvider);
     setState(() => onWatch = true);
   }
 
   Future<void> _removeWatch() async {
     final handle = await ref.read(bootProvider.future);
     await handle.api.watchRemove(widget.nid);
+    ref.invalidate(watchlistProvider);
     setState(() {
       onWatch = false;
       tracking = false;

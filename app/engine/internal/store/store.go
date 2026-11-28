@@ -1259,20 +1259,144 @@ func (s *Store) WatchRemove(ctx context.Context, nid int64) error {
 	return err
 }
 
+// WatchSetNote updates the free-form note on a watchlist entry. An empty
+// string clears it (NULL) so the UI can distinguish "no note" cheaply.
+func (s *Store) WatchSetNote(ctx context.Context, nid int64, note string) error {
+	var value any
+	if strings.TrimSpace(note) == "" {
+		value = nil
+	} else {
+		value = note
+	}
+	_, err := s.DB.ExecContext(ctx,
+		`UPDATE watchlist SET note = ? WHERE nid = ?`, value, nid)
+	return err
+}
+
+// WatchSetList moves an entry into a user group; 0 means ungrouped.
+func (s *Store) WatchSetList(ctx context.Context, nid, listID int64) error {
+	if listID != 0 {
+		var count int
+		if err := s.DB.QueryRowContext(ctx,
+			`SELECT COUNT(*) FROM watch_lists WHERE id = ?`, listID).Scan(&count); err != nil {
+			return err
+		}
+		if count == 0 {
+			return ErrNotFound
+		}
+	}
+	_, err := s.DB.ExecContext(ctx,
+		`UPDATE watchlist SET list_id = ? WHERE nid = ?`, listID, nid)
+	return err
+}
+
+// WatchSetInterval sets the poll interval (seconds) of one entry. The
+// watcher reads it per tick; 0 keeps the schema default untouched.
+func (s *Store) WatchSetInterval(ctx context.Context, nid, interval int64) error {
+	if interval <= 0 {
+		return ErrNotFound
+	}
+	_, err := s.DB.ExecContext(ctx,
+		`UPDATE watchlist SET poll_interval = ? WHERE nid = ?`, interval, nid)
+	return err
+}
+
+// WatchGroup is a user-defined watchlist group (v6 watch_lists).
+type WatchGroup struct {
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	CreatedAt int64  `json:"created_at"`
+	Count     int64  `json:"count"`
+}
+
+// WatchGroups lists groups with their current watchlist counts.
+func (s *Store) WatchGroups(ctx context.Context) ([]WatchGroup, error) {
+	rows, err := s.DB.QueryContext(ctx, `
+SELECT l.id, l.name, l.created_at, COUNT(w.nid)
+FROM watch_lists l
+LEFT JOIN watchlist w ON w.list_id = l.id
+GROUP BY l.id, l.name, l.created_at
+ORDER BY l.created_at ASC, l.id ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	groups := []WatchGroup{}
+	for rows.Next() {
+		var g WatchGroup
+		if err := rows.Scan(&g.ID, &g.Name, &g.CreatedAt, &g.Count); err != nil {
+			return nil, err
+		}
+		groups = append(groups, g)
+	}
+	return groups, rows.Err()
+}
+
+// WatchGroupCreate creates a named group and returns its id.
+func (s *Store) WatchGroupCreate(ctx context.Context, name string, createdAt int64) (int64, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return 0, fmt.Errorf("group name is empty")
+	}
+	res, err := s.DB.ExecContext(ctx,
+		`INSERT INTO watch_lists(name, created_at) VALUES(?, ?)`, name, createdAt)
+	if err != nil {
+		return 0, err
+	}
+	return res.LastInsertId()
+}
+
+// WatchGroupRename renames a group. Missing ids are a no-op.
+func (s *Store) WatchGroupRename(ctx context.Context, id int64, name string) error {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return fmt.Errorf("group name is empty")
+	}
+	_, err := s.DB.ExecContext(ctx,
+		`UPDATE watch_lists SET name = ? WHERE id = ?`, name, id)
+	return err
+}
+
+// WatchGroupDelete removes a group and returns its entries to ungrouped.
+func (s *Store) WatchGroupDelete(ctx context.Context, id int64) error {
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx,
+		`UPDATE watchlist SET list_id = 0 WHERE list_id = ?`, id); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM watch_lists WHERE id = ?`, id); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 // WatchItem is a watchlist row joined with seed metadata.
 type WatchItem struct {
-	NID      int64   `json:"nid"`
-	Title    string  `json:"title"`
-	Author   string  `json:"author"`
-	Genre    *string `json:"genre"`
-	CoverURL *string `json:"cover_url"`
-	AddedAt  int64   `json:"added_at"`
-	Role     string  `json:"role"`
-	Note     *string `json:"note"`
+	NID       int64   `json:"nid"`
+	Title     string  `json:"title"`
+	Author    string  `json:"author"`
+	Genre     *string `json:"genre"`
+	CoverURL  *string `json:"cover_url"`
+	AddedAt   int64   `json:"added_at"`
+	Role      string  `json:"role"`
+	Note      *string `json:"note"`
+	Status    *string `json:"status"`
+	Words     *int64  `json:"words"`
+	Favs      *int64  `json:"favs"`
+	Praises   *int64  `json:"praises"`
+	EstYear   *int64  `json:"est_year"`
+	Form      *string `json:"form"`
+	ListID    int64   `json:"list_id"`
 	// Active = tracking on (poll_enabled). Since v6 the watchlist is the
 	// single user-interest list: active entries are tracked, inactive
 	// ones are save-only (the former bookshelf).
-	Active bool `json:"active"`
+	Active       bool   `json:"active"`
+	LastPollAt   *int64 `json:"last_poll_at"`
+	PollInterval int64  `json:"poll_interval"`
 }
 
 // WatchList joins the watchlist with seed metadata, newest first.
@@ -1283,7 +1407,14 @@ SELECT w.nid,
        COALESCE(b.author, d.author, '') AS author,
        COALESCE(b.genre, d.genre),
        COALESCE(c.cover, NULLIF(b.cover_url, '')) AS cover_url,
-       w.added_at, w.role, w.note, w.poll_enabled
+       w.added_at, w.role, w.note,
+       b.status,
+       COALESCE(b.words, d.words),
+       COALESCE(b.favs, d.favs),
+       COALESCE(b.praises, d.praises),
+       COALESCE(b.est_year, d.est_year),
+       COALESCE(b.form, d.form),
+       w.list_id, w.poll_enabled, w.last_poll_at, w.poll_interval
 FROM watchlist w
 LEFT JOIN seed.books b ON b.nid = w.nid
 LEFT JOIN discovered d ON d.nid = w.nid
@@ -1296,19 +1427,30 @@ ORDER BY w.added_at DESC`)
 	items := []WatchItem{}
 	for rows.Next() {
 		var (
-			it         WatchItem
-			gen, cover sql.NullString
-			note       sql.NullString
-			poll       int
+			it                       WatchItem
+			gen, cover, note, status sql.NullString
+			form                     sql.NullString
+			words, favs, praises     sql.NullInt64
+			estYear, lastPoll        sql.NullInt64
+			poll                     int
 		)
 		if err := rows.Scan(&it.NID, &it.Title, &it.Author, &gen,
-			&cover, &it.AddedAt, &it.Role, &note, &poll); err != nil {
+			&cover, &it.AddedAt, &it.Role, &note, &status,
+			&words, &favs, &praises, &estYear, &form,
+			&it.ListID, &poll, &lastPoll, &it.PollInterval); err != nil {
 			return nil, err
 		}
 		it.Genre = strPtr(gen)
 		it.CoverURL = strPtr(cover)
 		it.Note = strPtr(note)
+		it.Status = strPtr(status)
+		it.Words = intPtr(words)
+		it.Favs = intPtr(favs)
+		it.Praises = intPtr(praises)
+		it.EstYear = intPtr(estYear)
+		it.Form = strPtr(form)
 		it.Active = poll == 1
+		it.LastPollAt = intPtr(lastPoll)
 		items = append(items, it)
 	}
 	return items, rows.Err()
