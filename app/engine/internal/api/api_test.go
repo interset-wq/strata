@@ -876,6 +876,39 @@ func TestWriteAppPersistsEveryField(t *testing.T) {
 	if body["cover"] != "https://example.test/app.jpg" {
 		t.Fatalf("cover = %v", body["cover"])
 	}
+	// 种子书经 App 路径刷新后，展示快照时间必须 = 触发爬虫时刻
+	// observedAt=1800000001（UI 读 effective；book 列保持 seed 只读值）。
+	if got := eff["db_update"]; got != "2027-01-15 08:00:01" {
+		t.Fatalf("refreshed effective[db_update] = %v, want crawl trigger time", got)
+	}
+}
+
+// TestAutoCollectedSnapshotTime: out-of-seed books collected via the App
+// refresh path must report db_update = the crawl trigger time (fetched_at),
+// both in book and effective — never the seed value or a stale timestamp.
+func TestAutoCollectedSnapshotTime(t *testing.T) {
+	srv, st := newTestServer(t)
+	s := &Server{store: st}
+	const nid int64 = 990001 // not in testseed
+	app := &crawl.AppNovel{
+		NovelID: nid, NovelName: "Auto Collected", AuthorName: "New Author",
+		AddTime: "2024-01-01T00:00:00", LastUpdateTime: "2026-11-20T10:00:00",
+		MarkCount: 12, ViewTimes: 340, CharCount: 5000, IsFinish: false,
+	}
+	if err := s.writeApp(context.Background(), nid, app, 1800000002); err != nil {
+		t.Fatal(err)
+	}
+	body := getJSON(t, srv.URL+"/strata/books/990001", http.StatusOK)
+	if body["source"] != "local" {
+		t.Fatalf("source = %v, want local", body["source"])
+	}
+	want := "2027-01-15 08:00:02"
+	if got := body["effective"].(map[string]any)["db_update"]; got != want {
+		t.Fatalf("auto-collected effective[db_update] = %v, want %v", got, want)
+	}
+	if got := body["book"].(map[string]any)["db_update"]; got != want {
+		t.Fatalf("auto-collected book[db_update] = %v, want %v", got, want)
+	}
 }
 
 // TestYearGroups: the short tab's year entry — one form's pool aggregated
