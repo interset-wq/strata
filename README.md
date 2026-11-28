@@ -1,182 +1,113 @@
 # 书层 Strata
 
-![](https://img.shields.io/badge/status-research-blue) ![](<https://img.shields.io/badge/data-245%2C779%20novels-green>)
+![](https://img.shields.io/badge/release-v1.0.1-blue) ![](https://img.shields.io/badge/data-248%2C338%20novels-green)
 
-对 SF 轻小说（菠萝包轻小说）二十年书目数据的可复现研究，并基于研究结果开发app用于帮助用户高效找书。
+基于 SF 轻小说（菠萝包轻小说）二十年书目数据的**离线优先找书 app**：
+一个 APK 内置完整历史书目库（248,338 本），内嵌 Go 引擎本地查询，
+在线能力（官方清单、详情刷新、作者追踪）按需补充——没有服务端，没有账号。
 
-**核心判断**：官方榜单回答「现在什么火」，本研究回答「过去十年结构如何变化」。
+**核心判断**：官方榜单回答「现在什么火」，本项目回答「过去十年结构如何变化」。
 一本 2015 年完结的作品不再给站方带来收入，因此不会进入任何当期榜；
-但它的成绩作为书目事实并不随时间衰减。这个错位是全部分析的出发点，
-也是后续产品重新设计时唯一需要守住的东西。
+但它的成绩作为书目事实并不随时间衰减。这个错位是产品的出发点，
+也是全部数据工作的唯一红线。
 
 ---
 
-## 当前状态
+## 产品（`app/`）
 
-| 层       | 目录                                                                                                                                                           | 状态                                                                                                          |
-| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| 数据集   | [`dataset/`](./dataset/) | **已建立**：全量书籍目录唯一真源 248,338 本（只归并重复抓取行，不删书；含 108 本月榜遗漏补充），15 字段 + 默认封面置空；供种子与产品使用，**不是分析口径** |
-| 研究     | [`analysis/`](./analysis/)                                                                                                                                    | **已完成**：可复现的数据分析                                                                            |
-| 产品     | [`app/`](./app/)                                                                                                                                              | **开发中**：Flutter UI + 内嵌 Go 服务，见 [APP 设计文档 01](./app/docs/01-tech-stack.md)                 |
-| 接口档案 | [`docs/sfacg-endpoints.md`](./analysis/references/sfacg-endpoints.md)（PC 端）+ [`sfacg-app-api.md`](./analysis/references/sfacg-app-api.md)（官方 App API） | **SFACG 接口唯一权威事实档案**：端点/参数/字段/状态码/限流；动手前必读，不要猜 API                      |
-| 归档     | [`archive/`](./archive/)                                                                                                                                      | **历史实测档案，不是设计文档**：4 份实测细节仅供参考，数字口径已过时，见 [归档索引](./archive/README.md) |
+| 能力 | 说明 |
+| --- | --- |
+| 经典榜单 | 长篇/中篇/短篇/对话多维榜单，收藏/点击/点赞同代分位排序，题材/状态/标签/年份/价格联动筛选 |
+| 量化榜单 | 口碑（cqs）与位置（cps）双榜，offset 翻页器定位长尾 |
+| 比赛归档 | 官方征文赛事档案：赛程、覆盖率、代表作、参赛/获奖清单按需抓取（限速 + 缓存 + 三态判活） |
+| 作者榜 | 全站作者按累计成绩排名，头像缓存 + 关注 |
+| 日历 | VIP 上架周历（PreOrder 期次），内置库上架速览 |
+| 关注与通知 | 关注作者定时刷新（引擎内置 cron），更新写入通知中心 |
+| 收录 | 库外作品点击即自动收录，与内置书地位均等，指标端上补算 |
+
+技术形态：Flutter UI + Go 引擎（`-buildmode=c-shared`，dart:ffi localhost HTTP）。
+只读种子库 `seed.db` + 可写 `user.db` 两个 SQLite；iOS 侧仅差 Xcode 构建。
+详见 [`app/README.md`](./app/README.md) 与设计文档 [`app/docs/01`–`16`](./app/docs/01-tech-stack.md)。
+
+## 构建
+
+```bash
+# Flutter（Android debug）
+cd app/ui && flutter build apk --debug
+
+# 引擎（Android arm64 FFI）
+cd app/engine
+GOOS=android GOARCH=arm64 CGO_ENABLED=1 \
+  CC=<ndk>/toolchains/llvm/prebuilt/windows-x86_64/bin/aarch64-linux-android24-clang.cmd \
+  go build -buildmode=c-shared -o libstrata.so ./cmd/ffi
+
+# 种子库（依赖 analysis 管线）
+cd analysis && uv run python ../app/tools/seedbuild/build_seed.py
+```
+
+发布：打 `v*` tag 推送即触发 [.github/workflows/release.yml](.github/workflows/release.yml)
+（NDK 编引擎 → release APK → GitHub Release），tag 与 `app/ui/pubspec.yaml` 的
+versionName 保持一致。
+
+---
+
+## 数据层
+
+| 目录 | 内容 |
+| --- | --- |
+| [`dataset/`](./dataset/) | 全量书籍目录唯一真源 248,338 本（只归并重复抓取行，不删书；15 字段），供种子使用，**不是分析口径** |
+| [`analysis/`](./analysis/) | 可复现数据分析：22 份报告 + 88 张图，全部由生成器产出 |
+| [`docs/`](./docs/) | 全局定义：SFACG 接口事实档案、自定义指标、体裁判定 |
 
 **引用任何数字之前，先读 [`analysis/README.md`](./analysis/README.md) 的口径约束。**
-`archive/` 下的报告基于早期数据集（246,045 本、2026-06 快照、`quarry/` 管线），
-其数字与结论已被后续分析修正，不作为当前口径。
 
----
+### SFACG 接口事实档案（动手前必读）
 
-## SFACG 接口事实档案（动手前必读）
+任何涉及 SFACG 端点、参数、字段、状态码或抓取的工作，先读
+[`docs/sfacg-endpoints.md`](./docs/sfacg-endpoints.md)（PC 端）与
+[`docs/sfacg-app-api.md`](./docs/sfacg-app-api.md)（官方 App API），
+不要凭印象猜 API——本项目已多次因猜测踩坑（搜索只认 `keyword`、
+`novelbytype` 必须 POST + `Referer`、无效 nid 返回 200、HTML 搜索硬截 30 条等）。
 
-**任何涉及 SFACG 端点、参数、字段、状态码或抓取的工作，
-先读下面两档——对应哪一端就读哪一档，不要凭印象猜 API。**
-
-| 档案                                                                                  | 覆盖                                                                                                                                            | 关键差异                                                                        |
-| ------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| [`analysis/references/sfacg-endpoints.md`](./analysis/references/sfacg-endpoints.md) | **PC 端** HTML + `HTML5.ashx`：15 端点总表、三类搜索接口字段覆盖、`novelbytype` 枚举、详情页/目录/评论/榜单选择器、静默限流与失败模式 | 点击数带「万」量化（±500）；**无上架时间**                               |
-| [`analysis/references/sfacg-app-api.md`](./analysis/references/sfacg-app-api.md)     | **官方移动端 App** `api.sfacg.com`：认证机制、19 字段字典、77 个推送位、**逐章时间戳**                                            | 单本仅 0.7 KB；**`addTime` 精确到秒**、**`viewTimes` 精确整数** |
-
-**不要凭印象猜 API**——本项目已多次因猜测踩坑：
-
-| 想当然的写法                       | 实测真相                                                                              |
-| ---------------------------------- | ------------------------------------------------------------------------------------- |
-| 搜索参数用 `q` / `key` / `s` | 只有 `keyword` 可用，其余报 501                                                     |
-| `novelbytype` 用 GET             | 必须 POST + `Referer`，GET 报 501                                                   |
-| 无效 nid 返回 404                  | 返回 **HTTP 200** + 文案「小说不存在」/「出错啦」，状态码零信息量               |
-| 搜索能翻页拿全量                   | HTML 硬截断 30 条，连约 17 次静默限流返回「0 结果」不报错                             |
-| 按「>5 KB 含书名」判存活           | 僵尸页 13–15 KB、与存活页体积中位只差 35 B，必须看 `div.book_Catalog` 有无 `<a>` |
-| App API 需要用户账号               | 用 App 内置固定凭据 + 每次请求自签即可；**但正文接口无权限，不取正文**          |
-
-档案的实测依据来自 2026-11-16 / 2026-11-17 现网请求，探针为
-`analysis/fetchers/probe_sfacg_api.py`、`probe_novelbytype.py`、`probe_sfacg_app_api.py`；
-上游实现参照 [sfacg_tools](https://github.com/light-nook-labs/sfacg_tools)（`sfacglib/`）。
-
-想临时看某个端点**实际返回哪些字段**，用根目录的极简脚本
-[`tools/api_inspect.py`](./tools/api_inspect.py)：`uv run --project analysis python tools/api_inspect.py`
-直接跑，里面是现成的 `res = requests.get(...)` + `dump(res)` 例子（改 URL 即可看别的端点，
-注释里列了详情/章节/列表/搜索/推送位/榜单等）。只依赖 requests，无 CLI、无 main。
-遵守同一套合规边界（只取书目元数据、不取正文、不登录、串行、低频）。
-产品侧的接口用法另见 [`app/docs/04-search.md`](./app/docs/04-search.md) 与
-[`app/docs/05-detail-fetch.md`](./app/docs/05-detail-fetch.md)；
-**`archive/search.md` 是旧稿，已被档案实测否定，不得作为接口依据。**
-
----
-
-## 数据速览
-
-| 项             | 值                                                                                     |
-| -------------- | -------------------------------------------------------------------------------------- |
-| 唯一原始数据集 | `analysis/data/extracted/dataset/data/meta*.jsonl`，22 文件 / 249,832 行             |
-| 规范化书目表   | `analysis/out/novels.csv`，245,887 行 × 15 列（构建时已剔除正版日轻 47 行）         |
-| 数据内容上界   | **2026-05-03**（原始 jsonl 的 `max(last_update)`，即扫描起点，非统一读取时刻） |
-| 上架年定年     | `analysis/lib/eras.py`，281 锚点、log(nid) 分段线性，内插段留一法 p90 3 天              |
-| 在架覆盖率     | 约 69.3%（报告 10 已重写：三态判据 + 按 nid 段分层加权；旧 68.9% 量级未变、口径已改）  |
-| 产出           | 19 份基准报告 + 3 份补充报告、88 张图，均由生成器产出                                  |
-
-抓取方式决定了数据的边界：原始 jsonl 是 Scrapy 按天切分、追加写入的产物，
-列表页按 `last_update` 降序、每天从上一天断点续爬。全量是一次约三周、
-从新到旧的**单向游标扫描**，不是统一时刻的快照；更新中的书与新入库书被重排到
-游标身后，因此遗漏偏向「短、新、更新中」而非冷门。所有绝对计数都是下界。
-
----
-
-## 核心发现
-
-以下六条出自 [报告 16：十年结构变迁](./analysis/reports/16_timeline.md)，
-主体序列现算；需要独立探测的派生指标标注来源报告，不重复判定。
-
-1. **供给是单峰，且「人」比「书」先见顶**。年供给 2022 年达峰 37,088 本，
-   2025 年降至 14,552 本（−61%）；新作者数 2020 年已见顶（18,388 人），
-   比供给峰早两年。收缩主体是作者基数流失，不是人均写得更少（报告 01、03）。
-2. **商业化是「门槛加深 + 天花板见顶」的剪刀差**。签约率中位从扩张期 3.1%
-   升至收缩期 10.5%，月票总票 2020 年见顶 109 万票后，2025 年剩 39 万（−64%）。
-   平台在变少的新书里签了更高比例，却没有更大的付费盘子（报告 01、07）。
-3. **注意力集中是结构常数，重心在迁移**。全书收藏 Gini 约 0.95，
-   45% 的收藏落在 2020–2022 三个世代。变的是「落在谁身上」，不是「是否集中」（报告 02）。
-4. **口味转向是运营与自选择的合力**。魔幻份额从兴趣站期中位 45% 降到扩张期 36%，
-   同人 2019 年上线、2021 年占 25% 后回落；女性主角标签占有标签书从 2017 年 9.1%
-   升至 2025 年 36.1%。标签有受控词表与 2022 年断层，不能全读成需求侧变化（报告 04、09）。
-5. **平台识别的是作者能力，不是单本爆款**。banner 授予对代表作收藏分位 <90% 的作者
-   精确为 0（报告 17）；征文的上榜优势控制 VIP 后反转、作者内对照仅 1.18 倍（报告 15）；
-   跟风书的高热度是选择效应（报告 12、13）。三类看似因果的优势逐层对照后收敛到「筛选的是人」。
-6. **图景有一面带盲区的镜子**。覆盖率 69.3%，遗漏偏短、新、更新中；
-   快照状态不等于当期状态；上界之后的新书完全不在库内。
-   全部发现都是结构描述，**先拆混杂，再谈差异**。
-
----
-
-## 快速开始
-
-工作目录为 `analysis/`，使用 `uv` 管理依赖：
+### 快速开始（研究管线）
 
 ```bash
 cd analysis
 uv sync
-uv run --extra archive python pipeline/prepare.py   # 首次：校验归档哈希并解压（已存在则跳过）
-uv run python pipeline/build_csv.py                 # 从 jsonl 重建 CSV / schema / manifest
-uv run python generators/report_timeline.py         # 生成报告 16（单份）
-for f in generators/report_*.py; do uv run python "$f"; done   # 全部 22 份（19 基准 + 3 补充）
+uv run --extra archive python pipeline/prepare.py   # 首次：校验归档哈希并解压
+uv run python pipeline/build_csv.py                 # 从 jsonl 重建 CSV / manifest
+for f in generators/report_*.py; do uv run python "$f"; done   # 全部报告
 ```
-
-完整管线、目录说明、22 份报告清单（19 基准 + 3 补充）和 12 条口径约束见 [`analysis/README.md`](./analysis/README.md)。
-`analysis/out/` 不入库，均可重建；榜单与存活探测需联网重新抓取。
 
 ---
 
-## 从早期文档保留的事实
+## 核心发现（研究摘要）
 
-这些是 `archive/` 里经页面/API 实测得到、且未被后续分析推翻的部分。
-具体数字以原档案的实测日期为准，**不视为当前快照口径**。
+以下六条出自 [报告 16：十年结构变迁](./analysis/reports/16_timeline.md)，
+完整口径见 [`analysis/README.md`](./analysis/README.md)：
 
-- **官方榜全是当期榜**：App 有 11 个榜（推荐/人气/畅销/新书/收藏/月票/打赏/种草/粉丝/角色/完结），
-  web 6 个；种草 15 分钟刷新、月票按月清零，没有一个是累计成绩榜（报告 07 另证月度榜每月清零）。
-- **字段语义错位**：上游（及早期 quarry）的 `like_num` 实为**收藏**、`praise_num` 实为**赞**；
-  所谓「点击」是**累计曝光**，受书龄与曝光分母影响，不能当兴趣强度。
-  规范化表已改名为 `clicks` / `favs` / `praises`，但语义仍需按此理解。
-- **计费口径**：月票由充值返还（1 票 ≈ 0.5 元），可投任意书含免费书；热销榜 ≈ 订阅额。
-  `fireMoney` 是按字数计的整本订阅定价，**不是营收**；平台无营收/订阅额/付费人数数据。
-- **nid 是免费时间轴**：nid 自增不重用，可作定年主轴；上游库没有 `add_time`，
-  `last_update` 是末次更新，不能当创建时间。
-- **标签不是实体**：上游 `tags.id` 跨分片同 id 率为 0，只能按 `name` 对齐；
-  官方无标签清单接口、词表会增减（含年度「萌神」荣誉标签）；「末世」与「末日」
-  交集为 0、长期并存，本站按独立标签处理，不做同义词合并。
-- **banner 是图资产**：750×430 横版插画、图上无书名，早期 667 张中 666 张可下载；
-  `Last-Modified` 是批量上传时间，不是上架时间。当前数据集内 `featured=1` 共 620 本（种子构建补回 47 本正版日轻后为 667），
-  且已区分平台下注与事后奖励两类（报告 17）。
-- **角色榜是唯一需要正面承认的对手维度**：官方有角色榜，印证角色是读者找书方式之一；
-  差别在于官方只能给「现在最热」，历史累计维度始终空白。
-- **端上抓取的两条硬约束**（若后续做客户端）：中心化抓详情等于分布式爬虫，
-  必须限速；详情缓存 TTL 14 天，这不是性能优化而是生存问题。
+1. **供给是单峰，且「人」比「书」先见顶**：年供给 2022 年达峰 37,088 本，2025 年降至 14,552 本（−61%）；新作者数 2020 年已见顶。
+2. **商业化是「门槛加深 + 天花板见顶」的剪刀差**：签约率中位 3.1% → 10.5%，月票总量 2020 年见顶后 −64%。
+3. **注意力集中是结构常数，重心在迁移**：全书收藏 Gini ≈ 0.95，45% 的收藏落在 2020–2022 三个世代。
+4. **口味转向是运营与自选择的合力**：魔幻份额下降、女性主角标签占比 9.1% → 36.1%，标签词表有断层，不能全读成需求侧变化。
+5. **平台识别的是作者能力，不是单本爆款**：banner 授予、征文上榜优势、跟风书热度逐层对照后收敛到「筛选的是人」。
+6. **图景有一面带盲区的镜子**：覆盖率约 69.3%，遗漏偏向「短、新、更新中」；全部绝对计数都是下界。
 
 ---
 
 ## 文档索引
 
-| 文档                                                      | 用途                                             | 状态                                                                               |
-| --------------------------------------------------------- | ------------------------------------------------ | ---------------------------------------------------------------------------------- |
-| [`analysis/README.md`](./analysis/README.md)             | 数据管线、报告清单、口径约束                     | **当前口径，先读**                                                           |
-| [`analysis/reports/`](./analysis/reports/)               | 19 份基准报告 + 3 份补充报告正文与 88 张图       | **当前结论**                                                                 |
-| [`archive/README.md`](./archive/README.md)               | 早期实测档案索引与失效清单                       | 历史稿，4 份实测细节可参考                                                         |
-| [`archive/data-findings.md`](./archive/data-findings.md) | 早期全量实测（字段陷阱、榜单机制、banner、标签） | 实测细节可参考，数字过时                                                           |
-| [`archive/search.md`](./archive/search.md)               | 三个官方接口实测边界与搜索方案                   | 接口事实可参考，方案已重设为 `app/docs/04-search.md`                             |
-| [`archive/architecture.md`](./archive/architecture.md)   | 早期架构、六个入口、种子策略                     | 方案已重设为 `app/docs/01`–`07`；§6.5 末保留服务端四条进入条件               |
-| [`app/README.md`](./app/README.md)                       | 产品设计与文档索引（01–07）                     | **当前方案**，见 [`app/docs/01-tech-stack.md`](./app/docs/01-tech-stack.md) |
+| 文档 | 用途 |
+| --- | --- |
+| [`app/README.md`](./app/README.md) | 产品结构与文档索引（01–16） |
+| [`app/docs/01-tech-stack.md`](./app/docs/01-tech-stack.md) | 技术栈与边界（无服务端/无账号/localhost only） |
+| [`docs/README.md`](./docs/README.md) | 全局定义：接口事实、指标、体裁 |
+| [`analysis/README.md`](./analysis/README.md) | 数据管线、报告清单、口径约束 |
+| [`analysis/reports/`](./analysis/reports/) | 22 份报告正文与图表 |
 
-`temp/` 下是参考项目的本地镜像（上游见各文档链接：[sfacg_tools](https://github.com/light-nook-labs/sfacg_tools)、[novly](https://github.com/light-nook-labs/novly)、[go-music-dl](https://github.com/guohuiyuan/go-music-dl)）与原始抓取脚本，不进版本库。
-
----
-
-## 尚未决定的事
-
-产品设计整体待重新设计，以下是早期档案留下、尚未有结论的问题：
-
-- 产品正式名称（早期用 Novly 占位）
-- 是否接入 SFACG 登录（涉及书架同步与合规风险）
-- 是否需要 iOS 版（采集与后台任务受限更多）
-- 是否建服务端（四条条件见 `archive/architecture.md` §6.5 末：爬虫稳定 ≥4 周、
-  种子周期 >2 周、端上闭包外占比 >5%、日活 ≥50 条新观测，四条同时成立才动手；
-  **当前 app 设计 v1 明确无服务端**，见 [`app/docs/01-tech-stack.md`](./app/docs/01-tech-stack.md)）
+`temp/` 下是参考项目的本地镜像（[sfacg_tools](https://github.com/light-nook-labs/sfacg_tools)、
+[novly](https://github.com/light-nook-labs/novly)、[go-music-dl](https://github.com/guohuiyuan/go-music-dl)），
+不进版本库；`archive/`（早期实测档案）已删除，其未失效结论已并入各当前文档。
 
 ---
 

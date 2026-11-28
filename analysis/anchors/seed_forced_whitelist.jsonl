@@ -1,0 +1,3 @@
+// 强制入种白名单（种子收录层最高优先级，2026-11-26 用户裁定）：与获奖白名单同级，完全不占 form 配额名额，豁免全部准入规则（E.31/E.32/E.34/P10/E.19/E.25 与配额）。
+// 行格式：nid / title / author / reason / source / verified=true / verified_on。手工维护，逐本写明裁定理由。
+{"nid": 24132, "title": "回到旧时光", "author": "鸦栖旱桐", "reason": "用户裁定强制入种：E.19 短篇点击天花板（215,723）锚点作品；连载中短篇，按普通规则被 E.31 剔除", "source": "user_ruling", "verified": true, "verified_on": "2026-11-26"}

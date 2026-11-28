@@ -53,7 +53,7 @@ cd dataset && uv run python build.py
 | `novel_title` | str | 书名（已清洗） |
 | `author` | str | 作者署名 |
 | `price_type` | str | 免费 / 签约 / VIP（快照态） |
-| `contest` | str | 征文标记，空串表示非征文 |
+| `contest` | str | 征文标记，空串表示非征文或无参赛记录；非空值一律来自 (参赛名单 ∪ 一二三征自建获奖清单) `nid→tag` + 我们自己的 `analysis/anchors/contest_names.jsonl` `tag→name`（全库先清空再赋值；只继承 contest-achieve 的 tagId，命名不依赖它） |
 | `genre` | str | 官方分类（主题轴，非形式轴） |
 | `click_num` | int | 累计点击（跨书不可比，见 `docs/metrics-definitions.md`） |
 | `word_num` | int | 字数 |

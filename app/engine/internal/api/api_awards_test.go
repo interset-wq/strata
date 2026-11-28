@@ -36,7 +36,7 @@ func TestBookAwardsBadge(t *testing.T) {
 // they never feed admission, ordering or scoring (docs/contest-display-in-app.md §6).
 func TestContestArchiveAwards(t *testing.T) {
 	srv, _ := newTestServer(t)
-	body := getJSON(t, srv.URL+"/strata/contests/books?contest="+url.QueryEscape("2025春季征文"), http.StatusOK)
+	body := getJSON(t, srv.URL+"/strata/contests/books?contest="+url.QueryEscape("2025春征"), http.StatusOK)
 	awards, ok := body["awards"].([]any)
 	if !ok || len(awards) != 10 {
 		t.Fatalf("awards = %v", body["awards"])
@@ -70,7 +70,7 @@ func TestContestArchiveAwards(t *testing.T) {
 		t.Fatalf("items = %v", items)
 	}
 	// 2023 春征 has a nid with two awards — both must survive in one row.
-	body = getJSON(t, srv.URL+"/strata/contests/books?contest="+url.QueryEscape("2023春季征文"), http.StatusOK)
+	body = getJSON(t, srv.URL+"/strata/contests/books?contest="+url.QueryEscape("2023春征"), http.StatusOK)
 	for _, raw := range body["awards"].([]any) {
 		a := raw.(map[string]any)
 		if a["nid"].(float64) == 635145 {
@@ -81,5 +81,5 @@ func TestContestArchiveAwards(t *testing.T) {
 			return
 		}
 	}
-	t.Fatal("nid 635145 missing from 2023春季征文 awards")
+	t.Fatal("nid 635145 missing from 2023春征 awards")
 }

@@ -18,8 +18,9 @@ import '../widgets/book_row_tile.dart';
 ///  - 日视图：全量列表（收藏降序，带 est_conf 精度徽标），点「月」回网格
 /// 口径（docs/14 §1.3）：日期是「作品创建时间估计」，非首章发布日期，
 /// UI 标「入库日期（估计）」；low 档只入月视图（引擎侧过滤）；
-/// 导航边界/首次落点 = /calendar 的 bounds（两层并集），回退 manifest
-/// genMin..genMax（日历不显示界外年份）。所有全平台数字必须带「估计/~」标注；
+/// 首次落点 = /calendar 的 bounds.last（两层并集），回退 manifest
+/// genMin..genMax；前后翻页不设上限，年月选择器 2000–2100。
+/// 所有全平台数字必须带「估计/~」标注；
 /// 估计只覆盖完整数据月——App 层由 bounds 末日是否在月末判定，不完整月
 /// （当前 2026-10）整月不展示全平台数字，种子与引擎不改。
 /// 推荐层不消费日历——只改变浏览路径，不改打分（12 §信号白名单）。
@@ -33,20 +34,19 @@ class CalendarPage extends ConsumerStatefulWidget {
 class _CalendarPageState extends ConsumerState<CalendarPage> {
   static const _weekdays = ['一', '二', '三', '四', '五', '六', '日'];
 
+  static const _pickerMinYear = 2000;
+  static const _pickerMaxYear = 2100;
+
   String _granularity = 'month'; // month|week|day
   late DateTime _focus = DateTime(2025, 1, 1); // 用户当前聚焦日（统一锚点）
-  int _genMin = 2007, _genMax = 2026; // manifest 右删失边界（initState 加载）
 
-  // 引擎 bounds（两层并集的有数据日期区间）：导航边界与首次落点用它，
-  // genMax 推出的 12-31 会让用户翻进空月。
+  // 日历 bounds（聚合层返回的日期范围）只用于首次落点和估计口径，
+  // 不再限制前后翻页；VIP 是在线期次，本来就不该被 seed 右删失卡住。
   DateTime? _boundFirst, _boundLast;
-  bool _userMoved = false; // 手动翻过页后不再自动落点
+  bool _userMoved = false; // 手动翻页后不再自动落点
 
   final _dayScroll = ScrollController();
   bool _showTop = false;
-
-  DateTime get _minDate => _boundFirst ?? DateTime(_genMin, 1, 1);
-  DateTime get _maxDate => _boundLast ?? DateTime(_genMax, 12, 31);
 
   // 高误差尾部不估算（2026-11-26 用户裁定「高误差区直接不估算总数」）：
   // bounds 末日停在月中的月份数据不完整（当前 2026-10 只到 07 日，月总量与
@@ -111,25 +111,8 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
     }
   }
 
-  DateTime _viewEnd() {
-    final f = _focus;
-    switch (_granularity) {
-      case 'month':
-        return DateTime(f.year, f.month + 1, 0);
-      case 'week':
-      case 'vip':
-        return _mondayOf(f).add(const Duration(days: 6));
-      default:
-        return DateTime(f.year, f.month, f.day);
-    }
-  }
-
-  // 右删失（docs/14 §1.3）：越界一步即禁用导航。
-  bool get _canPrev =>
-      !_viewStart().subtract(const Duration(days: 1)).isBefore(_minDate);
-  bool get _canNext =>
-      !_viewEnd().add(const Duration(days: 1)).isAfter(_maxDate);
-
+  // 前后翻页不设时间上限：VIP 是在线期次，月/周/日也允许越过 seed
+  // 右删失边界；无数据的月份/周/日显示空态，不把用户锁在 2026-10。
   void _shift(int dir) {
     _userMoved = true;
     setState(() {
@@ -143,8 +126,6 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
         default:
           _focus = f.add(Duration(days: dir));
       }
-      if (_focus.isBefore(_minDate)) _focus = _minDate;
-      if (_focus.isAfter(_maxDate)) _focus = _maxDate;
     });
   }
 
@@ -157,7 +138,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
 
   // ── 年月快速跳转：标题点击打开二维选择器（年横滑行 × 月 4×3 网格）。
   // 点年即时切换（保留月，sheet 不关，可继续点月）；点月跳转并关闭。
-  // 右删失边界直接由年范围表达（genMin..genMax），无需禁用态。
+  // 年月选择器用固定年范围 2000..2100，不受 seed 右删失限制。
 
   // 双列滚轮选年月（用户 2026-11-25 定）：CupertinoPicker 拖动即时生效
   //（年列与月列联动，sheet 不关）；日历只需年月精度，不用完整日历选择器。
@@ -170,18 +151,15 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (_) => _YearMonthWheel(
-        minYear: _genMin,
-        maxYear: _genMax,
+        minYear: _pickerMinYear,
+        maxYear: _pickerMaxYear,
         initialYear: _focus.year,
         initialMonth: _focus.month,
         onChanged: (y, m) {
           if (mounted) {
             setState(() {
               _userMoved = true;
-              final d = DateTime(y, m, 1);
-              _focus = d.isBefore(_minDate)
-                  ? _minDate
-                  : (d.isAfter(_maxDate) ? _maxDate : d);
+              _focus = DateTime(y, m, 1);
             });
           }
         },
@@ -203,8 +181,6 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
       _boundFirst = first;
       _boundLast = last;
       if (!_userMoved) _focus = DateTime(last.year, last.month, 1);
-      if (_focus.isBefore(_minDate)) _focus = _minDate;
-      if (_focus.isAfter(_maxDate)) _focus = _maxDate;
     });
   }
 
@@ -215,22 +191,6 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
       final show = _dayScroll.offset > 500;
       if (show != _showTop) setState(() => _showTop = show);
     });
-    _loadBounds();
-  }
-
-  Future<void> _loadBounds() async {
-    try {
-      final handle = await ref.read(bootProvider.future);
-      final meta = await handle.api.meta();
-      if (!mounted) return;
-      setState(() {
-        _genMin = meta.manifest.genMin;
-        _genMax = meta.manifest.genMax;
-        if (_focus.isAfter(_maxDate)) _focus = _maxDate;
-      });
-    } catch (_) {
-      // 失败保留默认边界（当前种子内容上界 2007..2026）
-    }
   }
 
   @override
@@ -324,18 +284,26 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                   ButtonSegment(value: 'vip', label: Text('VIP')),
                 ],
                 selected: {_granularity},
-                onSelectionChanged: (s) =>
-                    setState(() => _granularity = s.first),
+                onSelectionChanged: (s) => setState(() {
+                  final next = s.first;
+                  // VIP 是在线期次：首次进入默认当前周，不被 seed
+                  // 的最后日期拖回 2026-10。
+                  if (next == 'vip' && _granularity != 'vip' && !_userMoved) {
+                    _focus = DateTime.now();
+                    _userMoved = true;
+                  }
+                  _granularity = next;
+                }),
               ),
             ),
-            // 日期导航行（右删失边界处禁用）
+            // 日期导航行（不设时间上限）
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
               child: Row(
                 children: [
                   IconButton(
                     icon: const Icon(Icons.chevron_left),
-                    onPressed: _canPrev ? () => _shift(-1) : null,
+                    onPressed: () => _shift(-1),
                   ),
                   Expanded(
                     child: InkWell(
@@ -367,7 +335,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                   ),
                   IconButton(
                     icon: const Icon(Icons.chevron_right),
-                    onPressed: _canNext ? () => _shift(1) : null,
+                    onPressed: () => _shift(1),
                   ),
                 ],
               ),
@@ -406,11 +374,12 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
       0,
       (s, c) => s + (_suppressUniverse(c.date) ? 0 : c.universe),
     );
+    final maxTotal = days.fold<int>(0, (m, c) => c.total > m ? c.total : m);
     final noEst = _noEstimate;
     if (total == 0 && uni == 0) {
-      return _empty(noEst
-          ? '内置库当月无作品；该月数据不完整，全平台估计只到 $_estimateEnd'
-          : '本月没有估计发书作品');
+      return _empty(
+        noEst ? '内置库当月无作品；该月数据不完整，全平台估计只到 $_estimateEnd' : '本月没有估计发书作品',
+      );
     }
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
@@ -436,9 +405,9 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
             child: GridView.builder(
               gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 7,
-                mainAxisSpacing: 6,
-                crossAxisSpacing: 6,
-                childAspectRatio: 0.72,
+                mainAxisSpacing: 4,
+                crossAxisSpacing: 4,
+                mainAxisExtent: 64,
               ),
               itemCount: firstWeekday + days.length,
               itemBuilder: (context, i) {
@@ -451,54 +420,92 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                 // 幽灵日（有估计、内置 0）：可见且可点——原实现整格透明
                 // 不可点，被读成「当天没人发书」（幽灵日进日视图看估计说明）。
                 final ghost = !has && uni > 0;
+                final heat = maxTotal == 0 ? 0.0 : c.total / maxTotal;
                 return GestureDetector(
                   onTap: has || ghost
                       ? () => _openDay(DateTime.parse(c.date))
                       : null,
                   child: Container(
                     decoration: BoxDecoration(
-                      color: has || ghost ? scheme.surface : Colors.transparent,
-                      borderRadius: BorderRadius.circular(8),
-                      border: has
-                          ? Border.all(
-                              color: scheme.outline.withValues(alpha: .35),
-                            )
+                      color: has
+                          ? scheme.primary.withValues(alpha: .05 + .15 * heat)
                           : (ghost
-                                ? Border.all(
-                                    color: scheme.primary.withValues(
-                                      alpha: .4,
-                                    ),
-                                  )
-                                : null),
+                                ? scheme.primary.withValues(alpha: .035)
+                                : Colors.transparent),
+                      borderRadius: BorderRadius.circular(8),
+                      border: ghost
+                          ? Border.all(
+                              color: scheme.primary.withValues(alpha: .35),
+                            )
+                          : null,
                     ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    child: Stack(
                       children: [
-                        Text(
-                          '$dayNum',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: has ? FontWeight.w700 : FontWeight.w400,
-                            color: has
-                                ? scheme.onSurface
-                                : scheme.onSurfaceVariant.withValues(alpha: .7),
+                        // 日期居中，作为格子主信息。
+                        Center(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Text(
+                              '$dayNum',
+                              maxLines: 1,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: has
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                                color: has
+                                    ? scheme.onSurface
+                                    : scheme.onSurfaceVariant.withValues(
+                                        alpha: ghost ? .65 : .45,
+                                      ),
+                              ),
+                            ),
                           ),
                         ),
+                        // 数值走对角线：可点开本数左上，全平台估计右下。
                         if (has)
-                          Text(
-                            '${c.total}',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
+                          Positioned(
+                            top: 4,
+                            left: 5,
+                            child: SizedBox(
+                              width: 26,
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.topLeft,
+                                child: Text(
+                                  '${c.total}',
+                                  maxLines: 1,
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: scheme.onSurface.withValues(
+                                      alpha: .8,
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
                         if (uni > 0)
-                          Text(
-                            '~$uni',
-                            maxLines: 1,
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: scheme.primary.withValues(alpha: .85),
+                          Positioned(
+                            right: 5,
+                            bottom: 3,
+                            child: SizedBox(
+                              width: 34,
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.bottomRight,
+                                child: Text(
+                                  '~$uni',
+                                  maxLines: 1,
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    color: scheme.primary.withValues(
+                                      alpha: .85,
+                                    ),
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
                       ],
@@ -533,9 +540,9 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
       (s, c) => s + (_suppressUniverse(c.date) ? 0 : c.universe),
     );
     if (days.every((c) => c.total == 0) && weekUni == 0) {
-      return _empty(_noEstimate
-          ? '内置库本周无作品；该周数据不完整，全平台估计只到 $_estimateEnd'
-          : '本周没有估计发书作品');
+      return _empty(
+        _noEstimate ? '内置库本周无作品；该周数据不完整，全平台估计只到 $_estimateEnd' : '本周没有估计发书作品',
+      );
     }
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
@@ -617,9 +624,9 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
     final noEst = _suppressUniverse(day.date);
     final uni = noEst ? 0 : day.universe;
     if (day.total == 0 && uni == 0) {
-      return _empty(noEst
-          ? '内置库当日无作品；该日数据不完整，全平台估计只到 $_estimateEnd'
-          : '当日没有估计发书作品');
+      return _empty(
+        noEst ? '内置库当日无作品；该日数据不完整，全平台估计只到 $_estimateEnd' : '当日没有估计发书作品',
+      );
     }
     if (day.total == 0) {
       return _empty('内置库当日无可点击作品（全平台估计 ~$uni 本）');
@@ -898,7 +905,7 @@ class _VipBadge extends StatelessWidget {
 }
 
 /// 双列滚轮选年月（CupertinoPicker）：拖动即时切换（年月联动，sheet 不
-/// 关）；年范围 = 右删失边界（genMin..genMax），无需禁用态。
+/// 关）；年范围固定 2000..2100（不按 seed 右删失禁用）。
 class _YearMonthWheel extends StatefulWidget {
   final int minYear;
   final int maxYear;

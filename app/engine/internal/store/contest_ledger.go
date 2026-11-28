@@ -85,11 +85,13 @@ type ledgerEvent struct {
 }
 
 type contestLedger struct {
-	Source  map[string]string `json:"source"`
-	Aliases map[string]string `json:"aliases"`
-	Events  []ledgerEvent     `json:"events"`
-	byName  map[string]ledgerEvent
-	tracks  map[string][]RosterTag
+	Source  map[string]string      `json:"source"`
+	Aliases map[string]string      `json:"aliases"`
+	Events  []ledgerEvent          `json:"events"`
+	byName  map[string]ledgerEvent // legacy key (as authored)
+	tracks  map[string][]RosterTag // legacy key
+	byNew   map[string]ledgerEvent // our event name -> primary legacy row
+	newTrk  map[string][]RosterTag // our event name -> merged tracks
 }
 
 //go:embed contest_ledger.json
@@ -113,21 +115,62 @@ var ledger = func() *contestLedger {
 		}
 		l.tracks[e.Name] = tags
 	}
+	// Re-key by our 2026-11-27 event naming: the seed/dataset contest column
+	// now carries new names, and several new events merge more than one legacy
+	// ledger row (点鸭春节 <- 4, 十四征 <- 3). Digits are NOT recomputed — the
+	// primary row keeps its official totals/dates; only the tagIds (tracks)
+	// are unioned so every merged event can still fetch all of its lists.
+	l.byNew = make(map[string]ledgerEvent, len(contestNames.Events))
+	l.newTrk = make(map[string][]RosterTag, len(contestNames.Events))
+	for ev, info := range contestNames.Events {
+		if len(info.Legacy) == 0 {
+			continue
+		}
+		primary := l.byName[info.Legacy[0]]
+		primary.Name = ev
+		l.byNew[ev] = primary
+		var merged []RosterTag
+		seen := map[int]bool{}
+		for _, legacy := range info.Legacy {
+			for _, t := range l.tracks[legacy] {
+				if seen[t.Tag] {
+					continue
+				}
+				seen[t.Tag] = true
+				t.Event = ev
+				merged = append(merged, t)
+			}
+		}
+		l.newTrk[ev] = merged
+	}
 	return &l
 }()
 
-// LedgerCanonical resolves a seed label spelling to the ledger's event name
-// (the alias map is what stops one edition rendering as two archive rows).
+// LedgerCanonical resolves any contest spelling to OUR event name (the
+// 2026-11-27 naming the seed/dataset column and contest_awards.json carry).
+// New names map to themselves; legacy official names and the four hardcoded
+// aliases funnel through contest_names.json so one edition is one event.
+// Unknown labels (future editions, ad-hoc fixtures) pass through unchanged.
 func LedgerCanonical(name string) string {
+	if ev, ok := contestNameEvent(name); ok {
+		return ev
+	}
+	if _, ok := contestNameForEvent(name); ok {
+		return name
+	}
 	if c, ok := ledger.Aliases[name]; ok {
+		if ev, ok := contestNameEvent(c); ok {
+			return ev
+		}
 		return c
 	}
 	return name
 }
 
-// LedgerEventFor returns one event's official record, alias-resolved.
+// LedgerEventFor returns one event's official record (primary legacy row),
+// keyed by our event name. Digit fields are as authored, never recomputed.
 func LedgerEventFor(name string) (ledgerEvent, bool) {
-	e, ok := ledger.byName[LedgerCanonical(name)]
+	e, ok := ledger.byNew[LedgerCanonical(name)]
 	return e, ok
 }
 
@@ -152,7 +195,7 @@ func ContestMetaFor(name string) (ContestMeta, bool) {
 // tracks alike; the caller reads Kind to label the list. Nil when the event
 // has no verified tag (degrade to the in-library view).
 func RosterTagsFor(event string) []RosterTag {
-	return ledger.tracks[LedgerCanonical(event)]
+	return ledger.newTrk[LedgerCanonical(event)]
 }
 
 // LedgerListKind classifies the event's fetchable list: roster (participant

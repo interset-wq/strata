@@ -58,7 +58,7 @@ func TestContestOfficialURL(t *testing.T) {
 		switch g["name"] {
 		case "七征":
 			zheng = g
-		case "崩坏3征文":
+		case "崩坏3同人":
 			ip = g
 		}
 	}
@@ -66,14 +66,14 @@ func TestContestOfficialURL(t *testing.T) {
 		t.Fatalf("七征 = %v", zheng)
 	}
 	if ip == nil {
-		t.Fatal("missing 崩坏3征文 group")
+		t.Fatal("missing 崩坏3同人 group")
 	}
 	if ip["official"] != "https://pages.sfacg.com/h5/act/sfxbbb/" {
-		t.Fatalf("崩坏3征文 official = %v", ip["official"])
+		t.Fatalf("崩坏3同人 official = %v", ip["official"])
 	}
 	// The ledger's own gap: an event with no verified page stays URL-less.
-	if m, ok := store.ContestMetaFor("对话小说春节征文"); !ok || m.Official != "" {
-		t.Fatalf("对话小说春节征文 meta = %+v", m)
+	if m, ok := store.ContestMetaFor("点鸭春节"); !ok || m.Official != "" {
+		t.Fatalf("点鸭春节 meta = %+v", m)
 	}
 }
 
@@ -103,7 +103,7 @@ func TestContestLaunchYearSort(t *testing.T) {
 	}
 	// other section by launch year: 崩坏3 (2019, official meta year) >
 	// 龙之谷 (2016 in-library floor) > 少女前线 (2015); all three are ip lane.
-	wantNames := []string{"崩坏3征文", "龙之谷征文", "少女前线征文"}
+	wantNames := []string{"崩坏3同人", "龙之谷同人", "少女前线同人"}
 	for i, raw := range groups[3:] {
 		g := raw.(map[string]any)
 		if g["name"] != wantNames[i] || g["lane"] != "ip" {
@@ -130,8 +130,8 @@ func TestContestArchiveBooks(t *testing.T) {
 			t.Fatalf("item clicks = %v, want 1000", c)
 		}
 	}
-	// per caps each form: 崩坏3征文's two ip_collab books → one at per=1.
-	body = getJSON(t, srv.URL+"/strata/contests/books?contest="+url.QueryEscape("崩坏3征文")+"&per=1", http.StatusOK)
+	// per caps each form: 崩坏3同人's two ip_collab books → one at per=1.
+	body = getJSON(t, srv.URL+"/strata/contests/books?contest="+url.QueryEscape("崩坏3同人")+"&per=1", http.StatusOK)
 	items = body["items"].([]any)
 	if len(items) != 1 || items[0].(map[string]any)["nid"].(float64) != 1006 {
 		t.Fatalf("items = %v", items)
@@ -174,9 +174,9 @@ func TestRosterArchiveFlags(t *testing.T) {
 		switch g["name"] {
 		case "七征":
 			zheng = g
-		case "2025春季征文":
+		case "2025春征":
 			spring = g
-		case "崩坏3征文":
+		case "崩坏3同人":
 			ip = g
 		}
 	}
@@ -200,17 +200,17 @@ func TestRosterArchiveFlags(t *testing.T) {
 	if zheng["roster_total"].(float64) != 7350 {
 		t.Fatalf("七征 roster_total = %v", zheng["roster_total"])
 	}
-	// 2025春季征文: single track — one 全部 row, no division label.
+	// 2025春征: single track — one 全部 row, no division label.
 	if spring == nil || spring["roster"] != true {
-		t.Fatalf("2025春季征文 = %v", spring)
+		t.Fatalf("2025春征 = %v", spring)
 	}
 	sdiv, _ := spring["divisions"].([]any)
 	if len(sdiv) != 1 || sdiv[0].(map[string]any)["name"] != "全部" {
-		t.Fatalf("2025春季征文 divisions = %v", sdiv)
+		t.Fatalf("2025春征 divisions = %v", sdiv)
 	}
-	// 崩坏3征文: tag 405 verified 2026-11-22 → roster true.
+	// 崩坏3同人: tag 405 verified 2026-11-22 → roster true.
 	if ip == nil || ip["roster"] != true {
-		t.Fatalf("崩坏3征文 = %v", ip)
+		t.Fatalf("崩坏3同人 = %v", ip)
 	}
 }
 

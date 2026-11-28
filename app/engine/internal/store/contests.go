@@ -30,9 +30,9 @@ type ContestGroup struct {
 	Note     *string `json:"note,omitempty"`
 	Official *string `json:"official,omitempty"`
 	// Lane classifies other-series events for the home-tab lanes (user
-	// decision 2026-11-22: dialogue archives live in the home dialogue
-	// area, IP archives in the IP area): "dialogue" / "ip"; omitted
-	// (= theme) stays in the archive list's 其他 tab. Never set on the
+	// decision 2026-11-22/27): "dialogue" → home dialogue area, "ip" → IP
+	// area, "short" → home 短篇 tab (2024主题短篇 / 超新星杯短篇); omitted
+	// (= theme) stays in the archive list's 主题 tab. Never set on the
 	// four season series.
 	Lane string `json:"lane,omitempty"`
 	// Roster = the event has at least one participation-list tag (ledger);
@@ -79,12 +79,15 @@ func zhengToEvent(raw string) string {
 	return raw[:i+size]
 }
 
-// ContestEventName maps a raw contest string to its event-level name: the
-// N征 series collapses every division spelling (incl. 对话类:
-// 七征对话类征文长篇, 九征/十征对话小说, 十四征-长篇) to the N征 token; every
-// other contest is a single event, alias-resolved through the ledger (the
-// seed carries two spellings for four editions).
+// ContestEventName maps a raw contest string to its event-level name, always
+// in OUR 2026-11-27 naming (2025春征 / 崩坏3同人 / 点鸭星穹 / 四征 …).
+// The embed table resolves every authored spelling (new name, legacy official
+// name, old alias) to one event. Unlisted labels fall back to the structural
+// N征 rule (so a future 十五征 needs no code change) then the ledger alias.
 func ContestEventName(raw string) string {
+	if ev, ok := contestNameEvent(raw); ok {
+		return ev
+	}
 	if tok := zhengToEvent(raw); tok != "" {
 		return tok
 	}
@@ -92,22 +95,31 @@ func ContestEventName(raw string) string {
 }
 
 // contestEventMatch matches an event-level name against the raw column:
-// N征 events match every division spelling (prefix); every other event
-// matches the exact spellings the seed carries for it — its own name plus the
-// alias spellings that point at it (「2026春季征文」/「2026春征」 are one
-// edition).
+// N征 events match every division spelling (prefix, so a future 十五征 needs
+// no code change); every other event matches all spellings the table maps to
+// it — its new name plus legacy/alias spellings (2025春征 and 2025春季征文
+// are one event, 2021秋征 spans both 东方世界/异世大陆 rows).
 func contestEventMatch(col, name string) (string, []any) {
+	name = LedgerCanonical(name) // accept new name, legacy name or raw spelling
 	if isZhengEvent(name) {
 		return col + " LIKE ? || '%'", []any{name}
 	}
 	vals := []string{name}
-	for alias, canonical := range ledger.Aliases {
-		if canonical == name {
-			vals = append(vals, alias)
+	for _, raw := range contestRawSpellings(name) {
+		vals = append(vals, raw)
+	}
+	// Dedupe: the event's own name is usually also a raw spelling.
+	seen := map[string]bool{}
+	uniq := vals[:0]
+	for _, v := range vals {
+		if !seen[v] {
+			seen[v] = true
+			uniq = append(uniq, v)
 		}
 	}
+	vals = uniq
 	if len(vals) == 1 {
-		return col + " = ?", []any{name}
+		return col + " = ?", []any{vals[0]}
 	}
 	holders := make([]byte, 0, len(vals)*2)
 	args := make([]any, 0, len(vals))
@@ -121,16 +133,21 @@ func contestEventMatch(col, name string) (string, []any) {
 	return col + " IN (" + string(holders) + ")", args
 }
 
-// contestSeries buckets an event name for the archive list sections.
+// contestSeries buckets an event name for the archive list sections. The
+// embedded table carries our naming's bucket directly; string matching stays
+// only as a fallback for a future edition not yet in the anchor.
 func contestSeries(name string) string {
+	if info, ok := contestNameForEvent(name); ok {
+		return info.Series
+	}
 	switch {
 	case isZhengEvent(name):
 		return "x"
-	case strings.Contains(name, "冬季征文"):
+	case strings.Contains(name, "冬征"), strings.Contains(name, "冬季征文"):
 		return "winter"
-	case strings.Contains(name, "春季征文"):
+	case strings.Contains(name, "春征"), strings.Contains(name, "春季征文"):
 		return "spring"
-	case strings.Contains(name, "秋季征文"):
+	case strings.Contains(name, "秋征"), strings.Contains(name, "秋季征文"):
 		return "autumn"
 	default:
 		return "other"
@@ -165,19 +182,18 @@ func contestOrdinal(name string) int {
 
 // contestLane classifies an other-series event for the home-tab lanes
 // (user decision 2026-11-22: 对话的归档放对话区、IP 的归档放 IP 区):
-// 对话/点鸭 names are the dialogue line (点鸭 is the dialogue product
-// line's contest brand); 同人 and known IP titles are the IP line.
-// "" = theme, stays in the archive list's 其他 tab.
-//
-// Edition-level overrides come first: facts about one specific contest
-// that no name rule can capture — 星穹小说家征文 is a dialogue contest
-// (user-verified 2026-11-22; the IP-titled name would otherwise send it
-// to the IP lane).
+// 点鸭 dialogue contests → dialogue; 同人/IP contests → ip; "" = theme,
+// stays in the archive list's 主题 tab. Our 2026-11-27 naming encodes the
+// lane in the table (点鸭对话 / IP同人 series), so name matching remains only
+// a fallback for unlisted future spellings.
 func contestLane(name string) string {
+	if info, ok := contestNameForEvent(name); ok && info.Lane != "" {
+		return info.Lane
+	}
 	switch {
-	case strings.Contains(name, "星穹小说家"):
+	case strings.Contains(name, "星穹小说家"), strings.Contains(name, "点鸭"):
 		return "dialogue"
-	case strings.Contains(name, "对话"), strings.Contains(name, "点鸭"):
+	case strings.Contains(name, "对话"):
 		return "dialogue"
 	}
 	for _, ip := range []string{"同人", "崩坏3", "少女前线", "龙之谷", "星穹"} {
@@ -287,7 +303,7 @@ GROUP BY contest, form`)
 	// Stable ordering (user decision 2026-11-26, was ascending): tab section,
 	// then launch year DESC — the archive is read as 「最近一届在前」 — then
 	// 第X届 ordinal DESC (same-year winter editions), then official entry-list
-	// size DESC (the 主题/其他 tab has no ordinal: same-year editions rank by
+	// size DESC (the 主题 tab has no ordinal: same-year editions rank by
 	// scale), then name.
 	sort.Slice(out, func(i, j int) bool {
 		si, sj := seriesOrder[out[i].Series], seriesOrder[out[j].Series]

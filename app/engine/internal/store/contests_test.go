@@ -11,8 +11,9 @@ func TestContestEventName(t *testing.T) {
 		"七征对话类征文长篇": "七征",
 		"十征对话小说":    "十征",
 		"十一征长篇":     "十一征",
-		"2025春季征文":  "2025春季征文",
-		"冬季征文":      "冬季征文",
+		"2025春季征文":  "2025春征",
+		"2025春征":    "2025春征",
+		"冬季征文":      "第一届冬征",
 	}
 	for raw, want := range cases {
 		if got := ContestEventName(raw); got != want {
@@ -50,15 +51,15 @@ func TestContestGroups(t *testing.T) {
 	}
 	// spring section is recognized; section order follows the archive
 	// tabs (spring first — user decision 2026-11-22).
-	if g := byName["2025春季征文"]; g.Series != "spring" {
+	if g := byName["2025春征"]; g.Series != "spring" {
 		t.Fatalf("春季 series = %q", g.Series)
 	}
 	if groups[0].Series != "spring" {
 		t.Fatalf("first group = %+v, want spring section first", groups[0])
 	}
 	// other-series events carry home-tab lanes (dialogue/ip; empty =
-	// theme, stays in the list's 其他 tab).
-	if g := byName["崩坏3征文"]; g.Lane != "ip" {
+	// theme, stays in the list's 主题 tab).
+	if g := byName["崩坏3同人"]; g.Lane != "ip" {
 		t.Fatalf("崩坏3 lane = %q, want ip", g.Lane)
 	}
 	// within-section launch-year DESC: 十三征 (2025) before 七征 (2019).
@@ -133,13 +134,15 @@ func TestEarlyRosterTags(t *testing.T) {
 		div string
 		tag int
 	}{
-		"八征":         {{"长篇", 418}, {"中篇", 419}, {"短篇", 420}},
-		"九征":         {{"长篇", 457}, {"中篇", 458}, {"短篇", 459}, {"对话小说", 462}},
-		"十征":         {{"长篇", 475}, {"中篇", 476}, {"短篇", 477}, {"对话小说", 479}},
-		"龙之谷征文":      {{"", 413}},
-		"失业魔王同人征文":   {{"", 468}},
-		"对话小说青春幻想征文": {{"", 478}},
-		"春节征文短篇":     {{"", 623}},
+		"八征":     {{"长篇", 418}, {"中篇", 419}, {"短篇", 420}},
+		"九征":     {{"长篇", 457}, {"中篇", 458}, {"短篇", 459}, {"对话小说", 462}},
+		"十征":     {{"长篇", 475}, {"中篇", 476}, {"短篇", 477}, {"对话小说", 479}},
+		"龙之谷同人":  {{"", 413}},
+		"失业魔王同人": {{"", 468}},
+		"点鸭青春幻想": {{"", 478}},
+		// 点鸭春节 merges four legacy rows (点鸭春节 471,
+		// 春节征文分支对话 624, 春节征文短篇 623, 春节征文长篇 622).
+		"点鸭春节": {{"", 471}, {"", 624}, {"", 623}, {"", 622}},
 	}
 	for event, tags := range more {
 		got := RosterTagsFor(event)
@@ -165,9 +168,9 @@ func TestContestLabelNormalization(t *testing.T) {
 		"七征-赛道2":      "七征",
 		"十征对话小说":      "十征",
 		"十五征-长篇":      "十五征", // structural: a future edition needs no code change
-		"2026春征":      "2026春季征文",
-		"2024主题短篇":    "2024主题短篇征文",
-		"少年-二次元创想·短篇": "少年创想短篇",
+		"2026春征":      "2026春征",
+		"2024主题短篇":    "2024主题短篇",
+		"少年-二次元创想·短篇": "2025少年二次元创想短篇",
 	}
 	for raw, want := range cases {
 		if got := ContestEventName(raw); got != want {
@@ -179,9 +182,10 @@ func TestContestLabelNormalization(t *testing.T) {
 	}
 	// Every alias row of the ledger resolves — including the target whose name
 	// carries full-width quotes.
-	for alias, canonical := range ledger.Aliases {
-		if got := ContestEventName(alias); got != canonical {
-			t.Errorf("alias %q resolved to %q, want %q", alias, got, canonical)
+	for alias, legacy := range ledger.Aliases {
+		want := LedgerCanonical(legacy) // alias -> legacy row -> our event name
+		if got := ContestEventName(alias); got != want {
+			t.Errorf("alias %q resolved to %q, want %q", alias, got, want)
 		}
 	}
 }
@@ -288,7 +292,7 @@ func TestRosterTagForDisplayAlias(t *testing.T) {
 func TestContestLane(t *testing.T) {
 	cases := map[string]string{
 		"点鸭秋色回忆征文活动": "dialogue",
-		"对话小说春节征文":   "dialogue",
+		"点鸭春节":       "dialogue",
 		"征文大赛对话小说组":  "dialogue",
 		"春节征文分支对话":   "dialogue",
 		"崩坏3征文":      "ip",

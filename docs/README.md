@@ -15,6 +15,7 @@
 | 设计量化模式指标 | `quantitative-mode-metrics.md` → `metrics-definitions.md` → 域文档 |
 | 征文发现、tagId、获奖入种、App 展示 | `contest-url-api-patterns.md` 导航，再按权威分工读对应文档 |
 | 作者头像 / 简介 / 作品集 | `author-profile-on-demand.md` |
+| 详情页相关推荐（同 form 同类书、非协同过滤） | `related-books.md` |
 
 ## 文档索引
 
@@ -38,6 +39,7 @@
 | [`medium-quality-score.md`](./medium-quality-score.md) | 排序分的中篇域 `mqs`：已定参、归档未落地；与 `lqs` 不合并 |
 | [`ref-percentile-for-discovered.md`](./ref-percentile-for-discovered.md) | 位置分 `fav_pctl` 的库外域 `ref_pctl`：断点表查表法 |
 | [`lqs-ranking-integration.md`](./lqs-ranking-integration.md) | 推荐层接入 `lqs` 的排序键、候选门槛、验收断言 |
+| [`related-books.md`](./related-books.md) | 详情页「相关推荐」v4.1：强标签分级召回、档内分层/轮流、端点与 UI 契约（已落地） |
 | [`form-definitions.md`](./form-definitions.md) | `form` 六值判定与种子收录资格的唯一真源 |
 | [`fake-complete-short-medium.md`](./fake-complete-short-medium.md) | 假完结短/中篇与第二类僵尸裁定：已实施（种子 P10） |
 | [`anchor-density-strategy.md`](./anchor-density-strategy.md) | 定年锚点密度策略：P0 常规补最新锚点，早期保留、中段低优先 |

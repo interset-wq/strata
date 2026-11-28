@@ -304,26 +304,26 @@ LIMIT 1`
 }
 
 type RankItem struct {
-	Rank     int      `json:"rank"`
-	NID      int64    `json:"nid"`
-	Title    string   `json:"title"`
-	Author   string   `json:"author"`
-	Genre    *string  `json:"genre"`
-	EstYear  int      `json:"est_year"`
-	EstDate  *string  `json:"est_date,omitempty"`
-	Favs     *int64   `json:"favs"`
-	CQS      *float64 `json:"cqs,omitempty"`
-	CPS      *float64 `json:"cps,omitempty"`
-	CQSState string   `json:"cqs_state,omitempty"`
-	Contest  *string  `json:"contest"`
-	CoverURL *string  `json:"cover_url"`
-	Status   *string  `json:"status"`
-	PriceType *string `json:"price_type"`
-	Words    *int64   `json:"words"`
-	Clicks   *int64   `json:"clicks"`
-	Praises  *int64   `json:"praises"`
-	Form     string   `json:"form"`
-	Tags     []string `json:"tags"`
+	Rank      int      `json:"rank"`
+	NID       int64    `json:"nid"`
+	Title     string   `json:"title"`
+	Author    string   `json:"author"`
+	Genre     *string  `json:"genre"`
+	EstYear   int      `json:"est_year"`
+	EstDate   *string  `json:"est_date,omitempty"`
+	Favs      *int64   `json:"favs"`
+	CQS       *float64 `json:"cqs,omitempty"`
+	CPS       *float64 `json:"cps,omitempty"`
+	CQSState  string   `json:"cqs_state,omitempty"`
+	Contest   *string  `json:"contest"`
+	CoverURL  *string  `json:"cover_url"`
+	Status    *string  `json:"status"`
+	PriceType *string  `json:"price_type"`
+	Words     *int64   `json:"words"`
+	Clicks    *int64   `json:"clicks"`
+	Praises   *int64   `json:"praises"`
+	Form      string   `json:"form"`
+	Tags      []string `json:"tags"`
 }
 
 func (s *Store) RankingFavs(ctx context.Context, year int, genre, status, contest string, limit int) ([]RankItem, error) {
@@ -479,9 +479,9 @@ WHERE seed.books.is_licensed = 0`
 	items := make([]RankItem, 0, limit)
 	for rows.Next() {
 		var (
-			item                                RankItem
-			gen, status, price, contest, cover  sql.NullString
-			words, clicks, favs, praises        sql.NullInt64
+			item                               RankItem
+			gen, status, price, contest, cover sql.NullString
+			words, clicks, favs, praises       sql.NullInt64
 		)
 		if err := rows.Scan(&item.NID, &item.Title, &item.Author, &gen,
 			&item.EstYear, &status, &price, &words, &clicks, &favs, &praises,
@@ -1047,12 +1047,12 @@ func (s *Store) QuantBooks(ctx context.Context, form, board string,
 	items := make([]RankItem, 0, limit)
 	for rows.Next() {
 		var (
-			item                       RankItem
-			gen, status, price, cover  sql.NullString
-			words, clicks, favs        sql.NullInt64
-			praises                    sql.NullInt64
-			cqs, cps                   sql.NullFloat64
-			state                      sql.NullString
+			item                      RankItem
+			gen, status, price, cover sql.NullString
+			words, clicks, favs       sql.NullInt64
+			praises                   sql.NullInt64
+			cqs, cps                  sql.NullFloat64
+			state                     sql.NullString
 		)
 		if err := rows.Scan(&item.NID, &item.Title, &item.Author, &gen,
 			&item.EstYear, &status, &price, &words, &clicks, &favs,
@@ -1404,7 +1404,7 @@ func (s *Store) scanRankItems(ctx context.Context, rows *sql.Rows,
 	items := []RankItem{}
 	for rows.Next() {
 		var (
-			item                 RankItem
+			item                      RankItem
 			gen, status, price, cover sql.NullString
 			words, clicks, favs,
 			praises sql.NullInt64
@@ -2016,14 +2016,28 @@ GROUP BY contest ORDER BY c DESC, contest ASC`, form)
 		}
 		where += " AND contest IS NOT NULL AND contest != ''"
 		if len(names) > 0 {
-			ph := []string{}
+			// Exclude every raw spelling of the top-2 events. The old code
+			// appended 长篇/中篇/短篇 suffixes, which no longer matches our
+			// 2026-11-27 names (崩坏3同人 / 少女前线同人) or their raw rows —
+			// that left "other" showing the top-2 books too.
+			var excluded []string
+			seen := map[string]bool{}
 			for _, name := range names {
-				for _, v := range []string{name, name + "长篇", name + "中篇", name + "短篇"} {
-					ph = append(ph, "?")
-					args = append(args, v)
+				for _, v := range append([]string{name}, contestRawSpellings(name)...) {
+					if !seen[v] {
+						seen[v] = true
+						excluded = append(excluded, v)
+					}
 				}
 			}
-			where += fmt.Sprintf(" AND contest NOT IN (%s)", strings.Join(ph, ","))
+			if len(excluded) > 0 {
+				ph := make([]string, len(excluded))
+				for i, v := range excluded {
+					ph[i] = "?"
+					args = append(args, v)
+				}
+				where += fmt.Sprintf(" AND contest NOT IN (%s)", strings.Join(ph, ","))
+			}
 		}
 	} else {
 		clause, ca := contestMatchClause("contest", group)

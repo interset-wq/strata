@@ -71,17 +71,19 @@ DATASET = REPO / "dataset" / "out" / "books.jsonl"
 AWARD_CSV = ANALYSIS / "out" / "contest_awards_normalized.csv"
 
 SCHEMA_VERSION = 10  # v10: additive author_ranks table (docs/author-rank.md §9) — stable-output authors per form, top100
-SEED_VERSION = "20261126.38"  # .38: E.38 中短篇赛事补采入池（dataset 252,705→260,627）
+SEED_VERSION = "20261127.44"  # .44: contest 改用我们自己的 contest_names.jsonl 命名（tagId 继承 contest-achieve，命名不再依赖它；dataset 20261127.16）；数量不变
 CONTENT_END = pd.Timestamp("2026-11-24")  # 数据集从不全量刷新：标注最近一次部分更新时间，非快照上界
 GEN_MIN, GEN_MAX = 2007, 2026  # E.30: 2026 由"出界"改为正常世代，与其他年份一样走 admit 渠道筛选
 
 # Pinned calibre (see AGENTS.md and app/docs/02-data-model.md).
-EXPECT_UNIVERSE = 258_161       # 250,254 + 7,907 中短篇赛事补采（E.38，dataset 派生口径）
-EXPECT_ANALYSIS_ROWS = 258_161  # 同上；与 analysis/out/novels.csv 254,271 是双链差异（站外剔除口径不同）
-EXPECT_DATASET_ROWS = 260_627   # v20261126.10: 252,705 + 7,922 中短篇赛事补采
+EXPECT_UNIVERSE = 258_796       # dataset 261,262 派生（v20261126.13：+600 本 418/415 缺口试采）
+EXPECT_ANALYSIS_ROWS = 258_796  # 同上；与 analysis/out/novels.csv 254,271 是双链差异（站外剔除口径不同）
+EXPECT_DATASET_ROWS = 261_262   # v20261126.13: 260,662 + 八征长篇/第三届冬征各 300 本
 EXPECT_LICENSED = 47
-EXPECT_ADMITTED = 16_000       # E.35/E.37: form 配额同代分位准入（8350/6400/1100/100/50）
-EXPECT_SEED = 16_047           # 16,000 + 47 licensed
+EXPECT_ADMITTED = 18_607        # E.40: 18,000 配额 + 强制白名单额外 607（获奖 606 + 人工 1）
+EXPECT_SEED = 18_654            # 18,607 + 47 licensed
+EXPECT_FORCED_EXTRA = 607       # E.39/E.40: 白名单全部不占配额，额外入种数
+EXPECT_MANUAL_FORCED = 1        # E.40: 人工强制白名单《回到旧时光》(24132)
 EXPECT_COVERAGE_MIN = 0.9300   # E.35: 配额制绝对下限（dataset 口径含 licensed 现算见构建日志）
 # v5 contest awards (docs/award-winners-as-seed-source.md): net 911 rows over
 # 11 editions; the 602 shortlist rows are excluded upstream of this CSV.
@@ -388,6 +390,14 @@ def build_frames() -> tuple[pd.DataFrame, dict]:
         raise SystemExit("V3 postconditions failed; seed not rebuilt")
     if len(res["ids"]) != EXPECT_ADMITTED:
         raise SystemExit(f"admitted {len(res['ids'])} != {EXPECT_ADMITTED}")
+    if len(res["forced_added"]) != EXPECT_FORCED_EXTRA:
+        raise SystemExit(f"forced extra {len(res['forced_added'])} != {EXPECT_FORCED_EXTRA}")
+    if len(res["manual_forced"]) != EXPECT_MANUAL_FORCED:
+        raise SystemExit(f"manual forced {len(res['manual_forced'])} != {EXPECT_MANUAL_FORCED}")
+    # E.39/E.40: universe 内全部强制白名单书必须在种子里，一本不漏。
+    if res["forced_whitelist"] - res["ids"]:
+        raise SystemExit(f"forced whitelist not fully admitted: "
+                         f"{sorted(res['forced_whitelist'] - res['ids'])[:10]}")
 
     seed_ids = res["ids"] | set(ln_ids)
     if len(seed_ids) != EXPECT_SEED:
@@ -437,6 +447,13 @@ def build_frames() -> tuple[pd.DataFrame, dict]:
         "dropped_rules": dropped["rules"],
         "universe_rows": len(universe),
         "admitted": len(res["ids"]),
+        "forced_detail": {
+            "award_in_universe": len(res["award_whitelist"]),
+            "manual_in_universe": len(res["manual_forced"]),
+            "in_quota": len(res["forced_whitelist"] & res["quota_ids"]),
+            "forced_extra": len(res["forced_added"]),
+            "forced_nids": sorted(res["forced_added"]),
+        },
         "baseline_v0": len(res["baseline"]),
         "admission_detail": {
             "top_favs": len(res["base"]),
@@ -472,6 +489,7 @@ def build_frames() -> tuple[pd.DataFrame, dict]:
         "postconditions": checks,
         "manual_exempt": res["manual_exempt"],
         "manual_blacklist": res["manual_blacklist"],
+        "forced_whitelist": res["forced_whitelist"],  # E.39/E.40 强制入种，validate 豁免
         "favs_coverage": coverage,
         "seed_rows": len(seed),
         "licensed_ids": ln_ids,
@@ -683,6 +701,8 @@ def main() -> int:
             "seed": len(seed),
             "deep_rank_rows": len(meta["deep_ranks"]),
             "award_rows": len(awards),
+            "forced_whitelist_in_universe": meta["forced_detail"]["award_in_universe"] + meta["forced_detail"]["manual_in_universe"],
+            "forced_whitelist_extra": meta["forced_detail"]["forced_extra"],
             "cqs_scored": meta["runtime"]["cqs_scored"],
             "cqs_stable": meta["runtime"]["cqs_stable"],
             "cps_scored": meta["runtime"]["cps_scored"],

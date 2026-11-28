@@ -4,7 +4,7 @@
   "repository": "https://github.com/light-nook-labs/contest-achieve",
   "file": "docs/data/awards.json",
   "license": "AGPL-3.0",
-  "join": "contest_track_id == ledger track tag -> ledger event name"
+  "join": "contest_track_id == tag in analysis/anchors/contest_names.jsonl -> event (key) + name (entry.contest); our names, same mapping as dataset/build.py"
  },
  "tier_order": [
   "金奖",
@@ -35,7 +35,7 @@
     "awards": [
      "金奖"
     ],
-    "contest": "四征-中篇",
+    "contest": "四征中篇",
     "series": "X征"
    },
    {
@@ -44,7 +44,7 @@
     "awards": [
      "金奖"
     ],
-    "contest": "四征-短篇",
+    "contest": "四征短篇",
     "series": "X征"
    },
    {
@@ -53,7 +53,7 @@
     "awards": [
      "金奖"
     ],
-    "contest": "四征-长篇",
+    "contest": "四征长篇",
     "series": "X征"
    }
   ],
@@ -64,7 +64,7 @@
     "awards": [
      "金奖"
     ],
-    "contest": "六征-中篇",
+    "contest": "六征中篇",
     "series": "X征"
    },
    {
@@ -73,7 +73,7 @@
     "awards": [
      "金奖"
     ],
-    "contest": "六征-长篇",
+    "contest": "六征长篇",
     "series": "X征"
    },
    {
@@ -82,7 +82,7 @@
     "awards": [
      "金奖"
     ],
-    "contest": "六征-短篇",
+    "contest": "六征短篇",
     "series": "X征"
    },
    {
@@ -91,7 +91,7 @@
     "awards": [
      "金奖"
     ],
-    "contest": "六征-对话",
+    "contest": "六征对话",
     "series": "X征"
    },
    {
@@ -100,7 +100,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "六征-中篇",
+    "contest": "六征中篇",
     "series": "X征"
    },
    {
@@ -109,7 +109,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "六征-长篇",
+    "contest": "六征长篇",
     "series": "X征"
    },
    {
@@ -118,7 +118,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "六征-短篇",
+    "contest": "六征短篇",
     "series": "X征"
    },
    {
@@ -127,7 +127,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "六征-长篇",
+    "contest": "六征长篇",
     "series": "X征"
    },
    {
@@ -136,7 +136,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "六征-长篇",
+    "contest": "六征长篇",
     "series": "X征"
    },
    {
@@ -145,7 +145,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "六征-对话",
+    "contest": "六征对话",
     "series": "X征"
    },
    {
@@ -154,7 +154,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "六征-长篇",
+    "contest": "六征长篇",
     "series": "X征"
    },
    {
@@ -163,7 +163,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "六征-中篇",
+    "contest": "六征中篇",
     "series": "X征"
    },
    {
@@ -172,7 +172,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "六征-短篇",
+    "contest": "六征短篇",
     "series": "X征"
    },
    {
@@ -181,7 +181,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "六征-中篇",
+    "contest": "六征中篇",
     "series": "X征"
    },
    {
@@ -190,7 +190,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "六征-对话",
+    "contest": "六征对话",
     "series": "X征"
    },
    {
@@ -199,7 +199,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "六征-长篇",
+    "contest": "六征长篇",
     "series": "X征"
    },
    {
@@ -208,7 +208,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "六征-中篇",
+    "contest": "六征中篇",
     "series": "X征"
    },
    {
@@ -217,7 +217,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "六征-长篇",
+    "contest": "六征长篇",
     "series": "X征"
    },
    {
@@ -226,7 +226,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "六征-短篇",
+    "contest": "六征短篇",
     "series": "X征"
    },
    {
@@ -235,7 +235,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "六征-对话",
+    "contest": "六征对话",
     "series": "X征"
    },
    {
@@ -244,7 +244,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "六征-长篇",
+    "contest": "六征长篇",
     "series": "X征"
    },
    {
@@ -253,7 +253,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "六征-长篇",
+    "contest": "六征长篇",
     "series": "X征"
    },
    {
@@ -262,7 +262,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "六征-长篇",
+    "contest": "六征长篇",
     "series": "X征"
    },
    {
@@ -271,7 +271,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "六征-长篇",
+    "contest": "六征长篇",
     "series": "X征"
    },
    {
@@ -280,18 +280,18 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "六征-长篇",
+    "contest": "六征长篇",
     "series": "X征"
    }
   ],
-  "少女前线征文": [
+  "少女前线同人": [
    {
     "nid": 170618,
     "title": "你是我的军旗",
     "awards": [
      "一等奖"
     ],
-    "contest": "少女前线",
+    "contest": "少女前线同人",
     "series": "独立"
    },
    {
@@ -300,7 +300,7 @@
     "awards": [
      "二等奖"
     ],
-    "contest": "少女前线",
+    "contest": "少女前线同人",
     "series": "独立"
    },
    {
@@ -309,7 +309,7 @@
     "awards": [
      "二等奖"
     ],
-    "contest": "少女前线",
+    "contest": "少女前线同人",
     "series": "独立"
    },
    {
@@ -318,7 +318,7 @@
     "awards": [
      "三等奖"
     ],
-    "contest": "少女前线",
+    "contest": "少女前线同人",
     "series": "独立"
    },
    {
@@ -327,7 +327,7 @@
     "awards": [
      "三等奖"
     ],
-    "contest": "少女前线",
+    "contest": "少女前线同人",
     "series": "独立"
    },
    {
@@ -336,7 +336,7 @@
     "awards": [
      "三等奖"
     ],
-    "contest": "少女前线",
+    "contest": "少女前线同人",
     "series": "独立"
    },
    {
@@ -345,7 +345,7 @@
     "awards": [
      "三等奖"
     ],
-    "contest": "少女前线",
+    "contest": "少女前线同人",
     "series": "独立"
    },
    {
@@ -354,18 +354,18 @@
     "awards": [
      "三等奖"
     ],
-    "contest": "少女前线",
+    "contest": "少女前线同人",
     "series": "独立"
    }
   ],
-  "崩坏3征文": [
+  "崩坏3同人": [
    {
     "nid": 184355,
     "title": "律空四重奏",
     "awards": [
      "一等奖"
     ],
-    "contest": "崩坏3",
+    "contest": "崩坏3同人",
     "series": "独立"
    },
    {
@@ -374,7 +374,7 @@
     "awards": [
      "一等奖"
     ],
-    "contest": "崩坏3",
+    "contest": "崩坏3同人",
     "series": "独立"
    },
    {
@@ -383,7 +383,7 @@
     "awards": [
      "二等奖"
     ],
-    "contest": "崩坏3",
+    "contest": "崩坏3同人",
     "series": "独立"
    },
    {
@@ -392,7 +392,7 @@
     "awards": [
      "二等奖"
     ],
-    "contest": "崩坏3",
+    "contest": "崩坏3同人",
     "series": "独立"
    },
    {
@@ -401,7 +401,7 @@
     "awards": [
      "二等奖"
     ],
-    "contest": "崩坏3",
+    "contest": "崩坏3同人",
     "series": "独立"
    },
    {
@@ -410,7 +410,7 @@
     "awards": [
      "二等奖"
     ],
-    "contest": "崩坏3",
+    "contest": "崩坏3同人",
     "series": "独立"
    },
    {
@@ -419,7 +419,7 @@
     "awards": [
      "二等奖"
     ],
-    "contest": "崩坏3",
+    "contest": "崩坏3同人",
     "series": "独立"
    },
    {
@@ -428,7 +428,7 @@
     "awards": [
      "三等奖"
     ],
-    "contest": "崩坏3",
+    "contest": "崩坏3同人",
     "series": "独立"
    },
    {
@@ -437,7 +437,7 @@
     "awards": [
      "三等奖"
     ],
-    "contest": "崩坏3",
+    "contest": "崩坏3同人",
     "series": "独立"
    },
    {
@@ -446,7 +446,7 @@
     "awards": [
      "三等奖"
     ],
-    "contest": "崩坏3",
+    "contest": "崩坏3同人",
     "series": "独立"
    },
    {
@@ -455,7 +455,7 @@
     "awards": [
      "三等奖"
     ],
-    "contest": "崩坏3",
+    "contest": "崩坏3同人",
     "series": "独立"
    },
    {
@@ -464,7 +464,7 @@
     "awards": [
      "三等奖"
     ],
-    "contest": "崩坏3",
+    "contest": "崩坏3同人",
     "series": "独立"
    },
    {
@@ -473,7 +473,7 @@
     "awards": [
      "三等奖"
     ],
-    "contest": "崩坏3",
+    "contest": "崩坏3同人",
     "series": "独立"
    },
    {
@@ -482,7 +482,7 @@
     "awards": [
      "三等奖"
     ],
-    "contest": "崩坏3",
+    "contest": "崩坏3同人",
     "series": "独立"
    },
    {
@@ -491,7 +491,7 @@
     "awards": [
      "三等奖"
     ],
-    "contest": "崩坏3",
+    "contest": "崩坏3同人",
     "series": "独立"
    },
    {
@@ -500,7 +500,7 @@
     "awards": [
      "三等奖"
     ],
-    "contest": "崩坏3",
+    "contest": "崩坏3同人",
     "series": "独立"
    },
    {
@@ -509,7 +509,7 @@
     "awards": [
      "三等奖"
     ],
-    "contest": "崩坏3",
+    "contest": "崩坏3同人",
     "series": "独立"
    }
   ],
@@ -520,7 +520,7 @@
     "awards": [
      "金奖"
     ],
-    "contest": "七征-对话短",
+    "contest": "七征对话短篇",
     "series": "X征"
    },
    {
@@ -529,7 +529,7 @@
     "awards": [
      "金奖"
     ],
-    "contest": "七征-长篇",
+    "contest": "七征长篇",
     "series": "X征"
    },
    {
@@ -538,7 +538,7 @@
     "awards": [
      "金奖"
     ],
-    "contest": "七征-对话长",
+    "contest": "七征对话长篇",
     "series": "X征"
    },
    {
@@ -547,7 +547,7 @@
     "awards": [
      "金奖"
     ],
-    "contest": "七征-短篇",
+    "contest": "七征短篇",
     "series": "X征"
    },
    {
@@ -556,7 +556,7 @@
     "awards": [
      "金奖"
     ],
-    "contest": "七征-中篇",
+    "contest": "七征中篇",
     "series": "X征"
    },
    {
@@ -565,7 +565,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "七征-长篇",
+    "contest": "七征长篇",
     "series": "X征"
    },
    {
@@ -574,7 +574,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "七征-长篇",
+    "contest": "七征长篇",
     "series": "X征"
    },
    {
@@ -583,7 +583,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "七征-对话短",
+    "contest": "七征对话短篇",
     "series": "X征"
    },
    {
@@ -592,7 +592,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "七征-对话长",
+    "contest": "七征对话长篇",
     "series": "X征"
    },
    {
@@ -601,7 +601,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "七征-短篇",
+    "contest": "七征短篇",
     "series": "X征"
    },
    {
@@ -610,7 +610,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "七征-长篇",
+    "contest": "七征长篇",
     "series": "X征"
    },
    {
@@ -619,7 +619,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "七征-对话长",
+    "contest": "七征对话长篇",
     "series": "X征"
    },
    {
@@ -628,7 +628,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "七征-对话长",
+    "contest": "七征对话长篇",
     "series": "X征"
    },
    {
@@ -637,7 +637,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "七征-对话短",
+    "contest": "七征对话短篇",
     "series": "X征"
    },
    {
@@ -646,7 +646,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "七征-对话短",
+    "contest": "七征对话短篇",
     "series": "X征"
    },
    {
@@ -655,7 +655,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "七征-中篇",
+    "contest": "七征中篇",
     "series": "X征"
    },
    {
@@ -664,7 +664,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "七征-长篇",
+    "contest": "七征长篇",
     "series": "X征"
    },
    {
@@ -673,7 +673,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "七征-对话短",
+    "contest": "七征对话短篇",
     "series": "X征"
    },
    {
@@ -682,7 +682,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "七征-对话长",
+    "contest": "七征对话长篇",
     "series": "X征"
    },
    {
@@ -691,7 +691,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "七征-对话短",
+    "contest": "七征对话短篇",
     "series": "X征"
    },
    {
@@ -700,7 +700,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "七征-对话长",
+    "contest": "七征对话长篇",
     "series": "X征"
    },
    {
@@ -709,7 +709,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "七征-中篇",
+    "contest": "七征中篇",
     "series": "X征"
    },
    {
@@ -718,7 +718,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "七征-长篇",
+    "contest": "七征长篇",
     "series": "X征"
    },
    {
@@ -727,7 +727,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "七征-长篇",
+    "contest": "七征长篇",
     "series": "X征"
    },
    {
@@ -736,7 +736,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "七征-对话短",
+    "contest": "七征对话短篇",
     "series": "X征"
    },
    {
@@ -745,7 +745,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "七征-对话长",
+    "contest": "七征对话长篇",
     "series": "X征"
    },
    {
@@ -754,7 +754,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "七征-短篇",
+    "contest": "七征短篇",
     "series": "X征"
    },
    {
@@ -763,7 +763,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "七征-对话长",
+    "contest": "七征对话长篇",
     "series": "X征"
    },
    {
@@ -772,7 +772,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "七征-长篇",
+    "contest": "七征长篇",
     "series": "X征"
    },
    {
@@ -781,7 +781,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "七征-长篇",
+    "contest": "七征长篇",
     "series": "X征"
    },
    {
@@ -790,7 +790,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "七征-对话短",
+    "contest": "七征对话短篇",
     "series": "X征"
    },
    {
@@ -799,7 +799,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "七征-中篇",
+    "contest": "七征中篇",
     "series": "X征"
    },
    {
@@ -808,7 +808,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "七征-对话长",
+    "contest": "七征对话长篇",
     "series": "X征"
    },
    {
@@ -817,7 +817,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "七征-对话短",
+    "contest": "七征对话短篇",
     "series": "X征"
    },
    {
@@ -826,7 +826,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "七征-短篇",
+    "contest": "七征短篇",
     "series": "X征"
    },
    {
@@ -835,7 +835,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "七征-中篇",
+    "contest": "七征中篇",
     "series": "X征"
    },
    {
@@ -844,7 +844,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "七征-短篇",
+    "contest": "七征短篇",
     "series": "X征"
    },
    {
@@ -853,7 +853,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "七征-长篇",
+    "contest": "七征长篇",
     "series": "X征"
    },
    {
@@ -862,7 +862,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "七征-长篇",
+    "contest": "七征长篇",
     "series": "X征"
    },
    {
@@ -871,7 +871,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "七征-对话长",
+    "contest": "七征对话长篇",
     "series": "X征"
    },
    {
@@ -880,7 +880,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "七征-对话长",
+    "contest": "七征对话长篇",
     "series": "X征"
    },
    {
@@ -889,7 +889,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "七征-对话长",
+    "contest": "七征对话长篇",
     "series": "X征"
    },
    {
@@ -898,7 +898,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "七征-长篇",
+    "contest": "七征长篇",
     "series": "X征"
    },
    {
@@ -907,7 +907,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "七征-长篇",
+    "contest": "七征长篇",
     "series": "X征"
    },
    {
@@ -916,18 +916,18 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "七征-对话长",
+    "contest": "七征对话长篇",
     "series": "X征"
    }
   ],
-  "龙之谷征文": [
+  "龙之谷同人": [
    {
     "nid": 244215,
     "title": "记载外的英雄",
     "awards": [
      "一等奖"
     ],
-    "contest": "龙之谷",
+    "contest": "龙之谷同人",
     "series": "独立"
    },
    {
@@ -936,7 +936,7 @@
     "awards": [
      "二等奖"
     ],
-    "contest": "龙之谷",
+    "contest": "龙之谷同人",
     "series": "独立"
    },
    {
@@ -945,7 +945,7 @@
     "awards": [
      "二等奖"
     ],
-    "contest": "龙之谷",
+    "contest": "龙之谷同人",
     "series": "独立"
    },
    {
@@ -954,7 +954,7 @@
     "awards": [
      "三等奖"
     ],
-    "contest": "龙之谷",
+    "contest": "龙之谷同人",
     "series": "独立"
    },
    {
@@ -963,7 +963,7 @@
     "awards": [
      "三等奖"
     ],
-    "contest": "龙之谷",
+    "contest": "龙之谷同人",
     "series": "独立"
    },
    {
@@ -972,18 +972,18 @@
     "awards": [
      "三等奖"
     ],
-    "contest": "龙之谷",
+    "contest": "龙之谷同人",
     "series": "独立"
    }
   ],
-  "校园都市征文": [
+  "校园都市主题": [
    {
     "nid": 247710,
     "title": "我的校花养女最近有点怪",
     "awards": [
      "金奖"
     ],
-    "contest": "校园都市",
+    "contest": "校园都市主题",
     "series": "独立"
    },
    {
@@ -992,7 +992,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "校园都市",
+    "contest": "校园都市主题",
     "series": "独立"
    },
    {
@@ -1001,7 +1001,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "校园都市",
+    "contest": "校园都市主题",
     "series": "独立"
    },
    {
@@ -1010,7 +1010,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "校园都市",
+    "contest": "校园都市主题",
     "series": "独立"
    },
    {
@@ -1019,7 +1019,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "校园都市",
+    "contest": "校园都市主题",
     "series": "独立"
    },
    {
@@ -1028,7 +1028,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "校园都市",
+    "contest": "校园都市主题",
     "series": "独立"
    },
    {
@@ -1037,7 +1037,7 @@
     "awards": [
      "新星奖"
     ],
-    "contest": "校园都市",
+    "contest": "校园都市主题",
     "series": "独立"
    },
    {
@@ -1046,7 +1046,7 @@
     "awards": [
      "新星奖"
     ],
-    "contest": "校园都市",
+    "contest": "校园都市主题",
     "series": "独立"
    },
    {
@@ -1055,7 +1055,7 @@
     "awards": [
      "新星奖"
     ],
-    "contest": "校园都市",
+    "contest": "校园都市主题",
     "series": "独立"
    },
    {
@@ -1064,7 +1064,7 @@
     "awards": [
      "新星奖"
     ],
-    "contest": "校园都市",
+    "contest": "校园都市主题",
     "series": "独立"
    },
    {
@@ -1073,7 +1073,7 @@
     "awards": [
      "新星奖"
     ],
-    "contest": "校园都市",
+    "contest": "校园都市主题",
     "series": "独立"
    },
    {
@@ -1082,18 +1082,18 @@
     "awards": [
      "新星奖"
     ],
-    "contest": "校园都市",
+    "contest": "校园都市主题",
     "series": "独立"
    }
   ],
-  "第三届冬季征文": [
+  "第三届冬征": [
    {
     "nid": 262971,
     "title": "拯救我的魔堕师尊",
     "awards": [
      "金奖"
     ],
-    "contest": "三征冬征",
+    "contest": "第三届冬征",
     "series": "冬征"
    },
    {
@@ -1102,7 +1102,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "三征冬征",
+    "contest": "第三届冬征",
     "series": "冬征"
    },
    {
@@ -1111,7 +1111,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "三征冬征",
+    "contest": "第三届冬征",
     "series": "冬征"
    },
    {
@@ -1120,7 +1120,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "三征冬征",
+    "contest": "第三届冬征",
     "series": "冬征"
    },
    {
@@ -1129,7 +1129,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "三征冬征",
+    "contest": "第三届冬征",
     "series": "冬征"
    },
    {
@@ -1138,7 +1138,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "三征冬征",
+    "contest": "第三届冬征",
     "series": "冬征"
    },
    {
@@ -1147,7 +1147,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "三征冬征",
+    "contest": "第三届冬征",
     "series": "冬征"
    },
    {
@@ -1156,7 +1156,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "三征冬征",
+    "contest": "第三届冬征",
     "series": "冬征"
    },
    {
@@ -1165,7 +1165,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "三征冬征",
+    "contest": "第三届冬征",
     "series": "冬征"
    },
    {
@@ -1174,7 +1174,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "三征冬征",
+    "contest": "第三届冬征",
     "series": "冬征"
    },
    {
@@ -1183,7 +1183,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "三征冬征",
+    "contest": "第三届冬征",
     "series": "冬征"
    },
    {
@@ -1192,7 +1192,7 @@
     "awards": [
      "新星奖"
     ],
-    "contest": "三征冬征",
+    "contest": "第三届冬征",
     "series": "冬征"
    },
    {
@@ -1201,7 +1201,7 @@
     "awards": [
      "新星奖"
     ],
-    "contest": "三征冬征",
+    "contest": "第三届冬征",
     "series": "冬征"
    },
    {
@@ -1210,7 +1210,7 @@
     "awards": [
      "新星奖"
     ],
-    "contest": "三征冬征",
+    "contest": "第三届冬征",
     "series": "冬征"
    },
    {
@@ -1219,7 +1219,7 @@
     "awards": [
      "新星奖"
     ],
-    "contest": "三征冬征",
+    "contest": "第三届冬征",
     "series": "冬征"
    },
    {
@@ -1228,7 +1228,7 @@
     "awards": [
      "新星奖"
     ],
-    "contest": "三征冬征",
+    "contest": "第三届冬征",
     "series": "冬征"
    }
   ],
@@ -1239,7 +1239,7 @@
     "awards": [
      "金奖"
     ],
-    "contest": "八征-长篇",
+    "contest": "八征长篇",
     "series": "X征"
    },
    {
@@ -1248,7 +1248,7 @@
     "awards": [
      "金奖"
     ],
-    "contest": "八征-短篇",
+    "contest": "八征短篇",
     "series": "X征"
    },
    {
@@ -1257,7 +1257,7 @@
     "awards": [
      "金奖"
     ],
-    "contest": "八征-中篇",
+    "contest": "八征中篇",
     "series": "X征"
    },
    {
@@ -1266,7 +1266,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "八征-长篇",
+    "contest": "八征长篇",
     "series": "X征"
    },
    {
@@ -1275,7 +1275,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "八征-长篇",
+    "contest": "八征长篇",
     "series": "X征"
    },
    {
@@ -1284,7 +1284,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "八征-中篇",
+    "contest": "八征中篇",
     "series": "X征"
    },
    {
@@ -1293,7 +1293,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "八征-长篇",
+    "contest": "八征长篇",
     "series": "X征"
    },
    {
@@ -1302,7 +1302,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "八征-短篇",
+    "contest": "八征短篇",
     "series": "X征"
    },
    {
@@ -1311,7 +1311,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "八征-短篇",
+    "contest": "八征短篇",
     "series": "X征"
    },
    {
@@ -1320,7 +1320,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "八征-长篇",
+    "contest": "八征长篇",
     "series": "X征"
    },
    {
@@ -1329,7 +1329,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "八征-短篇",
+    "contest": "八征短篇",
     "series": "X征"
    },
    {
@@ -1338,7 +1338,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "八征-长篇",
+    "contest": "八征长篇",
     "series": "X征"
    },
    {
@@ -1347,7 +1347,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "八征-长篇",
+    "contest": "八征长篇",
     "series": "X征"
    },
    {
@@ -1356,7 +1356,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "八征-中篇",
+    "contest": "八征中篇",
     "series": "X征"
    },
    {
@@ -1365,7 +1365,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "八征-长篇",
+    "contest": "八征长篇",
     "series": "X征"
    },
    {
@@ -1374,7 +1374,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "八征-中篇",
+    "contest": "八征中篇",
     "series": "X征"
    },
    {
@@ -1383,7 +1383,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "八征-短篇",
+    "contest": "八征短篇",
     "series": "X征"
    },
    {
@@ -1392,7 +1392,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "八征-中篇",
+    "contest": "八征中篇",
     "series": "X征"
    },
    {
@@ -1401,7 +1401,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "八征-长篇",
+    "contest": "八征长篇",
     "series": "X征"
    },
    {
@@ -1410,7 +1410,7 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "八征-长篇",
+    "contest": "八征长篇",
     "series": "X征"
    },
    {
@@ -1419,7 +1419,7 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "八征-长篇",
+    "contest": "八征长篇",
     "series": "X征"
    },
    {
@@ -1428,7 +1428,7 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "八征-长篇",
+    "contest": "八征长篇",
     "series": "X征"
    },
    {
@@ -1437,7 +1437,7 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "八征-长篇",
+    "contest": "八征长篇",
     "series": "X征"
    },
    {
@@ -1446,7 +1446,7 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "八征-长篇",
+    "contest": "八征长篇",
     "series": "X征"
    },
    {
@@ -1455,7 +1455,7 @@
     "awards": [
      "新星奖"
     ],
-    "contest": "八征-长篇",
+    "contest": "八征长篇",
     "series": "X征"
    },
    {
@@ -1464,7 +1464,7 @@
     "awards": [
      "新星奖"
     ],
-    "contest": "八征-长篇",
+    "contest": "八征长篇",
     "series": "X征"
    },
    {
@@ -1473,7 +1473,7 @@
     "awards": [
      "新星奖"
     ],
-    "contest": "八征-长篇",
+    "contest": "八征长篇",
     "series": "X征"
    },
    {
@@ -1482,7 +1482,7 @@
     "awards": [
      "新星奖"
     ],
-    "contest": "八征-长篇",
+    "contest": "八征长篇",
     "series": "X征"
    },
    {
@@ -1491,18 +1491,18 @@
     "awards": [
      "新星奖"
     ],
-    "contest": "八征-长篇",
+    "contest": "八征长篇",
     "series": "X征"
    }
   ],
-  "第四届冬季征文": [
+  "第四届冬征": [
    {
     "nid": 400179,
     "title": "反派再生后不想跟美少女纠缠",
     "awards": [
      "金奖"
     ],
-    "contest": "四征冬征",
+    "contest": "第四届冬征",
     "series": "冬征"
    },
    {
@@ -1511,7 +1511,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "四征冬征",
+    "contest": "第四届冬征",
     "series": "冬征"
    },
    {
@@ -1520,7 +1520,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "四征冬征",
+    "contest": "第四届冬征",
     "series": "冬征"
    },
    {
@@ -1529,7 +1529,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "四征冬征",
+    "contest": "第四届冬征",
     "series": "冬征"
    },
    {
@@ -1538,7 +1538,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "四征冬征",
+    "contest": "第四届冬征",
     "series": "冬征"
    },
    {
@@ -1547,7 +1547,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "四征冬征",
+    "contest": "第四届冬征",
     "series": "冬征"
    },
    {
@@ -1556,7 +1556,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "四征冬征",
+    "contest": "第四届冬征",
     "series": "冬征"
    },
    {
@@ -1565,7 +1565,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "四征冬征",
+    "contest": "第四届冬征",
     "series": "冬征"
    },
    {
@@ -1574,7 +1574,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "四征冬征",
+    "contest": "第四届冬征",
     "series": "冬征"
    },
    {
@@ -1583,7 +1583,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "四征冬征",
+    "contest": "第四届冬征",
     "series": "冬征"
    },
    {
@@ -1592,7 +1592,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "四征冬征",
+    "contest": "第四届冬征",
     "series": "冬征"
    },
    {
@@ -1601,7 +1601,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "四征冬征",
+    "contest": "第四届冬征",
     "series": "冬征"
    },
    {
@@ -1610,7 +1610,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "四征冬征",
+    "contest": "第四届冬征",
     "series": "冬征"
    },
    {
@@ -1619,7 +1619,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "四征冬征",
+    "contest": "第四届冬征",
     "series": "冬征"
    },
    {
@@ -1628,7 +1628,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "四征冬征",
+    "contest": "第四届冬征",
     "series": "冬征"
    },
    {
@@ -1637,7 +1637,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "四征冬征",
+    "contest": "第四届冬征",
     "series": "冬征"
    }
   ],
@@ -1648,7 +1648,7 @@
     "awards": [
      "金奖"
     ],
-    "contest": "九征-长篇",
+    "contest": "九征长篇",
     "series": "X征"
    },
    {
@@ -1657,7 +1657,7 @@
     "awards": [
      "金奖"
     ],
-    "contest": "九征-中篇",
+    "contest": "九征中篇",
     "series": "X征"
    },
    {
@@ -1666,7 +1666,7 @@
     "awards": [
      "金奖"
     ],
-    "contest": "九征-短篇",
+    "contest": "九征短篇",
     "series": "X征"
    },
    {
@@ -1675,7 +1675,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "九征-长篇",
+    "contest": "九征长篇",
     "series": "X征"
    },
    {
@@ -1684,7 +1684,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "九征-长篇",
+    "contest": "九征长篇",
     "series": "X征"
    },
    {
@@ -1693,7 +1693,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "九征-长篇",
+    "contest": "九征长篇",
     "series": "X征"
    },
    {
@@ -1702,7 +1702,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "九征-中篇",
+    "contest": "九征中篇",
     "series": "X征"
    },
    {
@@ -1711,7 +1711,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "九征-短篇",
+    "contest": "九征短篇",
     "series": "X征"
    },
    {
@@ -1720,7 +1720,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "九征-短篇",
+    "contest": "九征短篇",
     "series": "X征"
    },
    {
@@ -1729,7 +1729,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "九征-中篇",
+    "contest": "九征中篇",
     "series": "X征"
    },
    {
@@ -1738,7 +1738,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "九征-长篇",
+    "contest": "九征长篇",
     "series": "X征"
    },
    {
@@ -1747,7 +1747,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "九征-长篇",
+    "contest": "九征长篇",
     "series": "X征"
    },
    {
@@ -1756,7 +1756,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "九征-长篇",
+    "contest": "九征长篇",
     "series": "X征"
    },
    {
@@ -1765,7 +1765,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "九征-长篇",
+    "contest": "九征长篇",
     "series": "X征"
    },
    {
@@ -1774,7 +1774,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "九征-长篇",
+    "contest": "九征长篇",
     "series": "X征"
    },
    {
@@ -1783,7 +1783,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "九征-中篇",
+    "contest": "九征中篇",
     "series": "X征"
    },
    {
@@ -1792,7 +1792,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "九征-短篇",
+    "contest": "九征短篇",
     "series": "X征"
    },
    {
@@ -1801,7 +1801,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "九征-中篇",
+    "contest": "九征中篇",
     "series": "X征"
    },
    {
@@ -1810,7 +1810,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "九征-短篇",
+    "contest": "九征短篇",
     "series": "X征"
    },
    {
@@ -1819,7 +1819,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "九征-对话",
+    "contest": "九征对话",
     "series": "X征"
    },
    {
@@ -1828,7 +1828,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "九征-长篇",
+    "contest": "九征长篇",
     "series": "X征"
    },
    {
@@ -1837,7 +1837,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "九征-长篇",
+    "contest": "九征长篇",
     "series": "X征"
    },
    {
@@ -1846,7 +1846,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "九征-长篇",
+    "contest": "九征长篇",
     "series": "X征"
    },
    {
@@ -1855,7 +1855,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "九征-长篇",
+    "contest": "九征长篇",
     "series": "X征"
    },
    {
@@ -1864,7 +1864,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "九征-长篇",
+    "contest": "九征长篇",
     "series": "X征"
    },
    {
@@ -1873,7 +1873,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "九征-长篇",
+    "contest": "九征长篇",
     "series": "X征"
    },
    {
@@ -1882,7 +1882,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "九征-长篇",
+    "contest": "九征长篇",
     "series": "X征"
    },
    {
@@ -1891,7 +1891,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "九征-长篇",
+    "contest": "九征长篇",
     "series": "X征"
    },
    {
@@ -1900,7 +1900,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "九征-对话",
+    "contest": "九征对话",
     "series": "X征"
    },
    {
@@ -1909,7 +1909,7 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "九征-长篇",
+    "contest": "九征长篇",
     "series": "X征"
    },
    {
@@ -1918,7 +1918,7 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "九征-长篇",
+    "contest": "九征长篇",
     "series": "X征"
    },
    {
@@ -1927,7 +1927,7 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "九征-长篇",
+    "contest": "九征长篇",
     "series": "X征"
    },
    {
@@ -1936,7 +1936,7 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "九征-长篇",
+    "contest": "九征长篇",
     "series": "X征"
    },
    {
@@ -1945,18 +1945,18 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "九征-长篇",
+    "contest": "九征长篇",
     "series": "X征"
    }
   ],
-  "第五届冬季征文": [
+  "第五届冬征": [
    {
     "nid": 517379,
     "title": "摆烂魔王才不会遇到退休剑圣",
     "awards": [
      "金奖"
     ],
-    "contest": "五征冬征",
+    "contest": "第五届冬征",
     "series": "冬征"
    },
    {
@@ -1965,7 +1965,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "五征冬征",
+    "contest": "第五届冬征",
     "series": "冬征"
    },
    {
@@ -1974,7 +1974,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "五征冬征",
+    "contest": "第五届冬征",
     "series": "冬征"
    },
    {
@@ -1983,7 +1983,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "五征冬征",
+    "contest": "第五届冬征",
     "series": "冬征"
    },
    {
@@ -1992,7 +1992,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "五征冬征",
+    "contest": "第五届冬征",
     "series": "冬征"
    },
    {
@@ -2001,7 +2001,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "五征冬征",
+    "contest": "第五届冬征",
     "series": "冬征"
    },
    {
@@ -2010,7 +2010,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "五征冬征",
+    "contest": "第五届冬征",
     "series": "冬征"
    },
    {
@@ -2019,7 +2019,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "五征冬征",
+    "contest": "第五届冬征",
     "series": "冬征"
    },
    {
@@ -2028,7 +2028,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "五征冬征",
+    "contest": "第五届冬征",
     "series": "冬征"
    },
    {
@@ -2037,7 +2037,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "五征冬征",
+    "contest": "第五届冬征",
     "series": "冬征"
    },
    {
@@ -2046,7 +2046,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "五征冬征",
+    "contest": "第五届冬征",
     "series": "冬征"
    },
    {
@@ -2055,7 +2055,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "五征冬征",
+    "contest": "第五届冬征",
     "series": "冬征"
    },
    {
@@ -2064,7 +2064,7 @@
     "awards": [
      "创意奖"
     ],
-    "contest": "五征冬征",
+    "contest": "第五届冬征",
     "series": "冬征"
    },
    {
@@ -2073,7 +2073,7 @@
     "awards": [
      "创意奖"
     ],
-    "contest": "五征冬征",
+    "contest": "第五届冬征",
     "series": "冬征"
    },
    {
@@ -2082,7 +2082,7 @@
     "awards": [
      "创意奖"
     ],
-    "contest": "五征冬征",
+    "contest": "第五届冬征",
     "series": "冬征"
    },
    {
@@ -2091,11 +2091,11 @@
     "awards": [
      "创意奖"
     ],
-    "contest": "五征冬征",
+    "contest": "第五届冬征",
     "series": "冬征"
    }
   ],
-  "失业魔王同人征文": [
+  "失业魔王同人": [
    {
     "nid": 514562,
     "title": "失业魔王：世界线因我而变动",
@@ -2160,7 +2160,7 @@
     "series": "独立"
    }
   ],
-  "英雄再临同人征文": [
+  "英雄再临同人": [
    {
     "nid": 514313,
     "title": "英雄再临之霍伦思帝国篇前传",
@@ -2234,7 +2234,7 @@
     "series": "独立"
    }
   ],
-  "2022春季征文": [
+  "2022春征": [
    {
     "nid": 538652,
     "title": "我真没想过让女主们都喜欢上我啊",
@@ -2387,7 +2387,7 @@
     "awards": [
      "金奖"
     ],
-    "contest": "十征-中篇",
+    "contest": "十征中篇",
     "series": "X征"
    },
    {
@@ -2396,7 +2396,7 @@
     "awards": [
      "金奖"
     ],
-    "contest": "十征-长篇",
+    "contest": "十征长篇",
     "series": "X征"
    },
    {
@@ -2405,7 +2405,7 @@
     "awards": [
      "金奖"
     ],
-    "contest": "十征-短篇",
+    "contest": "十征短篇",
     "series": "X征"
    },
    {
@@ -2414,7 +2414,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "十征-长篇",
+    "contest": "十征长篇",
     "series": "X征"
    },
    {
@@ -2423,7 +2423,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "十征-长篇",
+    "contest": "十征长篇",
     "series": "X征"
    },
    {
@@ -2432,7 +2432,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "十征-长篇",
+    "contest": "十征长篇",
     "series": "X征"
    },
    {
@@ -2441,7 +2441,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "十征-短篇",
+    "contest": "十征短篇",
     "series": "X征"
    },
    {
@@ -2450,7 +2450,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "十征-中篇",
+    "contest": "十征中篇",
     "series": "X征"
    },
    {
@@ -2459,7 +2459,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十征-短篇",
+    "contest": "十征短篇",
     "series": "X征"
    },
    {
@@ -2468,7 +2468,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十征-短篇",
+    "contest": "十征短篇",
     "series": "X征"
    },
    {
@@ -2477,7 +2477,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十征-短篇",
+    "contest": "十征短篇",
     "series": "X征"
    },
    {
@@ -2486,7 +2486,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十征-长篇",
+    "contest": "十征长篇",
     "series": "X征"
    },
    {
@@ -2495,7 +2495,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十征-长篇",
+    "contest": "十征长篇",
     "series": "X征"
    },
    {
@@ -2504,7 +2504,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十征-中篇",
+    "contest": "十征中篇",
     "series": "X征"
    },
    {
@@ -2513,7 +2513,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十征-长篇",
+    "contest": "十征长篇",
     "series": "X征"
    },
    {
@@ -2522,7 +2522,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十征-中篇",
+    "contest": "十征中篇",
     "series": "X征"
    },
    {
@@ -2531,7 +2531,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十征-长篇",
+    "contest": "十征长篇",
     "series": "X征"
    },
    {
@@ -2540,7 +2540,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十征-长篇",
+    "contest": "十征长篇",
     "series": "X征"
    },
    {
@@ -2549,7 +2549,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十征-中篇",
+    "contest": "十征中篇",
     "series": "X征"
    },
    {
@@ -2558,7 +2558,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "十征-长篇",
+    "contest": "十征长篇",
     "series": "X征"
    },
    {
@@ -2567,7 +2567,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "十征-对话",
+    "contest": "十征对话",
     "series": "X征"
    },
    {
@@ -2576,7 +2576,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "十征-长篇",
+    "contest": "十征长篇",
     "series": "X征"
    },
    {
@@ -2585,7 +2585,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "十征-长篇",
+    "contest": "十征长篇",
     "series": "X征"
    },
    {
@@ -2594,7 +2594,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "十征-对话",
+    "contest": "十征对话",
     "series": "X征"
    },
    {
@@ -2603,7 +2603,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "十征-对话",
+    "contest": "十征对话",
     "series": "X征"
    },
    {
@@ -2612,7 +2612,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "十征-长篇",
+    "contest": "十征长篇",
     "series": "X征"
    },
    {
@@ -2621,7 +2621,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "十征-长篇",
+    "contest": "十征长篇",
     "series": "X征"
    },
    {
@@ -2630,7 +2630,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "十征-对话",
+    "contest": "十征对话",
     "series": "X征"
    },
    {
@@ -2639,7 +2639,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "十征-长篇",
+    "contest": "十征长篇",
     "series": "X征"
    },
    {
@@ -2648,7 +2648,7 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "十征-长篇",
+    "contest": "十征长篇",
     "series": "X征"
    },
    {
@@ -2657,7 +2657,7 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "十征-长篇",
+    "contest": "十征长篇",
     "series": "X征"
    },
    {
@@ -2666,7 +2666,7 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "十征-长篇",
+    "contest": "十征长篇",
     "series": "X征"
    },
    {
@@ -2675,7 +2675,7 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "十征-长篇",
+    "contest": "十征长篇",
     "series": "X征"
    },
    {
@@ -2684,18 +2684,18 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "十征-长篇",
+    "contest": "十征长篇",
     "series": "X征"
    }
   ],
-  "少年的无限幻想": [
+  "2022少年无限幻想": [
    {
     "nid": 598456,
     "title": "炮灰却把路人师妹养成凤傲天",
     "awards": [
      "金奖"
     ],
-    "contest": "2022主题秋征（少年的无限幻想）",
+    "contest": "2022少年无限幻想",
     "series": "秋征"
    },
    {
@@ -2704,7 +2704,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "2022主题秋征（少年的无限幻想）",
+    "contest": "2022少年无限幻想",
     "series": "秋征"
    },
    {
@@ -2713,7 +2713,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "2022主题秋征（少年的无限幻想）",
+    "contest": "2022少年无限幻想",
     "series": "秋征"
    },
    {
@@ -2722,7 +2722,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "2022主题秋征（少年的无限幻想）",
+    "contest": "2022少年无限幻想",
     "series": "秋征"
    },
    {
@@ -2731,7 +2731,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "2022主题秋征（少年的无限幻想）",
+    "contest": "2022少年无限幻想",
     "series": "秋征"
    },
    {
@@ -2740,7 +2740,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "2022主题秋征（少年的无限幻想）",
+    "contest": "2022少年无限幻想",
     "series": "秋征"
    },
    {
@@ -2749,7 +2749,7 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "2022主题秋征（少年的无限幻想）",
+    "contest": "2022少年无限幻想",
     "series": "秋征"
    },
    {
@@ -2758,7 +2758,7 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "2022主题秋征（少年的无限幻想）",
+    "contest": "2022少年无限幻想",
     "series": "秋征"
    },
    {
@@ -2767,7 +2767,7 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "2022主题秋征（少年的无限幻想）",
+    "contest": "2022少年无限幻想",
     "series": "秋征"
    },
    {
@@ -2776,7 +2776,7 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "2022主题秋征（少年的无限幻想）",
+    "contest": "2022少年无限幻想",
     "series": "秋征"
    },
    {
@@ -2785,18 +2785,18 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "2022主题秋征（少年的无限幻想）",
+    "contest": "2022少年无限幻想",
     "series": "秋征"
    }
   ],
-  "第六届冬季征文": [
+  "第六届冬征": [
    {
     "nid": 619932,
     "title": "被偏执精灵女王变成了她妹妹",
     "awards": [
      "金奖"
     ],
-    "contest": "六征冬征",
+    "contest": "第六届冬征",
     "series": "冬征"
    },
    {
@@ -2805,7 +2805,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "六征冬征",
+    "contest": "第六届冬征",
     "series": "冬征"
    },
    {
@@ -2814,7 +2814,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "六征冬征",
+    "contest": "第六届冬征",
     "series": "冬征"
    },
    {
@@ -2823,7 +2823,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "六征冬征",
+    "contest": "第六届冬征",
     "series": "冬征"
    },
    {
@@ -2832,7 +2832,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "六征冬征",
+    "contest": "第六届冬征",
     "series": "冬征"
    },
    {
@@ -2841,7 +2841,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "六征冬征",
+    "contest": "第六届冬征",
     "series": "冬征"
    },
    {
@@ -2850,7 +2850,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "六征冬征",
+    "contest": "第六届冬征",
     "series": "冬征"
    },
    {
@@ -2859,7 +2859,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "六征冬征",
+    "contest": "第六届冬征",
     "series": "冬征"
    },
    {
@@ -2868,7 +2868,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "六征冬征",
+    "contest": "第六届冬征",
     "series": "冬征"
    },
    {
@@ -2877,7 +2877,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "六征冬征",
+    "contest": "第六届冬征",
     "series": "冬征"
    },
    {
@@ -2886,7 +2886,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "六征冬征",
+    "contest": "第六届冬征",
     "series": "冬征"
    },
    {
@@ -2895,7 +2895,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "六征冬征",
+    "contest": "第六届冬征",
     "series": "冬征"
    },
    {
@@ -2904,7 +2904,7 @@
     "awards": [
      "创意奖"
     ],
-    "contest": "六征冬征",
+    "contest": "第六届冬征",
     "series": "冬征"
    },
    {
@@ -2913,7 +2913,7 @@
     "awards": [
      "创意奖"
     ],
-    "contest": "六征冬征",
+    "contest": "第六届冬征",
     "series": "冬征"
    },
    {
@@ -2922,7 +2922,7 @@
     "awards": [
      "创意奖"
     ],
-    "contest": "六征冬征",
+    "contest": "第六届冬征",
     "series": "冬征"
    },
    {
@@ -2931,11 +2931,11 @@
     "awards": [
      "创意奖"
     ],
-    "contest": "六征冬征",
+    "contest": "第六届冬征",
     "series": "冬征"
    }
   ],
-  "2023春季征文": [
+  "2023春征": [
    {
     "nid": 627189,
     "title": "哥哥我是魔法少女有问题吗？",
@@ -3118,7 +3118,7 @@
     "series": "春征"
    }
   ],
-  "“超新星杯”短篇大赛": [
+  "超新星杯短篇": [
    {
     "nid": 632437,
     "title": "下班后，一车叔叔都被变成美少女",
@@ -3181,7 +3181,7 @@
     "awards": [
      "金奖"
     ],
-    "contest": "一征-金奖",
+    "contest": "一征",
     "series": "X征"
    },
    {
@@ -3190,7 +3190,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "一征-银奖",
+    "contest": "一征",
     "series": "X征"
    },
    {
@@ -3199,7 +3199,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "一征-铜奖",
+    "contest": "一征",
     "series": "X征"
    },
    {
@@ -3208,7 +3208,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "一征-铜奖",
+    "contest": "一征",
     "series": "X征"
    },
    {
@@ -3217,7 +3217,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "一征-铜奖",
+    "contest": "一征",
     "series": "X征"
    }
   ],
@@ -3228,7 +3228,7 @@
     "awards": [
      "金奖"
     ],
-    "contest": "二征-金奖",
+    "contest": "二征",
     "series": "X征"
    },
    {
@@ -3237,7 +3237,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "二征-银奖",
+    "contest": "二征",
     "series": "X征"
    },
    {
@@ -3246,7 +3246,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "二征-银奖",
+    "contest": "二征",
     "series": "X征"
    },
    {
@@ -3255,7 +3255,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "二征-铜奖",
+    "contest": "二征",
     "series": "X征"
    },
    {
@@ -3264,7 +3264,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "二征-铜奖",
+    "contest": "二征",
     "series": "X征"
    },
    {
@@ -3273,7 +3273,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "二征-铜奖",
+    "contest": "二征",
     "series": "X征"
    },
    {
@@ -3282,7 +3282,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "二征-铜奖",
+    "contest": "二征",
     "series": "X征"
    }
   ],
@@ -3293,7 +3293,7 @@
     "awards": [
      "金奖"
     ],
-    "contest": "三征-中篇金奖",
+    "contest": "三征",
     "series": "X征"
    },
    {
@@ -3302,7 +3302,7 @@
     "awards": [
      "金奖"
     ],
-    "contest": "三征-短篇金奖",
+    "contest": "三征",
     "series": "X征"
    },
    {
@@ -3311,7 +3311,7 @@
     "awards": [
      "金奖"
     ],
-    "contest": "三征-长篇金奖",
+    "contest": "三征",
     "series": "X征"
    },
    {
@@ -3320,7 +3320,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "三征-中篇银奖",
+    "contest": "三征",
     "series": "X征"
    },
    {
@@ -3329,7 +3329,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "三征-短篇银奖",
+    "contest": "三征",
     "series": "X征"
    },
    {
@@ -3338,7 +3338,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "三征-长篇银奖",
+    "contest": "三征",
     "series": "X征"
    },
    {
@@ -3347,7 +3347,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "三征-长篇铜奖",
+    "contest": "三征",
     "series": "X征"
    },
    {
@@ -3356,7 +3356,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "三征-长篇铜奖",
+    "contest": "三征",
     "series": "X征"
    },
    {
@@ -3365,7 +3365,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "三征-短篇铜奖",
+    "contest": "三征",
     "series": "X征"
    },
    {
@@ -3374,7 +3374,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "三征-短篇铜奖",
+    "contest": "三征",
     "series": "X征"
    },
    {
@@ -3383,7 +3383,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "三征-长篇铜奖",
+    "contest": "三征",
     "series": "X征"
    },
    {
@@ -3392,7 +3392,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "三征-短篇铜奖",
+    "contest": "三征",
     "series": "X征"
    },
    {
@@ -3401,7 +3401,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "三征-短篇铜奖",
+    "contest": "三征",
     "series": "X征"
    },
    {
@@ -3410,7 +3410,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "三征-短篇铜奖",
+    "contest": "三征",
     "series": "X征"
    },
    {
@@ -3419,7 +3419,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "三征-中篇铜奖",
+    "contest": "三征",
     "series": "X征"
    }
   ],
@@ -3430,7 +3430,7 @@
     "awards": [
      "金奖"
     ],
-    "contest": "十一征-中篇",
+    "contest": "十一征中篇",
     "series": "X征"
    },
    {
@@ -3439,7 +3439,7 @@
     "awards": [
      "金奖"
     ],
-    "contest": "十一征-短篇",
+    "contest": "十一征短篇",
     "series": "X征"
    },
    {
@@ -3448,7 +3448,7 @@
     "awards": [
      "金奖"
     ],
-    "contest": "十一征-长篇",
+    "contest": "十一征长篇",
     "series": "X征"
    },
    {
@@ -3457,7 +3457,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "十一征-中篇",
+    "contest": "十一征中篇",
     "series": "X征"
    },
    {
@@ -3466,7 +3466,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "十一征-短篇",
+    "contest": "十一征短篇",
     "series": "X征"
    },
    {
@@ -3475,7 +3475,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "十一征-长篇",
+    "contest": "十一征长篇",
     "series": "X征"
    },
    {
@@ -3484,7 +3484,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "十一征-长篇",
+    "contest": "十一征长篇",
     "series": "X征"
    },
    {
@@ -3493,7 +3493,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "十一征-长篇",
+    "contest": "十一征长篇",
     "series": "X征"
    },
    {
@@ -3502,7 +3502,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十一征-长篇",
+    "contest": "十一征长篇",
     "series": "X征"
    },
    {
@@ -3511,7 +3511,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十一征-中篇",
+    "contest": "十一征中篇",
     "series": "X征"
    },
    {
@@ -3520,7 +3520,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十一征-长篇",
+    "contest": "十一征长篇",
     "series": "X征"
    },
    {
@@ -3529,7 +3529,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十一征-中篇",
+    "contest": "十一征中篇",
     "series": "X征"
    },
    {
@@ -3538,7 +3538,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十一征-短篇",
+    "contest": "十一征短篇",
     "series": "X征"
    },
    {
@@ -3547,7 +3547,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十一征-短篇",
+    "contest": "十一征短篇",
     "series": "X征"
    },
    {
@@ -3556,7 +3556,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十一征-中篇",
+    "contest": "十一征中篇",
     "series": "X征"
    },
    {
@@ -3565,7 +3565,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十一征-长篇",
+    "contest": "十一征长篇",
     "series": "X征"
    },
    {
@@ -3574,7 +3574,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十一征-长篇",
+    "contest": "十一征长篇",
     "series": "X征"
    },
    {
@@ -3583,7 +3583,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十一征-长篇",
+    "contest": "十一征长篇",
     "series": "X征"
    },
    {
@@ -3592,7 +3592,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十一征-短篇",
+    "contest": "十一征短篇",
     "series": "X征"
    },
    {
@@ -3601,7 +3601,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "十一征-长篇",
+    "contest": "十一征长篇",
     "series": "X征"
    },
    {
@@ -3610,7 +3610,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "十一征-长篇",
+    "contest": "十一征长篇",
     "series": "X征"
    },
    {
@@ -3619,7 +3619,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "十一征-长篇",
+    "contest": "十一征长篇",
     "series": "X征"
    },
    {
@@ -3628,7 +3628,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "十一征-长篇",
+    "contest": "十一征长篇",
     "series": "X征"
    },
    {
@@ -3637,7 +3637,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "十一征-长篇",
+    "contest": "十一征长篇",
     "series": "X征"
    },
    {
@@ -3646,7 +3646,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "十一征-长篇",
+    "contest": "十一征长篇",
     "series": "X征"
    },
    {
@@ -3655,7 +3655,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "十一征-长篇",
+    "contest": "十一征长篇",
     "series": "X征"
    },
    {
@@ -3664,7 +3664,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "十一征-长篇",
+    "contest": "十一征长篇",
     "series": "X征"
    },
    {
@@ -3673,7 +3673,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "十一征-长篇",
+    "contest": "十一征长篇",
     "series": "X征"
    },
    {
@@ -3682,18 +3682,18 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "十一征-长篇",
+    "contest": "十一征长篇",
     "series": "X征"
    }
   ],
-  "少年的奇迹历险": [
+  "2023少年奇迹历险": [
    {
     "nid": 670734,
     "title": "穿越本子世界，可女主好像太多了",
     "awards": [
      "金奖"
     ],
-    "contest": "2023主题秋征（少年的奇迹历险）",
+    "contest": "2023少年奇迹历险",
     "series": "秋征"
    },
    {
@@ -3702,7 +3702,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "2023主题秋征（少年的奇迹历险）",
+    "contest": "2023少年奇迹历险",
     "series": "秋征"
    },
    {
@@ -3711,7 +3711,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "2023主题秋征（少年的奇迹历险）",
+    "contest": "2023少年奇迹历险",
     "series": "秋征"
    },
    {
@@ -3720,7 +3720,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "2023主题秋征（少年的奇迹历险）",
+    "contest": "2023少年奇迹历险",
     "series": "秋征"
    },
    {
@@ -3730,7 +3730,7 @@
      "铜奖",
      "题材鼓励奖"
     ],
-    "contest": "2023主题秋征（少年的奇迹历险）",
+    "contest": "2023少年奇迹历险",
     "series": "秋征"
    },
    {
@@ -3740,7 +3740,7 @@
      "铜奖",
      "题材鼓励奖"
     ],
-    "contest": "2023主题秋征（少年的奇迹历险）",
+    "contest": "2023少年奇迹历险",
     "series": "秋征"
    },
    {
@@ -3749,7 +3749,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "2023主题秋征（少年的奇迹历险）",
+    "contest": "2023少年奇迹历险",
     "series": "秋征"
    },
    {
@@ -3758,7 +3758,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "2023主题秋征（少年的奇迹历险）",
+    "contest": "2023少年奇迹历险",
     "series": "秋征"
    },
    {
@@ -3767,7 +3767,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "2023主题秋征（少年的奇迹历险）",
+    "contest": "2023少年奇迹历险",
     "series": "秋征"
    },
    {
@@ -3776,7 +3776,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "2023主题秋征（少年的奇迹历险）",
+    "contest": "2023少年奇迹历险",
     "series": "秋征"
    },
    {
@@ -3785,7 +3785,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "2023主题秋征（少年的奇迹历险）",
+    "contest": "2023少年奇迹历险",
     "series": "秋征"
    },
    {
@@ -3794,7 +3794,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "2023主题秋征（少年的奇迹历险）",
+    "contest": "2023少年奇迹历险",
     "series": "秋征"
    },
    {
@@ -3803,7 +3803,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "2023主题秋征（少年的奇迹历险）",
+    "contest": "2023少年奇迹历险",
     "series": "秋征"
    },
    {
@@ -3813,7 +3813,7 @@
      "编辑推荐奖",
      "题材鼓励奖"
     ],
-    "contest": "2023主题秋征（少年的奇迹历险）",
+    "contest": "2023少年奇迹历险",
     "series": "秋征"
    },
    {
@@ -3822,7 +3822,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "2023主题秋征（少年的奇迹历险）",
+    "contest": "2023少年奇迹历险",
     "series": "秋征"
    },
    {
@@ -3831,7 +3831,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "2023主题秋征（少年的奇迹历险）",
+    "contest": "2023少年奇迹历险",
     "series": "秋征"
    },
    {
@@ -3840,7 +3840,7 @@
     "awards": [
      "题材鼓励奖"
     ],
-    "contest": "2023主题秋征（少年的奇迹历险）",
+    "contest": "2023少年奇迹历险",
     "series": "秋征"
    },
    {
@@ -3849,18 +3849,18 @@
     "awards": [
      "题材鼓励奖"
     ],
-    "contest": "2023主题秋征（少年的奇迹历险）",
+    "contest": "2023少年奇迹历险",
     "series": "秋征"
    }
   ],
-  "第七届冬季征文": [
+  "第七届冬征": [
    {
     "nid": 677177,
     "title": "她们认清感情，骑士却已转生幼狐",
     "awards": [
      "金奖"
     ],
-    "contest": "七征冬征",
+    "contest": "第七届冬征",
     "series": "冬征"
    },
    {
@@ -3869,7 +3869,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "七征冬征",
+    "contest": "第七届冬征",
     "series": "冬征"
    },
    {
@@ -3878,7 +3878,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "七征冬征",
+    "contest": "第七届冬征",
     "series": "冬征"
    },
    {
@@ -3887,7 +3887,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "七征冬征",
+    "contest": "第七届冬征",
     "series": "冬征"
    },
    {
@@ -3896,7 +3896,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "七征冬征",
+    "contest": "第七届冬征",
     "series": "冬征"
    },
    {
@@ -3905,7 +3905,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "七征冬征",
+    "contest": "第七届冬征",
     "series": "冬征"
    },
    {
@@ -3914,7 +3914,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "七征冬征",
+    "contest": "第七届冬征",
     "series": "冬征"
    },
    {
@@ -3923,7 +3923,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "七征冬征",
+    "contest": "第七届冬征",
     "series": "冬征"
    },
    {
@@ -3932,7 +3932,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "七征冬征",
+    "contest": "第七届冬征",
     "series": "冬征"
    },
    {
@@ -3941,7 +3941,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "七征冬征",
+    "contest": "第七届冬征",
     "series": "冬征"
    },
    {
@@ -3950,7 +3950,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "七征冬征",
+    "contest": "第七届冬征",
     "series": "冬征"
    },
    {
@@ -3959,7 +3959,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "七征冬征",
+    "contest": "第七届冬征",
     "series": "冬征"
    },
    {
@@ -3968,7 +3968,7 @@
     "awards": [
      "优秀题材奖"
     ],
-    "contest": "七征冬征",
+    "contest": "第七届冬征",
     "series": "冬征"
    },
    {
@@ -3977,7 +3977,7 @@
     "awards": [
      "优秀题材奖"
     ],
-    "contest": "七征冬征",
+    "contest": "第七届冬征",
     "series": "冬征"
    },
    {
@@ -3986,11 +3986,11 @@
     "awards": [
      "优秀题材奖"
     ],
-    "contest": "七征冬征",
+    "contest": "第七届冬征",
     "series": "冬征"
    }
   ],
-  "2024主题短篇征文": [
+  "2024主题短篇": [
    {
     "nid": 681784,
     "title": "反派只想教你学习",
@@ -4037,7 +4037,7 @@
     "series": "独立"
    }
   ],
-  "2024春季征文": [
+  "2024春征": [
    {
     "nid": 692762,
     "title": "青蛇也非池中物",
@@ -4190,7 +4190,7 @@
     "awards": [
      "金奖"
     ],
-    "contest": "十二征-长篇",
+    "contest": "十二征长篇",
     "series": "X征"
    },
    {
@@ -4199,7 +4199,7 @@
     "awards": [
      "金奖"
     ],
-    "contest": "十二征-短篇",
+    "contest": "十二征短篇",
     "series": "X征"
    },
    {
@@ -4208,7 +4208,7 @@
     "awards": [
      "金奖"
     ],
-    "contest": "十二征-中篇",
+    "contest": "十二征中篇",
     "series": "X征"
    },
    {
@@ -4217,7 +4217,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "十二征-短篇",
+    "contest": "十二征短篇",
     "series": "X征"
    },
    {
@@ -4226,7 +4226,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "十二征-长篇",
+    "contest": "十二征长篇",
     "series": "X征"
    },
    {
@@ -4235,7 +4235,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "十二征-长篇",
+    "contest": "十二征长篇",
     "series": "X征"
    },
    {
@@ -4244,7 +4244,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "十二征-长篇",
+    "contest": "十二征长篇",
     "series": "X征"
    },
    {
@@ -4253,7 +4253,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "十二征-中篇",
+    "contest": "十二征中篇",
     "series": "X征"
    },
    {
@@ -4262,7 +4262,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十二征-中篇",
+    "contest": "十二征中篇",
     "series": "X征"
    },
    {
@@ -4271,7 +4271,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十二征-长篇",
+    "contest": "十二征长篇",
     "series": "X征"
    },
    {
@@ -4280,7 +4280,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十二征-短篇",
+    "contest": "十二征短篇",
     "series": "X征"
    },
    {
@@ -4289,7 +4289,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十二征-长篇",
+    "contest": "十二征长篇",
     "series": "X征"
    },
    {
@@ -4298,7 +4298,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十二征-短篇",
+    "contest": "十二征短篇",
     "series": "X征"
    },
    {
@@ -4307,7 +4307,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十二征-长篇",
+    "contest": "十二征长篇",
     "series": "X征"
    },
    {
@@ -4316,7 +4316,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十二征-长篇",
+    "contest": "十二征长篇",
     "series": "X征"
    },
    {
@@ -4325,7 +4325,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十二征-长篇",
+    "contest": "十二征长篇",
     "series": "X征"
    },
    {
@@ -4334,7 +4334,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十二征-中篇",
+    "contest": "十二征中篇",
     "series": "X征"
    },
    {
@@ -4343,7 +4343,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十二征-短篇",
+    "contest": "十二征短篇",
     "series": "X征"
    },
    {
@@ -4352,7 +4352,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十二征-中篇",
+    "contest": "十二征中篇",
     "series": "X征"
    },
    {
@@ -4361,7 +4361,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "十二征-长篇",
+    "contest": "十二征长篇",
     "series": "X征"
    },
    {
@@ -4370,7 +4370,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "十二征-长篇",
+    "contest": "十二征长篇",
     "series": "X征"
    },
    {
@@ -4379,7 +4379,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "十二征-长篇",
+    "contest": "十二征长篇",
     "series": "X征"
    },
    {
@@ -4388,7 +4388,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "十二征-长篇",
+    "contest": "十二征长篇",
     "series": "X征"
    },
    {
@@ -4397,7 +4397,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "十二征-长篇",
+    "contest": "十二征长篇",
     "series": "X征"
    },
    {
@@ -4406,7 +4406,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "十二征-长篇",
+    "contest": "十二征长篇",
     "series": "X征"
    },
    {
@@ -4415,7 +4415,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "十二征-长篇",
+    "contest": "十二征长篇",
     "series": "X征"
    },
    {
@@ -4424,7 +4424,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "十二征-长篇",
+    "contest": "十二征长篇",
     "series": "X征"
    },
    {
@@ -4433,7 +4433,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "十二征-长篇",
+    "contest": "十二征长篇",
     "series": "X征"
    },
    {
@@ -4442,18 +4442,18 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "十二征-长篇",
+    "contest": "十二征长篇",
     "series": "X征"
    }
   ],
-  "“少年的幻想校园”主题征文": [
+  "2024少年幻想校园": [
    {
     "nid": 711927,
     "title": "我反派，让仙子魔堕没什么问题吧",
     "awards": [
      "金奖"
     ],
-    "contest": "少年-幻想校园",
+    "contest": "2024少年幻想校园",
     "series": "少年"
    },
    {
@@ -4462,7 +4462,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "少年-幻想校园",
+    "contest": "2024少年幻想校园",
     "series": "少年"
    },
    {
@@ -4471,7 +4471,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "少年-幻想校园",
+    "contest": "2024少年幻想校园",
     "series": "少年"
    },
    {
@@ -4480,7 +4480,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "少年-幻想校园",
+    "contest": "2024少年幻想校园",
     "series": "少年"
    },
    {
@@ -4489,7 +4489,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "少年-幻想校园",
+    "contest": "2024少年幻想校园",
     "series": "少年"
    },
    {
@@ -4498,7 +4498,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "少年-幻想校园",
+    "contest": "2024少年幻想校园",
     "series": "少年"
    },
    {
@@ -4507,7 +4507,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "少年-幻想校园",
+    "contest": "2024少年幻想校园",
     "series": "少年"
    },
    {
@@ -4516,7 +4516,7 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "少年-幻想校园",
+    "contest": "2024少年幻想校园",
     "series": "少年"
    },
    {
@@ -4525,7 +4525,7 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "少年-幻想校园",
+    "contest": "2024少年幻想校园",
     "series": "少年"
    },
    {
@@ -4534,7 +4534,7 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "少年-幻想校园",
+    "contest": "2024少年幻想校园",
     "series": "少年"
    },
    {
@@ -4543,7 +4543,7 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "少年-幻想校园",
+    "contest": "2024少年幻想校园",
     "series": "少年"
    },
    {
@@ -4552,11 +4552,11 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "少年-幻想校园",
+    "contest": "2024少年幻想校园",
     "series": "少年"
    }
   ],
-  "点鸭秋色回忆征文活动": [
+  "点鸭秋色回忆": [
    {
     "nid": 719864,
     "title": "转生薇塔开始的综漫之旅",
@@ -4720,7 +4720,7 @@
     "series": "对话"
    }
   ],
-  "2024秋季征文": [
+  "2024秋征": [
    {
     "nid": 720699,
     "title": "我堂堂厉鬼，岂能郁郁屈居人下",
@@ -4821,14 +4821,14 @@
     "series": "秋征"
    }
   ],
-  "第八届冬季征文": [
+  "第八届冬征": [
    {
     "nid": 730611,
     "title": "恶役少爷怎么可能会是圣女？",
     "awards": [
      "金奖"
     ],
-    "contest": "八征冬征",
+    "contest": "第八届冬征",
     "series": "冬征"
    },
    {
@@ -4837,7 +4837,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "八征冬征",
+    "contest": "第八届冬征",
     "series": "冬征"
    },
    {
@@ -4846,7 +4846,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "八征冬征",
+    "contest": "第八届冬征",
     "series": "冬征"
    },
    {
@@ -4855,7 +4855,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "八征冬征",
+    "contest": "第八届冬征",
     "series": "冬征"
    },
    {
@@ -4864,7 +4864,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "八征冬征",
+    "contest": "第八届冬征",
     "series": "冬征"
    },
    {
@@ -4873,7 +4873,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "八征冬征",
+    "contest": "第八届冬征",
     "series": "冬征"
    },
    {
@@ -4882,7 +4882,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "八征冬征",
+    "contest": "第八届冬征",
     "series": "冬征"
    },
    {
@@ -4891,7 +4891,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "八征冬征",
+    "contest": "第八届冬征",
     "series": "冬征"
    },
    {
@@ -4900,7 +4900,7 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "八征冬征",
+    "contest": "第八届冬征",
     "series": "冬征"
    },
    {
@@ -4909,11 +4909,11 @@
     "awards": [
      "编辑推荐奖"
     ],
-    "contest": "八征冬征",
+    "contest": "第八届冬征",
     "series": "冬征"
    }
   ],
-  "2025春季征文": [
+  "2025春征": [
    {
     "nid": 738162,
     "title": "从来没觉得拯救世界开心过",
@@ -5005,14 +5005,14 @@
     "series": "春征"
    }
   ],
-  "少年创想长篇": [
+  "2025少年二次元创想长篇": [
    {
     "nid": 740306,
     "title": "电子女友，首充6元送魔堕剑仙",
     "awards": [
      "金奖"
     ],
-    "contest": "少年-二次元创想·长篇",
+    "contest": "2025少年二次元创想长篇",
     "series": "少年"
    },
    {
@@ -5021,7 +5021,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "少年-二次元创想·长篇",
+    "contest": "2025少年二次元创想长篇",
     "series": "少年"
    },
    {
@@ -5030,7 +5030,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "少年-二次元创想·长篇",
+    "contest": "2025少年二次元创想长篇",
     "series": "少年"
    },
    {
@@ -5039,7 +5039,7 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "少年-二次元创想·长篇",
+    "contest": "2025少年二次元创想长篇",
     "series": "少年"
    },
    {
@@ -5048,7 +5048,7 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "少年-二次元创想·长篇",
+    "contest": "2025少年二次元创想长篇",
     "series": "少年"
    },
    {
@@ -5057,7 +5057,7 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "少年-二次元创想·长篇",
+    "contest": "2025少年二次元创想长篇",
     "series": "少年"
    },
    {
@@ -5066,7 +5066,7 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "少年-二次元创想·长篇",
+    "contest": "2025少年二次元创想长篇",
     "series": "少年"
    },
    {
@@ -5075,18 +5075,18 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "少年-二次元创想·长篇",
+    "contest": "2025少年二次元创想长篇",
     "series": "少年"
    }
   ],
-  "少年创想短篇": [
+  "2025少年二次元创想短篇": [
    {
     "nid": 737829,
     "title": "请让我在昨日离去",
     "awards": [
      "金奖"
     ],
-    "contest": "少年-二次元创想·短篇",
+    "contest": "2025少年二次元创想短篇",
     "series": "少年"
    },
    {
@@ -5095,7 +5095,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "少年-二次元创想·短篇",
+    "contest": "2025少年二次元创想短篇",
     "series": "少年"
    },
    {
@@ -5104,7 +5104,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "少年-二次元创想·短篇",
+    "contest": "2025少年二次元创想短篇",
     "series": "少年"
    }
   ],
@@ -5115,7 +5115,7 @@
     "awards": [
      "金奖"
     ],
-    "contest": "十三征-短篇",
+    "contest": "十三征短篇",
     "series": "X征"
    },
    {
@@ -5124,7 +5124,7 @@
     "awards": [
      "金奖"
     ],
-    "contest": "十三征-中篇",
+    "contest": "十三征中篇",
     "series": "X征"
    },
    {
@@ -5133,7 +5133,7 @@
     "awards": [
      "金奖"
     ],
-    "contest": "十三征-长篇",
+    "contest": "十三征长篇",
     "series": "X征"
    },
    {
@@ -5142,7 +5142,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "十三征-短篇",
+    "contest": "十三征短篇",
     "series": "X征"
    },
    {
@@ -5151,7 +5151,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "十三征-长篇",
+    "contest": "十三征长篇",
     "series": "X征"
    },
    {
@@ -5160,7 +5160,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "十三征-中篇",
+    "contest": "十三征中篇",
     "series": "X征"
    },
    {
@@ -5169,7 +5169,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十三征-长篇",
+    "contest": "十三征长篇",
     "series": "X征"
    },
    {
@@ -5178,7 +5178,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十三征-中篇",
+    "contest": "十三征中篇",
     "series": "X征"
    },
    {
@@ -5187,7 +5187,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十三征-长篇",
+    "contest": "十三征长篇",
     "series": "X征"
    },
    {
@@ -5196,7 +5196,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十三征-短篇",
+    "contest": "十三征短篇",
     "series": "X征"
    },
    {
@@ -5205,7 +5205,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十三征-短篇",
+    "contest": "十三征短篇",
     "series": "X征"
    },
    {
@@ -5214,7 +5214,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十三征-中篇",
+    "contest": "十三征中篇",
     "series": "X征"
    },
    {
@@ -5223,7 +5223,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十三征-长篇",
+    "contest": "十三征长篇",
     "series": "X征"
    },
    {
@@ -5232,7 +5232,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十三征-短篇",
+    "contest": "十三征短篇",
     "series": "X征"
    },
    {
@@ -5241,7 +5241,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "十三征-中篇",
+    "contest": "十三征中篇",
     "series": "X征"
    },
    {
@@ -5250,7 +5250,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "十三征-长篇",
+    "contest": "十三征长篇",
     "series": "X征"
    },
    {
@@ -5259,7 +5259,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "十三征-长篇",
+    "contest": "十三征长篇",
     "series": "X征"
    },
    {
@@ -5268,7 +5268,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "十三征-长篇",
+    "contest": "十三征长篇",
     "series": "X征"
    },
    {
@@ -5277,7 +5277,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "十三征-长篇",
+    "contest": "十三征长篇",
     "series": "X征"
    },
    {
@@ -5286,7 +5286,7 @@
     "awards": [
      "星火奖"
     ],
-    "contest": "十三征-长篇",
+    "contest": "十三征长篇",
     "series": "X征"
    },
    {
@@ -5295,7 +5295,7 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "十三征-长篇",
+    "contest": "十三征长篇",
     "series": "X征"
    },
    {
@@ -5304,7 +5304,7 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "十三征-长篇",
+    "contest": "十三征长篇",
     "series": "X征"
    },
    {
@@ -5313,7 +5313,7 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "十三征-长篇",
+    "contest": "十三征长篇",
     "series": "X征"
    },
    {
@@ -5322,7 +5322,7 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "十三征-长篇",
+    "contest": "十三征长篇",
     "series": "X征"
    },
    {
@@ -5331,18 +5331,18 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "十三征-长篇",
+    "contest": "十三征长篇",
     "series": "X征"
    }
   ],
-  "奇幻世界主题征文": [
+  "奇幻世界主题": [
    {
     "nid": 756478,
     "title": "重生了不代表想被美少女攻略",
     "awards": [
      "金奖"
     ],
-    "contest": "奇幻世界主题征文",
+    "contest": "奇幻世界主题",
     "series": "独立"
    },
    {
@@ -5351,7 +5351,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "奇幻世界主题征文",
+    "contest": "奇幻世界主题",
     "series": "独立"
    },
    {
@@ -5360,7 +5360,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "奇幻世界主题征文",
+    "contest": "奇幻世界主题",
     "series": "独立"
    },
    {
@@ -5369,7 +5369,7 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "奇幻世界主题征文",
+    "contest": "奇幻世界主题",
     "series": "独立"
    },
    {
@@ -5378,11 +5378,11 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "奇幻世界主题征文",
+    "contest": "奇幻世界主题",
     "series": "独立"
    }
   ],
-  "2025秋季征文": [
+  "2025秋征": [
    {
     "nid": 759314,
     "title": "小牧师怎会是退队男主的白月光！",
@@ -5447,14 +5447,14 @@
     "series": "秋征"
    }
   ],
-  "第九届冬季征文": [
+  "第九届冬征": [
    {
     "nid": 765752,
     "title": "我哈气吸血姬，怎么成团宠了？",
     "awards": [
      "金奖"
     ],
-    "contest": "九征冬征",
+    "contest": "第九届冬征",
     "series": "冬征"
    },
    {
@@ -5463,7 +5463,7 @@
     "awards": [
      "银奖"
     ],
-    "contest": "九征冬征",
+    "contest": "第九届冬征",
     "series": "冬征"
    },
    {
@@ -5472,7 +5472,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "九征冬征",
+    "contest": "第九届冬征",
     "series": "冬征"
    },
    {
@@ -5481,7 +5481,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "九征冬征",
+    "contest": "第九届冬征",
     "series": "冬征"
    },
    {
@@ -5490,7 +5490,7 @@
     "awards": [
      "铜奖"
     ],
-    "contest": "九征冬征",
+    "contest": "第九届冬征",
     "series": "冬征"
    },
    {
@@ -5499,7 +5499,7 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "九征冬征",
+    "contest": "第九届冬征",
     "series": "冬征"
    },
    {
@@ -5508,7 +5508,7 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "九征冬征",
+    "contest": "第九届冬征",
     "series": "冬征"
    },
    {
@@ -5517,7 +5517,7 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "九征冬征",
+    "contest": "第九届冬征",
     "series": "冬征"
    },
    {
@@ -5526,7 +5526,7 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "九征冬征",
+    "contest": "第九届冬征",
     "series": "冬征"
    },
    {
@@ -5535,11 +5535,11 @@
     "awards": [
      "推荐奖"
     ],
-    "contest": "九征冬征",
+    "contest": "第九届冬征",
     "series": "冬征"
    }
   ],
-  "2026春季征文": [
+  "2026春征": [
    {
     "nid": 774528,
     "title": "从成为美少女的契约魔鬼开始",

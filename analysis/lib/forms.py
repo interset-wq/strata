@@ -60,6 +60,32 @@ def app_categories() -> dict[int, int]:
 
 
 @lru_cache(maxsize=1)
+def forced_admission_nids() -> frozenset[int]:
+    """强制入种白名单 nid（E.39 获奖 + E.40 人工），form 判定层豁免 E.19。
+
+    用户裁定（2026-11-26）：获奖作品「无论如何筛选都必须进种子」。这意味着
+    它们不仅要在种子收录层被放行，形态也不能被质量启发式污染——否则进了
+    种子却因 form=invalid 无处展示（43380《早安 哥哥 喵》三征短篇铜奖、
+    favs 5,924 高于听雨，却被 E.19 点击天花板判成 invalid，短篇榜没有排名）。
+    获奖是比点击数更强的形态+质量证据，故白名单书跳过 E.19 短篇点击天花板，
+    按字数正常判形态。名单与 `seed_policy` 共用同一锚点，只读 verified 行。
+    """
+    out: set[int] = set()
+    for name in ("seed_award_whitelist.jsonl", "seed_forced_whitelist.jsonl"):
+        path = paths.ANCHORS_DIR / name
+        if not path.exists():
+            continue
+        for line in path.read_text(encoding="utf-8").splitlines():
+            text = line.strip()
+            if not text or text.startswith("//"):
+                continue
+            row = json.loads(text)
+            if row.get("verified") is True:
+                out.add(int(row["nid"]))
+    return frozenset(out)
+
+
+@lru_cache(maxsize=1)
 def user_forms() -> dict[int, str]:
     """`nid -> form`，来自 `analysis/anchors/form_user_verified.jsonl`。
 
@@ -81,7 +107,10 @@ def user_forms() -> dict[int, str]:
     return out
 
 INVALID_MAX_WORDS = 2_000   # 用户 2026-11-19 定：<2000 不是有效篇幅（app 章节下限）
-SHORT_MAX_WORDS = 50_000
+# 用户 2026-11-27 定：短/中篇分界改回 3 万——按「万字四舍五入到整数 = 3」
+# 口径（保留 0 位小数是 3 就算 3 万），故上界 34,999 字（35,000 起为中篇）。
+# 听雨 30,346 / 回到旧时光 34,227 / 43380 29,076 均仍属短篇。
+SHORT_MAX_WORDS = 34_999
 MEDIUM_MAX_WORDS = 150_000
 # E.21 的正文征文保护档必须与本模块的中篇档一致，否则两条规则会互相错位。
 assert DF.PROSE_CONTEST_MIN_WORDS == SHORT_MAX_WORDS + 1
@@ -129,8 +158,16 @@ def classify(df: pd.DataFrame) -> pd.Series:
     #       对话，v2-d 已判 dialogue）。
     if "clicks" in d.columns:
         clicks = pd.to_numeric(d["clicks"], errors="coerce").fillna(0).to_numpy()
+        # 白名单（获奖/人工强制）豁免 E.19：获奖证据强于点击天花板启发式，
+        # 不能让真短篇天花板（43380）被判 invalid 后失去短篇榜排名。
+        forced = forced_admission_nids()
+        waived = (np.isin(pd.to_numeric(
+            d["id"] if "id" in d.columns else d.get("nid"),
+            errors="coerce").to_numpy(), list(forced)) if forced
+            else np.zeros(len(d), dtype=bool))
         form = np.where((form == "short") & (words <= SHORT_MAX_WORDS)
-                        & (clicks > DF.DIAL_CLICKS_CEIL), "invalid", form)
+                        & (clicks > DF.DIAL_CLICKS_CEIL) & ~waived,
+                        "invalid", form)
     # 级 3：对话征文（确定性）——可救回 invalid
     form = np.where(d["marked"].to_numpy(), "dialogue", form)
     # 级 3.5：详情页 DOM 的**对话**证据（E.22，最高确定性）。

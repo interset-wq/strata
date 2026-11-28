@@ -87,11 +87,12 @@ UI 启动轮询即打这个端点（200ms 间隔、15s 超时），`status=="ok"
 `local`（最新观测）覆盖后的展示值；`local != null || meta != null` 即
 `source == "local"`。`cover` 优先取本地封面直链，种子 `cover_url` 大量为空
 或为相对路径，客户端须兼容相对路径并使用官方默认封面兜底。
-`awards` = 种子侧获奖记录（schema v5，`contest_awards` 表）：详情页徽标
-`{edition} · {award|征文获奖}`（「待逐档标定」占位由展示层统一映射为
-「征文获奖」，edition 原样显示、多届并列）；种子书详情恒有该字段
-（空列表 = 无获奖），库外 overlay 详情无此字段。获奖仅作展示素材，
-永不参与排序/打分（docs/12 红线）。
+`awards` = 种子侧获奖记录（schema v5，`contest_awards` 表）：引擎仍返回该字段，
+但**端上已不解析、详情页不显示**（用户裁定 2026-11-26：911 行里 867 行的奖项是
+占位值「待逐档标定」，渲染成「征文获奖」零信息，真获奖名全库仅 42 本；详情页
+赛事卡只报 `books.contest` 届次，见 `docs/contest-display-in-app.md` §6）；
+种子书详情恒有该字段（空列表 = 无获奖），库外 overlay 详情无此字段。获奖仅作
+展示素材，永不参与排序/打分（docs/12 红线）。
 `POST /strata/books/:nid/refresh` 的 `detail` 同样返回本次请求解析到的全部字段：
 HTML 含书名/作者/分类/签约/封面/简介/收藏/赞/字数/状态/更新时间，外加
 `tickets`（当月月票，`GetTicketNum.ashx` 追加请求，失败为 null）；App API 含
@@ -155,6 +156,21 @@ contest 聚合端点：`form` 必填，池按征文（`contest`，非空）`GROU
 nid ASC`，分页同 `/rankings/classic`。未知征文名返回空列表不报错。
 `'other'` 仍保留为兼容旧深链（归一化后收藏数前 2 名征文之外的长尾，
 引擎内部算 top-2），但 IP tab 分组网格已不再生成该入口。
+
+### GET /strata/calendar?granularity=day|week|month&anchor=YYYY-MM-DD&per_cell=（**已实现**，2026-11-26 增 bounds）
+
+发书日历（docs/14 P1）：种子书按 `est_date` 日/周/月聚合，周一起算；空日期
+补零格。**响应**：`{granularity, anchor, cells:[{date,total,universe,items?}],
+bounds:{first,last}}`。`month` 格只有 total/universe（items 省略）；
+`total` = 内置库（is_licensed=0）可点击子集，`universe` = 全平台估计
+（`calendar_universe` 表，UI 必须标「估计~N」）；`low` 档只入月层。
+`bounds` = 日历真正有数据的日子区间（库内 est_date ∪ calendar_universe 两层
+并集），UI 的导航边界与默认落点用它——不能用 manifest genMax 推 12-31，
+那会让用户翻进空月（2026-11-26 修订）。`universe` 原样返回
+`calendar_universe` 的构建值（含不完整末尾月，如 2026-10）；「尾部不完整月
+不估算」由 UI 依据 `bounds.last` 是否在月末自行判定（不在月末 → 该月及之后
+不显示全平台数字，2026-11-26 裁定；引擎与种子不裁剪）。非法 granularity / 非
+YYYY-MM-DD anchor → 400。
 
 ### GET /strata/preorder?date=YYYYMMDD（**已实现**，2026-11-24）
 
@@ -381,46 +397,108 @@ form 过滤即池本身）。
 
 赛事档案列表（docs/contest-display-in-app.md 形态一）：seed 内置库（`is_licensed=0`）
 按赛事事件聚合——N征 系列并入母赛事（对话类分轨随之并入），非 N征 赛事以
-原名为单事件。零网络请求。官方日期来自引擎内嵌静态表（源
-`analysis/references/contest-editions.md`，用户核实；缺失只显届次/年份，不编造）。
+原名为单事件（异写经台账 alias 归一，同一届不会渲染成两行）。零网络请求。
 
-200：`{ groups: [ContestGroup] }`，示例（`.25` 种子实测）：
+官方口径（赛程日期、逐赛道清单条数、获奖数、活动页 URL）全部来自引擎内嵌
+**赛事台账** `store/contest_ledger.json`：`app/tools/contestledger/build_ledger.py`
+从 contest-achieve（https://github.com/light-nook-labs/contest-achieve，
+AGPL-3.0）`docs/data/contests.json` 生成，per-track 条数 2026-11-24 抓取。
+台账取代此前两份手抄 Go 表（`store/roster_tags.go` + `store/contest_meta.go`，
+已删），是官方事实的唯一来源；改台账只改生成脚本，不手改 JSON。
+当前 78 个事件 / 102 条 roster tag / 15 条 award tag / 4 条 alias；
+53 届有已验证活动页 URL、75 届有 `roster_total`、41 届有 `award_total`。
+表外赛事只显届次/年份，不编造。
+
+200：`{ groups: [ContestGroup] }`，示例（当前种子实测）：
 
 ```json
 {
-  "name": "七征", "series": "x", "count": 399,
-  "forms": { "long": 280, "dialogue": 107, "short": 8, "medium": 4 },
-  "tracks": ["七征长篇", "七征对话类征文长篇", "七征对话类征文短篇", "七征中篇", "七征短篇"],
-  "roster": true,
-  "roster_tracks": ["长篇", "中篇", "短篇", "对话类征文长篇", "对话类征文短篇"],
+  "name": "七征", "series": "x", "count": 452,
+  "forms": { "long": 217, "dialogue": 144, "short": 81, "medium": 10 },
+  "tracks": ["七征长篇", "七征对话类征文长篇", "七征对话类征文短篇",
+             "七征-赛道3", "七征短篇", "七征中篇", "七征-赛道2"],
   "year_min": 2019, "year_max": 2019,
-  "year": 2019, "start": null, "end": null, "note": null
+  "year": 2019, "start": "2019-05-25", "end": "2019-09-24",
+  "result": "2019-12-24",
+  "official": "https://pages.sfacg.com/h5/act/zw2019/",
+  "roster": true,
+  "list_kind": "roster",
+  "divisions": [
+    { "name": "长篇", "tag": 408, "kind": "roster", "roster": 4272 },
+    { "name": "中篇", "tag": 409, "kind": "roster", "roster": 1359 },
+    { "name": "短篇", "tag": 410, "kind": "roster", "roster": 764 },
+    { "name": "对话类征文长篇", "tag": 411, "kind": "roster", "roster": 583 },
+    { "name": "对话类征文短篇", "tag": 412, "kind": "roster", "roster": 372 }
+  ],
+  "roster_total": 7350, "award_total": 45
+}
+```
+
+一征（award-only 示例）：
+
+```json
+{
+  "name": "一征", "series": "x", "count": 2,
+  "forms": { "long": 2 }, "tracks": ["一征"],
+  "year": 2013, "year_min": 2014, "year_max": 2014,
+  "roster": false, "list_kind": "award",
+  "divisions": [
+    { "name": "金奖", "tag": 635, "kind": "award", "roster": 1, "awards": 1 },
+    { "name": "银奖", "tag": 636, "kind": "award", "roster": 1, "awards": 1 },
+    { "name": "铜奖", "tag": 637, "kind": "award", "roster": 3, "awards": 3 }
+  ],
+  "award_total": 5
 }
 ```
 
 - `series`：`x`（N征）/ `winter` / `spring` / `autumn` / `other`。组序 =
   档案 tab 序（`spring` / `x` / `autumn` / `winter` / `other`，用户
-  2026-11-22 裁定），节内按开赛年份增序（官方 `year` 优先、缺失落
-  `year_min`）、再按「第X届」届序、再按名（稳定排序）。
-- `count`/`forms`：仅内置库（种子收录）作品，**非官方全量参赛规模**
-  （属 P1 清单 API）。`forms` 按 DOM 核实的 `form` 统计，与 `tracks`
-  （平台原始赛项标注）不必互洽。
-- `tracks`：赛事原始赛项名（count DESC）。
-- `roster`/`roster_tracks`：该赛事是否可拉官方清单（引擎内嵌已验证 tagId
-  静态台账，`store/roster_tags.go`）+ 已验证赛道列表（空 = 单轨，
-  `roster_tracks` 键省略）。档案页「查看官方清单」入口恒在：`roster=false`
-  时引擎回落库内子集并提示「仅库内作品」（见 `/strata/roster` 降级）。
-- `year`/`start`/`end`/`note`：官方元数据（静态表），无则 null；
+  2026-11-22 裁定），节内按开赛年份**降序**（用户 2026-11-26 改裁定：档案
+  按「最近一届在前」读；官方 `year` 优先、缺失落 `year_min`）、再按
+  「第X届」届序降序、再按 `roster_total` 降序（缺失按 0 排最后；主题/其他
+  tab 无届序，靠这一级分大小）、再按名（稳定排序）。
+- `count`/`forms`：**本地在库**（种子收录）作品数与形态分布，不是官方参赛
+  规模；`forms` 按 DOM 核实的 `form` 统计，与 `tracks`（平台原始赛项标注）
+  不必互洽。UI 与 `roster_total` 并排时两个口径必须分开标注（「在库」/
+  「官方清单」），不得混成一个数。
+- `tracks`：赛事原始赛项名（count DESC，同数按名）。
+- `roster`/`divisions`/`list_kind`：`ledger tracks` 现在 roster 与 award 两类都出。
+  `roster` = 该赛事是否有参赛清单 tag（`list_kind == "roster"` 的快捷布尔；
+  award-only 赛事恒 false）；`list_kind` = `"roster"` | `"award"` | 键省略（无
+  tag）——`"award"` 仅一/二/三征（上游获奖作品标签 635–649），UI 只能说
+  「获奖名单」。`divisions` = 官方赛道（台账序 = 官方展示序），每行 `{name,
+  tag, kind, roster?, awards?}`：roster 赛道 `roster` = 官方清单条数（未核实
+  则键省略），award 赛道 `awards` = 获奖名额（`roster` 是该获奖 tag 的列表
+  长度，只有几个名额时二者可能不等，**展示名额用 `awards`**）。单轨赛事只有
+  一行 `name="全部"`（`tag` 仍是真实 tagId；`/strata/roster` 的 `division`
+  传「全部」与留空等价——UI 把 chip 文案原样回传，故两者都认）。
+  无 tag 时 `divisions` 键省略。档案页「查看官方清单 / 获奖名单」入口恒在：
+  无 tag 时引擎回落库内子集并提示「仅库内作品」（见 `/strata/roster` 降级）。
+- `roster_total`：官方参赛清单总条数 = 各 roster 赛道 `roster` 之和（上游
+  逐 tag 现场计数；award 赛道永不计入）。任一赛道条数未核实 → null，**不给
+  半截的和**；UI 于是回落显示「接口无清单」而不是摆一个偏小的数。award-only
+  赛事恒 null（从未有参赛清单）。
+- `award_total`：官方获奖名额 = 各赛道 `awards` 之和（台账全有才算，否则
+  null），只为统计格/入口撑数。2026-11-26 起一/二/三征的获奖名单本身可经
+  `/strata/roster` 拉取（见下），其余届次仍只有数量（docs/contest-display-in-app.md §6），
+  UI 不得把名额当参赛规模。
+- `year`/`start`/`end`/`result`/`note`/`official`：官方元数据（台账），
+  无则键省略（UI 区分「官方未公示」与一个日期）；`result` = 官方公布日，
+  晚于今天时档案页说「预计结果公布」——还没到日子的是承诺不是事实。
   `year_min`/`year_max` 是库内书 `est_year` 区间（在库口径）。
-- `official`：官方活动页 URL（h5/移动版形态），引擎内嵌静态表（源
-  `docs/contest-roster-harvest.md` §2 逐届页面实证，2026-11-22）；未验证
-  （页面下线/未取到）时键省略、不编造，档案页隐藏「查看官方活动页」入口。
+  一/二/三征上游无日期，`year` 按用户核定填 **2013/2014/2015**
+  （历史页 `zw2013`–`zw2015` 同证，2026-11-26）；三征另有上游公布日
+  2015-12-15。
+  `official` = 官方活动页 URL（h5/移动版形态，逐届页面实证见
+  `docs/contest-roster-harvest.md` §2），未验证时省略、UI 隐藏跳转入口。
 - `lane`：other 系列事件的首页 tab 归属（用户 2026-11-22 裁定：对话的
   归档放首页对话区、IP 的归档放 IP 区）：`dialogue` / `ip`；键省略 =
-  主题类（档案列表「其他」tab）。引擎侧确定性分类：先届次覆盖（星穹
+  主题类（档案列表「主题」tab）。引擎侧确定性分类：先届次覆盖（星穹
   小说家征文 = 对话赛事，用户 2026-11-22 核实——IP 标题但归对话区），
   再名称规则（含 对话/点鸭 → dialogue；含 同人/崩坏3/少女前线/龙之谷/
-  星穹 → ip）。四季系列永无 lane。
+  星穹 → ip）。四季系列永无 lane。UI 侧对应入口 =
+  `/contest-archive?lane=dialogue`（首页对话区）/ `?lane=ip`（首页 IP 区）——
+  不带 lane 时「主题」tab 只列 lane 为空的主题类。
 
 ### GET /strata/contests/books?contest=&per=
 
@@ -434,7 +512,8 @@ favs DESC, nid)`），`per` 限每形态条数（1..50，默认 10）；
 
 200：`{ contest, items: [RankItem], awards: [AwardBook] }`（`rank` = 该 form
 组内名次 1..per）。`awards` = 该赛事库内获奖作品（schema v5，`contest_awards`
-表 join seed.books；edition → 赛事名由引擎内置静态表映射 11 条，表外赛事
+表 join seed.books；edition → 赛事名由引擎内置映射表 `store/awards.go`
+`awardEventEditions`（11 条，仍是手抄小表，未并进台账）映射，表外赛事
 返回空列表）；行序 = `favs DESC NULLs last, nid`（E.30）——奖项字段不参与排序。
 `AwardBook` = award 四字段（nid/edition/award/category）
 + title/author/favs/cover_url/est_year。140 本库外获奖行无 books
@@ -444,14 +523,22 @@ favs DESC, nid)`），`per` 限每形态条数（1..50，默认 10）；
 
 一届赛事的官方参赛清单一页（docs/contest-display-in-app.md 形态二，
 **按需**——全库后台批量抓清单禁止）。`contest` = 赛事事件名（同
-`/contests`）；`division` = 赛道（多轨赛事必传，取值 = `/contests` 该组
-`roster_tracks`；单轨留空）；`page` 从 1 起（引擎内部换算各世代页基：
-新 API 1-based、旧 API 0-based pi）。
+`/contests`）；`division` = 赛道（取值 = `/contests` 该组
+`divisions[].name`；多轨赛事必传，单轨赛事传「全部」或留空，两者等价）；
+`page` 从 1 起——**对 App 的接口 1-based，两代上游端点都 0-based**，引擎
+内部换算 `page-1`（2026-11-26 探针订正：旧「新 API 1-based / 旧 API 0-based
+pi」是错的；tag 704 `page=0` 给 500 条、`page=1` 给末尾 321 条、`page=2`
+已空但 `totalPage` 仍说 2）。
 
 - 400 `invalid_argument`：`contest` 缺失；多轨赛事 `division` 缺失/未知；
   `page` < 1。
-- tagId 台账是引擎内嵌静态表（102 条，源 docs/contest-roster-harvest.md；
-  tagId 只能从每届页面现场取、不能推导——新增届次务必现取后入表）。
+- tagId 台账 = 引擎内嵌赛事台账 `store/contest_ledger.json`（102 条 roster
+  tag，源 docs/contest-roster-harvest.md；tagId 只能从每届页面现场取、不能
+  推导——新增届次务必现取后回 `build_ledger.py` 入表）。台账另有 15 条
+  `kind="award"` 的 tag（一/二/三征的金银铜榜，635–649，contest-achieve
+  2026-11-24 采集）：2026-11-26 起它们**同一抓取路径可拉**——响应带
+  `list_kind="award"`、降级 note 说「获奖名单暂不可用」，UI 标题写
+  「获奖名单 · X」；它们仍不计入 `roster_total`，也永不被称作参赛清单。
 - 两代端点（按 tag 世代选择）：新 SPA（2023+，`api/essay/getNovels`，
   size ≤ 500）/ 旧 H5（2018–22，`Common.ashx?op=getNovelsByTag`，ps ≤ 200，
   相对封面路径拼 CDN 前缀）。清单行只有 6 字段
@@ -461,7 +548,7 @@ favs DESC, nid)`），`per` 限每形态条数（1..50，默认 10）；
 - **size 边界陷阱**：个别 tag（如 724）size=500 返回空、≤8 正常——首页
   空时引擎按 500→100→10 递减重试后再下结论（旧世代 ps=200 单档）。
 - 缓存：进程内 TTL 缓存（引擎重启即清空；与官方榜单共享并发合并），
-  key = `roster:{tag}:{page}`；TTL 按 `contest_meta` end 日期判（未结束 24h /
+  key = `roster:{tag}:{page}`；TTL 按台账 `end` 日期判（未结束 24h /
   已结束 10 年——数据不变，用户 2026-11-22 裁定 / end 未知 24h）。
   缓存的是上游原始页；**本地 join 每次响应都做**（覆盖层/种子变化即时反映）。
 - **本地 join**：种子内作品 `in_library=true` + form/favs/status/
@@ -470,8 +557,9 @@ favs DESC, nid)`），`per` 限每形态条数（1..50，默认 10）；
 - **降级恒 200（无 502 墙）**：赛事无 tagId / 接口失效（新 API
   `errorCode≠200`、旧 API 裸 `status≠200`、结构缺失、响应体畸形）/ 上游
   抓取失败 → 引擎回落库内子集（同代分位序、cap 2000），响应
-  `source="degraded"` + `note`；UI 顶部提示条「仅库内作品，清单不完整」。
-  失效响应不入缓存，下次打开重试（不重试风暴）。
+  `source="degraded"` + `note`（roster 赛事「官方清单暂不可用…」，award
+  赛事「获奖名单暂不可用…」）；UI 顶部提示条同步换词。失效响应不入缓存，
+  下次打开重试（不重试风暴）。
 - 清单顺序保持官方返回序；v1 无排序控件（用户 2026-11-21 定案）。
 - 库外条目点击复用搜索页链路：UI 推 `/book/{nid}`，详情页覆盖层按需抓
   详情 + 自动收录（discovered），不写 seed。
@@ -480,7 +568,7 @@ favs DESC, nid)`），`per` 限每形态条数（1..50，默认 10）；
 
 ```json
 { "contest": "十三征", "division": "长篇", "page": 1, "pages": 3,
-  "total_estimate": 1500,
+  "total_estimate": 1500, "list_kind": "roster",
   "source": "official",
   "items": [ { "nid": 713638, "title": "Re：如果成为神明",
                "author": "某NoName", "intro": "…",
@@ -490,12 +578,15 @@ favs DESC, nid)`），`per` 限每形态条数（1..50，默认 10）；
                "est_year": 2024, "words": 38000 } ] }
 ```
 
-降级响应同形：`source="degraded"`、`note`（如「无官方清单，仅显示库内
-作品」）、`page`/`pages` 恒 1，items 为库内子集（无 intro/category_id），
-无 `total_estimate`。
-- `total_estimate` = pages × 实际页大小（官方全量规模近似；末页不满时
+`list_kind` = `"roster"` | `"award"`（一/二/三征获奖名单）；降级响应不带
+（UI 从档案组取）。降级响应同形：`source="degraded"`、`note`（如「无官方
+清单，仅显示库内作品」）、`page`/`pages` 恒 1，items 为库内子集（无
+intro/category_id），无 `total_estimate`。
+- `total_estimate` = pages × 实际页大小（官方清单规模近似；末页不满时
   误差至多一页——用户 2026-11-22 裁定：近似即可，不多发请求取精确值）；
-  UI 清单页显示「约 N 篇参赛」。
+  UI 清单页优先用台账的精确条数显示「官方清单 N 条」，台账缺数才回落
+  「官方清单约 N 条」。**文案统一「官方清单」，不写「官方参赛/约 N 篇参赛」**——
+  这个数数的是清单接口返回的条目。
 
 ### GET /strata/booklists?page=（**已实现**，2026-11-23 官方书单）
 
@@ -732,6 +823,34 @@ form favs Top-1，docs/17 §3）。meta.ordering 回显实际排序
   "items": [ { "nid": 48704, "title": "英雄再临(英雄？我早就不当了)",
                "author": "无聊看看天", "est_year": 2010,
                "est_date": "2010-06-12", "favs": 7881, ... } ] }
+```
+
+### GET /strata/related?nid=&limit=（**已实现**，2026-11-26）
+
+详情页「相关推荐」（算法与取舍见 `docs/related-books.md` v4.1）：**纯本地**，只读 seed，
+无网络、断网可用。`nid` 必填正整数（锚点=当前书，可以是库外书或授权书）；
+`limit` 默认 8、上限 20，越界或非法一律 400 `invalid_argument`。
+
+硬门槛（任一不满足即不进候选）：`is_licensed=0`、有封面（`covers` ∪ `cover_url`）、
+`form = 锚点 form`、`nid ≠ 锚点`、`author ≠ 锚点作者`（同作者交给 `/author-books` 轨）、
+质量证据（long/dialogue 要 `cqs` 非空且落在 `cps` 20–80 中层带；其余 form 要 `pr` 非空且
+`favs ≥ 10`，`favs` 只作准入不作排序键）。召回按 A′（同 genre + |Δyear|≤3 + 强标签重叠）→
+B（同 genre + ≤5，按全标签重叠数打散）→ C′（跨 genre + ≤3 + 强标签）→ 同 form 口碑末档
+逐级降档；锚点含 df ≤ 100 的极稀疏强标签时世代窗口放宽到 ±8，锚点 `est_year < 2000` 时
+A′/C′ 关闭。档内先按最稀有强标签分层、多标签轮流出一本，再按口碑 DESC（`cqs` 或
+平滑 `pr_s`）、nid ASC。累计值 `clicks/favs/praises` 只 SELECT 展示、绝不参与排序
+（docs/12 §3.2 红线）。
+
+`meta.tier` = 贡献了条目的最后一档（`a`/`b`/`c`/`fallback`，无条目为 `none`）、
+`meta.ordering` = 实际排序键（`cqs`/`pr`），两者只供诊断，UI 不展示指标名。
+锚点查不到（无 nid 行、无 form）→ `items: []` + `tier: "none"`，不是错误；UI 整行隐藏。
+
+```json
+{ "meta": { "pool": "seed", "form": "long", "genre": "魔幻",
+            "tier": "a", "ordering": "cqs" },
+  "items": [ { "nid": 1001, "title": "Long A", "author": "Author A",
+               "genre": "魔幻", "est_year": 2010, "form": "long",
+               "cover_url": "2010/1/x.jpg", "favs": 500, ... } ] }
 ```
 
 ### GET /strata/discovered?limit=&offset= 与 DELETE /strata/discovered/:nid（**已实现**）

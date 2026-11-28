@@ -1,0 +1,1393 @@
+{
+ "source": {
+  "names": "analysis/anchors/contest_names.jsonl",
+  "ledger": "app/engine/internal/store/contest_ledger.json",
+  "note": "tagId from contest-achieve; all names authored by us. Digits live only in contest_ledger.json and are never recomputed here."
+ },
+ "raw": {
+  "2021秋征-东方世界": {
+   "event": "2021秋征",
+   "series": "autumn",
+   "lane": ""
+  },
+  "2021秋征-异世大陆": {
+   "event": "2021秋征",
+   "series": "autumn",
+   "lane": ""
+  },
+  "2022少年奇幻冒险": {
+   "event": "2022少年奇幻冒险",
+   "series": "autumn",
+   "lane": ""
+  },
+  "2022少年无限幻想": {
+   "event": "2022少年无限幻想",
+   "series": "autumn",
+   "lane": ""
+  },
+  "2022春季征文": {
+   "event": "2022春征",
+   "series": "spring",
+   "lane": ""
+  },
+  "2022春征": {
+   "event": "2022春征",
+   "series": "spring",
+   "lane": ""
+  },
+  "2023少年奇迹历险": {
+   "event": "2023少年奇迹历险",
+   "series": "autumn",
+   "lane": ""
+  },
+  "2023少年幻想之旅": {
+   "event": "2023少年幻想之旅",
+   "series": "autumn",
+   "lane": ""
+  },
+  "2023春季征文": {
+   "event": "2023春征",
+   "series": "spring",
+   "lane": ""
+  },
+  "2023春征": {
+   "event": "2023春征",
+   "series": "spring",
+   "lane": ""
+  },
+  "2024主题短篇": {
+   "event": "2024主题短篇",
+   "series": "other",
+   "lane": "short"
+  },
+  "2024主题短篇征文": {
+   "event": "2024主题短篇",
+   "series": "other",
+   "lane": "short"
+  },
+  "2024少年幻想校园": {
+   "event": "2024少年幻想校园",
+   "series": "autumn",
+   "lane": ""
+  },
+  "2024年对话小说春节征文": {
+   "event": "点鸭2024春节",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "2024春季征文": {
+   "event": "2024春征",
+   "series": "spring",
+   "lane": ""
+  },
+  "2024春征": {
+   "event": "2024春征",
+   "series": "spring",
+   "lane": ""
+  },
+  "2024秋季征文": {
+   "event": "2024秋征",
+   "series": "autumn",
+   "lane": ""
+  },
+  "2024秋征": {
+   "event": "2024秋征",
+   "series": "autumn",
+   "lane": ""
+  },
+  "2025少年二次元创想短篇": {
+   "event": "2025少年二次元创想短篇",
+   "series": "autumn",
+   "lane": ""
+  },
+  "2025少年二次元创想长篇": {
+   "event": "2025少年二次元创想长篇",
+   "series": "autumn",
+   "lane": ""
+  },
+  "2025年对话小说新年征文活动": {
+   "event": "点鸭2025新年",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "2025春季征文": {
+   "event": "2025春征",
+   "series": "spring",
+   "lane": ""
+  },
+  "2025春征": {
+   "event": "2025春征",
+   "series": "spring",
+   "lane": ""
+  },
+  "2025秋季征文": {
+   "event": "2025秋征",
+   "series": "autumn",
+   "lane": ""
+  },
+  "2025秋征": {
+   "event": "2025秋征",
+   "series": "autumn",
+   "lane": ""
+  },
+  "2026春季征文": {
+   "event": "2026春征",
+   "series": "spring",
+   "lane": ""
+  },
+  "2026春征": {
+   "event": "2026春征",
+   "series": "spring",
+   "lane": ""
+  },
+  "2026秋季征文": {
+   "event": "2026秋征",
+   "series": "autumn",
+   "lane": ""
+  },
+  "2026秋征": {
+   "event": "2026秋征",
+   "series": "autumn",
+   "lane": ""
+  },
+  "“少年的幻想校园”主题征文": {
+   "event": "2024少年幻想校园",
+   "series": "autumn",
+   "lane": ""
+  },
+  "“超新星杯”短篇大赛": {
+   "event": "超新星杯短篇",
+   "series": "other",
+   "lane": "short"
+  },
+  "一征": {
+   "event": "一征",
+   "series": "x",
+   "lane": ""
+  },
+  "七征": {
+   "event": "七征",
+   "series": "x",
+   "lane": ""
+  },
+  "七征中篇": {
+   "event": "七征",
+   "series": "x",
+   "lane": ""
+  },
+  "七征对话短篇": {
+   "event": "七征",
+   "series": "x",
+   "lane": ""
+  },
+  "七征对话长篇": {
+   "event": "七征",
+   "series": "x",
+   "lane": ""
+  },
+  "七征短篇": {
+   "event": "七征",
+   "series": "x",
+   "lane": ""
+  },
+  "七征长篇": {
+   "event": "七征",
+   "series": "x",
+   "lane": ""
+  },
+  "三征": {
+   "event": "三征",
+   "series": "x",
+   "lane": ""
+  },
+  "东方世界秋季征文": {
+   "event": "2021秋征",
+   "series": "autumn",
+   "lane": ""
+  },
+  "九征": {
+   "event": "九征",
+   "series": "x",
+   "lane": ""
+  },
+  "九征中篇": {
+   "event": "九征",
+   "series": "x",
+   "lane": ""
+  },
+  "九征对话": {
+   "event": "九征",
+   "series": "x",
+   "lane": ""
+  },
+  "九征短篇": {
+   "event": "九征",
+   "series": "x",
+   "lane": ""
+  },
+  "九征长篇": {
+   "event": "九征",
+   "series": "x",
+   "lane": ""
+  },
+  "二征": {
+   "event": "二征",
+   "series": "x",
+   "lane": ""
+  },
+  "五征": {
+   "event": "五征",
+   "series": "x",
+   "lane": ""
+  },
+  "五征中篇": {
+   "event": "五征",
+   "series": "x",
+   "lane": ""
+  },
+  "五征对话": {
+   "event": "五征",
+   "series": "x",
+   "lane": ""
+  },
+  "五征短篇": {
+   "event": "五征",
+   "series": "x",
+   "lane": ""
+  },
+  "五征长篇": {
+   "event": "五征",
+   "series": "x",
+   "lane": ""
+  },
+  "八征": {
+   "event": "八征",
+   "series": "x",
+   "lane": ""
+  },
+  "八征中篇": {
+   "event": "八征",
+   "series": "x",
+   "lane": ""
+  },
+  "八征短篇": {
+   "event": "八征",
+   "series": "x",
+   "lane": ""
+  },
+  "八征长篇": {
+   "event": "八征",
+   "series": "x",
+   "lane": ""
+  },
+  "六征": {
+   "event": "六征",
+   "series": "x",
+   "lane": ""
+  },
+  "六征中篇": {
+   "event": "六征",
+   "series": "x",
+   "lane": ""
+  },
+  "六征对话": {
+   "event": "六征",
+   "series": "x",
+   "lane": ""
+  },
+  "六征短篇": {
+   "event": "六征",
+   "series": "x",
+   "lane": ""
+  },
+  "六征长篇": {
+   "event": "六征",
+   "series": "x",
+   "lane": ""
+  },
+  "冬季征文": {
+   "event": "第一届冬征",
+   "series": "winter",
+   "lane": ""
+  },
+  "冬季恋曲征文活动": {
+   "event": "点鸭冬季恋曲",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "分支对话小说征文": {
+   "event": "点鸭分支对话",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "十一征": {
+   "event": "十一征",
+   "series": "x",
+   "lane": ""
+  },
+  "十一征中篇": {
+   "event": "十一征",
+   "series": "x",
+   "lane": ""
+  },
+  "十一征短篇": {
+   "event": "十一征",
+   "series": "x",
+   "lane": ""
+  },
+  "十一征长篇": {
+   "event": "十一征",
+   "series": "x",
+   "lane": ""
+  },
+  "十三征": {
+   "event": "十三征",
+   "series": "x",
+   "lane": ""
+  },
+  "十三征中篇": {
+   "event": "十三征",
+   "series": "x",
+   "lane": ""
+  },
+  "十三征短篇": {
+   "event": "十三征",
+   "series": "x",
+   "lane": ""
+  },
+  "十三征长篇": {
+   "event": "十三征",
+   "series": "x",
+   "lane": ""
+  },
+  "十二征": {
+   "event": "十二征",
+   "series": "x",
+   "lane": ""
+  },
+  "十二征中篇": {
+   "event": "十二征",
+   "series": "x",
+   "lane": ""
+  },
+  "十二征短篇": {
+   "event": "十二征",
+   "series": "x",
+   "lane": ""
+  },
+  "十二征长篇": {
+   "event": "十二征",
+   "series": "x",
+   "lane": ""
+  },
+  "十四征": {
+   "event": "十四征",
+   "series": "x",
+   "lane": ""
+  },
+  "十四征短篇": {
+   "event": "十四征",
+   "series": "x",
+   "lane": ""
+  },
+  "十四征长篇": {
+   "event": "十四征",
+   "series": "x",
+   "lane": ""
+  },
+  "十征": {
+   "event": "十征",
+   "series": "x",
+   "lane": ""
+  },
+  "十征中篇": {
+   "event": "十征",
+   "series": "x",
+   "lane": ""
+  },
+  "十征对话": {
+   "event": "十征",
+   "series": "x",
+   "lane": ""
+  },
+  "十征短篇": {
+   "event": "十征",
+   "series": "x",
+   "lane": ""
+  },
+  "十征长篇": {
+   "event": "十征",
+   "series": "x",
+   "lane": ""
+  },
+  "四征": {
+   "event": "四征",
+   "series": "x",
+   "lane": ""
+  },
+  "四征中篇": {
+   "event": "四征",
+   "series": "x",
+   "lane": ""
+  },
+  "四征短篇": {
+   "event": "四征",
+   "series": "x",
+   "lane": ""
+  },
+  "四征长篇": {
+   "event": "四征",
+   "series": "x",
+   "lane": ""
+  },
+  "失业魔王同人": {
+   "event": "失业魔王同人",
+   "series": "other",
+   "lane": "ip"
+  },
+  "失业魔王同人征文": {
+   "event": "失业魔王同人",
+   "series": "other",
+   "lane": "ip"
+  },
+  "奇幻世界主题": {
+   "event": "奇幻世界主题",
+   "series": "other",
+   "lane": ""
+  },
+  "奇幻世界主题征文": {
+   "event": "奇幻世界主题",
+   "series": "other",
+   "lane": ""
+  },
+  "对话小说开学季征文": {
+   "event": "点鸭开学季",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "对话小说恋爱主题征文": {
+   "event": "点鸭恋爱主题",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "对话小说情人节征文": {
+   "event": "点鸭情人节",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "对话小说春节征文": {
+   "event": "点鸭春节",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "对话小说梦想季节征文活动": {
+   "event": "点鸭梦想季节",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "对话小说青春幻想征文": {
+   "event": "点鸭青春幻想",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "少女前线同人": {
+   "event": "少女前线同人",
+   "series": "other",
+   "lane": "ip"
+  },
+  "少女前线征文": {
+   "event": "少女前线同人",
+   "series": "other",
+   "lane": "ip"
+  },
+  "少年-二次元创想·短篇": {
+   "event": "2025少年二次元创想短篇",
+   "series": "autumn",
+   "lane": ""
+  },
+  "少年创想短篇": {
+   "event": "2025少年二次元创想短篇",
+   "series": "autumn",
+   "lane": ""
+  },
+  "少年创想长篇": {
+   "event": "2025少年二次元创想长篇",
+   "series": "autumn",
+   "lane": ""
+  },
+  "少年的奇幻冒险": {
+   "event": "2022少年奇幻冒险",
+   "series": "autumn",
+   "lane": ""
+  },
+  "少年的奇迹历险": {
+   "event": "2023少年奇迹历险",
+   "series": "autumn",
+   "lane": ""
+  },
+  "少年的幻想之旅": {
+   "event": "2023少年幻想之旅",
+   "series": "autumn",
+   "lane": ""
+  },
+  "少年的无限幻想": {
+   "event": "2022少年无限幻想",
+   "series": "autumn",
+   "lane": ""
+  },
+  "崩坏3同人": {
+   "event": "崩坏3同人",
+   "series": "other",
+   "lane": "ip"
+  },
+  "崩坏3征文": {
+   "event": "崩坏3同人",
+   "series": "other",
+   "lane": "ip"
+  },
+  "幻想小说主题": {
+   "event": "幻想小说主题",
+   "series": "other",
+   "lane": ""
+  },
+  "幻想小说征文": {
+   "event": "幻想小说主题",
+   "series": "other",
+   "lane": ""
+  },
+  "异世大陆秋季征文": {
+   "event": "2021秋征",
+   "series": "autumn",
+   "lane": ""
+  },
+  "征文大赛对话小说组": {
+   "event": "点鸭征文大赛",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "征文大赛短篇": {
+   "event": "十四征",
+   "series": "x",
+   "lane": ""
+  },
+  "征文大赛长篇": {
+   "event": "十四征",
+   "series": "x",
+   "lane": ""
+  },
+  "怪谈异闻主题征文短篇": {
+   "event": "点鸭怪谈异闻",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "怪谈异闻主题征文长篇": {
+   "event": "点鸭怪谈异闻",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "战斗主题征文": {
+   "event": "点鸭战斗",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "星穹小说家征文": {
+   "event": "点鸭星穹",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "春节征文分支对话": {
+   "event": "点鸭春节",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "春节征文短篇": {
+   "event": "点鸭春节",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "春节征文长篇": {
+   "event": "点鸭春节",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "校园恋爱主题": {
+   "event": "校园恋爱主题",
+   "series": "other",
+   "lane": ""
+  },
+  "校园恋爱征文": {
+   "event": "校园恋爱主题",
+   "series": "other",
+   "lane": ""
+  },
+  "校园都市主题": {
+   "event": "校园都市主题",
+   "series": "other",
+   "lane": ""
+  },
+  "校园都市征文": {
+   "event": "校园都市主题",
+   "series": "other",
+   "lane": ""
+  },
+  "楚楚动仁同人": {
+   "event": "楚楚动仁同人",
+   "series": "other",
+   "lane": "ip"
+  },
+  "楚楚动仁同人征文": {
+   "event": "楚楚动仁同人",
+   "series": "other",
+   "lane": "ip"
+  },
+  "点鸭2024春节": {
+   "event": "点鸭2024春节",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "点鸭2025新年": {
+   "event": "点鸭2025新年",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "点鸭冬季恋曲": {
+   "event": "点鸭冬季恋曲",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "点鸭分支对话": {
+   "event": "点鸭分支对话",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "点鸭开学季": {
+   "event": "点鸭开学季",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "点鸭征文大赛": {
+   "event": "点鸭征文大赛",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "点鸭怪谈异闻短篇": {
+   "event": "点鸭怪谈异闻",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "点鸭怪谈异闻长篇": {
+   "event": "点鸭怪谈异闻",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "点鸭恋爱主题": {
+   "event": "点鸭恋爱主题",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "点鸭情人节": {
+   "event": "点鸭情人节",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "点鸭战斗": {
+   "event": "点鸭战斗",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "点鸭星穹": {
+   "event": "点鸭星穹",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "点鸭春节": {
+   "event": "点鸭春节",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "点鸭春节分支对话": {
+   "event": "点鸭春节",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "点鸭春节短篇": {
+   "event": "点鸭春节",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "点鸭春节长篇": {
+   "event": "点鸭春节",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "点鸭梦想季节": {
+   "event": "点鸭梦想季节",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "点鸭秋之偶像季": {
+   "event": "点鸭秋之偶像季",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "点鸭秋之偶像季征文活动": {
+   "event": "点鸭秋之偶像季",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "点鸭秋色回忆": {
+   "event": "点鸭秋色回忆",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "点鸭秋色回忆征文活动": {
+   "event": "点鸭秋色回忆",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "点鸭穿越": {
+   "event": "点鸭穿越",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "点鸭青春幻想": {
+   "event": "点鸭青春幻想",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "玄幻主题": {
+   "event": "玄幻主题",
+   "series": "other",
+   "lane": ""
+  },
+  "玄幻征文": {
+   "event": "玄幻主题",
+   "series": "other",
+   "lane": ""
+  },
+  "秋季恋爱主题": {
+   "event": "秋季恋爱主题",
+   "series": "other",
+   "lane": ""
+  },
+  "秋季恋爱征文": {
+   "event": "秋季恋爱主题",
+   "series": "other",
+   "lane": ""
+  },
+  "穿越主题征文": {
+   "event": "点鸭穿越",
+   "series": "other",
+   "lane": "dialogue"
+  },
+  "第一届冬征": {
+   "event": "第一届冬征",
+   "series": "winter",
+   "lane": ""
+  },
+  "第七届冬季征文": {
+   "event": "第七届冬征",
+   "series": "winter",
+   "lane": ""
+  },
+  "第七届冬征": {
+   "event": "第七届冬征",
+   "series": "winter",
+   "lane": ""
+  },
+  "第三届冬季征文": {
+   "event": "第三届冬征",
+   "series": "winter",
+   "lane": ""
+  },
+  "第三届冬征": {
+   "event": "第三届冬征",
+   "series": "winter",
+   "lane": ""
+  },
+  "第九届冬季征文": {
+   "event": "第九届冬征",
+   "series": "winter",
+   "lane": ""
+  },
+  "第九届冬征": {
+   "event": "第九届冬征",
+   "series": "winter",
+   "lane": ""
+  },
+  "第二届冬季征文": {
+   "event": "第二届冬征",
+   "series": "winter",
+   "lane": ""
+  },
+  "第二届冬征": {
+   "event": "第二届冬征",
+   "series": "winter",
+   "lane": ""
+  },
+  "第五届冬季征文": {
+   "event": "第五届冬征",
+   "series": "winter",
+   "lane": ""
+  },
+  "第五届冬征": {
+   "event": "第五届冬征",
+   "series": "winter",
+   "lane": ""
+  },
+  "第八届冬季征文": {
+   "event": "第八届冬征",
+   "series": "winter",
+   "lane": ""
+  },
+  "第八届冬征": {
+   "event": "第八届冬征",
+   "series": "winter",
+   "lane": ""
+  },
+  "第六届冬季征文": {
+   "event": "第六届冬征",
+   "series": "winter",
+   "lane": ""
+  },
+  "第六届冬征": {
+   "event": "第六届冬征",
+   "series": "winter",
+   "lane": ""
+  },
+  "第四届冬季征文": {
+   "event": "第四届冬征",
+   "series": "winter",
+   "lane": ""
+  },
+  "第四届冬征": {
+   "event": "第四届冬征",
+   "series": "winter",
+   "lane": ""
+  },
+  "英雄再临同人": {
+   "event": "英雄再临同人",
+   "series": "other",
+   "lane": "ip"
+  },
+  "英雄再临同人征文": {
+   "event": "英雄再临同人",
+   "series": "other",
+   "lane": "ip"
+  },
+  "超新星杯短篇": {
+   "event": "超新星杯短篇",
+   "series": "other",
+   "lane": "short"
+  },
+  "龙之谷同人": {
+   "event": "龙之谷同人",
+   "series": "other",
+   "lane": "ip"
+  },
+  "龙之谷征文": {
+   "event": "龙之谷同人",
+   "series": "other",
+   "lane": "ip"
+  }
+ },
+ "events": {
+  "2021秋征": {
+   "series": "autumn",
+   "lane": "",
+   "legacy": [
+    "东方世界秋季征文",
+    "异世大陆秋季征文"
+   ]
+  },
+  "2022少年奇幻冒险": {
+   "series": "autumn",
+   "lane": "",
+   "legacy": [
+    "少年的奇幻冒险"
+   ]
+  },
+  "2022少年无限幻想": {
+   "series": "autumn",
+   "lane": "",
+   "legacy": [
+    "少年的无限幻想"
+   ]
+  },
+  "2022春征": {
+   "series": "spring",
+   "lane": "",
+   "legacy": [
+    "2022春季征文"
+   ]
+  },
+  "2023少年奇迹历险": {
+   "series": "autumn",
+   "lane": "",
+   "legacy": [
+    "少年的奇迹历险"
+   ]
+  },
+  "2023少年幻想之旅": {
+   "series": "autumn",
+   "lane": "",
+   "legacy": [
+    "少年的幻想之旅"
+   ]
+  },
+  "2023春征": {
+   "series": "spring",
+   "lane": "",
+   "legacy": [
+    "2023春季征文"
+   ]
+  },
+  "2024主题短篇": {
+   "series": "other",
+   "lane": "short",
+   "legacy": [
+    "2024主题短篇征文"
+   ]
+  },
+  "2024少年幻想校园": {
+   "series": "autumn",
+   "lane": "",
+   "legacy": [
+    "“少年的幻想校园”主题征文"
+   ]
+  },
+  "2024春征": {
+   "series": "spring",
+   "lane": "",
+   "legacy": [
+    "2024春季征文"
+   ]
+  },
+  "2024秋征": {
+   "series": "autumn",
+   "lane": "",
+   "legacy": [
+    "2024秋季征文"
+   ]
+  },
+  "2025少年二次元创想短篇": {
+   "series": "autumn",
+   "lane": "",
+   "legacy": [
+    "少年创想短篇"
+   ]
+  },
+  "2025少年二次元创想长篇": {
+   "series": "autumn",
+   "lane": "",
+   "legacy": [
+    "少年创想长篇"
+   ]
+  },
+  "2025春征": {
+   "series": "spring",
+   "lane": "",
+   "legacy": [
+    "2025春季征文"
+   ]
+  },
+  "2025秋征": {
+   "series": "autumn",
+   "lane": "",
+   "legacy": [
+    "2025秋季征文"
+   ]
+  },
+  "2026春征": {
+   "series": "spring",
+   "lane": "",
+   "legacy": [
+    "2026春季征文"
+   ]
+  },
+  "2026秋征": {
+   "series": "autumn",
+   "lane": "",
+   "legacy": [
+    "2026秋季征文"
+   ]
+  },
+  "一征": {
+   "series": "x",
+   "lane": "",
+   "legacy": [
+    "一征"
+   ]
+  },
+  "七征": {
+   "series": "x",
+   "lane": "",
+   "legacy": [
+    "七征"
+   ]
+  },
+  "三征": {
+   "series": "x",
+   "lane": "",
+   "legacy": [
+    "三征"
+   ]
+  },
+  "九征": {
+   "series": "x",
+   "lane": "",
+   "legacy": [
+    "九征"
+   ]
+  },
+  "二征": {
+   "series": "x",
+   "lane": "",
+   "legacy": [
+    "二征"
+   ]
+  },
+  "五征": {
+   "series": "x",
+   "lane": "",
+   "legacy": [
+    "五征"
+   ]
+  },
+  "八征": {
+   "series": "x",
+   "lane": "",
+   "legacy": [
+    "八征"
+   ]
+  },
+  "六征": {
+   "series": "x",
+   "lane": "",
+   "legacy": [
+    "六征"
+   ]
+  },
+  "十一征": {
+   "series": "x",
+   "lane": "",
+   "legacy": [
+    "十一征"
+   ]
+  },
+  "十三征": {
+   "series": "x",
+   "lane": "",
+   "legacy": [
+    "十三征"
+   ]
+  },
+  "十二征": {
+   "series": "x",
+   "lane": "",
+   "legacy": [
+    "十二征"
+   ]
+  },
+  "十四征": {
+   "series": "x",
+   "lane": "",
+   "legacy": [
+    "十四征",
+    "征文大赛短篇",
+    "征文大赛长篇"
+   ]
+  },
+  "十征": {
+   "series": "x",
+   "lane": "",
+   "legacy": [
+    "十征"
+   ]
+  },
+  "四征": {
+   "series": "x",
+   "lane": "",
+   "legacy": [
+    "四征"
+   ]
+  },
+  "失业魔王同人": {
+   "series": "other",
+   "lane": "ip",
+   "legacy": [
+    "失业魔王同人征文"
+   ]
+  },
+  "奇幻世界主题": {
+   "series": "other",
+   "lane": "",
+   "legacy": [
+    "奇幻世界主题征文"
+   ]
+  },
+  "少女前线同人": {
+   "series": "other",
+   "lane": "ip",
+   "legacy": [
+    "少女前线征文"
+   ]
+  },
+  "崩坏3同人": {
+   "series": "other",
+   "lane": "ip",
+   "legacy": [
+    "崩坏3征文"
+   ]
+  },
+  "幻想小说主题": {
+   "series": "other",
+   "lane": "",
+   "legacy": [
+    "幻想小说征文"
+   ]
+  },
+  "校园恋爱主题": {
+   "series": "other",
+   "lane": "",
+   "legacy": [
+    "校园恋爱征文"
+   ]
+  },
+  "校园都市主题": {
+   "series": "other",
+   "lane": "",
+   "legacy": [
+    "校园都市征文"
+   ]
+  },
+  "楚楚动仁同人": {
+   "series": "other",
+   "lane": "ip",
+   "legacy": [
+    "楚楚动仁同人征文"
+   ]
+  },
+  "点鸭2024春节": {
+   "series": "other",
+   "lane": "dialogue",
+   "legacy": [
+    "2024年对话小说春节征文"
+   ]
+  },
+  "点鸭2025新年": {
+   "series": "other",
+   "lane": "dialogue",
+   "legacy": [
+    "2025年对话小说新年征文活动"
+   ]
+  },
+  "点鸭冬季恋曲": {
+   "series": "other",
+   "lane": "dialogue",
+   "legacy": [
+    "冬季恋曲征文活动"
+   ]
+  },
+  "点鸭分支对话": {
+   "series": "other",
+   "lane": "dialogue",
+   "legacy": [
+    "分支对话小说征文"
+   ]
+  },
+  "点鸭开学季": {
+   "series": "other",
+   "lane": "dialogue",
+   "legacy": [
+    "对话小说开学季征文"
+   ]
+  },
+  "点鸭征文大赛": {
+   "series": "other",
+   "lane": "dialogue",
+   "legacy": [
+    "征文大赛对话小说组"
+   ]
+  },
+  "点鸭怪谈异闻": {
+   "series": "other",
+   "lane": "dialogue",
+   "legacy": [
+    "怪谈异闻主题征文短篇",
+    "怪谈异闻主题征文长篇"
+   ]
+  },
+  "点鸭恋爱主题": {
+   "series": "other",
+   "lane": "dialogue",
+   "legacy": [
+    "对话小说恋爱主题征文"
+   ]
+  },
+  "点鸭情人节": {
+   "series": "other",
+   "lane": "dialogue",
+   "legacy": [
+    "对话小说情人节征文"
+   ]
+  },
+  "点鸭战斗": {
+   "series": "other",
+   "lane": "dialogue",
+   "legacy": [
+    "战斗主题征文"
+   ]
+  },
+  "点鸭星穹": {
+   "series": "other",
+   "lane": "dialogue",
+   "legacy": [
+    "星穹小说家征文"
+   ]
+  },
+  "点鸭春节": {
+   "series": "other",
+   "lane": "dialogue",
+   "legacy": [
+    "对话小说春节征文",
+    "春节征文分支对话",
+    "春节征文短篇",
+    "春节征文长篇"
+   ]
+  },
+  "点鸭梦想季节": {
+   "series": "other",
+   "lane": "dialogue",
+   "legacy": [
+    "对话小说梦想季节征文活动"
+   ]
+  },
+  "点鸭秋之偶像季": {
+   "series": "other",
+   "lane": "dialogue",
+   "legacy": [
+    "点鸭秋之偶像季征文活动"
+   ]
+  },
+  "点鸭秋色回忆": {
+   "series": "other",
+   "lane": "dialogue",
+   "legacy": [
+    "点鸭秋色回忆征文活动"
+   ]
+  },
+  "点鸭穿越": {
+   "series": "other",
+   "lane": "dialogue",
+   "legacy": [
+    "穿越主题征文"
+   ]
+  },
+  "点鸭青春幻想": {
+   "series": "other",
+   "lane": "dialogue",
+   "legacy": [
+    "对话小说青春幻想征文"
+   ]
+  },
+  "玄幻主题": {
+   "series": "other",
+   "lane": "",
+   "legacy": [
+    "玄幻征文"
+   ]
+  },
+  "秋季恋爱主题": {
+   "series": "other",
+   "lane": "",
+   "legacy": [
+    "秋季恋爱征文"
+   ]
+  },
+  "第一届冬征": {
+   "series": "winter",
+   "lane": "",
+   "legacy": [
+    "冬季征文"
+   ]
+  },
+  "第七届冬征": {
+   "series": "winter",
+   "lane": "",
+   "legacy": [
+    "第七届冬季征文"
+   ]
+  },
+  "第三届冬征": {
+   "series": "winter",
+   "lane": "",
+   "legacy": [
+    "第三届冬季征文"
+   ]
+  },
+  "第九届冬征": {
+   "series": "winter",
+   "lane": "",
+   "legacy": [
+    "第九届冬季征文"
+   ]
+  },
+  "第二届冬征": {
+   "series": "winter",
+   "lane": "",
+   "legacy": [
+    "第二届冬季征文"
+   ]
+  },
+  "第五届冬征": {
+   "series": "winter",
+   "lane": "",
+   "legacy": [
+    "第五届冬季征文"
+   ]
+  },
+  "第八届冬征": {
+   "series": "winter",
+   "lane": "",
+   "legacy": [
+    "第八届冬季征文"
+   ]
+  },
+  "第六届冬征": {
+   "series": "winter",
+   "lane": "",
+   "legacy": [
+    "第六届冬季征文"
+   ]
+  },
+  "第四届冬征": {
+   "series": "winter",
+   "lane": "",
+   "legacy": [
+    "第四届冬季征文"
+   ]
+  },
+  "英雄再临同人": {
+   "series": "other",
+   "lane": "ip",
+   "legacy": [
+    "英雄再临同人征文"
+   ]
+  },
+  "超新星杯短篇": {
+   "series": "other",
+   "lane": "short",
+   "legacy": [
+    "“超新星杯”短篇大赛"
+   ]
+  },
+  "龙之谷同人": {
+   "series": "other",
+   "lane": "ip",
+   "legacy": [
+    "龙之谷征文"
+   ]
+  }
+ }
+}

@@ -36,7 +36,7 @@ func newPreorderTestServer(t *testing.T) (*httptest.Server, *Server) {
 		st.Close()
 	})
 	return ts, srv
- }
+}
 
 // TestPreorder covers Saturday normalization, the in_seed join against the
 // test seed, and the 24h per-issue cache (a failing seam after a successful

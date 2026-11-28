@@ -86,13 +86,16 @@ DIALOGUE_START_NID = 83_818
 # 不参与形态判定——越过者说明该书的 short 身份另有问题，须人工复核。
 SHORT_MAX_FAVS = 5_478
 SHORT_MAX_PRAISES = 2_389
-# 同人短字数上界（E.17）：>5 万字的同人是正常散文连载，不判对话。
-FAN_MAX_WORDS = 50_000
+# 同人短字数上界（E.17）：超过短篇分界（3 万口径，34,999 字）的同人是正常
+# 散文连载，不判对话。2026-11-27 随 SHORT_MAX_WORDS 从 5 万改回 3 万同步。
+FAN_MAX_WORDS = 34_999
 # 米哈游 IP 标题词的对话判定字数上界（E.18）：只吃短篇档，medium/long 另议。
-IP_MAX_WORDS = 50_000
+# 2026-11-27 随 SHORT_MAX_WORDS 从 5 万改回 3 万同步。
+IP_MAX_WORDS = 34_999
 # 正文征文保护的字数档（E.21）：与 forms.SHORT_MAX_WORDS / MEDIUM_MAX_WORDS 对齐
-# （forms 侧有断言）。只保护中篇档——短篇档的同人征文仍按 E.17 判对话。
-PROSE_CONTEST_MIN_WORDS = 50_001
+# （forms 侧有断言 PROSE_CONTEST_MIN_WORDS == SHORT_MAX_WORDS + 1）。
+# 只保护中篇档——短篇档的同人征文仍按 E.17 判对话。
+PROSE_CONTEST_MIN_WORDS = 35_000
 PROSE_CONTEST_MAX_WORDS = 150_000
 # 标题 IP 特征词（米哈游系为主，对话小说同人集中区）
 IP_PATTERN = re.compile(
@@ -154,14 +157,14 @@ def mark(df: pd.DataFrame) -> pd.DataFrame:
     d["morph"] = after_start & (
         (d["tong"] & d["unsigned"] & (words <= MORPH_MAX_WORDS))          # 原条款
         | (d["tong"] & d["ckw"].ge(DIAL_CKW_FAN))                          # v2-a
-        | (~d["tong"] & (words <= 50_000) & d["ckw"].ge(DIAL_CKW_SHORT))   # v2-b
-        | (~d["tong"] & words.between(50_001, 150_000)
+        | (~d["tong"] & (words <= FAN_MAX_WORDS) & d["ckw"].ge(DIAL_CKW_SHORT))  # v2-b
+        | (~d["tong"] & words.between(PROSE_CONTEST_MIN_WORDS, 150_000)
            & d["ckw"].ge(DIAL_CKW_MEDIUM))                                 # v2-c
         | (d["tong"] & (words <= FAN_MAX_WORDS))                           # v2-e（E.17）
         | (d["ip_title"] & (words <= IP_MAX_WORDS))                        # v2-f（E.18）
     )
     if clicks_num is not None:                                             # v2-d 天花板
-        d["morph"] = d["morph"] | (after_start & (words <= 50_000)
+        d["morph"] = d["morph"] | (after_start & (words <= FAN_MAX_WORDS)
                                    & clicks_num.gt(DIAL_CLICKS_CEIL))
     # E.21：中篇档的正文征文不受形态估计影响（征文组别是确定性证据，见上）。
     prose_medium = d["prose_contest"] & words.between(PROSE_CONTEST_MIN_WORDS,

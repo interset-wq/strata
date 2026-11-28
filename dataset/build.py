@@ -229,6 +229,83 @@ def dedupe(records: list[dict]) -> list[dict]:
     return [best[nid][2] for nid in sorted(best)]
 
 
+# contest 列的唯一重写来源：我们自己的命名映射 + 参赛清单（2026-11-27 用户定）。
+# 规则：先清空全库 contest，再按 (参赛名单 ∪ 自建获奖清单) 的 nid→tag，
+# 用 analysis/anchors/contest_names.jsonl 的 tag→我们定义的名字赋值。
+# 不再依赖 contest-achieve 的任何命名字段——只继承它已拿到的 tagId 映射与
+# 一/二/三征获奖作品清单（已固化到项目内 anchor，构建零外部依赖）。
+# 官方不显示 tag 或写法不统一的书一律不猜；无参赛记录保持空、无别名、不补采。
+ANCHORS = Path(__file__).resolve().parent.parent / "analysis" / "anchors"
+ROSTER_DEFAULT = Path(__file__).resolve().parent.parent / "analysis" / "out" / "contest_roster.jsonl"
+SELF_ROSTER_DEFAULT = ANCHORS / "contest_self_roster.jsonl"
+NAMES_DEFAULT = ANCHORS / "contest_names.jsonl"
+
+
+def _load_names(names_path: Path) -> dict[int, str]:
+    """tag → 我们定义的 contest 名；重复 tag 直接报错（单一真源不容冲突）。"""
+    out: dict[int, str] = {}
+    for line in names_path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        r = json.loads(line)
+        tag = int(r["tag"])
+        if tag in out:
+            raise ValueError(f"contest_names.jsonl 重复 tag {tag}")
+        out[tag] = str(r["name"])
+    return out
+
+
+def unify_contest(records: list[dict], roster_path: Path | None,
+                  self_roster_path: Path | None,
+                  names_path: Path | None) -> dict[str, int]:
+    """清空全库 contest → 按参赛/自建清单 + 我们的命名映射赋值；返回统计。"""
+    stat = {"cleared": 0, "assigned": 0, "roster_nids": 0, "self_nids": 0,
+            "outside_roster": 0, "no_name_tag": 0, "not_in_dataset": 0}
+    for rec in records:
+        if rec.get("contest"):
+            stat["cleared"] += 1
+        rec["contest"] = ""
+    if (roster_path is None or names_path is None
+            or not roster_path.exists() or not names_path.exists()):
+        stat["outside_roster"] = len(records)
+        return stat
+    tag2name = _load_names(names_path)
+    # nid → tags（roster 多 tag 仅 9 本，全量读入内存无压力）
+    nid2tags: dict[int, list[int]] = {}
+    for line in roster_path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        r = json.loads(line)
+        nid2tags.setdefault(int(r["nid"]), []).append(int(r.get("tag") or 0))
+    stat["roster_nids"] = len(nid2tags)
+    # 自建获奖清单（一/二/三征）叠加：nid 冲突时以参赛名单优先。
+    if self_roster_path is not None and self_roster_path.exists():
+        for line in self_roster_path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            r = json.loads(line)
+            nid, tag = int(r["nid"]), int(r["tag"])
+            stat["self_nids"] += 1
+            if nid in nid2tags:
+                continue  # 已有正式参赛记录，自建清单不覆盖
+            nid2tags[nid] = [tag]
+    by_nid = {int(r["nid"]): r for r in records}
+    for nid, tags in nid2tags.items():
+        rec = by_nid.get(nid)
+        if rec is None:
+            stat["not_in_dataset"] += 1
+            continue
+        known = sorted(t for t in tags if t in tag2name)
+        if not known:
+            stat["no_name_tag"] += 1
+            continue
+        # 多 tag 取最小 tag，确定且与旧值无关（旧值已清空）。
+        rec["contest"] = tag2name[known[0]]
+        stat["assigned"] += 1
+    stat["outside_roster"] = len(records) - stat["assigned"]
+    return stat
+
+
 def apply_cover_rules(records: list[dict], covers_path: Path,
                       crawl: dict[int, str], author_ids: dict[int, int],
                       audit: list[dict]) -> tuple[dict[str, int], dict[int, str], dict[int, str], set[int]]:
@@ -437,6 +514,12 @@ def main() -> None:
                     help="月榜遗漏书补充 jsonl（传空串禁用）")
     ap.add_argument("--contest-new", default=str(CONTEST_NEW_DEFAULT),
                     help="征文清单新书补充 jsonl（传空串禁用）")
+    ap.add_argument("--roster", default=str(ROSTER_DEFAULT),
+                    help="参赛名单 jsonl（nid→tag，contest 重写源；传空串禁用）")
+    ap.add_argument("--self-roster", default=str(SELF_ROSTER_DEFAULT),
+                    help="自建获奖清单 jsonl（一二三征 nid→tag；传空串禁用）")
+    ap.add_argument("--names", default=str(NAMES_DEFAULT),
+                    help="我们的赛事命名映射 jsonl（tag→name；传空串禁用）")
     ap.add_argument("--out", default=str(OUT_DEFAULT), help="产物目录")
     ap.add_argument("--version", default="20261124.9", help="数据集版本号")
     args = ap.parse_args()
@@ -476,6 +559,7 @@ def main() -> None:
     # 征文清单新书：est_year=2026 出界，只进全量目录供 app 搜索/看详情，不进分析口径与推荐池。
     contest_path = Path(args.contest_new) if args.contest_new else None
     contest_nids: set[int] = set()
+    contest_observed: set[str] = set()
     if contest_path is not None and contest_path.exists():
         digest = hashlib.sha256(contest_path.read_bytes()).hexdigest()
         n = 0
@@ -492,6 +576,8 @@ def main() -> None:
                         f"contest_new nid {nid} 与主源冲突（roster 去重应已排除在库书）")
                 existing.add(nid)
                 contest_nids.add(nid)
+                if raw.get("observed_at"):
+                    contest_observed.add(str(raw["observed_at"]))
                 rec = {"nid": nid}
                 for f in TEXT_FIELDS:
                     rec[f] = clean_text(raw.get(f), f, audit, nid)
@@ -504,12 +590,27 @@ def main() -> None:
                 records.append(rec)
         inputs.append({"path": str(contest_path.resolve().relative_to(ROOT)).replace("\\", "/"),
                        "lines": n, "sha256": digest, "role": "contest_new",
-                       "observed_at": "2026-11-24",
-                       "note": "征文清单发现、App API + mobile web 详情补采：14 征（tag 793/794）"
-                               "3,998 本 11-23、2026 春征（tag 789）369 本 11-24；"
-                               "计数为 2026-11 当期值，est_year=2026 按正常世代筛选"})
+                       "observed_at": max(contest_observed) if contest_observed else "2026-11-24",
+                       "note": "征文清单/获奖名单发现、App API + mobile web 详情补采："
+                               "14 征、2026 春征、2026-11-26 补 contest-achieve "
+                               "awards.json 全量获奖书（3 本死链 API 404 无法补详情），"
+                               "同日补八征长篇(tag 418)/第三届冬季征文(tag 415)各 300 本缺口试采；"
+                               "计数为当期值，est_year 按正常世代筛选"})
     lines_read = sum(i["lines"] for i in inputs)
     books = dedupe(records)
+    # contest 先全清空，再按 (参赛名单 ∪ 自建获奖清单) + 我们的命名映射赋值
+    # （用户 2026-11-27 定：只继承 tagId，命名 ourselves；无名单保持空）。
+    roster_path = Path(args.roster) if args.roster else None
+    self_roster_path = Path(args.self_roster) if args.self_roster else None
+    names_path = Path(args.names) if args.names else None
+    contest_stat = unify_contest(books, roster_path, self_roster_path, names_path)
+    print(f"contest rewrite: cleared={contest_stat['cleared']} "
+          f"assigned={contest_stat['assigned']} "
+          f"roster_nids={contest_stat['roster_nids']} "
+          f"self_nids={contest_stat['self_nids']} "
+          f"outside_roster={contest_stat['outside_roster']} "
+          f"no_name_tag={contest_stat['no_name_tag']} "
+          f"not_in_dataset={contest_stat['not_in_dataset']}")
     crawl_path = Path(args.crawl) if args.crawl else None
     api_path = Path(args.api_novels) if args.api_novels else None
     cover_sources = [p for p in (api_path, crawl_path) if p is not None]
@@ -527,6 +628,13 @@ def main() -> None:
     for a in audit:
         kinds[a["kind"]] = kinds.get(a["kind"], 0) + 1
     for path, role in ((api_path, "app_api_covers"), (crawl_path, "crawl_covers")):
+        if path is not None and path.exists():
+            inputs.append({"path": str(path.resolve().relative_to(ROOT)).replace("\\", "/"),
+                           "lines": len(path.read_text(encoding="utf-8").splitlines()),
+                           "sha256": sha256(path), "role": role})
+    for path, role in ((roster_path, "contest_roster"),
+                       (self_roster_path, "contest_self_roster"),
+                       (names_path, "contest_names")):
         if path is not None and path.exists():
             inputs.append({"path": str(path.resolve().relative_to(ROOT)).replace("\\", "/"),
                            "lines": len(path.read_text(encoding="utf-8").splitlines()),
@@ -549,7 +657,11 @@ def main() -> None:
         # 补充书的 last_update 是 2026-11 观测值（晚于快照上界），不计入上界；
         # 数值仍保留在行内，属事实记录而非快照内容。
         "rank_missing_observed": ("2026-11-19" if rank_nids else None),
-        "contest_new_observed": ("2026-11-24" if contest_nids else None),
+        "contest_new_observed": (max(contest_observed) if contest_observed else None),
+        # contest 重写：全库先清空 → (参赛名单 ∪ 自建获奖清单)(nid→tag) +
+        # 我们自己的 contest_names.jsonl(tag→name) 赋值；无参赛记录保持空。
+        # 只继承 contest-achieve 的 tagId 与获奖清单，命名不依赖其字段。
+        "contest_unified": contest_stat,
         "scope": "全量书籍目录，不做授权剔除与存活判定；不用于分析口径",
         "fields": FIELDS,
         "inputs": inputs,

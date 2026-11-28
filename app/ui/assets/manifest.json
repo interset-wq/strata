@@ -1,12 +1,12 @@
 {
   "schema_version": 10,
-  "seed_version": "20261126.40",
+  "seed_version": "20261127.44",
   "content_end": "2026-11-24",
-  "built_at": "2026-11-26T12:28:26+00:00",
+  "built_at": "2026-11-27T12:13:05+00:00",
   "book_count": 18654,
   "licensed_count": 47,
   "tag_count": 103,
-  "tag_rows": 59521,
+  "tag_rows": 59571,
   "gen_min": 2007,
   "gen_max": 2026,
   "counts": {
@@ -19,17 +19,17 @@
     "award_rows": 911,
     "forced_whitelist_in_universe": 607,
     "forced_whitelist_extra": 607,
-    "cqs_scored": 5718,
+    "cqs_scored": 5764,
     "cqs_stable": 4223,
-    "cps_scored": 108287,
-    "author_rank_rows": 319
+    "cps_scored": 107746,
+    "author_rank_rows": 323
   },
   "admission_detail": {
     "top_favs": 20000,
     "monthly": 1762,
     "featured": 622,
     "short": 2000,
-    "time_excluded": 8945,
+    "time_excluded": 8955,
     "time_gated_diagnostic": 3715,
     "time_cut_diagnostic": 5051,
     "deep": 8283,
@@ -40,21 +40,21 @@
       "shortfalls": {}
     },
     "abandoned": {
-      "total": 141893,
-      "in_seed": 4,
+      "total": 143087,
+      "in_seed": 0,
       "manual_exempt": 0,
       "manual_blacklist": 0
     },
     "invalid": {
-      "total": 22696,
-      "in_seed": 1
+      "total": 22790,
+      "in_seed": 0
     },
     "fake_complete_p10": {
-      "total": 25065,
+      "total": 25120,
       "in_seed": 0
     }
   },
-  "favs_coverage": 0.962929,
+  "favs_coverage": 0.964158,
   "postconditions": [
     {
       "name": "P1 各 form 配额全部填满（E.35）",
@@ -69,7 +69,7 @@
     {
       "name": "P3 收藏覆盖 ≥ 绝对下限（E.35 配额制）",
       "pass": true,
-      "detail": "新 96.29% vs 下限 93.00% （旧基线 96.58%，配额制主动压缩不再用回退口径）"
+      "detail": "新 96.42% vs 下限 93.00% （旧基线 96.73%，配额制主动压缩不再用回退口径）"
     },
     {
       "name": "P4 人工保底清单内征文达到设定本数",
@@ -79,12 +79,12 @@
     {
       "name": "P5 连载 short/medium 零入种（人工豁免/强制白名单例外）",
       "pass": true,
-      "detail": "全世代连载短/中篇 141,889 本（已剔除 0 本人工豁免、607 本强制白名单），入种 0 本"
+      "detail": "全世代连载短/中篇 143,087 本（已剔除 0 本人工豁免、607 本强制白名单），入种 0 本"
     },
     {
-      "name": "P6 invalid（僵尸/假短篇）零入种（强制白名单例外）",
+      "name": "P6 invalid（僵尸/假短篇）零入种",
       "pass": true,
-      "detail": "invalid 22,696 本，入种 0 本（白名单豁免 1 本）"
+      "detail": "常规池 invalid 22,790 本，入种 0 本"
     },
     {
       "name": "P7 short 层不越短篇三条天花板",
@@ -94,7 +94,7 @@
     {
       "name": "P8 全世代 short/medium 必须已完结（人工豁免/强制白名单例外）",
       "pass": true,
-      "detail": "全世代连载短/中篇 141,889 本，人工豁免 0 本、强制白名单 607 本，入种 0 本"
+      "detail": "全世代连载短/中篇 143,087 本，人工豁免 0 本、强制白名单 607 本，入种 0 本"
     },
     {
       "name": "P9 Web 死链零入种（详情页「小说不存在」）",
@@ -104,17 +104,17 @@
     {
       "name": "P10 征文含「长篇」的 short/medium 零入种（假完结）",
       "pass": true,
-      "detail": "命中 25,065 本，入种 0 本"
+      "detail": "常规池命中 25,120 本，入种 0 本"
     },
     {
-      "name": "P11 人工黑名单零入种（强制白名单例外，E.39/E.40）",
+      "name": "P11 人工黑名单零入种",
       "pass": true,
       "detail": "黑名单 0 本，入种 0 本"
     },
     {
-      "name": "P13 非中短篇赛事的 short/medium 零入种（人工 waive=contest/白名单例外）",
+      "name": "P13 非中短篇赛事的 short/medium 零入种（人工 waive=contest 例外）",
       "pass": true,
-      "detail": "union 外 149,882 本，人工豁免 0 本，非白名单入种 0 本（白名单豁免 18 本）"
+      "detail": "常规池 union 外 151,306 本，人工豁免 0 本，入种 0 本"
     },
     {
       "name": "P14 各 form 配额、总量 18,000 与对话占比 ≤40%（E.35/E.37/E.40）",
@@ -129,7 +129,7 @@
   ],
   "source": {
     "dataset": "local:dataset/out/books.jsonl",
-    "dataset_sha256": "139795746ebe06c22b0cd2e1b99eb01951493e926026cc35056d238e4a532667",
+    "dataset_sha256": "f57af9a4ec16e5df849d259628f2e3a3f67f0d92b3d2afa30ee65748bab9052a",
     "analysis_rows": 258796,
     "dropped_rows": 2466,
     "upstream": "light-nook-labs/novel_hub",
@@ -138,13 +138,13 @@
   "files": {
     "db": {
       "name": "seed.db",
-      "bytes": 15015936,
-      "sha256": "14edcc3041b6a7d272cb392eadc6eb4e6f34882507963ef50cf6d8866ee19e10"
+      "bytes": 14983168,
+      "sha256": "36befe6e7b05b022465ecfad6d5921ebfd2c4c7aad069d2a25aa669cf46104f1"
     },
     "gz": {
       "name": "seed.db.gz",
-      "bytes": 6244171,
-      "sha256": "3aa038698d76822568dc717b5e2488118acbe9b0b26fbedb52cdbd888c86c6cf"
+      "bytes": 6240599,
+      "sha256": "78bfd9b838e38851700aac9ab05e65c21cd7d63ab1a21dfea2a87e5ffdf7315f"
     }
   }
 }

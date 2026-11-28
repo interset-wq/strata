@@ -81,6 +81,10 @@ LICENSED = 47           # appended by build_seed.py, outside the universe
 SEED_EXEMPT_ANCHOR = ANALYSIS / "anchors" / "seed_manual_exempt.jsonl"
 SEED_FLOOR_ANCHOR = ANALYSIS / "anchors" / "seed_contest_floor.jsonl"
 SEED_BLACKLIST_ANCHOR = ANALYSIS / "anchors" / "seed_manual_blacklist.jsonl"
+# E.39（2026-11-26 用户裁定）：获奖作品强制入种，豁免所有筛选规则。
+SEED_AWARD_WHITELIST = ANALYSIS / "anchors" / "seed_award_whitelist.jsonl"
+# E.40（2026-11-26 用户裁定）：人工强制入种白名单，与获奖白名单同级、同样不占配额。
+SEED_FORCED_WHITELIST = ANALYSIS / "anchors" / "seed_forced_whitelist.jsonl"
 BLACKLIST_KINDS = ("fake_short", "fake_medium", "fake_complete")
 EXEMPT_WAIVES = ("complete", "contest")  # E.31 completion / E.34 contest-pool
 
@@ -151,6 +155,53 @@ def manual_blacklist_ids(df: pd.DataFrame) -> set[int]:
         nid = int(row["nid"])
         if nid not in present:
             raise ValueError(f"{SEED_BLACKLIST_ANCHOR.name}: nid {nid} outside the universe")
+        out.add(nid)
+    return out
+
+
+def award_whitelist_ids(df: pd.DataFrame) -> set[int]:
+    """E.39: 获奖作品强制入种白名单（contest-achieve awards.json，verified）。
+
+    用户裁定（2026-11-26）：所有获奖作品无条件进种子，「无论如何筛选」——
+    即豁免 E.31 完结、E.32 黑名单、E.34 中短篇赛事 union、P10 假完结、
+    E.19 invalid、E.25 死链、form 配额等全部准入规则。这是比人工豁免
+    更高一级的通道：作品在比赛中脱颖而出即证明为当年优质，不因后世形态
+    规则倒推否定。名单由 `build_award_whitelist.py` 从 contest-achieve 的
+    awards.json 生成，每行必须有 verified=true 且 nid 为正整数；锚点不能手改。
+    """
+    present = set(df["id"])
+    out: set[int] = set()
+    for row in _read_seed_anchor(SEED_AWARD_WHITELIST):
+        if row.get("verified") is not True:
+            raise ValueError(f"{SEED_AWARD_WHITELIST.name}: verified must be true")
+        nid = int(row["nid"])
+        if nid <= 0:
+            raise ValueError(f"{SEED_AWARD_WHITELIST.name}: non-positive nid {nid}")
+        if nid not in present:
+            # 库外/死链/越界的获奖书留在锚点留档，但不硬塞进 universe。
+            continue
+        out.add(nid)
+    return out
+
+
+def forced_whitelist_ids(df: pd.DataFrame) -> set[int]:
+    """E.40: 人工强制入种白名单（逐本裁定，verified）。
+
+    与获奖白名单同级，豁免全部准入规则且**不占 form 配额席位**：配额池先
+    排除全部强制白名单，选满 18,000 后再 union 白名单。当前唯一条目是
+    《回到旧时光》(nid 24132)——E.19 短篇点击天花板锚点作品，连载中短篇
+    按 E.31 会被剔除，用户裁定强制入种。锚点手工维护，须写明 reason。
+    """
+    present = set(df["id"])
+    out: set[int] = set()
+    for row in _read_seed_anchor(SEED_FORCED_WHITELIST):
+        if row.get("verified") is not True:
+            raise ValueError(f"{SEED_FORCED_WHITELIST.name}: verified must be true")
+        nid = int(row["nid"])
+        if nid <= 0:
+            raise ValueError(f"{SEED_FORCED_WHITELIST.name}: non-positive nid {nid}")
+        if nid not in present:
+            continue
         out.add(nid)
     return out
 
@@ -380,13 +431,15 @@ def contest_guarantee(df: pd.DataFrame, existing: set[int],
 # E.35（2026-11-26）：form 配额 + 同代分位准入。总量 16,000，按用户裁定
 # long/dialogue/short/medium/ip_collab 递减；IP 固定 50。旧锚点驱动
 # （top-favs / 月榜 / featured / deep）降级为诊断字段，不再决定入种。
-# E.37（2026-11-26，用户裁定）：dialogue 占比不得超过 40%，由 6,750（42.2%）
-# 压到 6,400（40.0%）；释放的 350 名额按优先级补给 long（8,000 → 8,350）。
+# E.37（2026-11-26，用户裁定）：dialogue 占比不得超过 40%。
+# E.40（同日）：配额从 16,000 提到 18,000；白名单不占配额。
+# short/medium/ip_collab 保持绝对值，dialogue 顶到 40% 上限（7,200），
+# 其余名额全给 long（8,350 → 9,550）。
 FORM_QUOTAS: dict[str, int] = {
-    "long": 8_350, "dialogue": 6_400, "short": 1_100,
+    "long": 9_550, "dialogue": 7_200, "short": 1_100,
     "medium": 100, "ip_collab": 50,
 }
-QUOTA_TOTAL = sum(FORM_QUOTAS.values())  # 16,000
+QUOTA_TOTAL = sum(FORM_QUOTAS.values())  # 18,000
 DIALOGUE_MAX_SHARE = 0.40  # E.37 硬上限：会话体不得占配额超过 40%（用户裁定）
 # 配额制下的绝对覆盖率下限：总量从 17,959 压到 16,000 后现算约 94.3%，
 # 该下限只守「没有把覆盖率搞崩」，不硬编码现算值（口径为快照现算、随版本变化）。
@@ -421,54 +474,68 @@ def quota_ids(df: pd.DataFrame, ineligible: set[int],
 
 def admit(df: pd.DataFrame, content_end: pd.Timestamp,
           deep: set[int] | None = None) -> dict:
-    """Quality-anchored seed ids plus the audit trail.
+    """两阶段种子准入：白名单无条件放行 → 常规池按 form 筛选 + 配额。
 
-    Since 2026-11-19 there is **no new-book discovery channel**: ``recent`` /
-    ``active`` / ``gated`` / ``cut`` are computed for diagnostics only and are
-    never unioned into ``ids``. See the module docstring for the decision.
+    这是 2026-11-27 重写后的单一入口，取代此前「每条规则算完再减白名单」
+    的打补丁结构。补丁结构分支爆炸：E.31/E.32/E.34/P10/E.19/E.25 六条规则
+    各自都要写 ``- forced_ids``，postconditions 也要逐条列白名单为例外，
+    漏掉任何一处就会出现「白名单进了种子却没排名」这类事故（43380）。
 
-    E.31: 连载中的 short/medium 在所有世代均无收录资格（2026 中短合并后同样
-    如此），唯一例外是人工清单逐本批准；征文保底仅对人工列名赛事生效，
-    且不得绕过这条完结规则。`form=invalid`（words<2000 的僵尸书）同样无资格。
-    E.32: 人工黑名单逐本排除假短/假中篇，优先级高于人工豁免，保底同样不得带入。
-    E.34: short/medium 必须落在中短篇赛事 roster union 内，唯一豁免是人工
-    ``waive="contest"``；无征文的高收藏 medium 是用户裁定的假中篇。
-    E.35: 入种改为 form 配额 + 同代分位取前 N（总量 16,000）。旧锚点
-    （base/monthly/featured/short/deep）与征文保底降级为诊断，不再 override
-    配额名额；P1/P3 语义随之改写，新增 P14 配额守门。
-    E.37: dialogue 配额压到 40%（6,400），释放名额补给 long（8,350）；
-    P14 同时守门对话占比硬上限，防止配比再次越过 40%。
+    新结构只有一个分流点，之后规则与白名单完全解耦：
+
+    **阶段 1**：从完整 universe 里算出强制白名单（获奖 + 人工），一次摘出。
+    它们不参与任何筛选、不占配额席位，直接 union 进最终种子。form 层
+    ``forms.classify`` 也对它们豁免 E.19（获奖是更强的形态证据）。
+
+    **阶段 2**：剩下的「常规池」先按单一真源 ``_form`` 分 form，再对常规池
+    应用六条硬规则（E.31 连载短中篇 / E.32 人工黑名单 / E.34 非中短篇赛事 /
+    P10 假完结 / E.19 invalid / E.25 死链），每个 form 内按同代分位取前 N。
+    因为常规池里根本没有白名单书，规则函数与配额函数里不再出现任何
+    ``forced_ids`` 例外判断——白名单的优先级由「数据分流」保证，而非散布的
+    ``if`` 分支。
+
+    诊断字段（base/monthly/featured/short/deep/time/gated/cut）仍基于完整
+    df 计算，只进审计 trail、永不决定入种。征文保底自 E.35 起已不 override
+    名额，保留空 trail 字段供 manifest 与 P4 消费。
     """
+    # ===== 阶段 1：强制白名单一次摘出（无条件、不占配额）=====
+    award_ids = award_whitelist_ids(df)
+    manual_forced = forced_whitelist_ids(df)
+    forced_ids = award_ids | manual_forced
+    regular = df[~df["id"].isin(forced_ids)].copy()
+
+    # ===== 阶段 2：常规池先分 form，再按 form 筛选 + 配额 =====
+    form = _form(regular)
+    blacklist = manual_blacklist_ids(regular)
+    exempt = manual_exempt_ids(regular, "complete") - blacklist  # 黑名单优先
+    contest_exempt = manual_exempt_ids(regular, "contest") - blacklist
+    floor = contest_floor_specs()
+
+    abandoned = abandoned_ids(regular, exempt=exempt)
+    invalid = invalid_ids(regular)
+    fake_complete = fake_complete_ids(regular)
+    outside_contest = short_medium_outside_contest_ids(regular, exempt=contest_exempt)
+    dead = dead_ids(regular)
+    ineligible = (abandoned | invalid | fake_complete | dead | blacklist
+                  | outside_contest)
+
+    if deep is None:
+        deep = set(build_deep_ranks(regular, 200)["nid"])
+
+    # 每个 form 独立取同代分位前 N；常规池已不含白名单，无需额外排除。
+    quota_ids_set, quota_detail = quota_ids(regular, ineligible, form=form)
+    forced_added = forced_ids - quota_ids_set  # 恒为全部白名单（池外）
+    ids = quota_ids_set | forced_ids
+    contest_added: set[int] = set()
+    contest_detail: dict = {}
+
+    # ===== 诊断 trail（完整 df；永不决定入种）=====
     base = set(df.nlargest(REC_N, "favs")["id"])
     monthly = monthly_ids(df)
     featured = set(df.loc[df["featured"] == 1, "id"])
     short = short_supplement(df)
     core = base | monthly | featured
-
-    if deep is None:
-        deep = set(build_deep_ranks(df, 200)["nid"])
-
-    blacklist = manual_blacklist_ids(df)
-    exempt = manual_exempt_ids(df, "complete") - blacklist  # 黑名单优先于豁免
-    contest_exempt = manual_exempt_ids(df, "contest") - blacklist
-    floor = contest_floor_specs()
-    abandoned = abandoned_ids(df, exempt=exempt)
-    invalid = invalid_ids(df)
-    fake_complete = fake_complete_ids(df)
-    outside_contest = short_medium_outside_contest_ids(df, exempt=contest_exempt)
-    dead = dead_ids(df)
-    ineligible = (abandoned | invalid | fake_complete | dead | blacklist
-                  | outside_contest)
     anchors = (core | short | deep) - ineligible
-
-    # E.35: 配额制替换锚点驱动。anchors/core/short/deep 仅作诊断字段保留，
-    # 不再决定入种；征文保底（contest_floor）也不再 override 配额名额。
-    ids, quota_detail = quota_ids(df, ineligible, form=_form(df))
-    ids -= ineligible  # 二次过滤防御
-    contest_added: set[int] = set()
-    contest_detail: dict = {}
-
-    # Diagnostic only: what the retired V2 time gate would have admitted.
     recent = set(df[df["est_date"] >= content_end - pd.Timedelta(days=RECENT_DAYS)]["id"])
     active = set(df[df["upd"] >= content_end - pd.Timedelta(days=ACTIVE_DAYS)]["id"])
     loose = (recent | active) - core - short - deep
@@ -478,6 +545,11 @@ def admit(df: pd.DataFrame, content_end: pd.Timestamp,
 
     return {
         "ids": ids,
+        "award_whitelist": award_ids,
+        "forced_whitelist": forced_ids,
+        "manual_forced": manual_forced,
+        "forced_added": forced_added,
+        "quota_ids": quota_ids_set,
         "base": base,
         "monthly": monthly,
         "featured": featured,
@@ -506,21 +578,31 @@ def admit(df: pd.DataFrame, content_end: pd.Timestamp,
 
 
 def postconditions(df: pd.DataFrame, res: dict) -> list[tuple[str, bool, str]]:
-    """Checks the rebuild must assert before shipping (P1-P14).
+    """Checks the rebuild must assert before shipping (P1-P15).
 
     E.35 配额制下 P1/P3 语义改写：旧「深榜书全入种」不再成立（每 form 有
     名额上限，深榜书按同代分位被挤出属预期），P1 改为配额满额检查；P3 改为
     绝对覆盖率下限。P14 守各 form 名额与总量。其余硬规则断言不变。
+
+    2026-11-27 两阶段重写后，硬规则集合（invalid/fake/dead/blacklist/outside/
+    abandoned）都在「常规池」上计算，结构上不可能含强制白名单书，因此断言
+    不再需要逐条写 ``- forced_ids`` 例外。唯一仍需显式排除白名单的是
+    ``serial_short_medium``：它从完整 df 独立复算，用于交叉复核 E.31。
     """
     seed = df[df["id"].isin(res["ids"])]
+    award_ids = res["award_whitelist"]
+    forced_ids = res["forced_whitelist"]
     abandoned = res["abandoned"]
     invalid = res["invalid"]
     ineligible = res["ineligible"]
+    # 常规池种子 = 种子 - 白名单（白名单由数据分流保证，不参与任何筛选）。
+    regular = df[df["id"].isin(res["ids"]) & ~df["id"].isin(forced_ids)]
     eligible = df[~df["id"].isin(ineligible)]
     eligible_tot = eligible["favs"].sum()
     base_seed = df[df["id"].isin(res["baseline"]) & ~df["id"].isin(ineligible)]
-    anchored = res["monthly"] | res["featured"] | res["deep"]
-    noise = seed[(seed["favs"] < NOISE_FAVS) & (seed["words"] < NOISE_WORDS)]
+    # 白名单即外部质量锚，低收藏白名单书不算无锚噪声。
+    anchored = res["monthly"] | res["featured"] | res["deep"] | forced_ids
+    noise = regular[(regular["favs"] < NOISE_FAVS) & (regular["words"] < NOISE_WORDS)]
     unanchored = noise[~noise["id"].isin(anchored)]
     # E.35: P1 改为「配额全部填满」——每个 form 取到 NAME 名额 or 池子上限。
     quota_detail = res["quota_detail"]
@@ -528,6 +610,7 @@ def postconditions(df: pd.DataFrame, res: dict) -> list[tuple[str, bool, str]]:
     p2 = unanchored.empty
     cov_new = seed["favs"].sum() / eligible_tot
     cov_old = base_seed["favs"].sum() / eligible_tot
+    # E.39: favs 覆盖率口径不变（分母仍为 ineligible 外的全量），获奖书是新增分子。
     # E.35: 配额制总量从锚点时代的 17,959 压到 16,000，覆盖率现算约 94.3%；
     # 旧「回退 ≤0.2pp」不再适用（旧基线含 top20k 全收），改为绝对下限守门。
     p3 = cov_new >= COVERAGE_FLOOR
@@ -546,22 +629,24 @@ def postconditions(df: pd.DataFrame, res: dict) -> list[tuple[str, bool, str]]:
             shortfalls[name] = {"have": have, "target": target,
                                 "eligible": eligible_n}
     p4 = not shortfalls
-    # P5: 连载 short/medium 零入种；唯一的合法例外是人工豁免清单逐本放行。
+    # P5: 连载 short/medium 零入种；合法例外是人工豁免与强制白名单（白名单
+    #     由 admit 的数据分流放行，这里从完整 df 独立复算故须显式排除）。
     form_all = _form(df)
     serial = df["status"].ne("已完结").to_numpy()
     exempt = res["manual_exempt"]
     serial_short_medium = set(df.loc[
-        form_all.isin(ABANDON_FORMS).to_numpy() & serial, "id"]) - exempt
+        form_all.isin(ABANDON_FORMS).to_numpy() & serial, "id"]) - exempt - forced_ids
     stray = serial_short_medium & res["ids"]
     p5 = not stray
     # P6: invalid（<2000 字僵尸 / 越短篇点击天花板的假短篇）在任何渠道都不得入种。
+    #     invalid 集合在常规池计算，结构上不含白名单书，无需减 forced_ids。
     p6 = not (invalid & res["ids"])
-    # P7: 短篇三条天花板（E.17/E.19，用户 App 目验）。回到旧时光 clicks 215,723
-    #     是全时期真短篇点击上限（早期书的点击虽累积十数年，`When It Sucks`
-    #     162 万这类越线者已被 E.19 判为僵尸/假短篇、归 invalid，不再留在
-    #     short 层）。听雨 5,478 favs / 2,389 赞是收藏与点赞上限。short 层若有
-    #     书越过任一条，说明 classify 的天花板条款失效，断言失败。
-    form_in_seed = FM.classify(df).where(df["id"].isin(res["ids"]))
+    # P7: 短篇三条天花板（E.17/E.19，用户 App 目验），只约束常规池。回到旧时光
+    #     clicks 215,723 是常规真短篇点击上限（`When It Sucks` 162 万这类越线者
+    #     已被 E.19 判僵尸归 invalid）。听雨 5,478 favs / 2,389 赞是收藏点赞上限。
+    #     强制白名单（获奖）豁免 E.19 天花板——43380 三征短篇铜奖 clicks 292,057
+    #     是真短篇天花板，form=short，经数据分流入种，不计入本断言。
+    form_in_seed = FM.classify(df).where(df["id"].isin(regular["id"]))
     short_mask = form_in_seed.eq("short")
     over_c = df.loc[short_mask & (df["clicks"] > DF.DIAL_CLICKS_CEIL)]
     over_f = df.loc[short_mask & (df["favs"] > DF.SHORT_MAX_FAVS)]
@@ -579,23 +664,28 @@ def postconditions(df: pd.DataFrame, res: dict) -> list[tuple[str, bool, str]]:
     fake = res["fake_complete"]
     p10 = not (fake & res["ids"])
     # P11: 人工黑名单（假短/假中篇）在任何渠道零入种，且压过人工豁免。
+    #      以上集合均在常规池计算，结构上不含白名单书。
     blacklist = res["manual_blacklist"]
     p11 = not (blacklist & res["ids"])
     # P13: E.34 正向准入——union 外的 short/medium（无征文/非中短篇征文，
-    # 用户确认为假中/假短）在任何渠道都不得入种；唯一例外是人工
-    # waive="contest" 白名单，已在 outside_contest 计算时扣除。
+    # 用户确认为假中/假短）在任何渠道都不得入种；人工 waive="contest" 已在
+    # 常规池计算时豁免，白名单由数据分流放行。
     outside = res["outside_contest"]
     p13 = not (outside & res["ids"])
     # P14: E.35 配额守门——每个 form 入种数 == 配额，同代分位底单调
     # （long < dialogue < short 在配额席位上的相对水位由配额定义，不强制序）。
     quota_detail = res["quota_detail"]
     form_all = _form(df)
-    seed_form = form_all[df["id"].isin(res["ids"])]
-    dialogue_share = (seed_form.eq("dialogue").sum() / len(res["ids"])
-                      if res["ids"] else 1.0)
-    p14 = (len(res["ids"]) == QUOTA_TOTAL
+    # E.40: 配额守门只看 18,000 个配额席位（白名单不占席位、额外 union）。
+    # total = QUOTA_TOTAL + forced_added（全部白名单数）。
+    quota_set = res["quota_ids"]
+    seed_form = form_all[df["id"].isin(quota_set)]
+    dialogue_share = (seed_form.eq("dialogue").sum() / len(quota_set)
+                      if quota_set else 1.0)
+    p14 = (len(quota_set) == QUOTA_TOTAL
            and all(seed_form.eq(fm).sum() == n for fm, n in FORM_QUOTAS.items())
-           and dialogue_share <= DIALOGUE_MAX_SHARE)  # E.37: 对话 ≤40%
+           and dialogue_share <= DIALOGUE_MAX_SHARE  # E.37: 配额内对话 ≤40%
+           and len(res["ids"]) == QUOTA_TOTAL + len(res["forced_added"]))
     return [
         ("P1 各 form 配额全部填满（E.35）", p1,
          " · ".join(f"{fm} {v['n']}/{v['quota']}"
@@ -609,38 +699,44 @@ def postconditions(df: pd.DataFrame, res: dict) -> list[tuple[str, bool, str]]:
         ("P4 人工保底清单内征文达到设定本数", p4,
          f"清单内 {len(res['contest_detail'])} 个征文，缺口 "
          f"{len(shortfalls)}" + (f"：{shortfalls}" if shortfalls else "")),
-        ("P5 连载 short/medium 零入种（仅人工豁免例外）", p5,
+        ("P5 连载 short/medium 零入种（人工豁免/强制白名单例外）", p5,
          f"全世代连载短/中篇 {len(serial_short_medium):,} 本（已剔除 "
-         f"{len(exempt)} 本人工豁免），入种 {len(stray)} 本"
+         f"{len(exempt)} 本人工豁免、{len(forced_ids)} 本强制白名单），"
+         f"入种 {len(stray)} 本"
          + (f"：{sorted(stray)[:10]}" if stray else "")),
         ("P6 invalid（僵尸/假短篇）零入种", p6,
-         f"invalid {len(invalid):,} 本，入种 {len(invalid & res['ids'])} 本"),
+         f"常规池 invalid {len(invalid):,} 本，入种 {len(invalid & res['ids'])} 本"),
         ("P7 short 层不越短篇三条天花板", p7,
          f"short {int(short_mask.sum()):,} 本；越点击 "
          f"{len(over_c)}、越收藏 {len(over_f)}、越点赞 {len(over_p)}"
          + (f"：{(over_c['id'].tolist() + over_f['id'].tolist() + over_p['id'].tolist())[:5]}"
             if not p7 else "")),
-        ("P8 全世代 short/medium 必须已完结（仅人工豁免例外）", p8,
+        ("P8 全世代 short/medium 必须已完结（人工豁免/强制白名单例外）", p8,
          f"全世代连载短/中篇 {len(serial_short_medium):,} 本，人工豁免 "
-         f"{len(exempt)} 本，入种 {len(stray)} 本"),
+         f"{len(exempt)} 本、强制白名单 {len(forced_ids)} 本，入种 {len(stray)} 本"),
         ("P9 Web 死链零入种（详情页「小说不存在」）", p9,
          f"死链 {len(dead)} 本，入种 {len(dead & res['ids'])} 本"
          + (f"：{sorted(dead & res['ids'])}" if not p9 else "")),
         ("P10 征文含「长篇」的 short/medium 零入种（假完结）", p10,
-         f"命中 {len(fake):,} 本，入种 {len(fake & res['ids'])} 本"
+         f"常规池命中 {len(fake):,} 本，入种 {len(fake & res['ids'])} 本"
          + (f"：{sorted(fake & res['ids'])[:10]}" if not p10 else "")),
-        ("P11 人工黑名单零入种（优先于人工豁免）", p11,
+        ("P11 人工黑名单零入种", p11,
          f"黑名单 {len(blacklist)} 本，入种 {len(blacklist & res['ids'])} 本"
          + (f"：{sorted(blacklist & res['ids'])[:10]}" if not p11 else "")),
-        ("P13 非中短篇赛事的 short/medium 零入种（仅人工 waive=contest 例外）", p13,
-         f"union 外 {len(outside):,} 本，人工豁免 {len(res['contest_pool_exempt'])} 本，"
-         f"入种 {len(outside & res['ids'])} 本"
+        ("P13 非中短篇赛事的 short/medium 零入种（人工 waive=contest 例外）", p13,
+         f"常规池 union 外 {len(outside):,} 本，人工豁免 "
+         f"{len(res['contest_pool_exempt'])} 本，入种 {len(outside & res['ids'])} 本"
          + (f"：{sorted(outside & res['ids'])[:10]}" if not p13 else "")),
-        ("P14 各 form 配额、总量 16,000 与对话占比 ≤40%（E.35/E.37）", p14,
-         f"总量 {len(res['ids']):,}/{QUOTA_TOTAL:,} · "
+        ("P14 各 form 配额、总量 18,000 与对话占比 ≤40%（E.35/E.37/E.40）", p14,
+         f"配额 {len(quota_set):,}/{QUOTA_TOTAL:,} + 白名单额外 {len(res['forced_added'])} "
+         f"= 总量 {len(res['ids']):,} · "
          + " · ".join(f"{fm} {seed_form.eq(fm).sum()}/{n}"
                       for fm, n in FORM_QUOTAS.items())
          + f" · dialogue {dialogue_share:.2%} ≤ {DIALOGUE_MAX_SHARE:.0%}"),
+        ("P15 强制白名单全部入种（E.39 获奖 + E.40 人工，不占配额）",
+         not (forced_ids - res["ids"]),
+         f"白名单 {len(forced_ids)} 本（获奖 {len(award_ids)} / 人工 "
+         f"{len(res['manual_forced'])}），遗漏 {len(forced_ids - res['ids'])} 本"),
     ]
 
 

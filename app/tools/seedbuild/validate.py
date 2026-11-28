@@ -192,21 +192,23 @@ def check_db(db_path: Path, seed: pd.DataFrame, meta: dict) -> None:
         if bad_form:
             _fail(errors, f"{bad_form} rows have invalid form")
         # E.31: every non-licensed short/medium book must be 已完结 (the two
-        # official categories merged in 2026); only the human-curated exemption
-        # list may waive. Licensed LNs are a display-only carve-out (user ruling).
+        # official categories merged in 2026); human-curated exemptions and
+        # the E.39/E.40 forced whitelist may waive. Licensed LNs are a
+        # display-only carve-out (user ruling).
         exempt = set(meta.get("manual_exempt", ()))
+        forced_whitelist = set(meta.get("forced_whitelist", ()))
         serial_short = conn.execute(
             "SELECT nid FROM books WHERE is_licensed=0"
             " AND form IN ('short','medium')"
             " AND (status IS NULL OR status <> '已完结')").fetchall()
         serial_violations = [r["nid"] for r in serial_short
-                             if r["nid"] not in exempt]
+                             if r["nid"] not in exempt and r["nid"] not in forced_whitelist]
         if serial_violations:
             _fail(errors, f"serial short/medium in seed: {serial_violations[:10]}")
         # E.32: human blacklist is an unconditional seed veto (it outranks the
         # manual exemption list); the DB check spans the whole seed, while the
         # anchor loader validates nids against the non-licensed universe.
-        blacklist = set(meta.get("manual_blacklist", ()))
+        blacklist = set(meta.get("manual_blacklist", ())) - forced_whitelist  # E.39/E.40 白名单优先
         blacklist_hits = seed.loc[seed["nid"].isin(blacklist), "nid"].tolist()
         if blacklist_hits:
             _fail(errors, f"blacklisted nids in seed: {blacklist_hits[:10]}")

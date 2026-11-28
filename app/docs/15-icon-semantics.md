@@ -26,7 +26,7 @@
 | 阅读记录入口 | `Icons.history` | 首页搜索行右侧 |
 | 搜索 | `Icons.search` | 首页搜索框、榜单页 |
 | 形式推断说明 | `Icons.info` | 首页 form tab 行末按钮：弹出「关于小说形式」模态框（形式为推断，非官方分类；原右上角刷新按钮改造，刷新走下拉手势） |
-| 打开官方页面 | `Icons.open_in_new` | 详情页 AppBar：系统浏览器打开移动版详情页（App 自身不加载官方内容） |
+| 打开官方页面 | `Icons.open_in_new` | 详情页 AppBar：系统浏览器打开移动版详情页（App 自身不加载官方内容）；单届赛事档案页 AppBar 同语义复用，仅 icon + tooltip「官方活动页」（2026-11-27 从正文动作行移入，URL 来自引擎台账，未验证则不显示） |
 | 复制（标题/ID） | `Icons.copy_rounded` | 详情页：长按标题复制、元数据卡「书籍 ID」行复制（SnackBar 反馈「××已复制」） |
 | 逆序切换 | `Icons.compare_arrows` | 经典榜单页指标行尾部：升/降序切换（升序态图标着色，tooltip 提示当前可切方向） |
 | 筛选 | `Icons.filter_list` | 经典榜单页 AppBar：四维筛选面板（状态/价格/题材/标签 BottomSheet，有激活维度时带计数角标；年份走顶部独立年份条） |
@@ -49,9 +49,9 @@
 
 | 语义 | icon | 使用处 |
 | --- | --- | --- |
-| 萌神获奖 | `Icons.emoji_events` | 赛事归档页 AppBar 入口（2026-11-25 首页宽卡已删，随比赛 tab 归档改造）；与宫格"征文比赛"同"获奖"语义，复用 |
+| 获奖记录 | `Icons.emoji_events` | 单届赛事档案页 AppBar，仅 icon + tooltip「获奖记录」（2026-11-27 从正文获奖区块收口；无获奖数据时隐藏）；与首页宫格「征文比赛」同「获奖」语义，复用 |
 | 官方榜单 | `Icons.leaderboard_outlined` | 对话 tab 入口行第 4 格「月票榜」（直达对话月票榜 m4）；首页长篇原宽卡 2026-11-25 降级为宫格单元（见「首页宫格」分节）；文档不登记本数 |
-| 赛事归档 | `Icons.event_note` | 对话 tab 入口行第 5 格（/contest-archive 全屏归档页；2026-11-26 用户裁定：原对话区内联归档列表退役，入口收进导航行） |
+| 赛事归档 | `Icons.event_note` | 对话 tab 入口行第 5 格「对话线赛事」（`/contest-archive?lane=dialogue`；2026-11-26 用户裁定：原对话区内联归档列表退役，入口收进导航行）+ IP tab「IP 合集」标题行尾部「IP 线赛事 ›」（`?lane=ip`，同日补：lane 归档此前无入口）+ 短篇 tab 入口行「短篇征文」（`?lane=short`，2026-11-27 用户裁定：超新星杯短篇/2024主题短篇从「主题」tab 迁来）|
 
 ## 分类入口（原中篇/对话 tab 入口网格，2026-11-26 精简退役）
 
@@ -59,7 +59,7 @@
 | --- | --- | --- |
 | 短/中/长对话篇幅轴 | （无 icon） | 经典榜单页（对话 form）顶部篇幅 chip 行：全部/短 ≤5万/中 5–15万/长 >15万（2026-11-26 用户裁定：篇幅是筛选轴不是三个独立页面，首页短/中/长入口退役；`Icons.short_text`/`Icons.menu_book`/`Icons.auto_stories` 随入口退役） |
 | 年份榜 | `Icons.calendar_month` | 官方榜单页月份按钮（原首页年份榜入口退役：年份在经典榜单页顶部年份条切换） |
-| 比赛榜 | （无 icon） | 经典榜单页侧滑赛道面板（原首页比赛榜入口退役；`Icons.emoji_events` 保留给赛事归档页萌神 AppBar 入口） |
+| 比赛榜 | （无 icon） | 经典榜单页侧滑赛道面板（原首页比赛榜入口退役；`Icons.emoji_events` 现保留给单届赛事档案页 AppBar 获奖记录入口） |
 | 题材浏览 | （无 icon） | 经典榜单页筛选面板（原首页题材榜入口退役；`Icons.category` 随入口退役） |
 | 优质中篇/对话 | （无 icon） | 经典榜单页 order=pct 排序（原首页优质入口退役；`Icons.star` 随入口退役） |
 | 随机短篇/中篇/对话 | （无 icon） | 各 tab 随机预览列表「更多」进随机池页（`Icons.shuffle` 随首页入口退役） |
@@ -83,7 +83,7 @@
 | 语义 | icon | 使用处 |
 | --- | --- | --- |
 | 切换排序方向 | `Icons.swap_vert` | 大图精选 gallery AppBar：收藏降序/升序切换（tooltip 显示目标方向） |
-| 打开年月选择器 | `Icons.expand_more` | 日历标题行：标题尾小箭头，点标题打开二维年月选择器（BottomSheet） |
+| 打开年月选择器 | `Icons.expand_more` | 日历标题行：标题尾小箭头，点标题打开年月双列滚轮（BottomSheet CupertinoPicker，用户 2026-11-25 定） |
 | 站内全搜 | `Icons.travel_explore` | 搜索页「搜全站」按钮（官方搜索手动触发，L1 结果段尾部；docs/08 §search-remote） |
 | 加入对照作品 | `Icons.person_add_alt_1` | 数据页「同期对照」区块：本地搜索选书加入 watchlist（role=peer，docs/07 §1） |
 

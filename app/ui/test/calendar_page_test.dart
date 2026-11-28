@@ -68,7 +68,7 @@ Map<String, dynamic> _cell(
 ]) => {'date': date, 'total': total, 'universe': universe, 'items': items};
 
 Future<void> _pumpCalendar(WidgetTester tester, _FakeCalendarApi api) async {
-  tester.view.physicalSize = const Size(600, 2400);
+  tester.view.physicalSize = const Size(360, 2400);
   tester.view.devicePixelRatio = 1.0;
   addTearDown(tester.view.reset);
   await tester.pumpWidget(
@@ -90,7 +90,7 @@ Future<void> _pumpCalendar(WidgetTester tester, _FakeCalendarApi api) async {
 
 void main() {
   group('日历页最小补丁', () {
-    testWidgets('落点 = bounds 最新月；右边界禁用下一页；原版结构保留', (
+    testWidgets('落点 = bounds 最新月；可越过 bounds 继续翻页；原版结构保留', (
       tester,
     ) async {
       // 2026-10：各日内置 3 本；15 日 = 幽灵日（内置 0 / 估计 40）。
@@ -128,14 +128,14 @@ void main() {
       expect(find.text('~40'), findsOneWidget);
       // 页底汇总保留
       expect(find.textContaining('本月：全平台估计 ~'), findsOneWidget);
-      // 右删失：10 月末越过 bounds.last(2026-10-31) → 下一页禁用
+      // 不设时间上限：越过 bounds.last(2026-10-31) 仍可继续翻页
       expect(
         tester
             .widget<IconButton>(
               find.widgetWithIcon(IconButton, Icons.chevron_right),
             )
             .onPressed,
-        isNull,
+        isNotNull,
       );
       expect(
         tester
@@ -158,6 +158,11 @@ void main() {
       await tester.tap(find.text('月'));
       await tester.pumpAndSettle();
       expect(find.text('2026年10月'), findsOneWidget);
+
+      // 越过 bounds.last 后仍可进入下一月（即使该月无数据）
+      await tester.tap(find.widgetWithIcon(IconButton, Icons.chevron_right));
+      await tester.pumpAndSettle();
+      expect(find.text('2026年11月'), findsOneWidget);
     });
 
     testWidgets('稀疏月同样走日历网格，幽灵格可见', (tester) async {
@@ -258,7 +263,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('10月6日（周二）'), findsOneWidget);
       expect(
-        find.text('— 内置库 41 本，按收藏排序 · 全平台估计只到 2026年9月 —'),
+        find.text('— 内置库 41 本，按收藏排序 —'),
         findsOneWidget,
       );
 

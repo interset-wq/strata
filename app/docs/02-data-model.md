@@ -99,6 +99,8 @@ CREATE TABLE book_tags(
 键集合（取值随版本变化，仅供参考）：`schema_version` / `seed_version` / `content_end` /
 `built_at` / `book_count` / `licensed_count` / `tag_count` / `tag_rows` /
 `stats_universe` / `gen_min` / `gen_max` / `calendar_universe_days` 等。
+「尾部不完整月不估算」是 App 层依据 `/calendar` `bounds.last` 的判定
+（docs/14 §1.3），不落 seed_meta。
 
 不下发 `source_coverage` 单值：覆盖率 69.3% 是可访问上界（空洞混死亡/僵尸/存活，
 且约 10% 库内书查不到分类目录）。UI 基于「本地已有 / 站上可发现 / 已下架」三态说明，

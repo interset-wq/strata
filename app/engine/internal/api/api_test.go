@@ -427,9 +427,9 @@ func TestIpGroups(t *testing.T) {
 		topNID   int
 		topTitle string
 	}{
-		{"崩坏3征文", 2, 1006, "IP F"},
-		{"少女前线征文", 1, 1010, "IP K"},
-		{"龙之谷征文", 1, 1011, "IP L"},
+		{"崩坏3同人", 2, 1006, "IP F"},
+		{"少女前线同人", 1, 1010, "IP K"},
+		{"龙之谷同人", 1, 1011, "IP L"},
 	}
 	if len(groups) != len(want) {
 		t.Fatalf("groups = %v", groups)
@@ -454,7 +454,7 @@ func TestIpGroups(t *testing.T) {
 	}
 	groups = body["groups"].([]any)
 	if len(groups) != 1 ||
-		groups[0].(map[string]any)["contest"] != "少女前线征文" ||
+		groups[0].(map[string]any)["contest"] != "少女前线同人" ||
 		int(groups[0].(map[string]any)["count"].(float64)) != 1 {
 		t.Fatalf("done groups = %v", groups)
 	}
@@ -464,9 +464,9 @@ func TestIpGroups(t *testing.T) {
 // for the long tail outside the top-2 contests by count.
 func TestIpBooks(t *testing.T) {
 	srv, _ := newTestServer(t)
-	// named group: 崩坏3征文 = 1006 + 1009, favs DESC.
+	// named group: 崩坏3同人 = 1006 + 1009, favs DESC.
 	body := getJSON(t,
-		srv.URL+"/strata/ip-books?form=ip_collab&group=崩坏3征文&limit=10",
+		srv.URL+"/strata/ip-books?form=ip_collab&group=崩坏3同人&limit=10",
 		http.StatusOK)
 	items := body["items"].([]any)
 	if len(items) != 2 ||
@@ -476,11 +476,11 @@ func TestIpBooks(t *testing.T) {
 	}
 	// regression: the ip-books scan must return contest — the client
 	// renders the IP badge from it on mixed-IP lists.
-	if items[0].(map[string]any)["contest"] != "崩坏3征文" {
-		t.Fatalf("items[0].contest = %v, want 崩坏3征文",
+	if items[0].(map[string]any)["contest"] != "崩坏3同人" {
+		t.Fatalf("items[0].contest = %v, want 崩坏3同人",
 			items[0].(map[string]any)["contest"])
 	}
-	// other: 龙之谷征文 is outside the top-2 by count → 1011.
+	// other: 龙之谷同人 is outside the top-2 by count → 1011.
 	body = getJSON(t,
 		srv.URL+"/strata/ip-books?form=ip_collab&group=other&limit=10",
 		http.StatusOK)

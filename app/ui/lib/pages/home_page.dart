@@ -807,6 +807,9 @@ class _HomePageState extends ConsumerState<HomePage> {
         '/classic-list?title=经典榜单&form=short&metric-switchable=1',
       ),
       (Icons.person_search, '作者榜', '/author-ranks?form=short'),
+      // 2026-11-27 用户定：短篇征文（超新星杯短篇 / 2024主题短篇）从赛事
+      // 档案「主题」tab 迁到首页短篇 tab，入口与对话线赛事同构。
+      (Icons.event_note, '短篇征文', '/contest-archive?lane=short'),
     ];
     return _iconNavRow(context, entries);
   }
@@ -961,7 +964,7 @@ class IpGroupGrid extends ConsumerWidget {
                         ),
                       ),
                       // IP 线赛事归档挂本区（2026-11-22 用户裁定：对话的
-                      // 归档放对话区、IP 的放 IP 区）；「其他」tab 不含
+                      // 归档放对话区、IP 的放 IP 区）；「主题」tab 不含
                       // lane 赛事，没有这一行就没有任何入口。
                       InkWell(
                         borderRadius: BorderRadius.circular(6),

@@ -10,10 +10,12 @@ import '../widgets/contest_row_card.dart';
 
 /// 赛事档案列表（docs/contest-display-in-app.md 形态一）：本地零请求视图。
 ///
-/// 2026-11-22 改版（用户裁定）：榜单 tab 同款切换——春季 / x征 / 秋季 /
-/// 冬季 / 其他 五个 tab，与引擎 series 一一对应；「其他」tab 只含主题类
-/// （group.lane 为空）——对话线归档放首页对话区、IP 线归档放 IP 区
-/// （lane 分类在引擎侧）。
+/// 2026-11-22 改版（用户裁定）：榜单 tab 同款切换——春季 / x征 / 秋季/少年 /
+/// 冬季 / 主题 五个 tab，与引擎 series 一一对应（2026-11-27 用户定：秋季 tab
+/// 更名「秋季/少年」，少年系列从 other 归入 autumn；末个 tab 更名「主题」，
+/// 因其余赛事已全部迁出，只剩主题类；内部 series 键仍为 `other`）；该 tab
+/// 只含主题类（group.lane 为空）——对话线归档放首页对话区、
+/// IP 线归档放 IP 区、短篇征文归档放首页短篇 tab（lane 分类在引擎侧）。
 ///
 /// 2026-11-26 改版（用户认可）：排序改「最近一届在前」（引擎侧），主数换
 /// 官方清单条数、在库退为次数，顶部口径说明删除；X征 tab 加年代轨；
@@ -32,16 +34,20 @@ class ContestListPage extends ConsumerStatefulWidget {
 
 class _ContestListPageState extends ConsumerState<ContestListPage>
     with SingleTickerProviderStateMixin {
-  // tab 顺序 = 用户裁定（春 / x征 / 秋 / 冬 / 其他），与引擎 seriesOrder
-  // 一致；series 值即过滤键。
+  // tab 顺序 = 用户裁定（春 / x征 / 秋·少年 / 冬 / 主题），与引擎 seriesOrder
+  // 一致；series 值即过滤键（末个内部键仍为 `other`，只改显示文案）。
   static const _tabs = [
     ('spring', '春季'),
     ('x', 'X征'),
-    ('autumn', '秋季'),
+    ('autumn', '秋季/少年'),
     ('winter', '冬季'),
-    ('other', '其他'),
+    ('other', '主题'),
   ];
-  static const _laneTitles = {'dialogue': '对话线归档', 'ip': 'IP 联动归档'};
+  static const _laneTitles = {
+    'dialogue': '对话线归档',
+    'ip': 'IP 联动归档',
+    'short': '短篇征文归档',
+  };
 
   late final TabController _tabCtrl;
   String? _lane;
@@ -54,17 +60,18 @@ class _ContestListPageState extends ConsumerState<ContestListPage>
     _lane = widget.initialLane;
     _tabCtrl = TabController(length: _tabs.length, vsync: this);
     // 详情页比赛卡片跳转：按 series 定位到对应分类 tab（用户 2026-11-25）；
-    // 首页对话区跳转带 lane——对话线只挂在「其他」系列上。
+    // 首页短篇/对话/IP 入口带 lane，走跨系列筛选，顶部不显示系列 tab。
     final idx = _tabs.indexWhere((t) => t.$1 == widget.initialTab);
     if (_lane != null) {
+      // 仅用于列头 rail / 尾注判定；lane 视图本身不显示 tab。
       _tabCtrl.index = _tabs.indexWhere((t) => t.$1 == 'other');
     } else if (idx > 0) {
       _tabCtrl.index = idx;
     }
+    // TabController 切 index 本身不触发本 Widget 重建，列表体必须靠这里
+    // 的 setState 换 series（lane 视图不显示 tab，不会走到）。
     _tabCtrl.addListener(() {
-      if (!_tabCtrl.indexIsChanging) return;
-      // 手动换 tab 即退出单线视图（lane 只属于「其他」系列）。
-      setState(() => _lane = null);
+      if (!_tabCtrl.indexIsChanging) setState(() {});
     });
     _scroll.addListener(() {
       final show = _scroll.hasClients && _scroll.offset > 500;
@@ -94,19 +101,26 @@ class _ContestListPageState extends ConsumerState<ContestListPage>
             onPressed: () => context.push('/moe-goddess'),
           ),
         ],
-        bottom: TabBar(
-          controller: _tabCtrl,
-          labelColor: scheme.primary,
-          unselectedLabelColor: scheme.onSurfaceVariant,
-          indicatorColor: scheme.primary,
-          dividerColor: Colors.transparent,
-          labelStyle: const TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.w600,
-          ),
-          unselectedLabelStyle: const TextStyle(fontSize: 13.5),
-          tabs: [for (final (_, label) in _tabs) Tab(text: label)],
-        ),
+        // lane 视图是跨系列筛选（短篇/对话/IP），不显示系列 tab：否则从
+        // 短篇/对话入口进来，顶部却选中「主题」，与入口语义矛盾（用户
+        // 2026-11-27 报 bug）。系列 tab 只在普通档案视图出现。
+        bottom: _lane == null
+            ? TabBar(
+                controller: _tabCtrl,
+                labelColor: scheme.primary,
+                unselectedLabelColor: scheme.onSurfaceVariant,
+                indicatorColor: scheme.primary,
+                dividerColor: Colors.transparent,
+                labelStyle: const TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w600,
+                ),
+                unselectedLabelStyle: const TextStyle(fontSize: 13.5),
+                // 5 个 tab 均分宽；默认 16px labelPadding 会截断「秋季/少年」。
+                labelPadding: const EdgeInsets.symmetric(horizontal: 2),
+                tabs: [for (final (_, label) in _tabs) Tab(text: label)],
+              )
+            : null,
       ),
       body: Stack(
         children: [
@@ -124,7 +138,7 @@ class _ContestListPageState extends ConsumerState<ContestListPage>
             ),
             data: (list) {
               final series = _tabs[_tabCtrl.index].$1;
-              // lane 视图：只看这一条线（首页对话区入口）。否则「其他」tab
+              // lane 视图：只看这一条线（首页短篇/对话/IP 入口）。否则「主题」tab
               // 只含主题类（lane 为空）——对话线/IP 线归档各有自己的入口
               // （2026-11-22 用户裁定）。
               final items = _lane != null
@@ -212,6 +226,7 @@ class _ContestListPageState extends ConsumerState<ContestListPage>
     final missing = items.length - known.length - awardOnly;
     final dialogue = all.where((g) => g.lane == 'dialogue').length;
     final ip = all.where((g) => g.lane == 'ip').length;
+    final short = all.where((g) => g.lane == 'short').length;
     final text = StringBuffer('本分类共 ${items.length} 届 · 官方清单合计 '
         '${fmtCount(off)} 条 · 本地在库 ${fmtCount(inst)} 本');
     if (missing > 0 || awardOnly > 0) {
@@ -222,7 +237,8 @@ class _ContestListPageState extends ConsumerState<ContestListPage>
       text.write('（${why.join('、')}，未计入）');
     }
     if (_lane == null && series == 'other') {
-      text.write('\n对话线 $dialogue 项在首页对话区，IP 联动 $ip 项在首页 IP 区。');
+      text.write('\n对话线 $dialogue 项在首页对话区，IP 联动 $ip 项在首页 IP 区，'
+          '短篇征文 $short 项在首页短篇 tab。');
     }
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 0),

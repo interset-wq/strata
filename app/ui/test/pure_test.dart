@@ -42,20 +42,18 @@ void main() {
   });
 
   group('contestIpLabel / contestChipLabel（征文 → IP 展示名）', () {
-    test('ip 标签去 征文/同人征文 后缀', () {
-      expect(contestIpLabel('崩坏3征文'), '崩坏3');
-      expect(contestIpLabel('失业魔王同人征文'), '失业魔王');
-      expect(contestIpLabel('超新星杯'), '超新星杯');
-      // 名字本身就是「征文」时不能裁成空串
-      expect(contestIpLabel('征文'), '征文');
+    test('2026-11-27 起完整显示我方统一命名，不再去后缀', () {
+      expect(contestIpLabel('崩坏3同人'), '崩坏3同人');
+      expect(contestIpLabel('失业魔王同人'), '失业魔王同人');
+      expect(contestIpLabel('点鸭星穹'), '点鸭星穹');
       expect(contestIpLabel(null), isNull);
       expect(contestIpLabel(''), isNull);
     });
 
-    test('chip 标签对超新星杯特殊处理', () {
-      expect(contestChipLabel('“超新星杯”短篇大赛'), '超新星杯');
-      expect(contestChipLabel('四征短篇'), '四征短篇');
-      expect(contestChipLabel('2025春季征文'), '2025春季');
+    test('chip 标签完整显示赛事名', () {
+      expect(contestChipLabel('超新星杯短篇'), '超新星杯短篇');
+      expect(contestChipLabel('四征长篇'), '四征长篇');
+      expect(contestChipLabel('2025春征'), '2025春征');
     });
   });
 

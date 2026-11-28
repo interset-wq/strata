@@ -1,17 +1,20 @@
 # 征文页参赛清单：短/中篇补采通路与 tagId 地图（唯一权威，2026-11-22）
 
 > **定位**：征文清单 REST 补采通路实证记录，也是本组文档唯一的 tagId 地图 / URL 实证权威——逐届 URL、tagId、接口世代以本文为准，其他文档只给文件指针。
-> **状态**：分析侧实证定案；`app/` 已解禁，赛事档案页（路径 A）与参赛清单浏览页（路径 B）均已落地（见 `contest-display-in-app.md`）；本文只维护 tagId/URL 事实、不规定代码。
+> **状态**：分析侧实证定案；`app/` 已解禁，赛事档案页（路径 A）与参赛清单浏览页（路径 B）均已落地（见 `contest-display-in-app.md`）；2026-11-26 起本文的 tagId 台账与上游官方规模一起烤进引擎内嵌赛事台账（结论 8），app 侧读台账、不读本文。本文只维护 tagId/URL 事实、不规定代码。
 > **权威范围**：本文唯一维护 tagId 地图、活动页 URL 台账、补采覆盖数字与试号实证。
 > **口径**：文中计数/比例/日期均为快照现算值，仅供参考、随数据版本变化，禁止硬编码进代码；数字不新增。
-> **更新日期**：2026-11-22（台账按赛事系列归类重排、消除重复行；补 X 征一/二/三届 + 时间 URL 反推发现十四征 793/794；号段扫描转正 2026 秋征 803；747/748、724 用户观测 URL 实证转正；**本地 24 万条 contest 反查新增独立赛事 tag，全量交集实证**；**订正早期 X 征「无清单 API」误判：四 275–277 / 五 377–380 / 六 383–386 官网 JS 实证；全号段重扫补 419/420/479/413/468/478/623，本地 99 种标注全部有 tag**；原 29 赛事获奖探查结论 + news.sfacg.com 补 URL 通路；仅 480/660 URL 未取）。
+> **更新日期**：2026-11-26（**分页基订正：两代端点都 0 基**，新 SPA 的 `page` 此前记「随版本变」是误判，实为 0 基探针实证，连带的旧「tag 规模」数（十二征短篇 321 / 中篇 686）是尾页计数、真实 821 / 1186，见结论 2；**官方规模入引擎台账** `app/engine/internal/store/contest_ledger.json`（源 contest-achieve `docs/data/contests.json`，AGPL-3.0，2026-11-24 抓取，见结论 8）；**早期 X 征获奖榜 tag 635–649 定性**：金银铜榜各自是一个 tag、里面只有获奖书不是参赛者，见结论 9；**2021 主题秋征活动页 URL 补到并页面实证**：`qjzw2021`（非日期式 `zw20210930`，后者确实 404），`js/index.js` 首行 `var tagIds = [464,465]`，见 §2.4；§2.8 独立赛事的 URL 列由上游台账补一批、标注未本地逐页复核）。同日早先：台账按赛事系列归类重排、消除重复行；补 X 征一/二/三届 + 时间 URL 反推发现十四征 793/794；号段扫描转正 2026 秋征 803；747/748、724 用户观测 URL 实证转正；**本地 24 万条 contest 反查新增独立赛事 tag，全量交集实证**；**订正早期 X 征「无清单 API」误判：四 275–277 / 五 377–380 / 六 383–386 官网 JS 实证；全号段重扫补 419/420/479/413/468/478/623，本地 99 种标注全部有 tag**；原 29 赛事获奖探查结论 + news.sfacg.com 补 URL 通路；仅 480/660 URL 未取）。
 
 ## 结论
 
 1. **通路成立**：征文清单由 REST 接口分页返回，含 `nid/标题/作者/intro/封面/categoryID`，可直接批量取，不必逐本抓详情页。
 2. **两套接口并存**（按活动页年代）：旧 H5 `GET /ajax/ashx/Common.ashx?op=getNovelsByTag&tagId={t}&ps=200&pi={0基}` →
    `{status,novels,totalPage}`；新 SPA `GET /api/essay/getNovels?tagIds={t}&page={n}&size={n}` → `{status,data:{totalPage,novels}}`。
-   `page` 起始随版本变、以页面实际传参为准；仅旧 H5 的 `pi` 稳定 0 基。字段名两套大小写（`NovelID` vs `novelID`），字段明细见 `contest-roster-fields.md`。
+   **两代都从 0 起**（2026-11-26 探针订正，tag 704：`page=0` 给 500 条、`page=1` 给末尾 321 条、`page=2` 已空而 `totalPage` 仍说 2；
+   页面自身传参同证——`qjzw2021/js/index.js` 的 `LoadNovel()` 用 UI 序 `curIndex`（1 起）拼 `pi: curIndex - 1` 发请求，「页面从第 1 页开始」是 UI 表象、不是线上参数）。
+   此前记「`page` 起始随版本变」不成立，是被尾页计数误导（见结论 4）。
+   字段名两套大小写（`NovelID` vs `novelID`），字段明细见 `contest-roster-fields.md`。
 3. **tagId 是「某届比赛的某个赛项」编号，每次新增、跨届不复用**（用户裁定）：十三征 3 个赛项 = 全新号 752/753/754，
    与十二征 702/703/704 无复用；sandbox / test / pages 三套环境各一批（十二征短篇 sandbox 533 vs 生产 704）。
    **「不复用」只对生产号成立**——十四征 sandbox long/short 599/597 与十三征 sandbox long/short 599/597 完全撞号（十三征中篇 sandbox 598 对应十四征 middle=0），跨届生产号仍全新（793/794）。
@@ -19,6 +22,9 @@
 4. **补采价值（覆盖数字只在此处一处）**：14 个 tag 拉取去重 **31,092** 本，与 `novels.csv`（245,887 行）比对
    **9,012 本（29%）不在 db**；短/中篇漏采最重（七征中篇 481/1,359=35%、十二征短篇 171/321=53%、
    十二征中篇 360/686=52%）。用户举的 5 本精确短篇中 `709232 血与梦` 命中十二征短篇 tag 704，路径实证有效。
+   **2026-11-26 订正：十二征那两式的分母 321 / 686 是尾页计数**（0 基分页被误当 1 基，`page=1` 只拿到末页余数），
+   真实赛道规模为短篇 821、中篇 1186（台账现值），故 53% / 52% 是旧口径比值、不可再引为精确覆盖数；
+   同理，这批 14-tag 拉取的绝对量（31,092 / 9,012）**只当作下界**——分页订正后重跑会变大。本轮不重算（数字过期只标注）。
 5. **赛事不止四季主线**：本地 24 万条 `contest` 标注有 99 种赛事、95,433 本；除四季/少年/点鸭外，
    **34 个独立赛事（IP 联动、题材主题、对话节日）各有专属 tagId 且清单接口存活**，均由全量 nid 交集 100% 实证（§2.8）。
    tag 号段 1–850 探活 447 个活跃 tag，多数是单一赛项；跨征文聚合大标签（如 125）需按「同标注比例」排除。
@@ -29,6 +35,26 @@
 7. **本地 99 种标注现已全部有 tag（2026-11-22 全量映射）**：补齐此前漏登的八征中/短 419/420、十征对话 479、
    龙之谷 413、失业魔王同人 468、青春幻想 478、春节短篇 623；「征文大赛长/短篇」69/4 本是十四征 793/794 内的旧标注异常，按别名指向同一清单。
    真正无 API 的只剩库外的一/二/三征（页面下线或参赛展空）——用户 DevTools + Web 渲染双重实证：无数据包、渲染为空、无静态清单，是站点本身没提供而非抓取遗漏；不影响 app 现有赛事档案。
+8. **官方规模有独立来源，app 不必现抓**：contest-achieve（https://github.com/light-nook-labs/contest-achieve，AGPL-3.0）
+   的 `docs/data/contests.json`（447 个 tag，`captured_at` 2026-11-24）逐 tag 记 `roster_count` / `award_count`——
+   **`roster_count` = 该 tag 官方清单条数**（参赛者全集，与本文 §2 的「全量本数」同物），`award_count` = 该赛道获奖数。
+   本仓库 `app/tools/contestledger/build_ledger.py` 按 **`contest_track_id` == 我们已验证 tagId** 连接，把逐赛道条数、
+   合计、日期、活动页 URL 一次性烤成引擎内嵌台账 `app/engine/internal/store/contest_ledger.json`
+   （78 事件 / 102 roster tag / 15 award tag / 4 别名；档案页零请求读到「官方清单 N 条」）。
+   **contest 统一名以我们自己的 `analysis/anchors/contest_names.jsonl` 为准**（2026-11-27 用户定，dataset 清空旧 contest 后按参赛名单+自建获奖清单重写；只继承 contest-achieve 的 tagId，其 `event`/`division`/`contest_name` 一律不进 UI）；tagId 真值仍只认本文 §2，
+   上游给出的 URL 只在台账该格为空时填空、不覆盖已实证值，冲突时保留我们的并打 WARN。
+   `--check` 模式可验证台账与上游不脱节。
+9. **早期 X 征的「获奖榜」也是 tag，但不是参赛者**（2026-11-26 定性）：一/二/三征按奖牌发榜——
+   一征 635/636/637、二征 638/639/640 为金/银/铜，三征 641–649 为（长/中/短）×（金/银/铜），
+   条数就是获奖数本身（1、1、3… 最大 4），是这三届在清单通路里唯一留下的东西。
+   台账用 `kind="award"` 与 `kind="roster"` 分开：**口径必须分开**——`RosterTagsFor` 两类都出，
+   但 award 号只按获奖名单抓取/展示（`/contests` 的 `list_kind=award`），
+   **永不进 `roster_total`**，否则档案页会把 1 本金奖书当成整届参赛规模。
+   （同日后续：这批号已接入 App 获奖名单页，取代早前「不进抓取路径」的保守做法。）
+   获奖书名单另有真源：`contest-achieve/docs/data/awards.json`（AGPL-3.0，2026-11-26 补采），
+   逐本给出 27 本 `verified` 的 nid/奖项；11 本库外已补详情落 `dataset/contest_new.jsonl`
+   （`harvest_awards.py`），仍不进 roster 抓取与 E.34 union（详见
+   `award-winners-as-seed-source.md` 边界段）。
 
 ## 事实：URL 形态与 tagId 地图（权威台账）
 
@@ -55,9 +81,9 @@ UUID 页起点是 **2024 秋征**，2024 春征（`zw20240301`，tag 699）仍�
 
 | 赛事 | 活动页 URL | tagId | 接口 | 备注 |
 | --- | --- | --- | --- | --- |
-| 一征 | ⬜（独立页已下线） | — | 无 | 2026-11-22 补：三届页面 `history.html`「过往精彩回顾」保留入口——BBS 帖 `bbs.sfacg.com/showtopic-60295.aspx`「第一届SF原创轻小说征文活动」（BBS 站现已不可访问）；`zw2013` 返 200 但为「页面找不到」文案陷阱 |
-| 二征 | ⬜（独立页已下线） | — | 无 | 同上，BBS 帖 `showtopic-64405.aspx`「第二届SF原创轻小说征文活动」；`zw2014` 同为 200+文案陷阱 |
-| 三征 | `https://book.sfacg.com/zw2015/`（早期静态页） | — | 无 | 页面实证标题「第三届SF原创轻小说征文大赛」；长/中/短三组（长 15W–30W、中 5W–15W、短 5K–3W）；`/zw2015/novels/{l,m,s}/` 列表为空、无清单接口；用户 DevTools + Web 渲染实证：无数据包、渲染空、无静态清单 |
+| 一征 | ⬜（独立页已下线） | — | 无 | **2013 年**（用户核定 2026-11-26，台账 `year=2013`）。2026-11-22 补：三届页面 `history.html`「过往精彩回顾」保留入口——BBS 帖 `bbs.sfacg.com/showtopic-60295.aspx`「第一届SF原创轻小说征文活动」（BBS 站现已不可访问）；`zw2013` 返 200 但为「页面找不到」文案陷阱 |
+| 二征 | ⬜（独立页已下线） | — | 无 | **2014 年**（用户核定 2026-11-26，台账 `year=2014`）。同上，BBS 帖 `showtopic-64405.aspx`「第二届SF原创轻小说征文活动」；`zw2014` 同为 200+文案陷阱 |
+| 三征 | `https://book.sfacg.com/zw2015/`（早期静态页） | — | 无 | **2015 年**（用户核定 2026-11-26，台账 `year=2015`）。页面实证标题「第三届SF原创轻小说征文大赛」；长/中/短三组（长 15W–30W、中 5W–15W、短 5K–3W）；`/zw2015/novels/{l,m,s}/` 列表为空、无清单接口；用户 DevTools + Web 渲染实证：无数据包、渲染空、无静态清单 |
 | 四征 | `https://book.sfacg.com/zw2016/`、规则页 `rule.html`、**参赛作品 `list.html`** | **275/276/277** | 旧 | 2026-11-22 订正：`list.js` 首行 `LoadNovel(1,275/276/277)`，`/zw2016/list.html` 三个图片标题 = 长/中/短；旧 `getNovelsByTag` 实测 60 条样本对本地 `contest` 命中 54/31/23 条，全部为对应赛道；规则页有精确日期 |
 | 五征 | `https://book.sfacg.com/zw2017/`、`list.html` | **377/378/379/380** | 旧 | `js/list.js` 首行 `var tagIds = [377,378,379,380]`；页面菜单「长篇/中篇/短篇/对话小说」同序；接口样本命中 50/35/20/32 条，全部同赛道 |
 | 六征 | `https://pages.sfacg.com/h5/act/zw2018/` | **383/384/385/386** | 旧 | 页面 `showSysTagDetail` 显式绑定 `383 长篇征文 / 384 中篇征文 / 385 短篇征文 / 386 对话小说征文`；接口样本命中 43/25/23/27 条，全部同赛道 |
@@ -98,8 +124,8 @@ UUID 页起点是 **2024 秋征**，2024 春征（`zw20240301`，tag 699）仍�
 
 | 赛事 | 活动页 URL | tagId | 接口 | 备注 |
 | --- | --- | --- | --- | --- |
-| 2021 东方世界秋征 | ⬜（活动页已下线，`zw20210930` 404） | **464** | 新 | 页面无 URL，tagId 靠本地交集反查：全量 815 本 ∩ 库内标注 602 = 602/602 |
-| 2021 异世大陆秋征 | ⬜（活动页已下线） | **465** | 新 | 全量 1287 本 ∩ 库内标注 930 = 929/930；与 464 连号、同届两赛道 |
+| 2021 东方世界秋征 | `https://pages.sfacg.com/h5/act/qjzw2021/`（**2026-11-26 页面实证**：此前只试过日期式 `zw20210930`，那个确实 404；`qjzw2021` 存活 200） | **464** | 新 | 页面 `js/index.js` 首行 `var tagIds = [464,465]`——tagId 由「本地交集反查（全量 815 ∩ 库内标注 602 = 602/602）」升级为**页面实证**，与交集结果同号；页面自身走旧 H5 `Common.ashx?op=getNovelsByTag`（`pi: curIndex-1`），台账按端点存活登记 `new`（两套端点对这批号均可，见 §5） |
+| 2021 异世大陆秋征 | 同上（`qjzw2021`，同届两赛道共用一页） | **465** | 新 | 同页第二号；全量 1287 本 ∩ 库内标注 930 = 929/930；与 464 连号、同届两赛道 |
 | 2022 主题秋征（少年的无限幻想） | `https://pages.sfacg.com/h5/act/zw20220930/`（日期式） | **481** | 新 | 标题「少年的无限幻想」；`index.1858c64f.js` 硬编码 `tagId:481`（单号、无三环境），`/api/essay/getNovels?tagIds=481` size=9；全量 1945 本 ∩ 库内标注 1461 = **1461/1461**。同少年主题系列，见 §2.5 |
 | 2023 主题秋征（少年的奇迹历险） | `https://pages.sfacg.com/h5/act/zw20230930/`（日期式） | **669** | 新 | 标题「少年的奇迹历险」；`index.0c352714.js` 三环境 sandbox 521 / test·pages **669**（521 仅 1 页反证），另有子榜 `getNovels2(tagId,"23,27")`；全量 1575 本 ∩ 库内标注 1246 = **1246/1246**。同少年主题系列，见 §2.5 |
 | 2024 秋征 | `https://pages.sfacg.com/h5/act/zw/essayActivity_0a10b388-bf92-410c-801a-59c91b853c3f.html` | **725** | 新 | HTML `data-tagid`，页面实证转正；获奖 11 本、alt 完整 |
@@ -137,7 +163,15 @@ UUID 页起点是 **2024 秋征**，2024 春征（`zw20240301`，tag 699）仍�
 用「tag 首本 nid → 本地 contest 标注」建立初筛，再按 **tp / 本地标注本数 ≈ 1.0–1.5** 选主 tag
 （复用大标签如 tag 125 比值达 398，直接排除），最后**拉全量 nid 与本地同标注集合求交集**——
 下表 34 个赛事**全部 100% 同标注命中**（逗号前=拉取数 / 本地命中数 / 同标注数），是比定年推断更硬的归属证据。
-这些赛事的清单接口全部存活；**活动页 URL 未逐一取**（聚合站只收录官方主线，独立赛事无页，同 §2.7 降级方案）。
+这些赛事的清单接口全部存活；**活动页 URL 未逐一本地取**（聚合站只收录官方主线，独立赛事无页，同 §2.7 降级方案）。
+**2026-11-26 更新**：上游台账（结论 8）现已为这批独立赛事中的一部分提供活动页 URL，app 台账空处即填、档案页据此显示
+「查看官方活动页」——例如 少女前线 `sfxsq`、崩坏3 `sfxbbb`、龙之谷 `sfxlzg`、校园恋爱 `xyzw2018`、校园都市 `xyzw2019`、
+幻想小说 `fantasyzw2020`、超新星杯 `zw20230331`、2024 主题短篇 `zw20240105`、星穹小说家 `dyzw20230329`、
+开学季 `dyzw20220331`、楚楚动仁 `book.sfacg.com/sp/migu`。**这批 URL 是上游抓取值、本仓库未逐页复核**（`⬜（未取）`
+只表示「我们没实证」，不再是「无人知道」）；表内 URL 列仍保持原样，需要精确到页时按 `qjzw2021` 那次的方法现取
+`var tagIds` / `data-tagid` 复核。**已见一处上游可疑**：`失业魔王同人征文`(468) 与 `英雄再临同人征文`(469)
+被上游给了同一个 `fanszw202112` URL——两届同页可能（同届双赛道先例见 747/748），但未经本地证实前当作待定，
+不要据此合并赛事。
 
 **IP 联动 / 游戏主题**
 
@@ -283,10 +317,11 @@ tagId 确是**全局递增编号池**。
 ## 操作：接口调用与探针
 
 ```python
-# 新 SPA（推荐，size 大、一页拿全）
-GET https://pages.sfacg.com/api/essay/getNovels?tagIds=704&page=1&size=500
+# 新 SPA（推荐，size 大、一页拿全）——**page 从 0 起**（2026-11-26 探针订正，见结论 2）
+GET https://pages.sfacg.com/api/essay/getNovels?tagIds=704&page=0&size=500
 # → {"status":{"errorCode":200},"data":{"totalPage":2,"novels":[
-#     {"novelID":713638,"categoryID":3,"novelName":"Re：如果成为神明",...}]}}
+#     {"novelID":715580,"categoryID":3,"novelName":"…",...}]}}   # 500 条，2026-11-26 实测
+# 取 page=1 拿到的是末页余数 321 条，不是「第二页起」——按 1 基翻页会静默丢首屏 500 条。
 # 旧 H5（pi 稳定 0 基；ps 可 200）
 GET https://pages.sfacg.com/ajax/ashx/Common.ashx?op=getNovelsByTag&tagId=415&ps=200&pi=0
 # → {"status":200,"novels":[{"NovelID":277050,...}],"totalPage":...}
@@ -347,4 +382,7 @@ uv run --project analysis python analysis/fetchers/probe_contest_roster.py \
 - **获奖四代形态与提取正则**：`contest-roster-fields.md`（权威）
 - **获奖逐届明细 / 入种口径（净 911、剔除 602、140 补采）**：`award-winners-as-seed-source.md`（权威）
 - **规律总览与导航**：`contest-url-api-patterns.md`；**展示设计 / 降级**：`contest-display-in-app.md`
+- **官方规模进 app 的落地表**：`app/engine/internal/store/contest_ledger.json`（生成脚本
+  `app/tools/contestledger/build_ledger.py`，`--upstream <contest-achieve>/docs/data/contests.json [--migrate|--check]`，
+  上游 contest-achieve（https://github.com/light-nook-labs/contest-achieve）AGPL-3.0，只借号与数、不借命名）
 - **赛事日期 / 届次对照**：`analysis/references/contest-editions.md`

@@ -43,9 +43,10 @@ from sklearn.model_selection import GroupKFold
 from lib import dialogue_form as DF, paths
 
 # 分档边界，与 forms.SHORT_MAX_WORDS / MEDIUM_MAX_WORDS 一致
+# 2026-11-27：短/中篇分界从 5 万改回 3 万口径（SHORT_MAX_WORDS=34_999）。
 BANDS = {
-    "short": (0, 50_000),
-    "medium": (50_000, 150_000),
+    "short": (0, 34_999),
+    "medium": (34_999, 150_000),
     "long": (150_000, 10**9),
 }
 ZONE_LO, ZONE_HI = 0.1, 0.9
