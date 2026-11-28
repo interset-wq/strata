@@ -2852,7 +2852,7 @@ func (s *Store) RefreshAttempt(ctx context.Context, nid int64) (*RefreshAttempt,
 	var a RefreshAttempt
 	err := s.DB.QueryRowContext(ctx, `
 SELECT nid, attempted_at, state FROM refresh_attempts WHERE nid = ?
-ORDER BY attempted_at DESC, id DESC LIMIT 1`, nid).
+ORDER BY attempted_at DESC LIMIT 1`, nid).
 		Scan(&a.NID, &a.AttemptedAt, &a.State)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
