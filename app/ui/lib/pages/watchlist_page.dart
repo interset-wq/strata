@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../widgets/book_row_tile.dart';
+import '../widgets/default_cover.dart';
 
 import '../core/providers.dart';
 import '../data/api/strata_api.dart';
@@ -531,7 +531,7 @@ class _FilterChips extends ConsumerWidget {
   }
 }
 
-/// 统一行（2026-11-26 书籍列表统一）：与经典榜单同款行（BookRowTile），
+/// 三段式行（2026-11-28 用户裁定）：cover / content / button。
 /// 长按进入批量多选；trailing 收观测/追踪/更多（备注/移组）操作。
 class _WatchCard extends StatelessWidget {
   final WatchItem item;
@@ -563,51 +563,82 @@ class _WatchCard extends StatelessWidget {
     final added = DateTime.fromMillisecondsSinceEpoch(item.addedAt * 1000);
     final days = DateTime.now().difference(added).inDays;
     final when = days <= 0 ? '今天' : days == 1 ? '昨天' : '$days 天前';
+    // 三段式行（用户裁定 2026-11-28）：cover / content / button。封面
+    // 左侧独立，中部内容区承载标题、作者与状态行，右侧按钮区垂直居中。
+    final hasCover = item.coverUrl != null && item.coverUrl!.isNotEmpty;
     return InkWell(
       onTap: onTap,
       onLongPress: onLongPress,
-      child: BookRowTile(
-        item: RankItem.fromJson({
-          'rank': 0,
-          'nid': item.nid,
-          'title': item.title,
-          'author': item.genre != null
-              ? '${item.author} · ${item.genre}'
-              : item.author,
-          'cover_url': item.coverUrl,
-        }),
-        extraTags: [
-          if (item.role == 'peer') '对照',
-          if (item.note != null && item.note!.isNotEmpty) '备注',
-        ],
-        trailing: batchMode
-            ? Icon(
-                selected ? Icons.check_circle : Icons.circle_outlined,
-                color: selected ? scheme.primary : scheme.onSurfaceVariant)
-            : Row(
-                mainAxisSize: MainAxisSize.min,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // 1. cover
+            SizedBox(
+              width: 48,
+              height: 64,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: hasCover
+                    ? coverImage(item.coverUrl, item.nid)
+                    : defaultCover(item.nid),
+              ),
+            ),
+            const SizedBox(width: 12),
+            // 2. content
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    item.active ? '追踪于 $when' : '保存于 $when',
+                    item.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        fontFamily: 'serif',
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    item.genre != null
+                        ? '${item.author} · ${item.genre}'
+                        : item.author,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                        fontSize: 11, color: scheme.onSurfaceVariant),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    item.active ? '追踪中 · $when' : '已保存 · $when',
                     style: TextStyle(
                         fontSize: 10,
                         color: item.active
                             ? scheme.primary
                             : scheme.onSurfaceVariant),
                   ),
-                  const SizedBox(width: 2),
-                  // 信息增强统一行（用户裁定 2026-11-28）：状态文字与 ⋮
-                  // 同行，备注/移组/追踪/移除收进面板。
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    padding: EdgeInsets.zero,
-                    icon: Icon(Icons.more_vert,
-                        size: 20, color: scheme.onSurfaceVariant),
-                    tooltip: '更多',
-                    onPressed: onSheet,
-                  ),
                 ],
               ),
+            ),
+            const SizedBox(width: 4),
+            // 3. button
+            if (batchMode)
+              Icon(
+                selected ? Icons.check_circle : Icons.circle_outlined,
+                color: selected ? scheme.primary : scheme.onSurfaceVariant,
+              )
+            else
+              IconButton(
+                visualDensity: VisualDensity.compact,
+                icon: Icon(Icons.more_vert,
+                    size: 20, color: scheme.onSurfaceVariant),
+                tooltip: '更多',
+                onPressed: onSheet,
+              ),
+          ],
+        ),
       ),
     );
   }
