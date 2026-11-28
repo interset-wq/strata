@@ -678,96 +678,202 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
     );
   }
 
-  // ── VIP 视图（docs/14 §1.5）：官方每周签约升 VIP 推荐期次（在线层）。
+  // ── VIP 视图（docs/14 §1.5）：同一周六期次的两条官方在线数据线并列。
+  //  ① 预约层 = PreOrder.ashx 编辑精选（预定签约升 VIP 周，含 intro/主编推荐）
+  //  ② 专题层 = vipPush H5 直出书单（当周上架全书，仅标题/封面/分类/标签）
   // 口径红线（sfacg-endpoints §7.5）：date 是预定签约升 VIP 周，不是首发日，
   // 与 est_date「入库日期（估计）」分列展示、不得互推。─────────────────
 
   Widget _buildVip(ColorScheme scheme) {
     final sat = _saturdayOf(_focus);
     final key = '${sat.year}${_pad(sat.month)}${_pad(sat.day)}';
-    final data = ref.watch(preorderProvider(key));
+    final preorder = ref.watch(preorderProvider(key));
+    final vippush = ref.watch(vipPushProvider(key));
+
+    final rows = <Widget>[
+      _vipSectionHead('签约升 VIP 预告', '官方编辑精选 · 预定升 VIP 周', scheme),
+      ..._preorderRows(preorder, scheme, key),
+      _vipSectionHead('新书上架专题', '官方 vipPush 书单 · 同一期', scheme),
+      ..._vippushRows(vippush, scheme, key),
+      _vipFooter(key, scheme),
+    ];
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+      itemCount: rows.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 4),
+      itemBuilder: (_, i) => rows[i],
+    );
+  }
+
+  Widget _vipSectionHead(String title, String sub, ColorScheme scheme) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 12, 4, 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.baseline,
+        textBaseline: TextBaseline.alphabetic,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              fontFamily: StrataTokens.serif,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              sub,
+              textAlign: TextAlign.end,
+              style: TextStyle(fontSize: 10.5, color: scheme.onSurfaceVariant),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 库外书点击先 rank-seed 预写收录，再进详情页自动 refresh 补全（docs/08）。
+  Future<void> _openVipBook({
+    required BuildContext context,
+    required int nid,
+    required String title,
+    required String cover,
+    required bool inSeed,
+  }) async {
+    if (!inSeed) {
+      try {
+        final handle = await ref.read(bootProvider.future);
+        await handle.api.rankSeed(nid: nid, title: title, coverUrl: cover);
+      } catch (_) {
+        // 预写失败也进详情：详情页会自行报错可重试。
+      }
+    }
+    if (context.mounted) context.push('/book/$nid');
+  }
+
+  List<Widget> _preorderRows(
+    AsyncValue<PreorderResponse> data,
+    ColorScheme scheme,
+    String key,
+  ) {
     return data.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(
+      loading: () => [
+        const Padding(
+          padding: EdgeInsets.all(16),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ],
+      error: (e, _) => [
+        _vipError(scheme, '预告加载失败：$e', () => ref.invalidate(preorderProvider(key))),
+      ],
+      data: (resp) => resp.items.isEmpty
+          ? [_vipEmpty(scheme, '该周没有签约升 VIP 预告')]
+          : [
+              for (final it in resp.items)
+                _PreorderRow(
+                  item: it,
+                  onOpen: () => _openVipBook(
+                    context: context,
+                    nid: it.nid,
+                    title: it.title,
+                    cover: it.cover ?? '',
+                    inSeed: it.inSeed,
+                  ),
+                ),
+            ],
+    );
+  }
+
+  List<Widget> _vippushRows(
+    AsyncValue<VipPushResponse> data,
+    ColorScheme scheme,
+    String key,
+  ) {
+    return data.when(
+      loading: () => [
+        const Padding(
+          padding: EdgeInsets.all(16),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ],
+      error: (e, _) => [
+        _vipError(scheme, '专题加载失败：$e', () => ref.invalidate(vipPushProvider(key))),
+      ],
+      data: (resp) => resp.items.isEmpty
+          ? [_vipEmpty(scheme, '该周没有上架专题（页面为空或未发布）')]
+          : [
+              for (final it in resp.items)
+                _VipPushRow(
+                  item: it,
+                  onOpen: () => _openVipBook(
+                    context: context,
+                    nid: it.nid,
+                    title: it.title,
+                    cover: it.cover,
+                    inSeed: it.inSeed,
+                  ),
+                ),
+            ],
+    );
+  }
+
+  Widget _vipEmpty(ColorScheme scheme, String msg) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Text(
+          msg,
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 11.5, color: scheme.onSurfaceVariant),
+        ),
+      );
+
+  Widget _vipError(ColorScheme scheme, String msg, VoidCallback onRetry) =>
+      Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'VIP 期次加载失败：$e',
-              style: TextStyle(fontSize: 12, color: scheme.error),
+              msg,
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 11.5, color: scheme.error),
             ),
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: () => ref.invalidate(preorderProvider(key)),
-              child: const Text('重试'),
-            ),
+            TextButton(onPressed: onRetry, child: const Text('重试')),
           ],
         ),
+      );
+
+  Widget _vipFooter(String key, ColorScheme scheme) {
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        children: [
+          Text(
+            '— $key 期 · 预定签约升 VIP 周（在线数据，非首发/入库日）—',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
+          ),
+          TextButton.icon(
+            onPressed: () => launchUrl(
+              Uri.parse(
+                'https://pages.sfacg.com/h5/general/preorder-$key.html?type=android',
+              ),
+              mode: LaunchMode.externalApplication,
+            ),
+            icon: const Icon(Icons.open_in_new, size: 14),
+            label: const Text('打开官方预告页', style: TextStyle(fontSize: 11)),
+          ),
+          TextButton.icon(
+            onPressed: () => launchUrl(
+              Uri.parse(
+                'https://pages.sfacg.com/h5/general/vipPush$key.html?type=android',
+              ),
+              mode: LaunchMode.externalApplication,
+            ),
+            icon: const Icon(Icons.open_in_new, size: 14),
+            label: const Text('打开官方上架专题页', style: TextStyle(fontSize: 11)),
+          ),
+        ],
       ),
-      data: (resp) {
-        if (resp.items.isEmpty) {
-          return _empty('该周没有签约升 VIP 预告（官方编辑精选期次）');
-        }
-        return ListView.separated(
-          padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-          itemCount: resp.items.length + 1,
-          separatorBuilder: (_, _) => const SizedBox(height: 4),
-          itemBuilder: (context, i) {
-            if (i == resp.items.length) {
-              // 官方签约升 VIP 预告 H5（§7.5）：给出来源页防"数据是编的"。
-              final url =
-                  'https://pages.sfacg.com/h5/general/preorder-${resp.date}.html?type=android';
-              return Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  children: [
-                    Text(
-                      '— ${resp.date} 期 · 官方编辑精选 · 预定签约升 VIP 周（在线数据，非首发/入库日）—',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                    TextButton.icon(
-                      onPressed: () => launchUrl(
-                        Uri.parse(url),
-                        mode: LaunchMode.externalApplication,
-                      ),
-                      icon: const Icon(Icons.open_in_new, size: 14),
-                      label: const Text(
-                        '打开官方签约升 VIP 预告页',
-                        style: TextStyle(fontSize: 11),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }
-            final it = resp.items[i];
-            return _PreorderRow(
-              item: it,
-              onOpen: () async {
-                if (!it.inSeed) {
-                  // 库外书自动收录：rank-seed 预写标题/封面（纯本地写），
-                  // 进详情页后 words==null 自动后台 refresh 补全（docs/08）。
-                  try {
-                    final handle = await ref.read(bootProvider.future);
-                    await handle.api.rankSeed(
-                      nid: it.nid,
-                      title: it.title,
-                      coverUrl: it.cover ?? '',
-                    );
-                  } catch (_) {
-                    // 预写失败也进详情：详情页会自行报错可重试。
-                  }
-                }
-                if (context.mounted) context.push('/book/${it.nid}');
-              },
-            );
-          },
-        );
-      },
     );
   }
 
@@ -875,6 +981,50 @@ class _PreorderRow extends StatelessWidget {
                   color: scheme.onSurface.withValues(alpha: .85),
                 ),
               ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// VIP 上架专题行（vipPush H5）：上游无作者/intro，用题材 + 标签作副标题；
+/// 库外书走 extraTags 提示，点击同预告层 rank-seed 预写收录。
+class _VipPushRow extends StatelessWidget {
+  final VipPushItem item;
+  final VoidCallback onOpen;
+
+  const _VipPushRow({required this.item, required this.onOpen});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final tags = <String>[
+      if (item.genre.isNotEmpty) item.genre,
+      ...item.tags,
+    ];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        BookRowTile(
+          item: RankItem.fromJson({
+            'rank': 0,
+            'nid': item.nid,
+            'title': item.title,
+            'author': item.inLibAuthor ?? '',
+            'favs': item.inLibFavs ?? 0,
+            'cover_url': item.cover,
+            'tags': tags,
+          }),
+          extraTags: item.inSeed ? const [] : const ['库外作品'],
+          onTap: onOpen,
+        ),
+        if (tags.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+            child: Text(
+              tags.join(' · '),
+              style: TextStyle(fontSize: 10.5, color: scheme.onSurfaceVariant),
             ),
           ),
       ],

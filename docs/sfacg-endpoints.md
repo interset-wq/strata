@@ -390,6 +390,30 @@ GET https://pages.sfacg.com/ajax/act/PreOrder.ashx?op=getPreOrderNovels&date={YY
   签约升级为 VIP；我们的「上架」（≈入库/创建，est_date）与官方不符，
   UI 措辞已全面改用官方语义，两套口径分列展示、不可混为一列。
 
+### 7.6 VIP 上架专题（`vipPush{YYYYMMDD}.html`）——当周上架书单
+
+用户提供 H5 页 `pages.sfacg.com/h5/general/vipPush{YYYYMMDD}.html?type=android`
+（2026-11-28 首测）。**这是服务端直出 HTML，不是 JSON API**：书单内联在 HTML
+里，页面无 ajax 请求；`type` 只选 App bridge 渠道。与 §7.5 的预约列表是同一
+周六期次、但**不同的两条数据线**：
+
+| | 预约列表（§7.5） | 上架专题（本节） |
+|---|---|---|
+| 数据源 | `PreOrder.ashx` JSON | H5 直出 HTML（解析 `data-nid`） |
+| 内容 | 编辑精选 3–10 本，含 intro / isMainPush | 当周上架全书（11-28 期 26 本） |
+| 字段 | novelId/novelName/intro/cover/isMainPush/tags | nid/标题/封面/分类/标签，无作者/字数/intro |
+
+- `data-nid` + `data-cid` 标识每本书。`<img src>` 是 `//rs.sfacg.com/...` 协议相对
+  URL（引擎补 `https:`）；`.novel-name` 标题；`.tag` 内 `<span>` 是题材、其后文本
+  用 `/` 分隔标签。页首两个 tab（轻小说/对话小说）容器 `display:none`，对话侧
+  实测为空，故只解析轻小说列表。
+- 日期键与 §7.5 同为周六（`vipPush20261114/21/28` 均 200，未来期 12-05 为 404）。
+  引擎复用 `normalizePreorderSaturday()` 把任意日归一到当周周六。
+- 只读、无认证、无分页；每期约 28 KB，串行 0.5 s 即可。
+- **用途（用户 2026-11-28 定）**：接入 app 日历页 VIP 粒度段，与预约层**并列**
+  展示——预约层是编辑精选预告，专题层是当周实际上架全书，两者互为补充，
+  不可合并或互相替代。库外 nid 点击先 rank-seed 预写收录，进详情页自动补全。
+
 ---
 
 ## 8. 判活、三态与覆盖率

@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no">
+    <meta content="telephone=no" name="format-detection" />
+    <meta http-equiv="Cache-Control" content="no-siteapp" />
+    <title>20261128新书上架-菠萝包轻小说</title>
+    <style type="text/css">
+        :root {
+            --page-width: 750px;
+            --new-blue: #558be8;
+            --button-blue: #4f86df;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body,
+        h1,
+        h2,
+        p,
+        ul,
+        ol,
+        li,
+        button {
+            margin: 0;
+            padding: 0;
+        }
+
+        html,
+        body {
+            min-height: 100%;
+        }
+
+        body {
+            background: #e9edf3;
+            color: #333;
+            font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+        }
+
+        button,
+        a {
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        button {
+            font: inherit;
+        }
+
+        img {
+            border: 0;
+        }
+
+        .phone-page {
+            width: min(100vw, var(--page-width));
+            margin: 0 auto;
+            overflow: hidden;
+        }
+
+        .full-img {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+
+        .new-shell {
+            min-height: 100vh;
+            padding-bottom: clamp(50px, 13.33vw, 100px);
+            background: var(--new-blue);
+        }
+
+        .new-banner {
+            border-bottom-left-radius: clamp(18px, 4.8vw, 36px);
+            border-bottom-right-radius: clamp(18px, 4.8vw, 36px);
+        }
+
+        .tab {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: clamp(8px, 2.13vw, 16px);
+            width: 82%;
+            margin: clamp(26px, 6.93vw, 52px) auto clamp(18px, 4.8vw, 36px);
+            padding: clamp(10px, 2.67vw, 20px);
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.34);
+        }
+
+        .tab .item {
+            min-width: 0;
+            border: 0;
+            border-radius: 999px;
+            background: transparent;
+            color: rgba(255, 255, 255, 0.88);
+            cursor: pointer;
+            font-size: clamp(20px, 5.33vw, 40px);
+            font-weight: 700;
+            line-height: 1;
+            padding: clamp(15px, 4vw, 30px) 0;
+            text-align: center;
+        }
+
+        .tab .item.active {
+            background: #fff;
+            color: var(--button-blue);
+        }
+
+        .tab-item {
+            display: none;
+        }
+
+        .tab-item.active {
+            display: block;
+        }
+
+        .new-grid,
+        .data-list {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            column-gap: 6.15%;
+            row-gap: clamp(15px, 4vw, 30px);
+            padding: clamp(16px, 4.27vw, 32px) 3.87% 0;
+        }
+
+        .new-card {
+            min-width: 0;
+            cursor: pointer;
+        }
+
+        .data-list .item {
+            position: relative;
+            min-width: 0;
+            cursor: pointer;
+        }
+
+        .new-cover-wrap {
+            position: relative;
+            display: block;
+            width: 100%;
+            aspect-ratio: 200 / 251;
+            overflow: hidden;
+            border-radius: clamp(7px, 1.87vw, 14px);
+            background: #d9e7fb;
+        }
+
+        .new-cover {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .data-list .item > img {
+            display: block;
+            width: 100%;
+            aspect-ratio: 200 / 251;
+            overflow: hidden;
+            border-radius: clamp(7px, 1.87vw, 14px);
+            background: #d9e7fb;
+            object-fit: cover;
+        }
+
+        .new-category {
+            position: absolute;
+            top: clamp(4px, 1.07vw, 8px);
+            left: clamp(5px, 1.33vw, 10px);
+            max-width: calc(100% - clamp(10px, 2.67vw, 20px));
+            overflow: hidden;
+            border-radius: clamp(3px, 0.8vw, 6px);
+            background: #ff3d36;
+            color: #fff;
+            font-size: clamp(13px, 3.2vw, 24px);
+            line-height: 1;
+            padding: clamp(3px, 0.8vw, 6px) clamp(5px, 1.33vw, 10px);
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .data-list .item .tag span {
+            display: inline;
+            margin-right: clamp(4px, 1.07vw, 8px);
+            color: #fff;
+            font-weight: 700;
+        }
+
+        .new-word-count {
+            position: absolute;
+            right: 0;
+            bottom: 0;
+            left: 0;
+            display: flex;
+            min-height: 20%;
+            align-items: center;
+            justify-content: center;
+            background: rgba(26, 26, 26, 0.68);
+            color: #fff;
+            font-size: clamp(14px, 3.47vw, 26px);
+            line-height: 1;
+        }
+
+        .new-card h2 {
+            display: -webkit-box;
+            height: clamp(42px, 11.04vw, 82px);
+            margin: clamp(12px, 3.2vw, 24px) 0 clamp(4px, 1.07vw, 8px);
+            overflow: hidden;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
+            line-clamp: 2;
+            color: #fff;
+            font-size: clamp(15px, 4vw, 30px);
+            font-weight: 700;
+            letter-spacing: 0;
+            line-height: clamp(21px, 5.52vw, 41px);
+        }
+
+        .data-list .item .novel-name {
+            display: -webkit-box;
+            height: clamp(42px, 11.04vw, 82px);
+            margin: clamp(12px, 3.2vw, 24px) 0 clamp(4px, 1.07vw, 8px);
+            overflow: hidden;
+            -webkit-box-orient: vertical;
+            -webkit-line-clamp: 2;
+            line-clamp: 2;
+            color: #fff;
+            font-size: clamp(15px, 4vw, 30px);
+            font-weight: 700;
+            letter-spacing: 0;
+            line-height: clamp(21px, 5.52vw, 41px);
+        }
+
+        .new-card p {
+            height: clamp(16px, 4.27vw, 32px);
+            margin: 0 0 clamp(15px, 4vw, 30px);
+            overflow: hidden;
+            color: rgba(255, 255, 255, 0.72);
+            font-size: clamp(14px, 3.73vw, 28px);
+            line-height: 1.1;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .data-list .item .tag {
+            min-height: clamp(16px, 4.27vw, 32px);
+            margin: 0 0 clamp(15px, 4vw, 30px);
+            overflow: visible;
+            color: rgba(255, 255, 255, 0.72);
+            font-size: clamp(14px, 3.73vw, 28px);
+            line-height: 1.28;
+            white-space: normal;
+            word-break: break-all;
+        }
+
+        .read-btn {
+            display: block;
+            width: 100%;
+            min-height: clamp(32px, 8.53vw, 64px);
+            border: 0;
+            border-radius: 999px;
+            background: #fff;
+            color: var(--button-blue);
+            cursor: pointer;
+            font-size: clamp(18px, 4.8vw, 36px);
+            font-weight: 800;
+            line-height: 1;
+        }
+
+        .data-list .item .btn {
+            display: block;
+            width: 100%;
+            min-height: clamp(32px, 8.53vw, 64px);
+            border: 0;
+            border-radius: 999px;
+            background: #fff;
+            color: var(--button-blue);
+            cursor: pointer;
+            font-size: clamp(18px, 4.8vw, 36px);
+            font-weight: 800;
+            line-height: clamp(32px, 8.53vw, 64px);
+            text-align: center;
+        }
+
+        .toast {
+            position: fixed;
+            left: 50%;
+            bottom: 28px;
+            z-index: 20;
+            max-width: min(86vw, 420px);
+            padding: 10px 16px;
+            border-radius: 999px;
+            background: rgba(0, 0, 0, 0.74);
+            color: #fff;
+            font-size: 14px;
+            opacity: 0;
+            pointer-events: none;
+            transform: translate(-50%, 12px);
+            transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+
+        .toast.is-visible {
+            opacity: 1;
+            transform: translate(-50%, 0);
+        }
+
+        @media (min-width: 751px) {
+            .phone-page {
+                width: var(--page-width);
+            }
+        }
+    </style>
+</head>
+
+<body class="new-page">
+    <main class="phone-page new-shell" aria-label="20261128新书上架">
+        <img class="full-img new-banner" src="//rs.sfacg.com/web/pages/images/upload/2026/11/c9b0b63f-ed77-4ec1-8db0-abb737a9ca02.jpg" alt="20261128新书上架" />
+
+        <div class="tab" style="display:none;">
+            <div class="item active">轻小说</div>
+            <div class="item">对话小说</div>
+        </div>
+        <div class="tab-content">
+            <div class="tab-item active">
+                <div class="data-list">
+                              <div class="item" data-nid="786432" data-cid="0">
+            <img
+              src="//rs.sfacg.com/web/novel/images/NovelCover/Big/2026/10/7d3805c0-104b-4a7f-90c6-bfd16b9e767b.jpg">
+            <div class="novel-name">
+              反派大师兄才不会是纯爱宗圣女！
+            </div>
+            <div class="tag">
+              <span>玄幻</span>
+              女性主角/变身/橘味/恋爱
+            </div>
+            <!--已订阅标签-->
+            <div class="order-tag" style="display:none;">
+              已预订
+            </div>
+            <div class="btn">
+              去阅读
+            </div>
+          </div>          <div class="item" data-nid="786191" data-cid="0">
+            <img
+              src="//rs.sfacg.com/web/novel/images/NovelCover/Big/2026/10/1724003d-f63e-4849-bf5f-b760cdd85fca.jpg">
+            <div class="novel-name">
+              变成反派师姐后，夜夜被师妹欺负
+            </div>
+            <div class="tag">
+              <span>古风</span>
+              女性主角/橘味/治愈/仙侠
+            </div>
+            <!--已订阅标签-->
+            <div class="order-tag" style="display:none;">
+              已预订
+            </div>
+            <div class="btn">
+              去阅读
+            </div>
+          </div>          <div class="item" data-nid="786018" data-cid="0">
+            <img
+              src="//rs.sfacg.com/web/novel/images/NovelCover/Big/2026/10/6c0f1924-ea60-4abe-8ee3-2d37dbc128e1.jpg">
+            <div class="novel-name">
+              你一定要拯救我吗，骑士大人？
+            </div>
+            <div class="tag">
+              <span>魔幻</span>
+              女性主角/变身/嫁人/恋爱
+            </div>
+            <!--已订阅标签-->
+            <div class="order-tag" style="display:none;">
+              已预订
+            </div>
+            <div class="btn">
+              去阅读
+            </div>
+          </div>          <div class="item" data-nid="785758" data-cid="0">
+            <img
+              src="//rs.sfacg.com/web/novel/images/NovelCover/Big/2026/10/1cef5952-9fc8-4896-910b-89a0011d09bb.jpg">
+            <div class="novel-name">
+              魔女小屋，收留心碎问题少女
+            </div>
+            <div class="tag">
+              <span>都市</span>
+              女性主角/变身/橘味/日常
+            </div>
+            <!--已订阅标签-->
+            <div class="order-tag" style="display:none;">
+              已预订
+            </div>
+            <div class="btn">
+              去阅读
+            </div>
+          </div>          <div class="item" data-nid="785707" data-cid="0">
+            <img
+              src="//rs.sfacg.com/web/novel/images/NovelCover/Big/2026/10/a6e784e5-f109-4b26-8797-65ae1683ecc2.jpg">
+            <div class="novel-name">
+              当魔法少女死后，我成了她
+            </div>
+            <div class="tag">
+              <span>都市</span>
+              变身/橘味/日常/搞笑
+            </div>
+            <!--已订阅标签-->
+            <div class="order-tag" style="display:none;">
+              已预订
+            </div>
+            <div class="btn">
+              去阅读
+            </div>
+          </div>          <div class="item" data-nid="786349" data-cid="0">
+            <img
+              src="//rs.sfacg.com/web/novel/images/NovelCover/Big/2026/10/d671d134-0acb-4108-a849-177842f3720a.jpg">
+            <div class="novel-name">
+              我的反派人生从心声泄露开始崩坏
+            </div>
+            <div class="tag">
+              <span>玄幻</span>
+              脑洞/恋爱/系统/仙侠
+            </div>
+            <!--已订阅标签-->
+            <div class="order-tag" style="display:none;">
+              已预订
+            </div>
+            <div class="btn">
+              去阅读
+            </div>
+          </div>          <div class="item" data-nid="787759" data-cid="0">
+            <img
+              src="//rs.sfacg.com/web/novel/images/NovelCover/Big/2026/10/337b1a0a-bf8f-42d6-992c-244857a19931.jpg">
+            <div class="novel-name">
+              杂鱼的我转生成杂鱼反派合理吗
+            </div>
+            <div class="tag">
+              <span>魔幻</span>
+              女性主角/变身/橘味/战斗
+            </div>
+            <!--已订阅标签-->
+            <div class="order-tag" style="display:none;">
+              已预订
+            </div>
+            <div class="btn">
+              去阅读
+            </div>
+          </div>          <div class="item" data-nid="787541" data-cid="0">
+            <img
+              src="//rs.sfacg.com/web/novel/images/NovelCover/Big/2026/10/43df8700-188c-4a6f-9e01-820bba8ea970.jpg">
+            <div class="novel-name">
+              魔女怎么被魔法少女给攻略了
+            </div>
+            <div class="tag">
+              <span>魔幻</span>
+              女性主角/橘味/战斗/多女主
+            </div>
+            <!--已订阅标签-->
+            <div class="order-tag" style="display:none;">
+              已预订
+            </div>
+            <div class="btn">
+              去阅读
+            </div>
+          </div>          <div class="item" data-nid="786038" data-cid="0">
+            <img
+              src="//rs.sfacg.com/web/novel/images/NovelCover/Big/2026/10/596a85e0-f859-48f2-a07f-69748ffec27a.jpg">
+            <div class="novel-name">
+              败北后堕为修女的吸血姬想要翻身
+            </div>
+            <div class="tag">
+              <span>魔幻</span>
+              女性主角/变身/橘味/战斗
+            </div>
+            <!--已订阅标签-->
+            <div class="order-tag" style="display:none;">
+              已预订
+            </div>
+            <div class="btn">
+              去阅读
+            </div>
+          </div>          <div class="item" data-nid="785655" data-cid="0">
+            <img
+              src="//rs.sfacg.com/web/novel/images/NovelCover/Big/2026/10/5bca71e6-020a-4de3-b3a3-8b3f7d9a44fc.jpg">
+            <div class="novel-name">
+              抱歉女主，净化完黑化值咱就死遁
+            </div>
+            <div class="tag">
+              <span>都市</span>
+              女性主角/橘味/恋爱/治愈
+            </div>
+            <!--已订阅标签-->
+            <div class="order-tag" style="display:none;">
+              已预订
+            </div>
+            <div class="btn">
+              去阅读
+            </div>
+          </div>          <div class="item" data-nid="786845" data-cid="0">
+            <img
+              src="//rs.sfacg.com/web/novel/images/NovelCover/Big/2026/10/e9249b3e-e5a4-42a6-9745-e55396a3ade5.jpg">
+            <div class="novel-name">
+              勇者大人，挚友是不能当老婆的啊
+            </div>
+            <div class="tag">
+              <span>魔幻</span>
+              女性主角/嫁人/异世界/纯爱
+            </div>
+            <!--已订阅标签-->
+            <div class="order-tag" style="display:none;">
+              已预订
+            </div>
+            <div class="btn">
+              去阅读
+            </div>
+          </div>          <div class="item" data-nid="787284" data-cid="0">
+            <img
+              src="//rs.sfacg.com/web/novel/images/NovelCover/Big/2026/10/f7e4465f-8ef2-402e-bdc4-01507c47464c.jpg">
+            <div class="novel-name">
+              从变成狐娘开始，到诸天万雌王
+            </div>
+            <div class="tag">
+              <span>魔幻</span>
+              女性主角/变身/橘味/战斗
+            </div>
+            <!--已订阅标签-->
+            <div class="order-tag" style="display:none;">
+              已预订
+            </div>
+            <div class="btn">
+              去阅读
+            </div>
+          </div>          <div class="item" data-nid="785848" data-cid="0">
+            <img
+              src="//rs.sfacg.com/web/novel/images/NovelCover/Big/2026/10/dae48d53-c8bc-4f1c-94d5-8dba8ca674db.jpg">
+            <div class="novel-name">
+              从乡野相遇开始，我和他的故事
+            </div>
+            <div class="tag">
+              <span>校园</span>
+              变身/嫁人/恋爱/治愈
+            </div>
+            <!--已订阅标签-->
+            <div class="order-tag" style="display:none;">
+              已预订
+            </div>
+            <div class="btn">
+              去阅读
+            </div>
+          </div>          <div class="item" data-nid="786078" data-cid="0">
+            <img
+              src="//rs.sfacg.com/web/novel/images/NovelCover/Big/2026/10/90a7ecd9-ca90-4bc5-9fc9-1a7513e3d6e2.jpg">
+            <div class="novel-name">
+              身为魔王靠贴贴变强很奇怪吗？
+            </div>
+            <div class="tag">
+              <span>游戏</span>
+              女性主角/变身/橘味/冒险
+            </div>
+            <!--已订阅标签-->
+            <div class="order-tag" style="display:none;">
+              已预订
+            </div>
+            <div class="btn">
+              去阅读
+            </div>
+          </div>          <div class="item" data-nid="783701" data-cid="0">
+            <img
+              src="//rs.sfacg.com/web/novel/images/NovelCover/Big/2026/08/ae417bd5-f780-4420-a043-3587427230b0.jpg">
+            <div class="novel-name">
+              假扮病娇，拯救缺爱少女们
+            </div>
+            <div class="tag">
+              <span>科幻</span>
+              女性主角/橘味/恋爱/系统
+            </div>
+            <!--已订阅标签-->
+            <div class="order-tag" style="display:none;">
+              已预订
+            </div>
+            <div class="btn">
+              去阅读
+            </div>
+          </div>          <div class="item" data-nid="787779" data-cid="0">
+            <img
+              src="//rs.sfacg.com/web/novel/images/NovelCover/Big/2026/10/c5ebe94b-c9cf-4d00-89b1-2b96bbee2731.jpg">
+            <div class="novel-name">
+              什么叫我成了魔王青梅的眷属？！
+            </div>
+            <div class="tag">
+              <span>科幻</span>
+              变身/橘味/无限流/退队
+            </div>
+            <!--已订阅标签-->
+            <div class="order-tag" style="display:none;">
+              已预订
+            </div>
+            <div class="btn">
+              去阅读
+            </div>
+          </div>          <div class="item" data-nid="786510" data-cid="0">
+            <img
+              src="//rs.sfacg.com/web/novel/images/NovelCover/Big/2026/10/136668b8-0216-4619-9d3b-592b99f9aeb0.jpg">
+            <div class="novel-name">
+              抱歉圣女，勇者已经跳槽魔界啦
+            </div>
+            <div class="tag">
+              <span>魔幻</span>
+              西幻/异世界/恋爱/治愈
+            </div>
+            <!--已订阅标签-->
+            <div class="order-tag" style="display:none;">
+              已预订
+            </div>
+            <div class="btn">
+              去阅读
+            </div>
+          </div>          <div class="item" data-nid="785481" data-cid="0">
+            <img
+              src="//rs.sfacg.com/web/novel/images/NovelCover/Big/2026/10/f81c1376-a1de-49aa-84d7-f01db3d03c9d.jpg">
+            <div class="novel-name">
+              转生恶魔小公主？谁是你家殿下！
+            </div>
+            <div class="tag">
+              <span>魔幻</span>
+              女性主角/变身/橘味/西幻
+            </div>
+            <!--已订阅标签-->
+            <div class="order-tag" style="display:none;">
+              已预订
+            </div>
+            <div class="btn">
+              去阅读
+            </div>
+          </div>          <div class="item" data-nid="781148" data-cid="0">
+            <img
+              src="//rs.sfacg.com/web/novel/images/NovelCover/Big/2026/08/b19c6bce-462c-4d66-bc31-0933bbb676d2.jpg">
+            <div class="novel-name">
+              停！什么叫你也变成魔法少女了？
+            </div>
+            <div class="tag">
+              <span>都市</span>
+              女性主角/变身/橘味/战斗
+            </div>
+            <!--已订阅标签-->
+            <div class="order-tag" style="display:none;">
+              已预订
+            </div>
+            <div class="btn">
+              去阅读
+            </div>
+          </div>          <div class="item" data-nid="787668" data-cid="0">
+            <img
+              src="//rs.sfacg.com/web/novel/images/NovelCover/Big/2026/10/684f0f7b-cf2e-4eb3-a514-dc40e2929d11.jpg">
+            <div class="novel-name">
+              被逐出豪门后，变成青梅小女仆
+            </div>
+            <div class="tag">
+              <span>魔幻</span>
+              女性主角/变身/大小姐
+            </div>
+            <!--已订阅标签-->
+            <div class="order-tag" style="display:none;">
+              已预订
+            </div>
+            <div class="btn">
+              去阅读
+            </div>
+          </div>          <div class="item" data-nid="784554" data-cid="0">
+            <img
+              src="//rs.sfacg.com/web/novel/images/NovelCover/Big/2026/10/c3910c83-29c6-41be-ae3f-e6a79969e725.jpg">
+            <div class="novel-name">
+              只想做代练，却把反派仙子攻略了
+            </div>
+            <div class="tag">
+              <span>玄幻</span>
+              战斗/恋爱/系统/无敌
+            </div>
+            <!--已订阅标签-->
+            <div class="order-tag" style="display:none;">
+              已预订
+            </div>
+            <div class="btn">
+              去阅读
+            </div>
+          </div>          <div class="item" data-nid="786203" data-cid="0">
+            <img
+              src="//rs.sfacg.com/web/novel/images/NovelCover/Big/2026/10/0516a324-e0ae-49db-bc66-8a81611ba0a0.jpg">
+            <div class="novel-name">
+              变成糟糕世界的魔法少女，这对吗
+            </div>
+            <div class="tag">
+              <span>都市</span>
+              战斗/西幻/恋爱/纯爱
+            </div>
+            <!--已订阅标签-->
+            <div class="order-tag" style="display:none;">
+              已预订
+            </div>
+            <div class="btn">
+              去阅读
+            </div>
+          </div>          <div class="item" data-nid="786698" data-cid="0">
+            <img
+              src="//rs.sfacg.com/web/novel/images/NovelCover/Big/2026/10/f985866f-4615-4760-8a0c-9f57da9ff03a.jpg">
+            <div class="novel-name">
+              勇者堕落后，被厨男恶龙投喂着
+            </div>
+            <div class="tag">
+              <span>魔幻</span>
+              变身/嫁人/西幻/恋爱
+            </div>
+            <!--已订阅标签-->
+            <div class="order-tag" style="display:none;">
+              已预订
+            </div>
+            <div class="btn">
+              去阅读
+            </div>
+          </div>          <div class="item" data-nid="784133" data-cid="0">
+            <img
+              src="//rs.sfacg.com/web/novel/images/NovelCover/Big/2026/09/162192c9-7f75-4c94-a85d-d19cecb87583.jpg">
+            <div class="novel-name">
+              失忆的美少女，不想沦为宠物
+            </div>
+            <div class="tag">
+              <span>魔幻</span>
+              女性主角/变身/橘味/战斗
+            </div>
+            <!--已订阅标签-->
+            <div class="order-tag" style="display:none;">
+              已预订
+            </div>
+            <div class="btn">
+              去阅读
+            </div>
+          </div>          <div class="item" data-nid="784160" data-cid="0">
+            <img
+              src="//rs.sfacg.com/web/novel/images/NovelCover/Big/2026/11/92903e54-4add-47db-8be9-6f0c4e3288fd.jpg">
+            <div class="novel-name">
+              我家师尊温柔又病娇
+            </div>
+            <div class="tag">
+              <span>古风</span>
+              仙侠/日常/倒追/多女主
+            </div>
+            <!--已订阅标签-->
+            <div class="order-tag" style="display:none;">
+              已预订
+            </div>
+            <div class="btn">
+              去阅读
+            </div>
+          </div>          <div class="item" data-nid="784359" data-cid="0">
+            <img
+              src="//rs.sfacg.com/web/novel/images/NovelCover/Big/2026/11/45c2b437-7f54-4c65-be4d-0821d5812be6.jpg">
+            <div class="novel-name">
+              与青梅竹马同居的距离
+            </div>
+            <div class="tag">
+              <span>都市</span>
+              橘味/恋爱/治愈/日常
+            </div>
+            <!--已订阅标签-->
+            <div class="order-tag" style="display:none;">
+              已预订
+            </div>
+            <div class="btn">
+              去阅读
+            </div>
+          </div>
+
+                </div>
+            </div>
+            <div class="tab-item ">
+                <div class="data-list">
+                    
+
+                </div>
+            </div>
+        </div>
+    </main>
+    <div class="toast" role="status" aria-live="polite"></div>
+
+    <script type="text/javascript" src="//rs.sfacg.com/web/common/js/jquery.min.js"></script>
+    <script type="text/javascript" src="//rs.sfacg.com/web/novel/js/v1/request-1.0.16.js"></script>
+    <script type="text/javascript" src="//rs.sfacg.com/web/pages/js/bridge-1.0.78.js"></script>
+    <script type="text/javascript" src="/js/basenofast.js"></script>
+    <script type="text/javascript">
+// 选项卡切换
+        $(function () {
+            $('.tab .item').click(function () {
+                $(this).addClass('active').siblings().removeClass('active')
+                $('.tab-content .tab-item').eq($(this).index()).addClass('active').siblings().removeClass('active')
+            });
+            var novelType = GetArgsFromHref(location.href, "nt");
+            if (novelType == "chat")
+                $('.tab .item').eq(1).click();
+            var bridge = bridgeFactory.getBridge(GetArgsFromHref(location.href, "type"));
+            var eventLabel = 'vipPush20261128';
+            var pushTypeArray = ['huawei', 'oppo', 'vivo', 'xiaomi']
+            var sourceChannel = GetArgsFromHref(location.href, "pushType").toLowerCase();
+            if (sourceChannel != "") {
+                if (!pushTypeArray.includes(sourceChannel))
+                    sourceChannel = "other";
+                bridge.onUmengEvent("count_act_" + sourceChannel + "_push", eventLabel);
+            }
+            $("div[data-nid]").click(function () {
+                bridge.showBookDetail2($(this).attr("data-nid"), $(this).attr("data-cid"));
+            });
+        })
+    </script>
+</body>
+</html>

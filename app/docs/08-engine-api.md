@@ -183,8 +183,9 @@ YYYY-MM-DD anchor → 400。
 - `cid` 固定 0（轻小说）——实测各期 cid=1 对话小说全空，暂不暴露参数。
 - 只读、无认证、无分页；走全局限速器前台车道（用户触发），结果按期缓存
   24h（空期缓存负结果），重复打开不再打上游。
-- 响应：`{date: "YYYY-MM-DD", items: [{nid, title, intro, cover,
-  is_main_push, tags: [], in_seed, in_lib}]}`。`is_main_push=true` 官方渲染
+- 响应：`{date: "YYYYMMDD", items: [{nid, title, intro, cover,
+  is_main_push, tags: [], in_seed, in_lib}]}`（`date` 是归一后的周六期数键，
+  H5 URL 形态）。`is_main_push=true` 官方渲染
   「主编推荐」。`in_seed` = 该 nid 在内置库；是则 `in_lib` 带库内
   author/favs/cover，端上直接进详情页；否则详情不可用（上游无作者/字数，
   intro 内联展示）。
@@ -192,6 +193,23 @@ YYYY-MM-DD anchor → 400。
   签约升级为 VIP），不是首发日——我们此前的「上架」语义实为入库/创建，
   与官方不符已弃用；与日历 est_date（nid 内插）口径不同，UI 严禁混列/互推。
 - `hasOrder` 是用户预约态（未登录恒 false），不透传。
+
+### GET /strata/vippush?date=YYYYMMDD（**已实现**，2026-11-28）
+
+VIP 上架专题：解析官方 `pages.sfacg.com/h5/general/vipPush{YYYYMMDD}.html?type=android`
+的服务端直出 HTML（`data-nid` / `.novel-name` / `img@src` / `.tag`，无 JSON ajax 端点；
+事实 → docs/sfacg-endpoints.md §7.6），与 `/strata/preorder` 是同一周六期次的
+**两条不同数据线**（预约 = 编辑精选预告，专题 = 当周上架全书）。要点：
+
+- `date` 归一规则与 preorder 完全相同（任意日 → 所在周周六）；空期（页面未发布）
+  返回 `items: []` 并缓存负结果。
+- 走全局限速器前台车道；按周六期缓存 24h。响应：
+  `{date: "YYYYMMDD", items: [{nid, title, cover, genre, tags: [], in_seed, in_lib}]}`。
+  `genre` = `.tag` 内 `<span>`；`tags` = 其后 `/` 分隔文本。上游封面 `//rs.sfacg.com/...`
+  补 `https:` 后透传。无 intro / is_main_push / 作者 / 字数。
+- `in_seed` / `in_lib` 语义与 preorder 同（复用 `store.PreorderInLib`）；库外书
+  由端上 rank-seed 预写收录后再进详情页。
+- `date` 字段与 preorder 一致，均回 `YYYYMMDD` 周六期数键（H5 URL 形态）。
 
 ### GET /strata/cover-carousel?form=&limit=&seed=（**已实现**）
 
