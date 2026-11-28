@@ -110,6 +110,14 @@ class SettingsPage extends ConsumerWidget {
                 read: (st) => st.appApiEnabled,
                 // App API 是内置凭据自签（sfacg-app-api.md §1），无需用户输入。
                 write: (h, v) => h.api.setAppAPIEnabled(v)),
+            _switchRow(context, ref,
+                title: '关注时同时开启定时刷新',
+                subtitleOf: (st) => st.watchDefaultActive
+                    ? '开启——关注即加入关注列表并由引擎定时抓取更新'
+                    : '关闭——关注仅加入关注列表，不发起定时抓取',
+                watch: detailRateLimitProvider,
+                read: (st) => st.watchDefaultActive,
+                write: (h, v) => h.api.setWatchDefaultActive(v)),
           ]),
           _card(context, [
             _fold(context,

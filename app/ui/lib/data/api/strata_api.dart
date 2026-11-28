@@ -128,6 +128,12 @@ class StrataApi {
   Future<EngineSettings> settings() async =>
       EngineSettings.fromJson(await _get('/settings') as Map<String, dynamic>);
 
+  Future<EngineSettings> setWatchDefaultActive(bool enabled) async =>
+      EngineSettings.fromJson(
+        await _putBody('/settings', {'watch_default_active': enabled})
+            as Map<String, dynamic>,
+      );
+
   Future<EngineSettings> setDetailRateLimitEnabled(bool enabled) async =>
       EngineSettings.fromJson(
         await _putBody('/settings', {'detail_rate_limit_enabled': enabled})
@@ -865,11 +871,16 @@ class EngineSettings {
   final bool appApiEnabled;
   final String discoverK;
 
+  /// 详情页「关注」的默认行为（用户裁定 2026-11-28）：
+  /// true = 关注并加入定时刷新，false = 仅关注。
+  final bool watchDefaultActive;
+
   EngineSettings({
     required this.detailRateLimitEnabled,
     required this.windowSeconds,
     this.appApiEnabled = false,
     this.discoverK = '0',
+    this.watchDefaultActive = false,
   });
 
   factory EngineSettings.fromJson(Map<String, dynamic> j) => EngineSettings(
@@ -877,6 +888,7 @@ class EngineSettings {
     windowSeconds: j['detail_refresh_window_seconds'] as int? ?? 86400,
     appApiEnabled: j['app_api_enabled'] as bool? ?? false,
     discoverK: j['discover_k'] as String? ?? '0',
+    watchDefaultActive: j['watch_default_active'] as bool? ?? false,
   );
 }
 

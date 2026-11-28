@@ -500,7 +500,10 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
   /// 加入 watchlist（v6：只存，原「收藏/加入书架」）。
   Future<void> _addWatch() async {
     final handle = await ref.read(bootProvider.future);
-    await handle.api.watchAdd(widget.nid);
+    // 默认行为（用户裁定 2026-11-28）：settings 里选择「仅关注」或
+    // 「关注并定时刷新」（watch_default_active）——单按钮统一入口。
+    final settings = await handle.api.settings();
+    await handle.api.watchAdd(widget.nid, active: settings.watchDefaultActive);
     setState(() => onWatch = true);
   }
 
@@ -513,20 +516,6 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
     });
   }
 
-  /// 追踪切换（v6）：不在列表 = 加入并激活；在列表 = 翻转 poll_enabled。
-  Future<void> _toggleTracking() async {
-    final handle = await ref.read(bootProvider.future);
-    final next = !tracking;
-    if (onWatch) {
-      await handle.api.watchSetActive(widget.nid, next);
-    } else {
-      await handle.api.watchAdd(widget.nid, active: true);
-    }
-    setState(() {
-      onWatch = true;
-      tracking = next;
-    });
-  }
 
   String? _num(Object? v) {
     if (v == null) return null;
@@ -907,16 +896,6 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
               icon: Icon(onWatch ? Icons.bookmark : Icons.bookmark_add_outlined,
                   size: 18),
               label: Text(onWatch ? '已关注' : '关注'),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: OutlinedButton.icon(
-              onPressed: _toggleTracking,
-              icon:
-                  Icon(tracking ? Icons.visibility : Icons.visibility_outlined,
-                      size: 18),
-              label: Text(tracking ? '停止追踪' : '追踪'),
             ),
           ),
           const SizedBox(width: 8),

@@ -81,6 +81,9 @@ const (
 	detailRefreshWindow = 24 * time.Hour
 	detailRateLimitPref = "detail_rate_limit_enabled"
 	appAPIPref          = "app_api_enabled"
+	// watchDefaultActivePref：详情页「关注」的默认行为（用户裁定
+	// 2026-11-28）——true = 关注并加入定时刷新，false = 仅关注。
+	watchDefaultActivePref = "watch_default_active"
 	discoverKPref       = "discover_k"
 )
 
@@ -249,6 +252,11 @@ func (s *Server) settings(c *gin.Context) {
 		fail(c, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
+	watchDefault, err := s.watchDefaultActive(c.Request.Context())
+	if err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	}
 	discoverK := "0"
 	if v, ok, err := s.store.Pref(c.Request.Context(), discoverKPref); err != nil {
 		fail(c, http.StatusInternalServerError, "internal", err.Error())
@@ -261,6 +269,7 @@ func (s *Server) settings(c *gin.Context) {
 		"detail_refresh_window_seconds": int64(detailRefreshWindow / time.Second),
 		"app_api_enabled":               appAPI,
 		"discover_k":                    discoverK,
+		"watch_default_active":          watchDefault,
 	})
 }
 
@@ -269,10 +278,11 @@ func (s *Server) updateSettings(c *gin.Context) {
 		DetailRateLimitEnabled *bool   `json:"detail_rate_limit_enabled"`
 		AppAPIEnabled          *bool   `json:"app_api_enabled"`
 		DiscoverK              *string `json:"discover_k"`
+		WatchDefaultActive     *bool   `json:"watch_default_active"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil ||
 		(body.DetailRateLimitEnabled == nil && body.AppAPIEnabled == nil &&
-			body.DiscoverK == nil) {
+			body.DiscoverK == nil && body.WatchDefaultActive == nil) {
 		fail(c, http.StatusBadRequest, "invalid_argument",
 			"detail_rate_limit_enabled, app_api_enabled or discover_k is required")
 		return
@@ -302,6 +312,12 @@ func (s *Server) updateSettings(c *gin.Context) {
 			return
 		}
 	}
+	if body.WatchDefaultActive != nil {
+		if err := s.store.SetPref(c.Request.Context(), watchDefaultActivePref, boolPref(*body.WatchDefaultActive)); err != nil {
+			fail(c, http.StatusInternalServerError, "internal", err.Error())
+			return
+		}
+	}
 	s.settings(c)
 }
 
@@ -320,6 +336,19 @@ func (s *Server) detailRateLimitEnabled(ctx context.Context) (bool, error) {
 	}
 	if !ok {
 		return true, nil
+	}
+	return v != "0" && v != "false", nil
+}
+
+// watchDefaultActive returns the persisted default behavior for the
+// detail-page follow button; missing means false (仅关注, no poller).
+func (s *Server) watchDefaultActive(ctx context.Context) (bool, error) {
+	v, ok, err := s.store.Pref(ctx, watchDefaultActivePref)
+	if err != nil {
+		return false, err
+	}
+	if !ok {
+		return false, nil
 	}
 	return v != "0" && v != "false", nil
 }
