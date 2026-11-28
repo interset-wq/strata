@@ -25,6 +25,7 @@ class _WatchlistPageState extends ConsumerState<WatchlistPage> {
   int? _groupFilter; // null = 全部（不做分组过滤）
   final int _sort = 0; // 0 最近添加 / 1 上次抓取 / 2 收藏最多
   String _query = '';
+  bool _searchMode = false; // AppBar 搜索态：点击搜索 icon 后展开搜索框
   final _scroll = ScrollController();
   bool _showTop = false;
 
@@ -174,9 +175,35 @@ class _WatchlistPageState extends ConsumerState<WatchlistPage> {
   PreferredSizeWidget _normalAppBar() {
     final unread =
         ref.watch(notificationsProvider).value?['unread'] as int? ?? 0;
+    if (_searchMode) {
+      // 搜索态：AppBar 整体变搜索框，返回即退出搜索并清词。
+      return AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => setState(() {
+            _searchMode = false;
+            _query = '';
+          }),
+        ),
+        title: TextField(
+          autofocus: true,
+          onChanged: (v) => setState(() => _query = v.trim()),
+          decoration: const InputDecoration(
+            isDense: true,
+            hintText: '搜索标题 / 作者 / 备注',
+            border: InputBorder.none,
+          ),
+        ),
+      );
+    }
     return AppBar(
         title: const Text('我的关注'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            tooltip: '搜索',
+            onPressed: () => setState(() => _searchMode = true),
+          ),
           IconButton(
             // 关注通知入口（2026-11-26）+ 未读角标（2026-11-28）：有未读
             // 关注更新时角标提示。
@@ -252,7 +279,6 @@ class _WatchlistPageState extends ConsumerState<WatchlistPage> {
               onGenre: (v) => setState(() => _genreFilter = v),
               onManage: _manageGroups,
             ),
-            const _HeatmapCard(),
             Expanded(
               child: filtered.isEmpty
                   ? Center(
@@ -398,7 +424,7 @@ class _Overview extends StatelessWidget {
   }
 }
 
-/// 搜索框 + 双模式分段（全部 / 仅关注 / 追踪中）。
+/// 双模式分段（全部 / 仅关注 / 追踪中）；搜索已收进 AppBar。
 class _SearchAndMode extends StatelessWidget {
   final String query;
   final ValueChanged<String> onQuery;
@@ -415,39 +441,22 @@ class _SearchAndMode extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-      child: Column(
-        children: [
-          TextField(
-            onChanged: onQuery,
-            decoration: InputDecoration(
-              isDense: true,
-              prefixIcon: const Icon(Icons.search, size: 20),
-              hintText: '搜索标题 / 作者 / 备注',
-              border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10)),
-              contentPadding:
-                  const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-            ),
+      child: SizedBox(
+        height: 40,
+        child: SegmentedButton<int>(
+          segments: const [
+            ButtonSegment(value: 0, label: Text('全部')),
+            ButtonSegment(value: 1, label: Text('仅关注')),
+            ButtonSegment(value: 2, label: Text('追踪中')),
+          ],
+          selected: {mode},
+          showSelectedIcon: false,
+          style: const ButtonStyle(
+            visualDensity: VisualDensity.compact,
+            textStyle: WidgetStatePropertyAll(TextStyle(fontSize: 12)),
           ),
-          const SizedBox(height: 6),
-          SizedBox(
-            height: 40,
-            child: SegmentedButton<int>(
-              segments: const [
-                ButtonSegment(value: 0, label: Text('全部')),
-                ButtonSegment(value: 1, label: Text('仅关注')),
-                ButtonSegment(value: 2, label: Text('追踪中')),
-              ],
-              selected: {mode},
-              showSelectedIcon: false,
-              style: const ButtonStyle(
-                visualDensity: VisualDensity.compact,
-                textStyle: WidgetStatePropertyAll(TextStyle(fontSize: 12)),
-              ),
-              onSelectionChanged: (s) => onMode(s.first),
-            ),
-          ),
-        ],
+          onSelectionChanged: (s) => onMode(s.first),
+        ),
       ),
     );
   }
@@ -869,80 +878,6 @@ class _ErrorState extends StatelessWidget {
           OutlinedButton(onPressed: onRetry, child: const Text('重试')),
         ],
       ),
-    );
-  }
-}
-
-/// 更新热力图（docs/07 §4）：关注书观测的按日聚合，90 天格子，
-/// 强度 = 当日有观测的书数。纯聚合视图，不伪造全库时序。
-class _HeatmapCard extends ConsumerWidget {
-  const _HeatmapCard();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final scheme = Theme.of(context).colorScheme;
-    final future =
-        ref.read(bootProvider.future).then((h) => h.api.watchHeatmap());
-    return FutureBuilder<List<HeatmapDay>>(
-      future: future,
-      builder: (context, snap) {
-        Widget body;
-        if (snap.hasError) {
-          body = Text('加载失败：${snap.error}',
-              style: TextStyle(color: scheme.error, fontSize: 12));
-        } else if (snap.connectionState != ConnectionState.done) {
-          body = const Center(
-              child: SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2)));
-        } else {
-          final byDay = {
-            for (final c in snap.data ?? <HeatmapDay>[]) c.day: c,
-          };
-          final today = DateTime.now().millisecondsSinceEpoch ~/ 86400000;
-          final maxBooks = byDay.values
-              .fold<int>(0, (m, c) => c.books > m ? c.books : m);
-          body = Wrap(
-            spacing: 2,
-            runSpacing: 2,
-            children: [
-              for (int d = today - 89; d <= today; d++)
-                Builder(builder: (_) {
-                  final c = byDay[d];
-                  final f =
-                      (c == null || maxBooks == 0) ? 0.0 : c.books / maxBooks;
-                  return Container(
-                    width: 11,
-                    height: 11,
-                    decoration: BoxDecoration(
-                      color: f == 0
-                          ? scheme.surfaceContainerHighest
-                          : scheme.primary.withAlpha((80 + 175 * f).round()),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  );
-                }),
-            ],
-          );
-        }
-        return Card(
-          margin: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('更新动态 · 90 天',
-                    style: TextStyle(
-                        fontSize: 12, color: scheme.onSurfaceVariant)),
-                const SizedBox(height: 8),
-                body,
-              ],
-            ),
-          ),
-        );
-      },
     );
   }
 }
