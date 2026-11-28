@@ -269,6 +269,28 @@ GROUP BY contest, form`)
 		return nil, err
 	}
 
+	// 收录书并入在库计数（用户裁定 2026-11-28）：参赛清单点库外书触发
+	// 自动收录，book_meta.contest 带回比赛归属，下次进列表计数即更新。
+	metaRows, err := s.DB.QueryContext(ctx,
+		`SELECT contest, COUNT(*) FROM book_meta WHERE contest != '' GROUP BY contest`)
+	if err != nil {
+		return nil, err
+	}
+	defer metaRows.Close()
+	for metaRows.Next() {
+		var contest string
+		var n int
+		if err := metaRows.Scan(&contest, &n); err != nil {
+			return nil, err
+		}
+		if a, ok := byName[ContestEventName(contest)]; ok {
+			a.g.Count += n
+		}
+	}
+	if err := metaRows.Err(); err != nil {
+		return nil, err
+	}
+
 	out := make([]ContestGroup, 0, len(byName))
 	for name, a := range byName {
 		tracks := make([]string, 0, len(a.trackCnt))

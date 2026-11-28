@@ -1756,12 +1756,13 @@ func (s *Server) bookRankSeed(c *gin.Context) {
 		Author   string `json:"author"`
 		CoverURL string `json:"cover_url"`
 		Genre    string `json:"genre"`
+		Contest  string `json:"contest"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		fail(c, http.StatusBadRequest, "invalid_argument", "invalid json body")
 		return
 	}
-	if err := s.store.SeedFromRank(c.Request.Context(), nid, req.Title, req.Author, req.CoverURL, req.Genre); err != nil {
+	if err := s.store.SeedFromRank(c.Request.Context(), nid, req.Title, req.Author, req.CoverURL, req.Genre, req.Contest); err != nil {
 		fail(c, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}

@@ -405,12 +405,14 @@ class StrataApi {
     String author = '',
     String coverUrl = '',
     String genre = '',
+    String contest = '',
   }) async {
     await _postBody('/books/$nid/rank-seed', {
       'title': title,
       'author': author,
       'cover_url': coverUrl,
       'genre': genre,
+      if (contest.isNotEmpty) 'contest': contest,
     });
   }
 

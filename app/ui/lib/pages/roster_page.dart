@@ -372,7 +372,12 @@ class _RosterPageState extends ConsumerState<RosterPage> {
             }),
           );
         }
-        return _RosterRow(item: items[i]);
+        return _RosterRow(
+            item: items[i],
+            contest: widget.contest +
+                ((_division.isEmpty || _division == '全部')
+                    ? ''
+                    : _division));
       },
     );
   }
@@ -383,7 +388,11 @@ class _RosterPageState extends ConsumerState<RosterPage> {
 class _RosterRow extends ConsumerWidget {
   final RosterItem item;
 
-  const _RosterRow({required this.item});
+  /// 比赛归属（用户裁定 2026-11-28）：收录库外书时带回赛事，清单在库
+  /// 计数与该行库内态随收录更新。
+  final String contest;
+
+  const _RosterRow({required this.item, required this.contest});
 
   static const _formLabels = {
     'long': '长篇',
@@ -422,6 +431,9 @@ class _RosterRow extends ConsumerWidget {
               title: item.title,
               author: item.author,
               coverUrl: item.coverUrl ?? '',
+              // 比赛归属（用户裁定 2026-11-28）：收录时带回赛事，清单在库
+              // 计数与该行库内态随收录更新。
+              contest: contest,
             );
           } catch (_) {}
         }

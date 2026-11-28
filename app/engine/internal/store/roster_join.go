@@ -80,7 +80,49 @@ FROM seed.books WHERE nid IN (`+marks+`)`, args...)
 			Favs: intPtr(favs), Status: status, EstYear: year, Words: intPtr(words),
 		}
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return out, err
+	}
+	// 收录书并入（用户裁定 2026-11-28）：book_meta 命中即库内——参赛清单
+	// 点库外书触发自动收录后，下次进清单该行即显示为库内。
+	var missing []int64
+	for _, n := range nids {
+		if _, ok := out[n]; !ok {
+			missing = append(missing, n)
+		}
+	}
+	if len(missing) == 0 {
+		return out, nil
+	}
+	marks2 := strings.TrimSuffix(strings.Repeat("?,", len(missing)), ",")
+	args2 := make([]any, len(missing))
+	for i, n := range missing {
+		args2[i] = n
+	}
+	rows2, err := s.DB.QueryContext(ctx, `
+SELECT nid, form, favs, est_year, words
+FROM book_meta WHERE nid IN (`+marks2+`)`, args2...)
+	if err != nil {
+		return out, nil // book_meta enrich is best-effort
+	}
+	defer rows2.Close()
+	for rows2.Next() {
+		var (
+			nid64        int64
+			form         sql.NullString
+			favs         sql.NullInt64
+			year         sql.NullInt64
+			words        sql.NullInt64
+		)
+		if err := rows2.Scan(&nid64, &form, &favs, &year, &words); err != nil {
+			continue
+		}
+		out[nid64] = BookLite{
+			NID: nid64, Form: form.String,
+			Favs: intPtr(favs), EstYear: int(year.Int64), Words: intPtr(words),
+		}
+	}
+	return out, nil
 }
 
 // RosterLocalBooks lists the in-library books of one event (optionally one

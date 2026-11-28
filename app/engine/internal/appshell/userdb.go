@@ -152,7 +152,8 @@ CREATE TABLE IF NOT EXISTS book_meta(
   bg_banner    TEXT,
   category_id  INTEGER,
   is_sensitive INTEGER,
-  allow_down   INTEGER
+  allow_down   INTEGER,
+  contest      TEXT
 );
 
 -- One row per nid records the last outbound detail-fetch attempt. An attempt
@@ -309,6 +310,9 @@ func migrateDiscoveredMetrics(db *sql.DB) error {
 	cols := []struct{ name, typ string }{
 		{"est_year", "INTEGER"}, {"form", "TEXT"}, {"cqs", "REAL"},
 		{"cqs_state", "TEXT"}, {"cps", "REAL"}, {"len_norm", "REAL"},
+		// 比赛归属（用户裁定 2026-11-28）：参赛清单点库外书触发收录时写入，
+		// ContestGroups 的在库计数把收录书也算上。
+		{"contest", "TEXT"},
 	}
 	for _, c := range cols {
 		if !hasColumn(db, "discovered", c.name) {

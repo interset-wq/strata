@@ -3084,16 +3084,17 @@ WHERE seed.books.nid IN (`+placeholders+`)`, args...)
 // 404-ing into a blocking collect. Existing rows are never downgraded:
 // basic fields are filled only when empty; full fetch data (words, favs,
 // summary, …) is left to the standard refresh path.
-func (s *Store) SeedFromRank(ctx context.Context, nid int64, title, author, coverURL, genre string) error {
+func (s *Store) SeedFromRank(ctx context.Context, nid int64, title, author, coverURL, genre, contest string) error {
 	_, err := s.DB.ExecContext(ctx, `
-INSERT INTO book_meta(nid, source, fetched_at, title, author, cover_url, genre)
-VALUES (?, 'rank', ?, ?, ?, ?, ?)
+INSERT INTO book_meta(nid, source, fetched_at, title, author, cover_url, genre, contest)
+VALUES (?, 'rank', ?, ?, ?, ?, ?, ?)
 ON CONFLICT(nid) DO UPDATE SET
   title     = COALESCE(NULLIF(book_meta.title, ''), excluded.title),
   author    = COALESCE(NULLIF(book_meta.author, ''), excluded.author),
   cover_url = COALESCE(NULLIF(book_meta.cover_url, ''), excluded.cover_url),
-  genre     = COALESCE(NULLIF(book_meta.genre, ''), excluded.genre)`,
-		nid, time.Now().Unix(), title, author, coverURL, genre)
+  genre     = COALESCE(NULLIF(book_meta.genre, ''), excluded.genre),
+  contest   = COALESCE(NULLIF(excluded.contest, ''), book_meta.contest)`,
+		nid, time.Now().Unix(), title, author, coverURL, genre, contest)
 	return err
 }
 
