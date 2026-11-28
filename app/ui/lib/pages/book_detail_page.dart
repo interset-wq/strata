@@ -46,6 +46,8 @@ class BookDetailPage extends ConsumerStatefulWidget {
 
 class _BookDetailPageState extends ConsumerState<BookDetailPage> {
   bool refreshing = false;
+  // 时间窗防抖锚点：上次刷新发起时刻（含收录链路的自动调用）。
+  DateTime _lastRefreshAt = DateTime.fromMillisecondsSinceEpoch(0);
   bool _footprintLogged = false;
   // 榜单库外书自动补全（docs/08 §rank-seed）：每次进页至多一次。
   bool _autoCompleted = false;
@@ -435,6 +437,13 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
     // 防抖（用户 2026-11-28 报无防抖）：in-flight 直接忽略——按钮禁用只在
     // rebuild 后生效，同帧连点或收录链路的自动调用仍可能并发穿透。
     if (refreshing) return;
+    // 时间窗防抖：完成后 3 秒内的再点也忽略——连点会连发请求刷屏
+    // （引擎 24h cooldown 会拦，但每次都产生一次请求与提示）。
+    if (DateTime.now().difference(_lastRefreshAt) <
+        const Duration(seconds: 3)) {
+      return;
+    }
+    _lastRefreshAt = DateTime.now();
     setState(() => refreshing = true);
     String msg;
     Color color;
