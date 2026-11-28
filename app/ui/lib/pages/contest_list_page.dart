@@ -122,7 +122,15 @@ class _ContestListPageState extends ConsumerState<ContestListPage>
               )
             : null,
       ),
-      body: Stack(
+      body: RefreshIndicator(
+        // 下拉重查（用户裁定 2026-11-28）：收录书即时反映到在库计数——
+        // provider invalidate 后引擎 ContestGroups 现查。放最外层，
+        // loading/error/空态也能下拉重试。
+        onRefresh: () async {
+          ref.invalidate(contestArchiveProvider);
+          await ref.read(contestArchiveProvider.future);
+        },
+        child: Stack(
         children: [
           groups.when(
             loading: () => const Center(child: CircularProgressIndicator()),
@@ -156,23 +164,18 @@ class _ContestListPageState extends ConsumerState<ContestListPage>
                   ),
                 );
               }
-              return RefreshIndicator(
-                // 下拉重查（用户裁定 2026-11-28）：收录书即时反映到在库
-                // 计数——provider invalidate 后引擎 ContestGroups 现查。
-                onRefresh: () async {
-                  ref.invalidate(contestArchiveProvider);
-                  await ref.read(contestArchiveProvider.future);
-                },
-                child: ListView(
-                  controller: _scroll,
-                  padding: const EdgeInsets.only(bottom: 24),
-                  children: [
-                    _columns(context, scheme, rail: series == 'x'),
-                    for (final g in items)
-                      ContestRowCard(group: g, yearRail: series == 'x'),
-                    _summary(context, scheme, list, items, series),
-                  ],
-                ),
+              return ListView(
+                controller: _scroll,
+                // 内容不满一屏时 ClampingScrollPhysics 拉不动，下拉刷新永不
+                // 触发（2026-11-28 实测）——必须强制可滚。
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.only(bottom: 24),
+                children: [
+                  _columns(context, scheme, rail: series == 'x'),
+                  for (final g in items)
+                    ContestRowCard(group: g, yearRail: series == 'x'),
+                  _summary(context, scheme, list, items, series),
+                ],
               );
             },
           ),
@@ -189,6 +192,7 @@ class _ContestListPageState extends ConsumerState<ContestListPage>
               ),
             ),
         ],
+      ),
       ),
     );
   }
