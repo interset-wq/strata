@@ -487,6 +487,7 @@ class _FilterChips extends ConsumerWidget {
             child: ChoiceChip(
               label: Text(label),
               selected: selected,
+              showCheckmark: false,
               onSelected: (_) => onTap(),
               labelStyle: TextStyle(
                   fontSize: 12,
