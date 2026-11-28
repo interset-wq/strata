@@ -21,11 +21,16 @@ class AboutPage extends StatelessWidget {
           return ListView(
             padding: const EdgeInsets.fromLTRB(16, 32, 16, 24),
             children: [
-              // App logo（与启动图标同源资源）。
-              Image.asset(
-                'assets/icon/app-icon-foreground.png',
-                width: 72,
-                height: 72,
+              // App logo：用 fullbleed 完整图（foreground 是自适应图标的
+              // 遮罩前景层，透明底，渲染出来与桌面图标完全不同——bug 修复
+              // 2026-11-28），圆角对齐桌面图标的遮罩形状。
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Image.asset(
+                  'assets/icon/app-icon-fullbleed.png',
+                  width: 72,
+                  height: 72,
+                ),
               ),
               const SizedBox(height: 10),
               Text(
