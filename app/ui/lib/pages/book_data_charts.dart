@@ -82,11 +82,17 @@ List<DayCell> buildDayCells(List<ObservationRow> items, {DateTime? end}) {
   return cells;
 }
 
-/// 万/亿记数（端上统一口径）。
+/// 全精度记数（用户裁定 2026-11-28）：千分位分隔，不用万/亿缩写——
+/// 观测数据要求尽可能精确。
 String wan(int n) {
-  if (n >= 100000000) return '${(n / 100000000).toStringAsFixed(1)}亿';
-  if (n >= 10000) return '${(n / 10000).toStringAsFixed(1)}万';
-  return '$n';
+  final s = n.toString();
+  final b = StringBuffer();
+  for (var i = 0; i < s.length; i++) {
+    final rest = s.length - i;
+    b.write(s[i]);
+    if (rest > 1 && rest % 3 == 1) b.write(',');
+  }
+  return b.toString();
 }
 
 /// 更新热力图（docs/07 §5 首屏）：某日新增字数，色阶**锚全勤阈值**（不做

@@ -199,7 +199,7 @@ func TestWatchlistCycle(t *testing.T) {
 		t.Fatalf("watchlist = %+v, want one 1004/self row", items)
 	}
 	// never polled => due
-	due, err := st.WatchDue(ctx, now+10, 10)
+	due, err := st.WatchDue(ctx, now+10, 0, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -210,7 +210,7 @@ func TestWatchlistCycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	// default poll_interval is 86400s: not due again right after
-	due, err = st.WatchDue(ctx, now+20, 10)
+	due, err = st.WatchDue(ctx, now+20, 0, 10)
 	if err != nil {
 		t.Fatal(err)
 	}

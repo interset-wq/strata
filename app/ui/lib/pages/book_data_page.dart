@@ -30,16 +30,28 @@ class _BookDataPageState extends ConsumerState<BookDataPage> {
   void initState() {
     super.initState();
     // book 可 404（库外书未抓过详情）——吞掉置 null，当前值仪表盘降级
-    _data = Future.wait<Object?>([
-      ref
-          .read(bootProvider.future)
-          .then((h) => h.api.observations(widget.nid)),
-      ref
-          .read(bootProvider.future)
-          .then<BookDetail?>((h) => h.api.book(widget.nid))
-          .catchError((_) => null),
-    ]);
+    _data = _load();
     _scroll.addListener(_onScroll);
+  }
+
+  Future<List<Object?>> _load() => Future.wait<Object?>([
+        ref
+            .read(bootProvider.future)
+            .then((h) => h.api.observations(widget.nid)),
+        ref
+            .read(bootProvider.future)
+            .then<BookDetail?>((h) => h.api.book(widget.nid))
+            .catchError((_) => null),
+      ]);
+
+  // 下拉刷新（用户 2026-11-28）：不必反复进出页面即可看到新观测。
+  Future<void> _refresh() async {
+    setState(() => _data = _load());
+    try {
+      await _data;
+    } catch (_) {
+      // 错误态由 FutureBuilder 渲染。
+    }
   }
 
   void _onScroll() {
@@ -89,9 +101,11 @@ class _BookDataPageState extends ConsumerState<BookDataPage> {
           final first = items.last;
           final spanDays =
               ((newest.observedAt - first.observedAt) / 86400).floor();
-          return ListView(
-            controller: _scroll,
-            padding: const EdgeInsets.all(16),
+          return RefreshIndicator(
+            onRefresh: _refresh,
+            child: ListView(
+              controller: _scroll,
+              padding: const EdgeInsets.all(16),
             children: [
               // 1. 更新热力图（首屏）+ 全勤达标看板——需字数观测
               if (hasWords) ...[
@@ -152,7 +166,8 @@ class _BookDataPageState extends ConsumerState<BookDataPage> {
                 ),
               ],
             ],
-          );
+          ),
+        );
         },
       ),
     );

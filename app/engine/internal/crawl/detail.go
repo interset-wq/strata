@@ -44,8 +44,11 @@ type Detail struct {
 	Favs      int64  `json:"favs"`
 	Praises   int64  `json:"praises"`
 	Words     int64  `json:"words"`
-	Status    string `json:"status"`
-	UpdatedAt string `json:"updated_at"`
+	// ShortComments/LongComments come from the "全部N条评论/书评" links.
+	ShortComments int64 `json:"short_comments,omitempty"`
+	LongComments  int64 `json:"long_comments,omitempty"`
+	Status        string `json:"status"`
+	UpdatedAt     string `json:"updated_at"`
 
 	// Author section (book_Author): snapshot data for the author page
 	// (docs/author-profile-on-demand §2.1). Absent on some pages — all
@@ -68,6 +71,8 @@ var (
 	reCatalogA    = regexp.MustCompile(`<a\s`)
 	reInteract    = regexp.MustCompile(`book_interact`)
 	reSmall       = regexp.MustCompile(`<small>\s*(-?[\d,]+)\s*</small>`)
+	reShortC      = regexp.MustCompile(`全部([\d,]+)条评论`)
+	reLongC       = regexp.MustCompile(`全部([\d,]+)条书评`)
 	reWords       = regexp.MustCompile(`book_info3">[^<]*?([\d,]+)字`)
 	reStatus      = regexp.MustCompile(`(已完结|连载中)`)
 	reUpdated     = regexp.MustCompile(`\b(\d{2})-(\d{2})-(\d{2}) (\d{2}):(\d{2})\b`)
@@ -136,6 +141,19 @@ func ParseDetail(html string) (DetailState, *Detail) {
 	}
 
 	d := Detail{Favs: favs, Praises: praises}
+
+	// Comment counts: the "全部N条评论/书评" links carry the exact value
+	// (Web API keeps full precision — no 万 abbreviation here).
+	if m := reShortC.FindStringSubmatch(html); m != nil {
+		if n, err := strconv.ParseInt(strings.ReplaceAll(m[1], ",", ""), 10, 64); err == nil {
+			d.ShortComments = n
+		}
+	}
+	if m := reLongC.FindStringSubmatch(html); m != nil {
+		if n, err := strconv.ParseInt(strings.ReplaceAll(m[1], ",", ""), 10, 64); err == nil {
+			d.LongComments = n
+		}
+	}
 
 	if m := reTitle.FindStringSubmatch(html); m != nil {
 		d.Title = cleanText(m[1])
@@ -261,8 +279,26 @@ func normalizeURL(s string) string {
 }
 
 func parseNum(s string) (int64, error) {
-	return strconv.ParseInt(strings.ReplaceAll(strings.TrimSpace(s), ",", ""), 10, 64)
+	s = strings.TrimSpace(s)
+	// High precision first: an exact integer with optional thousand
+	// separators. A trailing 万/亿 abbreviation is expanded in full —
+	// never truncated to the abbreviation's own precision.
+	if m := reAbbrev.FindStringSubmatch(s); m != nil {
+		f, err := strconv.ParseFloat(m[1], 64)
+		if err != nil {
+			return 0, err
+		}
+		if m[2] == "亿" {
+			f *= 100_000_000
+		} else {
+			f *= 10_000
+		}
+		return int64(f), nil
+	}
+	return strconv.ParseInt(strings.ReplaceAll(s, ",", ""), 10, 64)
 }
+
+var reAbbrev = regexp.MustCompile(`^([\d.]+)\s*(万|亿)$`)
 
 func min(a, b int) int {
 	if a < b {

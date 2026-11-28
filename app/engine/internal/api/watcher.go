@@ -45,10 +45,34 @@ func (s *Server) startWatcher(ctx context.Context) {
 }
 
 // pollDue polls every due book in this tick, serially, through the
-// background lane of the global limiter.
+// background lane of the global limiter. The watch_schedule pref, when
+// set, overrides the per-entry poll_interval: "1min" (testing),
+// "hourly", "6h", "12h" make every tracked book due once that window
+// has passed; "daily" makes each book due once after midnight.
 func (s *Server) pollDue(ctx context.Context) {
 	now := time.Now().Unix()
-	nids, err := s.store.WatchDue(ctx, now, watcherPollLimit)
+	var dueBefore int64
+	if v, ok, err := s.store.Pref(ctx, watchSchedulePref); err != nil {
+		log.Printf("watcher: schedule pref: %v", err)
+	} else if ok {
+		switch v {
+		case "30s":
+			dueBefore = now - 30
+		case "1min":
+			dueBefore = now - 60
+		case "hourly":
+			dueBefore = now - 3600
+		case "6h":
+			dueBefore = now - 6*3600
+		case "12h":
+			dueBefore = now - 12*3600
+		case "daily":
+			t := time.Now()
+			dueBefore = time.Date(t.Year(), t.Month(), t.Day(),
+				0, 0, 0, 0, t.Location()).Unix() // today's local midnight
+		}
+	}
+	nids, err := s.store.WatchDue(ctx, now, dueBefore, watcherPollLimit)
 	if err != nil {
 		log.Printf("watcher: due query: %v", err)
 		return

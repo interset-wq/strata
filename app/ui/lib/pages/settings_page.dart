@@ -114,6 +114,7 @@ class SettingsPage extends ConsumerWidget {
                 watch: detailRateLimitProvider,
                 read: (st) => st.watchDefaultActive,
                 write: (h, v) => h.api.setWatchDefaultActive(v)),
+            _scheduleRow(context, ref),
           ]),
           _card(context, [
             _fold(context,
@@ -359,13 +360,74 @@ class SettingsPage extends ConsumerWidget {
     );
   }
 
+  /// 定时抓取节奏（watch_schedule）：全局覆盖条目级间隔。每分钟档仅供
+  /// 测试（每个 tick 都会发起真实请求，风控与耗电风险自负）。
+  static const _scheduleOptions = <String, String>{
+    '': '按条目间隔（默认）',
+    '30s': '每 30 秒（测试用）',
+    '1min': '每分钟（测试用）',
+    'hourly': '每小时',
+    '6h': '每 6 小时',
+    '12h': '每 12 小时',
+    'daily': '每天整点（0 点后一次）',
+  };
+
+  Widget _scheduleRow(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(detailRateLimitProvider);
+    final current =
+        async.maybeWhen(data: (st) => st.watchSchedule, orElse: () => '');
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+      title: const Text('定时抓取节奏', style: TextStyle(fontSize: 13)),
+      subtitle: Text(
+        async.maybeWhen(
+          data: (st) =>
+              '当前：${_scheduleOptions[st.watchSchedule] ?? '按条目间隔（默认）'}',
+          orElse: () => async.isLoading ? '读取中…' : '引擎未就绪',
+        ),
+        style: const TextStyle(fontSize: 11, height: 1.4),
+      ),
+      trailing: const Icon(Icons.chevron_right, size: 20),
+      onTap: async is AsyncData<EngineSettings>
+          ? () async {
+              final picked = await showDialog<String>(
+                context: context,
+                builder: (context) => SimpleDialog(
+                  title: const Text('定时抓取节奏',
+                      style: TextStyle(fontSize: 16)),
+                  children: [
+                    RadioGroup<String>(
+                      groupValue: current,
+                      onChanged: (v) => Navigator.pop(context, v),
+                      child: Column(
+                        children: [
+                          for (final e in _scheduleOptions.entries)
+                            RadioListTile<String>(
+                              value: e.key,
+                              title: Text(e.value,
+                                  style: const TextStyle(fontSize: 13)),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+              if (picked == null || picked == current) return;
+              final h = await ref.read(bootProvider.future);
+              await h.api.setWatchSchedule(picked);
+              ref.invalidate(detailRateLimitProvider);
+            }
+          : null,
+    );
+  }
+
   Widget _fold(BuildContext context,
       {required IconData icon,
       required String title,
       required List<Widget> children,
       EdgeInsets childrenPadding =
-          const EdgeInsets.fromLTRB(14, 0, 14, 12)}) {
-    final scheme = Theme.of(context).colorScheme;
+          const EdgeInsets.fromLTRB(14, 0, 14, 12)}) {    final scheme = Theme.of(context).colorScheme;
     return Theme(
       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
       child: ExpansionTile(

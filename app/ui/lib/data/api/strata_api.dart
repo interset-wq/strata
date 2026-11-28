@@ -134,6 +134,13 @@ class StrataApi {
             as Map<String, dynamic>,
       );
 
+  /// 定时抓取节奏：空 = 条目间隔；1min/hourly/6h/12h/daily。
+  Future<EngineSettings> setWatchSchedule(String schedule) async =>
+      EngineSettings.fromJson(
+        await _putBody('/settings', {'watch_schedule': schedule})
+            as Map<String, dynamic>,
+      );
+
   Future<EngineSettings> setDetailRateLimitEnabled(bool enabled) async =>
       EngineSettings.fromJson(
         await _putBody('/settings', {'detail_rate_limit_enabled': enabled})
@@ -457,6 +464,43 @@ class StrataApi {
     await _putBody('/watchlist/$nid', {'active': active});
   }
 
+  /// v12 备注：自由文本，空串清空（NULL）。
+  Future<void> watchSetNote(int nid, String note) async {
+    await _putBody('/watchlist/$nid/note', {'note': note});
+  }
+
+  /// v12 分组：把条目移入用户分组，0 = 未分组。
+  Future<void> watchSetList(int nid, int listId) async {
+    await _putBody('/watchlist/$nid/list', {'list_id': listId});
+  }
+
+  /// v12 抓取间隔（秒）：覆盖该条目的 poll_interval。
+  Future<void> watchSetInterval(int nid, int interval) async {
+    await _putBody('/watchlist/$nid/interval', {'interval': interval});
+  }
+
+  /// v12 分组列表（含各组条目计数）。
+  Future<List<WatchGroup>> watchGroups() async {
+    final j = await _get('/watchlist/groups') as Map<String, dynamic>;
+    return (j['groups'] as List? ?? [])
+        .map((g) => WatchGroup.fromJson(g as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// v12 建组，返回新组 id。
+  Future<int> watchGroupCreate(String name) async {
+    final j = await _postBody('/watchlist/groups', {'name': name});
+    return (j as Map<String, dynamic>)['id'] as int;
+  }
+
+  Future<void> watchGroupRename(int gid, String name) async {
+    await _putBody('/watchlist/groups/$gid', {'name': name});
+  }
+
+  Future<void> watchGroupDelete(int gid) async {
+    await _delete('/watchlist/groups/$gid');
+  }
+
   /// 切换 role（docs/07 §1）：self 本人作品 / peer 同期对照（PUT 一列，
   /// 历史曲线连续）。
   Future<void> watchSetRole(int nid, String role) async {
@@ -741,6 +785,13 @@ class StrataApi {
     return PreorderResponse.fromJson(body as Map<String, dynamic>);
   }
 
+  /// VIP 上架专题（官方 vipPush H5 直出页，§7.6）：引擎解析 HTML 内联书单
+  /// 并按 nid join 种子，date = 周六期数 YYYYMMDD。库外项仅标题/封面/分类。
+  Future<VipPushResponse> vipPush({required String date}) async {
+    final body = await _get('/vippush', {'date': date});
+    return VipPushResponse.fromJson(body as Map<String, dynamic>);
+  }
+
   /// IP tab 分组网格：一个 form 的书按征文（contest）聚合，
   /// count DESC（引擎侧稳定排序）；每组 top_* 是收藏最高的一本。
   Future<IpGroupsResult> ipGroups({
@@ -875,12 +926,17 @@ class EngineSettings {
   /// true = 关注并加入定时刷新，false = 仅关注。
   final bool watchDefaultActive;
 
+  /// 定时抓取节奏（覆盖条目级 poll_interval）：
+  /// 空 = 条目间隔；1min（测试）/hourly/6h/12h/daily（本地 0 点后一次）。
+  final String watchSchedule;
+
   EngineSettings({
     required this.detailRateLimitEnabled,
     required this.windowSeconds,
     this.appApiEnabled = false,
     this.discoverK = '0',
     this.watchDefaultActive = false,
+    this.watchSchedule = '',
   });
 
   factory EngineSettings.fromJson(Map<String, dynamic> j) => EngineSettings(
@@ -889,6 +945,7 @@ class EngineSettings {
     appApiEnabled: j['app_api_enabled'] as bool? ?? false,
     discoverK: j['discover_k'] as String? ?? '0',
     watchDefaultActive: j['watch_default_active'] as bool? ?? false,
+    watchSchedule: j['watch_schedule'] as String? ?? '',
   );
 }
 
@@ -1100,6 +1157,43 @@ class PreorderResponse {
     : date = m['date'] as String? ?? '',
       items = ((m['items'] as List?) ?? const [])
           .map((e) => PreorderItem.fromJson(e as Map<String, dynamic>))
+          .toList();
+}
+
+/// VIP 上架专题（官方 vipPush H5 直出页，docs/sfacg-endpoints.md §7.6）：
+/// 当周上架全书，上游只有 nid/标题/封面/分类/标签，无 intro 与主编推荐。
+/// 与 PreorderItem（编辑精选预告）是同一周六期次的两条不同数据线。
+class VipPushItem {
+  final int nid;
+  final String title;
+  final String cover;
+  final String genre;
+  final List<String> tags;
+  final bool inSeed;
+  final String? inLibAuthor;
+  final int? inLibFavs;
+
+  VipPushItem.fromJson(Map<String, dynamic> m)
+    : nid = (m['nid'] as num).toInt(),
+      title = m['title'] as String? ?? '',
+      cover = m['cover'] as String? ?? '',
+      genre = m['genre'] as String? ?? '',
+      tags = [for (final t in ((m['tags'] as List?) ?? const [])) '$t'],
+      inSeed = m['in_seed'] as bool? ?? false,
+      inLibAuthor =
+          ((m['in_lib'] as Map<String, dynamic>?)?['author']) as String?,
+      inLibFavs =
+          ((m['in_lib'] as Map<String, dynamic>?)?['favs'] as num?)?.toInt();
+}
+
+class VipPushResponse {
+  final String date;
+  final List<VipPushItem> items;
+
+  VipPushResponse.fromJson(Map<String, dynamic> m)
+    : date = m['date'] as String? ?? '',
+      items = ((m['items'] as List?) ?? const [])
+          .map((e) => VipPushItem.fromJson(e as Map<String, dynamic>))
           .toList();
 }
 
@@ -1570,9 +1664,20 @@ class WatchItem {
   final int addedAt;
   final String role;
   final String? note;
+  final String? status;
+  final int? words;
+  final int? favs;
+  final int? praises;
+  final int? estYear;
+  final String? form;
 
   /// v6 统一列表：true = 追踪中（后台抓取），false = 只存（原书架条目）。
   final bool active;
+  final int? lastPollAt;
+  final int pollInterval;
+
+  /// v12 用户分组：0 = 未分组。
+  final int listId;
 
   WatchItem.fromJson(Map<String, dynamic> m)
     : nid = m['nid'] as int,
@@ -1583,7 +1688,30 @@ class WatchItem {
       addedAt = m['added_at'] as int,
       role = m['role'] as String? ?? 'self',
       note = m['note'] as String?,
-      active = m['active'] as bool? ?? false;
+      status = m['status'] as String?,
+      words = m['words'] as int?,
+      favs = m['favs'] as int?,
+      praises = m['praises'] as int?,
+      estYear = m['est_year'] as int?,
+      form = m['form'] as String?,
+      active = m['active'] as bool? ?? false,
+      lastPollAt = m['last_poll_at'] as int?,
+      pollInterval = m['poll_interval'] as int? ?? 86400,
+      listId = m['list_id'] as int? ?? 0;
+}
+
+/// v12 用户分组（watch_lists）：条目计数随查询带出。
+class WatchGroup {
+  final int id;
+  final String name;
+  final int createdAt;
+  final int count;
+
+  WatchGroup.fromJson(Map<String, dynamic> m)
+    : id = m['id'] as int,
+      name = m['name'] as String,
+      createdAt = m['created_at'] as int,
+      count = m['count'] as int? ?? 0;
 }
 
 class DiscoverPage {

@@ -91,6 +91,7 @@ const (
 	// watchDefaultActivePref：详情页「关注」的默认行为（用户裁定
 	// 2026-11-28）——true = 关注并加入定时刷新，false = 仅关注。
 	watchDefaultActivePref = "watch_default_active"
+	watchSchedulePref      = "watch_schedule"
 	discoverKPref          = "discover_k"
 )
 
@@ -277,6 +278,13 @@ func (s *Server) settings(c *gin.Context) {
 		fail(c, http.StatusInternalServerError, "internal", err.Error())
 		return
 	}
+	schedule := ""
+	if v, ok, err := s.store.Pref(c.Request.Context(), watchSchedulePref); err != nil {
+		fail(c, http.StatusInternalServerError, "internal", err.Error())
+		return
+	} else if ok {
+		schedule = v
+	}
 	discoverK := "0"
 	if v, ok, err := s.store.Pref(c.Request.Context(), discoverKPref); err != nil {
 		fail(c, http.StatusInternalServerError, "internal", err.Error())
@@ -290,6 +298,7 @@ func (s *Server) settings(c *gin.Context) {
 		"app_api_enabled":               appAPI,
 		"discover_k":                    discoverK,
 		"watch_default_active":          watchDefault,
+		"watch_schedule":                schedule,
 	})
 }
 
@@ -299,10 +308,12 @@ func (s *Server) updateSettings(c *gin.Context) {
 		AppAPIEnabled          *bool   `json:"app_api_enabled"`
 		DiscoverK              *string `json:"discover_k"`
 		WatchDefaultActive     *bool   `json:"watch_default_active"`
+		WatchSchedule          *string `json:"watch_schedule"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil ||
 		(body.DetailRateLimitEnabled == nil && body.AppAPIEnabled == nil &&
-			body.DiscoverK == nil && body.WatchDefaultActive == nil) {
+			body.DiscoverK == nil && body.WatchDefaultActive == nil &&
+			body.WatchSchedule == nil) {
 		fail(c, http.StatusBadRequest, "invalid_argument",
 			"detail_rate_limit_enabled, app_api_enabled or discover_k is required")
 		return
@@ -334,6 +345,19 @@ func (s *Server) updateSettings(c *gin.Context) {
 	}
 	if body.WatchDefaultActive != nil {
 		if err := s.store.SetPref(c.Request.Context(), watchDefaultActivePref, boolPref(*body.WatchDefaultActive)); err != nil {
+			fail(c, http.StatusInternalServerError, "internal", err.Error())
+			return
+		}
+	}
+	if body.WatchSchedule != nil {
+		switch *body.WatchSchedule {
+		case "", "30s", "1min", "hourly", "6h", "12h", "daily":
+		default:
+			fail(c, http.StatusBadRequest, "invalid_argument",
+				"watch_schedule must be empty, 30s, 1min, hourly, 6h, 12h or daily")
+			return
+		}
+		if err := s.store.SetPref(c.Request.Context(), watchSchedulePref, *body.WatchSchedule); err != nil {
 			fail(c, http.StatusInternalServerError, "internal", err.Error())
 			return
 		}
@@ -2093,8 +2117,9 @@ func (s *Server) writeHTML(ctx context.Context, nid int64, d *crawl.Detail, obse
 	if words > 0 {
 		wordsPtr = &words
 	}
-	if err := s.store.InsertObservation(ctx, nid, observedAt,
-		nil, &favs, &praises, wordsPtr, metaStr(d.Status), metaStr(d.UpdatedAt)); err != nil {
+	if err := s.store.InsertObservationFull(ctx, nid, observedAt,
+		nil, &favs, &praises, wordsPtr, &d.ShortComments, &d.LongComments,
+		metaStr(d.Status), metaStr(d.UpdatedAt)); err != nil {
 		return err
 	}
 	m := &store.BookMeta{

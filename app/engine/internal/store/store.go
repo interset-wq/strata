@@ -1458,11 +1458,22 @@ ORDER BY w.added_at DESC`)
 
 // WatchDue returns nids whose poll schedule is due: poll enabled and
 // (never polled or past poll_interval). Ordered oldest-last-poll first.
-func (s *Store) WatchDue(ctx context.Context, now int64, limit int) ([]int64, error) {
+// WatchDue lists poll-enabled books due for a fetch. dueBefore overrides
+// the per-entry poll_interval when > 0 (the watch_schedule pref): a book
+// is due when its last poll predates that unix second — 0 keeps the
+// legacy per-entry behaviour.
+func (s *Store) WatchDue(ctx context.Context, now, dueBefore, limit int64) ([]int64, error) {
+	cond := `(last_poll_at IS NULL OR ? - last_poll_at >= poll_interval)`
+	args := []any{now}
+	if dueBefore > 0 {
+		cond = `(last_poll_at IS NULL OR last_poll_at < ?)`
+		args = []any{dueBefore}
+	}
+	args = append(args, limit)
 	rows, err := s.DB.QueryContext(ctx, `
 SELECT nid FROM watchlist
-WHERE poll_enabled = 1 AND (last_poll_at IS NULL OR ? - last_poll_at >= poll_interval)
-ORDER BY last_poll_at ASC LIMIT ?`, now, limit)
+WHERE poll_enabled = 1 AND `+cond+`
+ORDER BY last_poll_at ASC LIMIT ?`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -2605,11 +2616,20 @@ type SearchItem struct {
 // fetches). Only seed.db stays untouched; this writes user.db.
 func (s *Store) InsertObservation(ctx context.Context, nid, observedAt int64,
 	clicks, favs, praises, words *int64, status, updatedAt *string) error {
+	return s.InsertObservationFull(ctx, nid, observedAt, clicks, favs,
+		praises, words, nil, nil, status, updatedAt)
+}
+
+// InsertObservationFull adds the comment counters (Web parse only — the
+// App API exposes none). nil keeps the column NULL.
+func (s *Store) InsertObservationFull(ctx context.Context, nid, observedAt int64,
+	clicks, favs, praises, words, shortC, longC *int64, status, updatedAt *string) error {
 	_, err := s.DB.ExecContext(ctx, `
 INSERT OR IGNORE INTO observations(nid, observed_at, clicks, favs, praises, words,
- status, updated_at, source)
-VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'detail')`,
-		nid, observedAt, clicks, favs, praises, words, status, updatedAt)
+ short_comments, long_comments, status, updated_at, source)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'detail')`,
+		nid, observedAt, clicks, favs, praises, words, shortC, longC,
+		status, updatedAt)
 	return err
 }
 
