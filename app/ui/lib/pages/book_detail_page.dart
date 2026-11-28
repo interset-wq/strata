@@ -432,6 +432,9 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
   }
 
   Future<void> _refresh() async {
+    // 防抖（用户 2026-11-28 报无防抖）：in-flight 直接忽略——按钮禁用只在
+    // rebuild 后生效，同帧连点或收录链路的自动调用仍可能并发穿透。
+    if (refreshing) return;
     setState(() => refreshing = true);
     String msg;
     Color color;
@@ -807,7 +810,10 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
           children: [
             _metaRow(context, '数据来源',
                 d.source == 'local' ? '本地观测' : '内置'),
-            _metaRow(context, '快照', d.dataEnd),
+            // 逐本快照时间（爬取时刻）：内置书取 seed.db_update，详情页刷新后
+            // 更新为本次抓取时刻；无逐本值时回退到数据集上界 dataEnd。
+            _metaRow(context, '快照',
+                d.dbUpdate == null ? d.dataEnd : _fmtTs(d.dbUpdate, withTime: true)),
             _metaRow(context, '最后更新',
                 _fmtTs(s(eff['updated_at'] ?? b['updated_at']), withTime: true)),
             _metaRow(context, '官方建档', _fmtTs(s(eff['add_time']))),
