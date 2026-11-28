@@ -48,6 +48,9 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
   bool refreshing = false;
   // 时间窗防抖锚点：上次刷新发起时刻（含收录链路的自动调用）。
   DateTime _lastRefreshAt = DateTime.fromMillisecondsSinceEpoch(0);
+  // 超出请求限额（24h cooldown）即禁用按钮（用户裁定 2026-11-28）：
+  // 本会话内不再允许点击，重进页面后首次点击会再确认冷却状态。
+  bool _rateLimited = false;
   bool _footprintLogged = false;
   // 榜单库外书自动补全（docs/08 §rank-seed）：每次进页至多一次。
   bool _autoCompleted = false;
@@ -143,7 +146,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
       final r = await h.api.refresh(widget.nid);
       // rate_limited = 24h 冷却窗（含失败占用）——明确提示，不误报。
       if (r.state == 'rate_limited') {
-        err = '已进入刷新冷却（24 小时），稍后再试';
+        err = '今日限额已用，0 点后自动恢复';
       } else if (r.state != 'alive') {
         err = '该书在站上不可读（${r.state}）';
       }
@@ -465,9 +468,12 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
           msg = '该书当前不可阅读（未写观测）';
           color = const Color(0xFFC2410F);
         case 'rate_limited':
+          // 超出请求限额直接禁用按钮（用户裁定 2026-11-28）：本会话内
+          // 不再允许点击，0 点后引擎限额自动恢复。
+          setState(() => _rateLimited = true);
           final retry = rd['retry_after_seconds'] as int? ?? 0;
           final hours = (retry / 3600).ceil();
-          msg = '24 小时内已刷新过（约 $hours 小时后可再试，设置中可关闭限流）';
+          msg = '今日限额已用，约 $hours 小时后（0 点）自动恢复';
           color = const Color(0xFFC2410F);
         default:
           msg = '未知状态：${r.state}';
@@ -916,7 +922,7 @@ class _BookDetailPageState extends ConsumerState<BookDetailPage> {
           const SizedBox(width: 8),
           Expanded(
             child: FilledButton.icon(
-              onPressed: refreshing ? null : _refresh,
+              onPressed: (refreshing || _rateLimited) ? null : _refresh,
               icon: refreshing
                   ? const SizedBox(
                       width: 15,

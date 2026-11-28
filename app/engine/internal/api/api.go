@@ -1860,17 +1860,23 @@ func (s *Server) reserveDetailRefresh(ctx context.Context, nid int64, now time.T
 	if err != nil {
 		return nil, false, err
 	}
-	window := int64(detailRefreshWindow / time.Second)
-	if enabled && attempt != nil && now.Unix() < attempt.AttemptedAt+window {
-		next := attempt.AttemptedAt + window
-		return gin.H{
-			"state":               "rate_limited",
-			"written":             false,
-			"rate_limit_enabled":  true,
-			"last_attempt_at":     attempt.AttemptedAt,
-			"next_allowed_at":     next,
-			"retry_after_seconds": next - now.Unix(),
-		}, false, nil
+	// 限额按天计（用户裁定 2026-11-28）：0 点重置，不做 24h 滚动窗——
+	// 同一自然日内已刷新过即 rate_limited，跨天自动恢复
+	// （retry_after = 距下一个 0 点的秒数）。
+	if enabled && attempt != nil {
+		attempted := time.Unix(attempt.AttemptedAt, 0).In(now.Location())
+		if attempted.Year() == now.Year() && attempted.YearDay() == now.YearDay() {
+			nextMidnight := time.Date(now.Year(), now.Month(), now.Day()+1,
+				0, 0, 0, 0, now.Location()).Unix()
+			return gin.H{
+				"state":               "rate_limited",
+				"written":             false,
+				"rate_limit_enabled":  true,
+				"last_attempt_at":     attempt.AttemptedAt,
+				"next_allowed_at":     nextMidnight,
+				"retry_after_seconds": nextMidnight - now.Unix(),
+			}, false, nil
+		}
 	}
 	if err := s.store.RecordRefreshAttempt(ctx, nid, now.Unix(), "pending"); err != nil {
 		return nil, false, err
